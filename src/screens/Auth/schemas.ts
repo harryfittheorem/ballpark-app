@@ -54,10 +54,12 @@ export const addKidSchema = z.object({
     .transform((v) => v.trim())
     .transform((v) => (v.length ? v : null))
     .nullable(),
-  // Nullable rather than required: if the tenant has zero locations, the
-  // picker is hidden and the field stays null. The screen handles the
-  // "tenant has locations but parent didn't pick one" case explicitly via
-  // a refine below.
+  // Nullable rather than required: when the tenant has zero locations the
+  // picker is hidden and this field stays null. When the picker IS shown,
+  // the AddKid screen enforces a non-null value via an imperative submit
+  // guard (we don't know `hasLocations` at schema-construction time, so
+  // expressing it via `refine` here would require threading runtime state
+  // into the schema — the screen-level guard keeps that simple).
   locationId: z.string().uuid('Pick a home location').nullable(),
 });
 
