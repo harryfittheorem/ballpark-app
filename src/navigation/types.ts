@@ -28,6 +28,7 @@ export type CoachInboxStackParamList = {
   InboxHome: undefined;
   RecordVideo: undefined;
   RecipientPicker: { videoId: string };
+  SentVideos: undefined;
 };
 
 export type CoachInboxStackScreenProps<T extends keyof CoachInboxStackParamList> =

@@ -6,9 +6,10 @@
 
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import InboxScreen from '@/screens/Coach/Inbox/InboxScreen';
+import CoachHomeScreen from '@/screens/Coach/CoachHomeScreen/CoachHomeScreen';
 import RecipientPickerScreen from '@/screens/Coach/RecipientPicker/RecipientPickerScreen';
 import RecordVideoScreen from '@/screens/Coach/RecordVideo/RecordVideoScreen';
+import SentVideosScreen from '@/screens/Coach/SentVideos/SentVideosScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
 import type { CoachInboxStackParamList } from './types';
@@ -30,7 +31,7 @@ export default function CoachInboxStackNavigator() {
     >
       <Stack.Screen
         name="InboxHome"
-        component={InboxScreen}
+        component={CoachHomeScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -42,6 +43,11 @@ export default function CoachInboxStackNavigator() {
         name="RecipientPicker"
         component={RecipientPickerScreen}
         options={{ title: 'Send To' }}
+      />
+      <Stack.Screen
+        name="SentVideos"
+        component={SentVideosScreen}
+        options={{ title: 'My Videos' }}
       />
     </Stack.Navigator>
   );
