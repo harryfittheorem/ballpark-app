@@ -47,8 +47,8 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   circle: {
-    width: 56,
-    height: 56,
+    width: spacing['7xl'],
+    height: spacing['7xl'],
     borderRadius: radius.full,
     backgroundColor: colors.darker,
     borderWidth: 1,

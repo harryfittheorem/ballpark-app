@@ -4,7 +4,7 @@ import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useFamily } from '@/hooks/useFamily';
-import { colors } from '@/theme';
+import { colors, spacing } from '@/theme';
 
 import CoachVideoCard from './components/CoachVideoCard';
 import HeroCard from './components/HeroCard';
@@ -48,7 +48,10 @@ export default function HomeScreen() {
       <HomeHeader locationName="Dallas N." />
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarHeight + 24 }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: tabBarHeight + spacing['4xl'] },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

@@ -37,26 +37,31 @@ export default function HeroCard({
         end={{ x: 1, y: 1 }}
         style={styles.card}
       >
+        <View style={styles.decorCircle} pointerEvents="none" />
         <View style={styles.innerBorder} pointerEvents="none" />
 
-        <Text style={styles.name} numberOfLines={1}>
-          {kidName.toUpperCase()}
-        </Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        <View style={styles.content}>
+          <Text style={styles.name} numberOfLines={1}>
+            {kidName.toUpperCase()}
+          </Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
 
-        <View style={styles.pointsBlock}>
-          <Text style={styles.pointsValue}>{pointsBalance}</Text>
-          <Text style={styles.pointsLabel}>POINTS</Text>
-        </View>
+          <View style={styles.pointsBlock}>
+            <Text style={styles.pointsValue}>{pointsBalance}</Text>
+            <Text style={styles.pointsLabel}>POINTS</Text>
+          </View>
 
-        <View style={styles.streakRow}>
-          <Flame size={16} color={colors.dark} fill={colors.goldDeep} />
-          <Text style={styles.streakText}>{currentStreakDays} DAY STREAK</Text>
+          <View style={styles.streakRow}>
+            <Flame size={16} color={colors.dark} fill={colors.goldDeep} />
+            <Text style={styles.streakText}>{currentStreakDays} DAY STREAK</Text>
+          </View>
         </View>
       </LinearGradient>
     </View>
   );
 }
+
+const DECOR_SIZE = spacing['7xl'] * 3;
 
 const styles = StyleSheet.create({
   shadow: {
@@ -71,6 +76,20 @@ const styles = StyleSheet.create({
     borderRadius: radius['5xl'],
     padding: spacing['3xl'],
     overflow: 'hidden',
+  },
+  decorCircle: {
+    position: 'absolute',
+    top: -spacing['5xl'],
+    right: -spacing['5xl'],
+    width: DECOR_SIZE,
+    height: DECOR_SIZE,
+    borderRadius: DECOR_SIZE / 2,
+    backgroundColor: colors.dark,
+    opacity: 0.08,
+  },
+  content: {
+    position: 'relative',
+    zIndex: 1,
   },
   innerBorder: {
     ...StyleSheet.absoluteFillObject,

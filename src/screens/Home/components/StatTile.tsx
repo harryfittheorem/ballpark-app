@@ -57,9 +57,9 @@ const styles = StyleSheet.create({
   },
   label: {
     flex: 1,
-    fontFamily: fontFamilies.interExtraBold,
+    fontFamily: fontFamilies.interBold,
     fontSize: fontSizes.xs,
-    color: colors.textLight,
+    color: colors.textMuted,
     letterSpacing: tracking.wide,
   },
   value: {

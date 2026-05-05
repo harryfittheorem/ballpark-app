@@ -1,5 +1,5 @@
 import { CalendarPlus } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 import {
   colors,
@@ -62,127 +62,80 @@ export default function UpcomingSessionCard({
     return (
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [styles.shadow, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.card, styles.emptyCard, pressed && styles.pressed]}
       >
-        <View style={[styles.card, styles.emptyCard]}>
-          <View style={styles.goldEdge} pointerEvents="none" />
-          <View style={styles.emptyBody}>
-            <CalendarPlus size={20} color={colors.gold} />
-            <Text style={styles.emptyText}>
-              No upcoming sessions — book one!
-            </Text>
-          </View>
-        </View>
+        <CalendarPlus size={20} color={colors.gold} />
+        <Text style={styles.emptyText}>
+          No upcoming sessions — book one!
+        </Text>
       </Pressable>
     );
   }
 
-  const meta: string[] = [];
-  if (durationMinutes != null) meta.push(`${durationMinutes} min`);
-  if (isPast) meta.push('Past');
+  const subtitleParts: string[] = [];
+  if (durationMinutes != null) subtitleParts.push(`${durationMinutes} min`);
+  if (isPast) subtitleParts.push('Past');
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.shadow, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
-      <View style={styles.card}>
-        <View style={styles.goldEdge} pointerEvents="none" />
-        <View style={styles.body}>
-          <Text style={styles.eyebrow}>UPCOMING SESSION</Text>
-          <Text style={styles.dateText}>{formatDate(date)}</Text>
-          <Text style={styles.timeText}>{formatTime(date)}</Text>
-          <Text style={styles.coachLine} numberOfLines={1}>
-            {coachName} • {location}
-          </Text>
-          {meta.length > 0 ? (
-            <Text style={styles.metaText}>{meta.join(' • ')}</Text>
-          ) : null}
-        </View>
-      </View>
+      <Text style={styles.eyebrow}>
+        {formatDate(date)} · {formatTime(date)}
+      </Text>
+      <Text style={styles.title} numberOfLines={1}>
+        {coachName} · {location}
+      </Text>
+      {subtitleParts.length > 0 ? (
+        <Text style={styles.subtitle}>{subtitleParts.join(' · ')}</Text>
+      ) : null}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  shadow: {
-    shadowColor: colors.darkest,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 6,
-    borderRadius: radius['5xl'],
+  card: {
+    borderRadius: radius['3xl'],
+    backgroundColor: colors.darker,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    paddingHorizontal: spacing['2xl'],
+    paddingVertical: spacing['2xl'],
   },
   pressed: {
     opacity: 0.85,
   },
-  card: {
-    borderRadius: radius['5xl'],
-    backgroundColor: colors.darker,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
   emptyCard: {
-    minHeight: 96,
-    justifyContent: 'center',
-  },
-  goldEdge: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    backgroundColor: colors.gold,
-  },
-  body: {
-    paddingHorizontal: spacing['3xl'],
-    paddingVertical: spacing['2xl'],
-  },
-  eyebrow: {
-    fontFamily: fontFamilies.oswaldSemiBold,
-    fontSize: fontSizes.sm,
-    color: colors.gold,
-    letterSpacing: tracking.wider,
-  },
-  dateText: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes['3xl'],
-    color: colors.textOnDark,
-    letterSpacing: -tracking.tight,
-    marginTop: spacing.xs,
-  },
-  timeText: {
-    fontFamily: fontFamilies.oswaldMedium,
-    fontSize: fontSizes.xl,
-    color: colors.textOnDark,
-    opacity: 0.85,
-    marginTop: spacing.xxs,
-  },
-  coachLine: {
-    fontFamily: fontFamilies.interSemiBold,
-    fontSize: fontSizes.md,
-    color: colors.textOnDark,
-    opacity: 0.85,
-    marginTop: spacing.lg,
-  },
-  metaText: {
-    fontFamily: fontFamilies.interMedium,
-    fontSize: fontSizes.base,
-    color: colors.textLight,
-    marginTop: spacing.xs,
-  },
-  emptyBody: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.lg,
-    paddingHorizontal: spacing['3xl'],
-    paddingVertical: spacing['2xl'],
+    minHeight: 72,
   },
   emptyText: {
     fontFamily: fontFamilies.interSemiBold,
     fontSize: fontSizes.md,
     color: colors.textOnDark,
     flexShrink: 1,
+  },
+  eyebrow: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.sm,
+    color: colors.gold,
+    letterSpacing: tracking.wider,
+    textTransform: 'uppercase',
+    marginBottom: spacing.sm,
+  },
+  title: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xl,
+    color: colors.textOnDark,
+    letterSpacing: -tracking.tight,
+  },
+  subtitle: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.base,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
   },
 });

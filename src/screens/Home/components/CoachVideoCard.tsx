@@ -34,127 +34,104 @@ export default function CoachVideoCard({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.shadow, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
-      <View style={styles.card}>
-        <View style={styles.goldEdge} pointerEvents="none" />
-
-        <View style={styles.thumbWrap}>
-          {thumbnail ? (
-            <Image source={{ uri: thumbnail }} style={styles.thumbImage} />
-          ) : (
-            <LinearGradient
-              colors={[colors.dark, colors.darker]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-          )}
-          <View style={styles.thumbOverlay} pointerEvents="none" />
-          <View style={styles.playBadge} pointerEvents="none">
-            <Play size={20} color={colors.dark} fill={colors.dark} />
+      <View style={styles.thumbWrap}>
+        {thumbnail ? (
+          <Image source={{ uri: thumbnail }} style={styles.thumbImage} />
+        ) : (
+          <LinearGradient
+            colors={[colors.dark, colors.darker]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+        <View style={styles.playIconWrap} pointerEvents="none">
+          <Play size={22} color={colors.gold} fill={colors.gold} />
+        </View>
+        {durationSeconds != null ? (
+          <View style={styles.durationBadge} pointerEvents="none">
+            <Text style={styles.durationText}>
+              {formatDuration(durationSeconds)}
+            </Text>
           </View>
-          {durationSeconds != null ? (
-            <View style={styles.durationBadge} pointerEvents="none">
-              <Text style={styles.durationText}>
-                {formatDuration(durationSeconds)}
-              </Text>
-            </View>
-          ) : null}
-        </View>
+        ) : null}
+      </View>
 
-        <View style={styles.body}>
-          <Text style={styles.eyebrow}>TODAY&apos;S VIDEO</Text>
-          <Text style={styles.coachName} numberOfLines={1}>
-            {coachName}
-          </Text>
-        </View>
+      <View style={styles.body}>
+        <Text style={styles.eyebrow}>TODAY&apos;S VIDEO</Text>
+        <Text style={styles.coachName} numberOfLines={1}>
+          {coachName}
+        </Text>
       </View>
     </Pressable>
   );
 }
 
+const THUMB_WIDTH = spacing['7xl'] + spacing['5xl'];
+
 const styles = StyleSheet.create({
-  shadow: {
-    shadowColor: colors.darkest,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 6,
-    borderRadius: radius['5xl'],
+  card: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    padding: spacing.xl,
+    borderRadius: radius['3xl'],
+    backgroundColor: colors.darker,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
   },
   pressed: {
     opacity: 0.85,
   },
-  card: {
-    borderRadius: radius['5xl'],
-    backgroundColor: colors.darker,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  goldEdge: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    backgroundColor: colors.gold,
-  },
   thumbWrap: {
-    aspectRatio: 16 / 9,
-    width: '100%',
+    width: THUMB_WIDTH,
+    aspectRatio: 3 / 4,
+    borderRadius: radius.lg,
     backgroundColor: colors.dark,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
   },
   thumbImage: {
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
   },
-  thumbOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 14, 14, 0.35)',
-  },
-  playBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.full,
-    backgroundColor: colors.gold,
+  playIconWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingLeft: 3,
   },
   durationBadge: {
     position: 'absolute',
-    right: spacing.lg,
-    bottom: spacing.lg,
-    paddingHorizontal: spacing.base,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.base,
+    right: spacing.xs,
+    bottom: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.sm,
     backgroundColor: 'rgba(15, 14, 14, 0.75)',
   },
   durationText: {
     fontFamily: fontFamilies.interSemiBold,
-    fontSize: fontSizes.sm,
+    fontSize: fontSizes.xs,
     color: colors.textOnDark,
     letterSpacing: tracking.tight,
   },
   body: {
-    paddingHorizontal: spacing['3xl'],
-    paddingVertical: spacing['2xl'],
+    flex: 1,
+    justifyContent: 'center',
   },
   eyebrow: {
-    fontFamily: fontFamilies.oswaldSemiBold,
-    fontSize: fontSizes.sm,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xs,
     color: colors.gold,
     letterSpacing: tracking.wider,
   },
   coachName: {
-    fontFamily: fontFamilies.interSemiBold,
-    fontSize: fontSizes.xl,
+    fontFamily: fontFamilies.interBold,
+    fontSize: fontSizes.md,
     color: colors.textOnDark,
     marginTop: spacing.xs,
   },

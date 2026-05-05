@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     color: colors.textMuted,
-    fontFamily: fontFamilies.oswaldSemiBold,
+    fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.sm,
     letterSpacing: tracking.wider,
   },

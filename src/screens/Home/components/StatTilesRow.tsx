@@ -40,6 +40,6 @@ export default function StatTilesRow({ pointsBalance, currentStreakDays }: Props
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    gap: spacing.lg,
+    gap: spacing.base,
   },
 });
