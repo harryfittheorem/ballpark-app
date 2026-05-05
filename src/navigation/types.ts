@@ -28,6 +28,11 @@ export type CoachInboxStackParamList = {
   InboxHome: undefined;
   RecordVideo: undefined;
   RecipientPicker: { videoId: string };
+  SendConfirmation: {
+    videoId: string;
+    recipientFamilyId: string;
+    recipientKidId: string;
+  };
   SentVideos: undefined;
 };
 
