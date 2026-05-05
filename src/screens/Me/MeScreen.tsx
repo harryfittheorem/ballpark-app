@@ -1,12 +1,16 @@
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ChevronRight, Plus } from 'lucide-react-native';
+import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { signOut } from '@/api/auth';
 import { useAuth } from '@/hooks/useAuth';
 import { useFamily } from '@/hooks/useFamily';
+import type { MeStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
 
-export default function MeScreen() {
+type Props = MeStackScreenProps<'MeHome'>;
+
+export default function MeScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { family, kids } = useFamily();
 
@@ -20,7 +24,7 @@ export default function MeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Me</Text>
         <Text style={styles.subtitle}>{user?.email}</Text>
 
@@ -30,27 +34,61 @@ export default function MeScreen() {
             <Text style={styles.cardValue}>
               {family.parent_first_name} {family.parent_last_name}
             </Text>
-            <Text style={styles.cardLabel}>Kids ({kids.length})</Text>
-            {kids.map((k) => (
-              <Text key={k.id} style={styles.cardValue}>
-                • {k.first_name} {k.last_name}
-                {k.age_group ? ` — ${k.age_group}` : ''}
-              </Text>
-            ))}
           </View>
         ) : null}
+
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeader}>Kids ({kids.length})</Text>
+        </View>
+
+        {kids.map((k) => (
+          <TouchableOpacity
+            key={k.id}
+            style={styles.kidRow}
+            onPress={() => navigation.navigate('EditKid', { kidId: k.id })}
+          >
+            {k.avatar_url ? (
+              <Image source={{ uri: k.avatar_url }} style={styles.kidAvatar} />
+            ) : (
+              <View style={[styles.kidAvatar, styles.kidAvatarPlaceholder]}>
+                <Text style={styles.kidAvatarInitial}>
+                  {k.first_name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.kidInfo}>
+              <Text style={styles.kidName}>
+                {k.first_name} {k.last_name}
+              </Text>
+              <Text style={styles.kidMeta}>
+                {[k.age_group, k.primary_position, k.jersey_number != null ? `#${k.jersey_number}` : null]
+                  .filter(Boolean)
+                  .join(' • ') || 'Tap to add details'}
+              </Text>
+            </View>
+            <ChevronRight color={colors.textMuted} size={20} />
+          </TouchableOpacity>
+        ))}
+
+        <TouchableOpacity
+          style={styles.addKidBtn}
+          onPress={() => navigation.navigate('AddKid')}
+        >
+          <Plus color={colors.gold} size={18} />
+          <Text style={styles.addKidText}>Add another kid</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.darkest },
-  container: { flex: 1, padding: spacing['4xl'] },
+  container: { padding: spacing['4xl'], paddingBottom: spacing['6xl'] },
   title: {
     color: colors.gold,
     fontFamily: fontFamilies.oswaldBold,
@@ -77,7 +115,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginTop: spacing.lg,
   },
   cardValue: {
     color: colors.textOnDark,
@@ -85,8 +122,81 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     marginTop: spacing.xs,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  sectionHeader: {
+    color: colors.textMuted,
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  kidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.darker,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: spacing['2xl'],
+    marginBottom: spacing.lg,
+  },
+  kidAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.darkest,
+    marginRight: spacing['2xl'],
+  },
+  kidAvatarPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderColor: colors.border,
+    borderWidth: 1,
+  },
+  kidAvatarInitial: {
+    color: colors.gold,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xl,
+  },
+  kidInfo: { flex: 1 },
+  kidName: {
+    color: colors.textOnDark,
+    fontFamily: fontFamilies.interBold,
+    fontSize: fontSizes.lg,
+  },
+  kidMeta: {
+    color: colors.textLight,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    marginTop: spacing.xs,
+  },
+  addKidBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderColor: colors.gold,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: radius.lg,
+    paddingVertical: spacing['3xl'],
+    marginTop: spacing.lg,
+    marginBottom: spacing['4xl'],
+  },
+  addKidText: {
+    color: colors.gold,
+    fontFamily: fontFamilies.interBold,
+    fontSize: fontSizes.md,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
   signOutBtn: {
-    marginTop: 'auto',
+    marginTop: spacing['4xl'],
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: radius.lg,

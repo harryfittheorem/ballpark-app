@@ -8,10 +8,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAddKid } from '@/hooks/useFamily';
+import type { MeStackScreenProps } from '@/navigation/types';
 import KidForm from '@/screens/Me/components/KidForm';
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 
-export default function AddKidScreen() {
+type Props = MeStackScreenProps<'AddKid'>;
+
+export default function AddKidModalScreen({ navigation }: Props) {
   const addKid = useAddKid();
 
   return (
@@ -21,8 +24,8 @@ export default function AddKidScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <Text style={styles.title}>Add your kid</Text>
-          <Text style={styles.subtitle}>You can add more later from the Me tab.</Text>
+          <Text style={styles.title}>Add another kid</Text>
+          <Text style={styles.subtitle}>They&apos;ll show up on the Me tab.</Text>
 
           <KidForm
             submitLabel="Add kid"
@@ -37,7 +40,7 @@ export default function AddKidScreen() {
                 },
                 picked,
               );
-              // useFamily refresh will flip the root nav to MainTabs.
+              navigation.goBack();
             }}
           />
         </ScrollView>

@@ -1,4 +1,5 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 export type AuthStackParamList = {
@@ -12,6 +13,12 @@ export type AuthStackScreenProps<T extends keyof AuthStackParamList> = NativeSta
   T
 >;
 
+export type MeStackParamList = {
+  MeHome: undefined;
+  EditKid: { kidId: string };
+  AddKid: undefined;
+};
+
 export type MainTabParamList = {
   Home: undefined;
   Work: undefined;
@@ -23,4 +30,9 @@ export type MainTabParamList = {
 export type MainTabScreenProps<T extends keyof MainTabParamList> = BottomTabScreenProps<
   MainTabParamList,
   T
+>;
+
+export type MeStackScreenProps<T extends keyof MeStackParamList> = CompositeScreenProps<
+  NativeStackScreenProps<MeStackParamList, T>,
+  MainTabScreenProps<'Me'>
 >;
