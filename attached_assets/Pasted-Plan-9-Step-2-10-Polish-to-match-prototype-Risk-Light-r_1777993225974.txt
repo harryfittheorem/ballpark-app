@@ -1,0 +1,58 @@
+Plan 9: Step 2.10 — Polish to match prototype
+Risk: Light review, but visual judgment is the value-add here
+What & Why:
+The Home tab is structurally complete (5 cards rendering with real or mock data). Now compare each card side-by-side with design/InfiniteHittingApp.jsx and adjust pixel-level details: padding, spacing, font weights, border radius, shadow, color values where they drifted. This is where v0.2 stops looking "almost like the prototype" and starts looking "exactly like the prototype."
+Done looks like:
+For each of the 5 cards (Hero, Stat Tiles, Coach Video, Upcoming Session, Quick Actions):
+
+Visual matches design/InfiniteHittingApp.jsx within ~2px tolerance on padding/margins
+Font sizes and weights exactly match prototype
+Colors pull from @/theme tokens (no drifted hex values)
+Border radius matches DESIGN.md spec for that component class
+Shadow / elevation matches prototype where present
+
+Plus:
+
+Home header (location name) matches prototype
+Section spacing between cards matches prototype
+Scroll content padding (top + bottom) matches prototype
+Pull-to-refresh tint color uses colors.gold
+All existing functionality preserved (no regressions)
+
+Out of scope:
+
+Adding new cards (Today's Plan, etc.) — out of scope
+Adding new tabs or screens
+Animations beyond what's in the prototype
+Refactoring the underlying data flow
+Modifying any non-Home screen
+Touching auth, schema, navigation
+
+Files expected to change:
+
+src/screens/Home/HomeScreen.tsx
+src/screens/Home/styles.ts
+src/screens/Home/components/HeroCard.tsx
+src/screens/Home/components/StatTile.tsx
+src/screens/Home/components/StatTilesRow.tsx
+src/screens/Home/components/CoachVideoCard.tsx
+src/screens/Home/components/UpcomingSessionCard.tsx
+src/screens/Home/components/QuickAction.tsx
+src/screens/Home/components/QuickActionsRow.tsx
+src/screens/Home/components/HomeHeader.tsx
+src/screens/Home/components/SectionPlaceholder.tsx — DELETE this file (no longer used after 2.6-2.9)
+
+Architectural constraints:
+
+Every value comes from @/theme — no raw hex, no raw px
+Don't introduce new components — only refine existing
+Don't change component APIs (props stay stable)
+Don't add libraries
+
+Phone smoke test:
+
+All 5 Home cards still render correctly
+Visual diff against design/InfiniteHittingApp.jsx looks tight
+Pull-to-refresh still works
+Tab switching to Work/Book/Earn/Me still works
+Sign out still works

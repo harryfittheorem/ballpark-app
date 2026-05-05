@@ -1,0 +1,49 @@
+v0.2 Step 2.6 — Stat tiles row.
+
+What & Why
+The second visible card on Home tab. Three small stat tiles in a row,
+showing recent activity. Mock data for sessions count, real data
+for points balance and current streak (from useFamily). Per
+design/InfiniteHittingApp.jsx.
+
+Done looks like:
+- New component: src/screens/Home/components/StatTile.tsx (single tile, reusable)
+- New component: src/screens/Home/components/StatTilesRow.tsx (composes 3 tiles)
+- StatTile props: { label: string, value: string | number, icon?: ReactNode, accent?: 'gold' | 'default' }
+- Three tiles: Sessions This Week / Points Earned / Streak Days
+- Sessions count: hardcoded 0 for v0.2 (real data v0.3+ when sessions exist)
+- Points balance: pulls from kid.points_balance via useFamily
+- Streak days: pulls from kid.current_streak_days via useFamily
+- Visually matches prototype: dark card bg, gold accent for value, Inter for label
+- HomeScreen replaces the "stats" SectionPlaceholder with <StatTilesRow />
+- Other 3 placeholders (coachVideo, upcoming, quickActions) stay as-is
+- npm run typecheck and npm run lint clean
+
+Out of scope:
+- Tap interactions on tiles
+- Sparkline / trend lines (v0.4+)
+- Animations on number changes
+- Real sessions count (v0.3 when bookings exist)
+- Touching other Home tab sections (separate tasks)
+
+Architectural constraints:
+- Use existing tokens from @/theme — no raw hex, no raw px
+- StatTile must accept icon prop but icon is optional (for v0.2, can render without icons or use lucide-react-native if visually needed)
+- Pull values from useFamily hook (TanStack Query'd) — do not refetch separately
+
+Scope guards:
+- Do not modify schema, RLS, auth hook, or migrations
+- Do not "improve" useFamily or other hooks while you're here
+- Do not pre-build other Home tab cards (those are 2.7, 2.8, 2.9)
+- Only files: src/screens/Home/components/StatTile.tsx, StatTilesRow.tsx, HomeScreen.tsx
+
+Phone smoke test (Step 9):
+- Land on Home → see hero card, then 3 stat tiles in a row below
+- Sessions = 0, Points = 0 (or whatever's in DB), Streak = 0 (or whatever's in DB)
+- Visual matches prototype's stat row pattern
+- Hero card and other placeholders still render
+- Pull-to-refresh still works
+
+Plan-mode first. Show me your project_tasks entry before switching
+to Build mode. After execution, stop before merge — I'll run the
+phone smoke test and merge manually.
