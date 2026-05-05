@@ -230,14 +230,16 @@ When implementing a screen, open the corresponding component in `InfiniteHitting
 
 ## Current Status
 
-**Phase:** v0.4 kickoff — Step 4.1 (videos + coach_messages schema) MERGED. v0.3 closed at Step 3.11.
+**Phase:** v0.4 ✅ SHIPPED 2026-05-05 — Coach video messaging complete (Steps 4.1–4.16). v0.3 closed at Step 3.11.
 **Anchor customer:** Infinite Hitting (17 locations)
 **Target users:** Athletes (kids), Parents
 **Active features:** v0.1 foundation + v0.2 Home Tab (5 cards, RHF/Zod forms, TanStack Query). v0.3 Phase A: bookings schema + tenant-pinned RLS + dev seed (Coach Mike, 4 session types, Tue/Thu/Sat 09:00–12:00). v0.3 Phase B: end-to-end Book tab — session type → date → time → coach → Summary; Step 3.8 wires the `Confirm Booking` button via `createBooking()` + `useCreateBooking` mutation that inserts a `status='confirmed'` row, invalidates `['day_bookings']` + `['upcoming_bookings']`, resets BookScreen state, navigates to Home, and shows a "Session booked for {date} at {time}" toast via the new `ToastProvider` (`src/components/ui/Toast.tsx`). Failure shows an inline error + Retry under the button (raw error in dev only).
 **Verified:** `npm run typecheck` + `npm run lint` clean. `node scripts/verify-auth-hook.mjs` PASS. Remote verification: 1 coach / 4 session_types / 3 availability rows present.
 **Step 3.11 (2026-05-05):** Migration `20260505070000_v03_default_primary_location.sql` defaults new families' `primary_location_id` to the tenant's first location (alphabetical) inside `handle_new_user`, plus backfills existing NULL rows. AddKid renders a "Home location" picker (hidden if tenant has zero locations) prefilled to the trigger-set default; `useAddKid` updates `families.primary_location_id` before the kid insert when changed. `DateSection` / `TimeSection` defensively gate their loading state on `fetchStatus !== 'idle'` so a disabled location query never pins the spinner. Fixes Book-tab Date picker hanging on spinner.
 
-**Next milestone:** v0.4 — Booking detail (Task #43) + cancel booking (Task #44).
+**v0.4 sign-off (2026-05-05):** Coach video messaging shipped end-to-end. `videos` + `coach_messages` schema with tenant-scoped RLS; coach record/select-from-library flow against Mux direct uploads (`mux-create-upload` Edge Function); `mux-webhook` Edge Function (deployed `--no-verify-jwt`, HMAC-verified, idempotent on `videos.mux_asset_id`) flips status uploading→ready and writes playback ids; recipient picker scoped to coach's location families; send confirmation INSERTs into `coach_messages`; Sent Videos list with viewed indicator; Resend email notification on send (Step 4.15); parent in-app polling (~60s) surfaces a Home "New from Coach" card (Step 4.13) and full-screen playback that calls the `mark_viewed` RPC. Coach landing now has a Sign out button (Step 4.16). Coach provisioned via `scripts/provision-coach-mike.mjs` with `app_role='coach'` (no in-app coach signup).
+
+**Next milestone:** v0.5 — Earn (rewards + store + leaderboard).
 
 ---
 

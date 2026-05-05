@@ -146,10 +146,12 @@
 
 ---
 
-## v0.4 — Messages
+## v0.4 — Messages ✅ SHIPPED 2026-05-05
 
 **Time estimate:** 9-12 days (Replit) / 7-10 days (local)
 **Goal:** Real two-way messaging between coach and family, with text + video.
+
+**Sign-off:** Coach video messaging shipped end-to-end (Steps 4.1–4.16). One-way coach→family video flow via Mux direct uploads + HMAC-verified `mux-webhook` Edge Function (idempotent on `videos.mux_asset_id`); Resend email notification on send; parent in-app polling (~60s) surfaces a Home "New from Coach" card and full-screen playback that calls the `mark_viewed` RPC; Sent Videos list shows viewed indicator. Coach surface gained a Sign-out button. Two-way text threads, family→coach video, and the standalone web coach portal were deferred — coach acts via the mobile app under `app_role='coach'`. `npm run typecheck` + `npm run lint` clean. `node scripts/verify-auth-hook.mjs` PASS.
 
 ### Build order
 

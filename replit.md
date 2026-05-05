@@ -60,12 +60,16 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 
 ## Product
 
--   User authentication (signup, sign-in, sign-out)
+-   User authentication (signup, sign-in, sign-out — sign-out available on parent Me tab and coach home)
 -   Kid registration for a family
 -   Home dashboard with athlete stats, upcoming sessions, and quick actions
 -   Booking system for private, group, and cage sessions with coaches
 -   Displaying upcoming and past bookings
--   Video messaging between coaches and families (v0.4+)
+-   Coach → family video messaging: coach records/uploads via Mux, parent gets email + in-app card, full-screen playback marks viewed (v0.4 ✅ shipped 2026-05-05)
+
+## Status
+
+-   v0.1 Foundation, v0.2 Home, v0.3 Booking, **v0.4 Messages** all shipped. Next: v0.5 — Earn (rewards, store, leaderboard).
 
 ## User preferences
 
