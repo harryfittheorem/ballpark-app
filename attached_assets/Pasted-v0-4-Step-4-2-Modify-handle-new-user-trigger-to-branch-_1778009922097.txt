@@ -1,0 +1,67 @@
+v0.4 Step 4.2 — Modify handle_new_user trigger to branch on app_role.
+
+PRE-CHECK: Read CLAUDE.md, replit.md current status, the existing
+handle_new_user function on remote (run via Supabase Management API
+SQL endpoint), and 20260505014743_initial_schema.sql lines 140-180
+for the current trigger body.
+
+Plan-mode first. Do not write SQL until I approve the plan.
+
+What changes:
+- handle_new_user reads NEW.raw_user_meta_data->>'app_role'
+- If 'coach': INSERT into public.coaches (tenant_id, user_id,
+  first_name, last_name, is_active=true). Tenant lookup via
+  raw_user_meta_data->>'tenant_slug' (same path as parent)
+- If null/undefined/'parent'/anything else: existing parent
+  behavior (INSERT into families) — no behavior change
+- Loud failure on missing tenant_slug (existing behavior preserved)
+
+Out of scope:
+- custom_access_token_hook (unchanged — already handles coach
+  fallback from Step 1.5)
+- Any UI changes
+- Any client-side signup metadata changes (parent signup keeps
+  passing tenant_slug='infinitehitting' without app_role; defaults
+  to parent path)
+
+Migration filename: supabase/migrations/<timestamp>_v04_handle_new_user_coach_branch.sql
+(timestamp > 20260505081000)
+
+Plan must include:
+1. The exact CASE statement or IF/ELSE in the trigger body
+2. How tenant_id is looked up for the coach branch (same as
+   parent — via tenant_slug)
+3. Default values for coaches columns not in metadata (specialty,
+   bio, primary_location_id — should be NULL, is_active should
+   default true)
+4. Verification queries (sign up test parent → families row created;
+   provision coach via dashboard → coaches row created via trigger)
+5. Edge cases: what if tenant_slug missing for coach signup?
+   What if coach signs up but tenant_slug points to a tenant
+   without coaches table access? (Trigger should fail loudly.)
+
+After plan approval: WRITE the SQL, paste it back to me before
+db push. Two-gate review per workflow agreement.
+
+Phone test (Step 9):
+1. Sign up a NEW parent user (e.g., harry+v04parent@fittheorem.com).
+   Should land on AddKid like before. Verify families row created
+   in dashboard.
+2. Provision Coach Mike manually in Supabase dashboard:
+   - Authentication → Users → Add User → Create new user
+   - Email: coach.mike@infinitehitting.com
+   - Password: testtest123
+   - Auto Confirm User: ON
+   - Edit raw user metadata BEFORE submit:
+     {"tenant_slug": "infinitehitting", "app_role": "coach",
+      "first_name": "Mike", "last_name": "Coach"}
+   - Verify coaches row created automatically
+3. Sign in as Coach Mike via mobile app. Auth succeeds. Verify
+   JWT claims via scripts/check-jwt.mjs:
+   - app_role = 'coach'
+   - tenant_id present
+   - family_id ABSENT (coach has no family)
+4. Verify existing parent test user still signs in correctly
+   with app_role='parent' and family_id present.
+
+Mark complete only after all 4 verification points pass.
