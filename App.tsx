@@ -1,11 +1,23 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+
+import { colors, fontFamilies, fontSizes, useAppFonts } from '@/theme';
 
 export default function App() {
+  const [fontsLoaded] = useAppFonts();
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator color={colors.gold} size="large" />
+        <StatusBar style="light" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.brand}>BALLPARK</Text>
-      <Text style={styles.subtitle}>v0.1 — Foundation</Text>
       <StatusBar style="light" />
     </View>
   );
@@ -14,20 +26,13 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F0E0E',
+    backgroundColor: colors.darkest,
     alignItems: 'center',
     justifyContent: 'center',
   },
   brand: {
-    color: '#F1E5AD',
-    fontSize: 32,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  subtitle: {
-    color: '#9B9590',
-    fontSize: 12,
-    marginTop: 8,
-    letterSpacing: 1.5,
+    color: colors.gold,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['6xl'],
   },
 });
