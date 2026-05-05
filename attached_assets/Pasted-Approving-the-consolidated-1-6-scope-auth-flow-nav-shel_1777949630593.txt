@@ -1,0 +1,60 @@
+Approving the consolidated 1.6 scope (auth flow + nav shell as one
+milestone). Smart consolidation — the splits in my original roadmap
+created artificial seams.
+
+Before you execute, expand the plan into our standard format:
+
+1. Done-looks-like (you already wrote this — keep)
+
+2. Step-by-step build order — which files first, what depends on
+   what. Specifically:
+   - Supabase client + types must be wired before any screen
+   - useAuth hook before screens that consume it
+   - RootNavigator skeleton before AuthNavigator/MainTabNavigator
+   - Empty tab screens before bottom nav (so nav has something to render)
+
+3. Polish strategy — for v0.1, auth screens should be FUNCTIONAL
+   first, then polished pixel-perfect to match design tokens.
+   Reusable form components (<Input>, <Button>, <PickerField>)
+   built along the way for use in v0.2+.
+
+4. Out of scope (call out explicitly):
+   - Password reset / forgot password flow
+   - Social auth (Google, Apple)
+   - Biometric auth
+   - Email verification flows
+   - Multi-kid (one kid per family for v0.5 per PRD §7)
+   - Push notifications
+   - Loading skeletons (basic ActivityIndicator is fine for now)
+   - Empty-state designs for placeholder tabs (just centered "Coming
+     soon")
+
+5. Dual-tool split:
+   - Replit Agent: file scaffolding, navigation wiring, tab
+     placeholder screens
+   - Claude Code: Supabase client, useAuth hook, auth screen polish
+     to match design tokens, form component primitives
+
+6. Verification criteria for "done":
+   - Fresh install opens to SignIn screen
+   - Tap "Create account" → SignUp form appears
+   - Submit creates auth user + families row in Supabase (verify in
+     dashboard)
+   - Redirected to AddKid screen
+   - Submit creates kids row (verify in Supabase)
+   - Redirected to MainTabNavigator with Home tab active
+   - All 5 tabs render placeholder screens with correct theme
+   - Bottom nav matches design prototype
+   - Force-quit + reopen → still logged in
+   - Sign out from Me tab (or somewhere) → returns to SignIn
+   - npm run typecheck clean
+   - npm run lint clean
+
+7. Three things you'll flag if you encounter them:
+   - tenant_slug not making it into raw_user_meta_data (auth
+     metadata pattern)
+   - JWT custom claims not appearing (hook not firing)
+   - RLS blocking expected operations (policy gaps from 1.5)
+
+Show me the expanded plan, I'll review, then approve and you proceed
+with the dual-tool flow.
