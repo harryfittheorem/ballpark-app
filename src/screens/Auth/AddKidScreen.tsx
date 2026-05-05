@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   Alert,
@@ -15,12 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { signOut } from '@/api/auth';
 import { Button, Input, PickerField, type PickerOption } from '@/components/ui';
 import { AGE_GROUPS, type AgeGroup } from '@/constants/kid';
-import { useAddKid } from '@/hooks/useFamily';
+import { useFamily, useAddKid } from '@/hooks/useFamily';
 import {
   addKidSchema,
   type AddKidFormOutput,
   type AddKidFormValues,
 } from '@/screens/Auth/schemas';
+import { useTenantLocations } from '@/screens/Book/hooks/useTenantLocations';
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
@@ -31,9 +32,17 @@ const AGE_GROUP_OPTIONS: ReadonlyArray<PickerOption<AgeGroup>> = AGE_GROUPS.map(
 
 export default function AddKidScreen() {
   const addKid = useAddKid();
+  const { family } = useFamily();
+  const locations = useTenantLocations();
   const [signingOut, setSigningOut] = useState(false);
 
-  const { control, handleSubmit, formState } = useForm<
+  const locationOptions = useMemo<ReadonlyArray<PickerOption<string>>>(
+    () => (locations.data ?? []).map((l) => ({ value: l.id, label: l.name })),
+    [locations.data],
+  );
+  const hasLocations = locationOptions.length > 0;
+
+  const { control, handleSubmit, formState, setValue, watch } = useForm<
     AddKidFormValues,
     unknown,
     AddKidFormOutput
@@ -46,18 +55,40 @@ export default function AddKidScreen() {
       lastName: '',
       ageGroup: null,
       position: '',
+      locationId: null,
     },
   });
+
+  // Default the picker to the trigger-set primary_location_id once the
+  // family + locations both load. Only set if the parent hasn't already
+  // touched the field.
+  const watchedLocationId = watch('locationId');
+  const familyDefault = family?.primary_location_id ?? null;
+  useEffect(() => {
+    if (
+      hasLocations &&
+      watchedLocationId === null &&
+      familyDefault &&
+      locationOptions.some((o) => o.value === familyDefault)
+    ) {
+      setValue('locationId', familyDefault, { shouldDirty: false });
+    }
+  }, [hasLocations, watchedLocationId, familyDefault, locationOptions, setValue]);
 
   const submitting = formState.isSubmitting;
 
   const onSubmit = handleSubmit(async (values) => {
+    if (hasLocations && !values.locationId) {
+      Alert.alert('Pick a home location', 'Choose where your kid trains.');
+      return;
+    }
     try {
       await addKid({
         first_name: values.firstName,
         last_name: values.lastName,
         age_group: values.ageGroup,
         primary_position: values.position,
+        primary_location_id: values.locationId,
       });
       // useFamily will re-fetch and the root navigator will swap to MainTabs.
     } catch (err) {
@@ -137,6 +168,26 @@ export default function AddKidScreen() {
               />
             )}
           />
+
+          {hasLocations ? (
+            <Controller
+              control={control}
+              name="locationId"
+              render={({ field, fieldState }) => (
+                <PickerField<string>
+                  label="Home location"
+                  options={locationOptions}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  allowClear={false}
+                  required
+                  disabled={busy}
+                  error={fieldState.error?.message}
+                />
+              )}
+            />
+          ) : null}
 
           <Controller
             control={control}

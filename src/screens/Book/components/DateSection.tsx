@@ -35,7 +35,12 @@ export default function DateSection({
     });
   }, [availability.data, durationMinutes, location.data?.timezone]);
 
-  const isPending = availability.isPending || (location.isPending && !location.data);
+  // A disabled query (no primary_location_id on the family) reports
+  // isPending=true forever; treat fetchStatus='idle' as "not loading" so the
+  // calendar still renders using the device timezone fallback.
+  const locationLoading =
+    location.fetchStatus !== 'idle' && location.isPending && !location.data;
+  const isPending = availability.isPending || locationLoading;
   const isError = availability.isError || location.isError;
   const isRefetching = availability.isRefetching || location.isRefetching;
   const retry = () => {

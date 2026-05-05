@@ -50,10 +50,15 @@ export default function TimeSection({
     });
   }, [date, durationMinutes, availability.data, bookings.data, location.data?.timezone]);
 
+  // A disabled location query (no primary_location_id) reports
+  // isPending=true forever; gate on fetchStatus so the time grid can still
+  // render using the device timezone fallback.
+  const locationLoading =
+    location.fetchStatus !== 'idle' && location.isPending && !location.data;
   const isPending =
     availability.isPending ||
     (bookings.isPending && !!date) ||
-    (location.isPending && !location.data);
+    locationLoading;
   const isError = availability.isError || bookings.isError || location.isError;
   const isRefetching =
     availability.isRefetching || bookings.isRefetching || location.isRefetching;

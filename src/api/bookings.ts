@@ -117,6 +117,20 @@ export async function listFamilyBookings(kidIds: string[]): Promise<FamilyBookin
   return (data ?? []) as unknown as FamilyBooking[];
 }
 
+/**
+ * Fetch all locations the caller can see (RLS scopes by tenant). Sorted by
+ * name so the AddKid picker matches the trigger's "first alphabetically"
+ * default ordering.
+ */
+export async function listTenantLocations(): Promise<Location[]> {
+  const { data, error } = await supabase
+    .from('locations')
+    .select('*')
+    .order('name', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function getLocationById(id: string): Promise<Location | null> {
   const { data, error } = await supabase
     .from('locations')

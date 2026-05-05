@@ -54,6 +54,11 @@ export const addKidSchema = z.object({
     .transform((v) => v.trim())
     .transform((v) => (v.length ? v : null))
     .nullable(),
+  // Nullable rather than required: if the tenant has zero locations, the
+  // picker is hidden and the field stays null. The screen handles the
+  // "tenant has locations but parent didn't pick one" case explicitly via
+  // a refine below.
+  locationId: z.string().uuid('Pick a home location').nullable(),
 });
 
 export type AddKidFormValues = z.input<typeof addKidSchema>;

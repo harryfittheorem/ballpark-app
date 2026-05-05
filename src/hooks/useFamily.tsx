@@ -75,7 +75,7 @@ export function useAddKid() {
   const qc = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async (input: Omit<TablesInsert<'kids'>, 'family_id'>) => {
+    mutationFn: async (input: AddKidInput) => {
       if (!user) throw new Error('Not authenticated');
 
       // Family must exist (provisioned by handle_new_user). Read from cache
@@ -93,9 +93,25 @@ export function useAddKid() {
         family = data;
       }
 
+      // If the parent picked a different home location at AddKid time,
+      // persist that on the family row first so a kid insert that also
+      // references the location stays consistent. No-op when the value
+      // matches the trigger-set default.
+      const { primary_location_id, ...kidFields } = input;
+      if (
+        primary_location_id !== undefined &&
+        primary_location_id !== family.primary_location_id
+      ) {
+        const { error: famErr } = await supabase
+          .from('families')
+          .update({ primary_location_id })
+          .eq('id', family.id);
+        if (famErr) throw famErr;
+      }
+
       const { error: insertErr } = await supabase
         .from('kids')
-        .insert({ ...input, family_id: family.id });
+        .insert({ ...kidFields, family_id: family.id });
       if (insertErr) throw insertErr;
     },
     onSuccess: () => {
@@ -107,7 +123,11 @@ export function useAddKid() {
 
   // Preserve the existing call signature: `await addKid(input)`.
   return useCallback(
-    (input: Omit<TablesInsert<'kids'>, 'family_id'>) => mutation.mutateAsync(input),
+    (input: AddKidInput) => mutation.mutateAsync(input),
     [mutation],
   );
 }
+
+type AddKidInput = Omit<TablesInsert<'kids'>, 'family_id'> & {
+  primary_location_id?: string | null;
+};

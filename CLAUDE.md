@@ -230,12 +230,14 @@ When implementing a screen, open the corresponding component in `InfiniteHitting
 
 ## Current Status
 
-**Phase:** v0.3 — Booking System — Phase A + Phase B COMPLETE (Steps 3.1–3.8 MERGED 2026-05-05). Remaining v0.3: 3.9 (Home Upcoming Session pulls real data) + 3.10 (Bookings list in Me tab).
+**Phase:** v0.3 — Booking System — COMPLETE through Step 3.11 (Phase A + Phase B + Home/Me bookings + family `primary_location_id` defaulting). Next is v0.4 booking detail + cancel.
 **Anchor customer:** Infinite Hitting (17 locations)
 **Target users:** Athletes (kids), Parents
 **Active features:** v0.1 foundation + v0.2 Home Tab (5 cards, RHF/Zod forms, TanStack Query). v0.3 Phase A: bookings schema + tenant-pinned RLS + dev seed (Coach Mike, 4 session types, Tue/Thu/Sat 09:00–12:00). v0.3 Phase B: end-to-end Book tab — session type → date → time → coach → Summary; Step 3.8 wires the `Confirm Booking` button via `createBooking()` + `useCreateBooking` mutation that inserts a `status='confirmed'` row, invalidates `['day_bookings']` + `['upcoming_bookings']`, resets BookScreen state, navigates to Home, and shows a "Session booked for {date} at {time}" toast via the new `ToastProvider` (`src/components/ui/Toast.tsx`). Failure shows an inline error + Retry under the button (raw error in dev only).
 **Verified:** `npm run typecheck` + `npm run lint` clean. `node scripts/verify-auth-hook.mjs` PASS. Remote verification: 1 coach / 4 session_types / 3 availability rows present.
-**Next milestone:** v0.3 Step 3.9 — Home Upcoming Session pulls real data; then 3.10 — Bookings list in Me tab.
+**Step 3.11 (2026-05-05):** Migration `20260505070000_v03_default_primary_location.sql` defaults new families' `primary_location_id` to the tenant's first location (alphabetical) inside `handle_new_user`, plus backfills existing NULL rows. AddKid renders a "Home location" picker (hidden if tenant has zero locations) prefilled to the trigger-set default; `useAddKid` updates `families.primary_location_id` before the kid insert when changed. `DateSection` / `TimeSection` defensively gate their loading state on `fetchStatus !== 'idle'` so a disabled location query never pins the spinner. Fixes Book-tab Date picker hanging on spinner.
+
+**Next milestone:** v0.4 — Booking detail (Task #43) + cancel booking (Task #44).
 
 ---
 
