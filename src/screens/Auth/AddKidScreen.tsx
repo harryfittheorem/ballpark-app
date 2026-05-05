@@ -1,25 +1,26 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { signOut } from '@/api/auth';
+import { Button, Input, PickerField, type PickerOption } from '@/components/ui';
+import { AGE_GROUPS, type AgeGroup } from '@/constants/kid';
 import { useAddKid } from '@/hooks/useFamily';
-import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
+import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
-const AGE_GROUPS = ['9U', '10U', '11U', '12U', '13U', '14U', '15U+'] as const;
-type AgeGroup = (typeof AGE_GROUPS)[number];
+const AGE_GROUP_OPTIONS: ReadonlyArray<PickerOption<AgeGroup>> = AGE_GROUPS.map((g) => ({
+  value: g,
+  label: g,
+}));
 
 export default function AddKidScreen() {
   const [firstName, setFirstName] = useState('');
@@ -52,6 +53,15 @@ export default function AddKidScreen() {
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('signOut failed', err);
+      Alert.alert('Could not sign out', errorMessage(err));
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
@@ -62,86 +72,58 @@ export default function AddKidScreen() {
           <Text style={styles.title}>Add your kid</Text>
           <Text style={styles.subtitle}>You can add more later from the Me tab.</Text>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>First name</Text>
-            <TextInput
-              style={styles.input}
-              value={firstName}
-              onChangeText={setFirstName}
-              autoCapitalize="words"
-              placeholderTextColor={colors.textMuted}
-            />
-          </View>
-          <View style={styles.field}>
-            <Text style={styles.label}>Last name</Text>
-            <TextInput
-              style={styles.input}
-              value={lastName}
-              onChangeText={setLastName}
-              autoCapitalize="words"
-              placeholderTextColor={colors.textMuted}
-            />
-          </View>
+          <Input
+            label="First name"
+            value={firstName}
+            onChangeText={setFirstName}
+            autoCapitalize="words"
+            required
+          />
+          <Input
+            label="Last name"
+            value={lastName}
+            onChangeText={setLastName}
+            autoCapitalize="words"
+            required
+          />
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Age group (optional)</Text>
-            <View style={styles.chipRow}>
-              {AGE_GROUPS.map((g) => {
-                const selected = g === ageGroup;
-                return (
-                  <TouchableOpacity
-                    key={g}
-                    onPress={() => setAgeGroup(selected ? null : g)}
-                    style={[styles.chip, selected && styles.chipSelected]}
-                  >
-                    <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{g}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Primary position (optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={position}
-              onChangeText={setPosition}
-              autoCapitalize="words"
-              placeholder="e.g. Shortstop"
-              placeholderTextColor={colors.textMuted}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[styles.primaryBtn, submitting && styles.btnDisabled]}
-            onPress={handleSubmit}
+          <PickerField<AgeGroup>
+            label="Age group (optional)"
+            options={AGE_GROUP_OPTIONS}
+            value={ageGroup}
+            onChange={setAgeGroup}
+            allowClear
             disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color={colors.darkest} />
-            ) : (
-              <Text style={styles.primaryBtnText}>Add kid</Text>
-            )}
-          </TouchableOpacity>
+          />
+
+          <Input
+            label="Primary position (optional)"
+            value={position}
+            onChangeText={setPosition}
+            autoCapitalize="words"
+            placeholder="e.g. Shortstop"
+          />
+
+          <Button
+            label="Add kid"
+            onPress={handleSubmit}
+            loading={submitting}
+            testID="addkid-submit"
+          />
 
           {/* Escape hatch: a user with a stale or wrong session is otherwise
               trapped here (no kid → can't reach the Me tab → can't sign out).
               The auth listener in useAuth flips RootNavigator back to SignIn. */}
-          <TouchableOpacity
-            style={styles.signOutBtn}
-            onPress={async () => {
-              try {
-                await signOut();
-              } catch (err) {
-                console.error('signOut failed', err);
-                Alert.alert('Could not sign out', errorMessage(err));
-              }
-            }}
-            disabled={submitting}
-          >
-            <Text style={styles.signOutText}>Sign out</Text>
-          </TouchableOpacity>
+          <View style={styles.signOutWrap}>
+            <Button
+              label="SIGN OUT"
+              onPress={handleSignOut}
+              variant="tertiary"
+              tone="muted"
+              disabled={submitting}
+              testID="addkid-sign-out"
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -164,70 +146,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     marginBottom: spacing['4xl'],
   },
-  field: { marginBottom: spacing['3xl'] },
-  label: {
-    color: colors.textLight,
-    fontFamily: fontFamilies.interMedium,
-    fontSize: fontSizes.sm,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  input: {
-    backgroundColor: colors.darker,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    color: colors.textOnDark,
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.lg,
-    paddingHorizontal: spacing['3xl'],
-    paddingVertical: spacing['2xl'],
-  },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.base },
-  chip: {
-    paddingHorizontal: spacing['3xl'],
-    paddingVertical: spacing.lg,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.darker,
-  },
-  chipSelected: {
-    backgroundColor: colors.gold,
-    borderColor: colors.gold,
-  },
-  chipText: {
-    color: colors.textLight,
-    fontFamily: fontFamilies.interMedium,
-    fontSize: fontSizes.md,
-  },
-  chipTextSelected: { color: colors.darkest },
-  primaryBtn: {
-    backgroundColor: colors.gold,
-    borderRadius: radius.lg,
-    paddingVertical: spacing['3xl'],
-    alignItems: 'center',
-    marginTop: spacing['2xl'],
-  },
-  btnDisabled: { opacity: 0.6 },
-  primaryBtnText: {
-    color: colors.darkest,
-    fontFamily: fontFamilies.interBold,
-    fontSize: fontSizes.lg,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  signOutBtn: {
-    alignItems: 'center',
-    paddingVertical: spacing['3xl'],
+  signOutWrap: {
     marginTop: spacing.lg,
-  },
-  signOutText: {
-    color: colors.textMuted,
-    fontFamily: fontFamilies.interMedium,
-    fontSize: fontSizes.md,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
 });

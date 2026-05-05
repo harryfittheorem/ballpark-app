@@ -1,21 +1,20 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { signInParent } from '@/api/auth';
+import { Button, Input } from '@/components/ui';
 import type { AuthStackScreenProps } from '@/navigation/types';
-import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
+import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
+import { errorMessage } from '@/utils/error';
 
 type Props = AuthStackScreenProps<'SignIn'>;
 
@@ -33,7 +32,7 @@ export default function SignInScreen({ navigation }: Props) {
     try {
       await signInParent(email, password);
     } catch (err) {
-      Alert.alert('Sign-in failed', err instanceof Error ? err.message : 'Unknown error');
+      Alert.alert('Sign-in failed', errorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -49,46 +48,43 @@ export default function SignInScreen({ navigation }: Props) {
           <Text style={styles.brand}>BALLPARK</Text>
           <Text style={styles.title}>Welcome back</Text>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-              placeholderTextColor={colors.textMuted}
-            />
-          </View>
-          <View style={styles.field}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              autoComplete="password"
-              placeholderTextColor={colors.textMuted}
-            />
-          </View>
+          <Input
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoComplete="email"
+            textContentType="emailAddress"
+            required
+          />
+          <Input
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete="password"
+            textContentType="password"
+            required
+          />
 
-          <TouchableOpacity
-            style={[styles.primaryBtn, submitting && styles.btnDisabled]}
+          <Button
+            label="Sign in"
             onPress={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color={colors.darkest} />
-            ) : (
-              <Text style={styles.primaryBtnText}>Sign in</Text>
-            )}
-          </TouchableOpacity>
+            loading={submitting}
+            testID="signin-submit"
+          />
 
-          <TouchableOpacity onPress={() => navigation.navigate('SignUp')} style={styles.linkBtn}>
-            <Text style={styles.linkText}>New here? Create an account</Text>
-          </TouchableOpacity>
+          <View style={styles.linkWrap}>
+            <Button
+              label="New here? Create an account"
+              onPress={() => navigation.navigate('SignUp')}
+              variant="tertiary"
+              disabled={submitting}
+              testID="signin-go-to-signup"
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -112,45 +108,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes['2xl'],
     marginBottom: spacing['4xl'],
   },
-  field: { marginBottom: spacing['3xl'] },
-  label: {
-    color: colors.textLight,
-    fontFamily: fontFamilies.interMedium,
-    fontSize: fontSizes.sm,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  input: {
-    backgroundColor: colors.darker,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    color: colors.textOnDark,
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.lg,
-    paddingHorizontal: spacing['3xl'],
-    paddingVertical: spacing['2xl'],
-  },
-  primaryBtn: {
-    backgroundColor: colors.gold,
-    borderRadius: radius.lg,
-    paddingVertical: spacing['3xl'],
-    alignItems: 'center',
-    marginTop: spacing['2xl'],
-  },
-  btnDisabled: { opacity: 0.6 },
-  primaryBtnText: {
-    color: colors.darkest,
-    fontFamily: fontFamilies.interBold,
-    fontSize: fontSizes.lg,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  linkBtn: { marginTop: spacing['3xl'], alignItems: 'center' },
-  linkText: {
-    color: colors.gold,
-    fontFamily: fontFamilies.interMedium,
-    fontSize: fontSizes.md,
+  linkWrap: {
+    marginTop: spacing['3xl'],
   },
 });

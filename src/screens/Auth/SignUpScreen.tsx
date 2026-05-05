@@ -1,21 +1,20 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { signUpParent } from '@/api/auth';
+import { Button, Input } from '@/components/ui';
 import type { AuthStackScreenProps } from '@/navigation/types';
-import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
+import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
+import { errorMessage } from '@/utils/error';
 
 type Props = AuthStackScreenProps<'SignUp'>;
 
@@ -42,7 +41,7 @@ export default function SignUpScreen({ navigation }: Props) {
       // Auth state listener will route us into the app; AddKid is shown next
       // because the family will have zero kids.
     } catch (err) {
-      Alert.alert('Sign-up failed', err instanceof Error ? err.message : 'Unknown error');
+      Alert.alert('Sign-up failed', errorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -59,72 +58,68 @@ export default function SignUpScreen({ navigation }: Props) {
           <Text style={styles.title}>Create your account</Text>
           <Text style={styles.subtitle}>Parents — add your kid in the next step.</Text>
 
-          <Field label="First name" value={firstName} onChangeText={setFirstName} autoCapitalize="words" />
-          <Field label="Last name" value={lastName} onChangeText={setLastName} autoCapitalize="words" />
-          <Field
+          <Input
+            label="First name"
+            value={firstName}
+            onChangeText={setFirstName}
+            autoCapitalize="words"
+            required
+          />
+          <Input
+            label="Last name"
+            value={lastName}
+            onChangeText={setLastName}
+            autoCapitalize="words"
+            required
+          />
+          <Input
             label="Email"
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
+            textContentType="emailAddress"
+            required
           />
-          <Field
+          <Input
             label="Phone (optional)"
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
             autoComplete="tel"
+            textContentType="telephoneNumber"
           />
-          <Field
+          <Input
             label="Password"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
             autoCapitalize="none"
             autoComplete="password-new"
+            textContentType="newPassword"
+            required
           />
 
-          <TouchableOpacity
-            style={[styles.primaryBtn, submitting && styles.btnDisabled]}
+          <Button
+            label="Sign up"
             onPress={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color={colors.darkest} />
-            ) : (
-              <Text style={styles.primaryBtnText}>Sign up</Text>
-            )}
-          </TouchableOpacity>
+            loading={submitting}
+            testID="signup-submit"
+          />
 
-          <TouchableOpacity onPress={() => navigation.navigate('SignIn')} style={styles.linkBtn}>
-            <Text style={styles.linkText}>Already have an account? Sign in</Text>
-          </TouchableOpacity>
+          <View style={styles.linkWrap}>
+            <Button
+              label="Already have an account? Sign in"
+              onPress={() => navigation.navigate('SignIn')}
+              variant="tertiary"
+              disabled={submitting}
+              testID="signup-go-to-signin"
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  );
-}
-
-function Field(props: {
-  label: string;
-  value: string;
-  onChangeText: (v: string) => void;
-  secureTextEntry?: boolean;
-  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
-  keyboardType?: 'default' | 'email-address' | 'phone-pad';
-  autoComplete?: 'email' | 'password-new' | 'tel' | 'off';
-}) {
-  const { label, ...rest } = props;
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={styles.input}
-        placeholderTextColor={colors.textMuted}
-        {...rest}
-      />
-    </View>
   );
 }
 
@@ -151,45 +146,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     marginBottom: spacing['4xl'],
   },
-  field: { marginBottom: spacing['3xl'] },
-  label: {
-    color: colors.textLight,
-    fontFamily: fontFamilies.interMedium,
-    fontSize: fontSizes.sm,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  input: {
-    backgroundColor: colors.darker,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    color: colors.textOnDark,
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.lg,
-    paddingHorizontal: spacing['3xl'],
-    paddingVertical: spacing['2xl'],
-  },
-  primaryBtn: {
-    backgroundColor: colors.gold,
-    borderRadius: radius.lg,
-    paddingVertical: spacing['3xl'],
-    alignItems: 'center',
-    marginTop: spacing['2xl'],
-  },
-  btnDisabled: { opacity: 0.6 },
-  primaryBtnText: {
-    color: colors.darkest,
-    fontFamily: fontFamilies.interBold,
-    fontSize: fontSizes.lg,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  linkBtn: { marginTop: spacing['3xl'], alignItems: 'center' },
-  linkText: {
-    color: colors.gold,
-    fontFamily: fontFamilies.interMedium,
-    fontSize: fontSizes.md,
+  linkWrap: {
+    marginTop: spacing['3xl'],
   },
 });
