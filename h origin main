@@ -1,0 +1,318 @@
+[33mcommit 74280aca112af31b33678f396b8158cdcbef01c9[m
+Author: harry240 <40821888-harry240@users.noreply.replit.com>
+Date:   Tue May 5 02:55:36 2026 +0000
+
+    Confirm parent email before letting them into the app
+    
+    Original task (#9): When Supabase signup returns no session because email
+    confirmation is required, the app silently dropped users into AddKid. Add a
+    "check your email" screen with a resend action and route to it from signup.
+    
+    Changes:
+    - src/api/auth.ts: added `resendSignUpConfirmation(email)` wrapper around
+      `supabase.auth.resend({ type: 'signup', email })`.
+    - src/navigation/types.ts: added `ConfirmEmail: { email: string }` route to
+      `AuthStackParamList`.
+    - src/navigation/AuthNavigator.tsx: registered the new ConfirmEmail screen.
+    - src/screens/Auth/ConfirmEmailScreen.tsx (new): shows the destination email,
+      a "I've confirmed — sign me in" primary button, a Resend confirmation
+      button (with last-sent timestamp) and a back-to-sign-in link. Because the
+      Supabase client is configured with `detectSessionInUrl: false` (no deep
+      link handling), the screen polls `signInWithPassword(email, password)`
+      every 4s — Supabase rejects with "Email not confirmed" until the user
+      clicks the link in their inbox, then the call succeeds, AuthProvider's
+      onAuthStateChange fires, and RootNavigator swaps to the main stack
+      automatically. Manual button gives instant feedback if the user already
+      confirmed.
+    - src/screens/Auth/SignUpScreen.tsx: after `signUpParent`, if the returned
+      data has no `session`, navigate to `ConfirmEmail` with the trimmed email
+      and the password (kept in memory only, used to complete sign-in once the
+      email is confirmed) instead of waiting on the auth listener.
+    
+    No deviations from the task description. Theme tokens reused for styling;
+    typecheck (`tsc --noEmit`) passes.
+    
+    Replit-Task-Id: 4a6142fb-0117-4cf2-add6-8586104790da
+
+[1mdiff --git a/src/api/auth.ts b/src/api/auth.ts[m
+[1mindex 93f6e0a..181a16c 100644[m
+[1m--- a/src/api/auth.ts[m
+[1m+++ b/src/api/auth.ts[m
+[36m@@ -44,6 +44,14 @@[m [mexport async function signInParent(email: string, password: string) {[m
+   return data;[m
+ }[m
+ [m
+[32m+[m[32mexport async function resendSignUpConfirmation(email: string) {[m
+[32m+[m[32m  const { error } = await supabase.auth.resend({[m
+[32m+[m[32m    type: 'signup',[m
+[32m+[m[32m    email: email.trim(),[m
+[32m+[m[32m  });[m
+[32m+[m[32m  if (error) throw error;[m
+[32m+[m[32m}[m
+[32m+[m
+ export async function signOut() {[m
+   const { error } = await supabase.auth.signOut();[m
+   if (error) throw error;[m
+[1mdiff --git a/src/navigation/AuthNavigator.tsx b/src/navigation/AuthNavigator.tsx[m
+[1mindex 58ab323..9e0966e 100644[m
+[1m--- a/src/navigation/AuthNavigator.tsx[m
+[1m+++ b/src/navigation/AuthNavigator.tsx[m
+[36m@@ -1,5 +1,6 @@[m
+ import { createNativeStackNavigator } from '@react-navigation/native-stack';[m
+ [m
+[32m+[m[32mimport ConfirmEmailScreen from '@/screens/Auth/ConfirmEmailScreen';[m
+ import SignInScreen from '@/screens/Auth/SignInScreen';[m
+ import SignUpScreen from '@/screens/Auth/SignUpScreen';[m
+ [m
+[36m@@ -15,6 +16,7 @@[m [mexport default function AuthNavigator() {[m
+     >[m
+       <Stack.Screen name="SignUp" component={SignUpScreen} />[m
+       <Stack.Screen name="SignIn" component={SignInScreen} />[m
+[32m+[m[32m      <Stack.Screen name="ConfirmEmail" component={ConfirmEmailScreen} />[m
+     </Stack.Navigator>[m
+   );[m
+ }[m
+[1mdiff --git a/src/navigation/types.ts b/src/navigation/types.ts[m
+[1mindex 8472f68..8ea9fef 100644[m
+[1m--- a/src/navigation/types.ts[m
+[1m+++ b/src/navigation/types.ts[m
+[36m@@ -4,6 +4,7 @@[m [mimport type { NativeStackScreenProps } from '@react-navigation/native-stack';[m
+ export type AuthStackParamList = {[m
+   SignIn: undefined;[m
+   SignUp: undefined;[m
+[32m+[m[32m  ConfirmEmail: { email: string; password: string };[m
+ };[m
+ [m
+ export type AuthStackScreenProps<T extends keyof AuthStackParamList> = NativeStackScreenProps<[m
+[1mdiff --git a/src/screens/Auth/ConfirmEmailScreen.tsx b/src/screens/Auth/ConfirmEmailScreen.tsx[m
+[1mnew file mode 100644[m
+[1mindex 0000000..ee7c8d5[m
+[1m--- /dev/null[m
+[1m+++ b/src/screens/Auth/ConfirmEmailScreen.tsx[m
+[36m@@ -0,0 +1,196 @@[m
+[32m+[m[32mimport { useEffect, useRef, useState } from 'react';[m
+[32m+[m[32mimport {[m
+[32m+[m[32m  ActivityIndicator,[m
+[32m+[m[32m  Alert,[m
+[32m+[m[32m  StyleSheet,[m
+[32m+[m[32m  Text,[m
+[32m+[m[32m  TouchableOpacity,[m
+[32m+[m[32m  View,[m
+[32m+[m[32m} from 'react-native';[m
+[32m+[m[32mimport { SafeAreaView } from 'react-native-safe-area-context';[m
+[32m+[m
+[32m+[m[32mimport { resendSignUpConfirmation, signInParent } from '@/api/auth';[m
+[32m+[m[32mimport type { AuthStackScreenProps } from '@/navigation/types';[m
+[32m+[m[32mimport { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';[m
+[32m+[m
+[32m+[m[32mtype Props = AuthStackScreenProps<'ConfirmEmail'>;[m
+[32m+[m
+[32m+[m[32mconst POLL_INTERVAL_MS = 4000;[m
+[32m+[m
+[32m+[m[32mexport default function ConfirmEmailScreen({ route, navigation }: Props) {[m
+[32m+[m[32m  const { email, password } = route.params;[m
+[32m+[m[32m  const [resending, setResending] = useState(false);[m
+[32m+[m[32m  const [checking, setChecking] = useState(false);[m
+[32m+[m[32m  const [resentAt, setResentAt] = useState<Date | null>(null);[m
+[32m+[m[32m  const inFlight = useRef(false);[m
+[32m+[m
+[32m+[m[32m  // Try to sign the user in. Until they click the confirmation link in their[m
+[32m+[m[32m  // inbox, Supabase rejects with "Email not confirmed" — we treat that as[m
+[32m+[m[32m  // "still waiting" and keep polling. Once it succeeds, the AuthProvider's[m
+[32m+[m[32m  // onAuthStateChange listener will swap RootNavigator over to the main stack[m
+[32m+[m[32m  // automatically, so we don't have to navigate manually here.[m
+[32m+[m[32m  const attemptSignIn = async (manual = false) => {[m
+[32m+[m[32m    if (inFlight.current) return;[m
+[32m+[m[32m    inFlight.current = true;[m
+[32m+[m[32m    if (manual) setChecking(true);[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      await signInParent(email, password);[m
+[32m+[m[32m    } catch (err) {[m
+[32m+[m[32m      if (manual) {[m
+[32m+[m[32m        const msg = err instanceof Error ? err.message : 'Unknown error';[m
+[32m+[m[32m        Alert.alert('Not confirmed yet', msg);[m
+[32m+[m[32m      }[m
+[32m+[m[32m    } finally {[m
+[32m+[m[32m      inFlight.current = false;[m
+[32m+[m[32m      if (manual) setChecking(false);[m
+[32m+[m[32m    }[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  useEffect(() => {[m
+[32m+[m[32m    const interval = setInterval(() => {[m
+[32m+[m[32m      void attemptSignIn(false);[m
+[32m+[m[32m    }, POLL_INTERVAL_MS);[m
+[32m+[m[32m    return () => clearInterval(interval);[m
+[32m+[m[32m    // eslint-disable-next-line react-hooks/exhaustive-deps[m
+[32m+[m[32m  }, []);[m
+[32m+[m
+[32m+[m[32m  const handleResend = async () => {[m
+[32m+[m[32m    setResending(true);[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      await resendSignUpConfirmation(email);[m
+[32m+[m[32m      setResentAt(new Date());[m
+[32m+[m[32m    } catch (err) {[m
+[32m+[m[32m      Alert.alert('Could not resend', err instanceof Error ? err.message : 'Unknown error');[m
+[32m+[m[32m    } finally {[m
+[32m+[m[32m      setResending(false);[m
+[32m+[m[32m    }[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  return ([m
+[32m+[m[32m    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>[m
+[32m+[m[32m      <View style={styles.container}>[m
+[32m+[m[32m        <Text style={styles.brand}>BALLPARK</Text>[m
+[32m+[m[32m        <Text style={styles.title}>Check your email</Text>[m
+[32m+[m[32m        <Text style={styles.body}>[m
+[32m+[m[32m          We sent a confirmation link to{'\n'}[m
+[32m+[m[32m          <Text style={styles.email}>{email}</Text>[m
+[32m+[m[32m        </Text>[m
+[32m+[m[32m        <Text style={styles.hint}>[m
+[32m+[m[32m          Tap the link in that email to finish creating your account. We'll sign you in[m
+[32m+[m[32m          automatically once you do.[m
+[32m+[m[32m        </Text>[m
+[32m+[m
+[32m+[m[32m        <TouchableOpacity[m
+[32m+[m[32m          style={[styles.primaryBtn, checking && styles.btnDisabled]}[m
+[32m+[m[32m          onPress={() => attemptSignIn(true)}[m
+[32m+[m[32m          disabled={checking}[m
+[32m+[m[32m        >[m
+[32m+[m[32m          {checking ? ([m
+[32m+[m[32m            <ActivityIndicator color={colors.darkest} />[m
+[32m+[m[32m          ) : ([m
+[32m+[m[32m            <Text style={styles.primaryBtnText}>I've confirmed — sign me in</Text>[m
+[32m+[m[32m          )}[m
+[32m+[m[32m        </TouchableOpacity>[m
+[32m+[m
+[32m+[m[32m        <TouchableOpacity[m
+[32m+[m[32m          style={[styles.secondaryBtn, resending && styles.btnDisabled]}[m
+[32m+[m[32m          onPress={handleResend}[m
+[32m+[m[32m          disabled={resending}[m
+[32m+[m[32m        >[m
+[32m+[m[32m          {resending ? ([m
+[32m+[m[32m            <ActivityIndicator color={colors.gold} />[m
+[32m+[m[32m          ) : ([m
+[32m+[m[32m            <Text style={styles.secondaryBtnText}>Resend confirmation</Text>[m
+[32m+[m[32m          )}[m
+[32m+[m[32m        </TouchableOpacity>[m
+[32m+[m
+[32m+[m[32m        {resentAt && ([m
+[32m+[m[32m          <Text style={styles.sentNote}>Sent again at {resentAt.toLocaleTimeString()}</Text>[m
+[32m+[m[32m        )}[m
+[32m+[m
+[32m+[m[32m        <TouchableOpacity onPress={() => navigation.navigate('SignIn')} style={styles.linkBtn}>[m
+[32m+[m[32m          <Text style={styles.linkText}>Back to sign in</Text>[m
+[32m+[m[32m        </TouchableOpacity>[m
+[32m+[m[32m      </View>[m
+[32m+[m[32m    </SafeAreaView>[m
+[32m+[m[32m  );[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mconst styles = StyleSheet.create({[m
+[32m+[m[32m  safe: { flex: 1, backgroundColor: colors.darkest },[m
+[32m+[m[32m  container: { flex: 1, padding: spacing['4xl'], justifyContent: 'center' },[m
+[32m+[m[32m  brand: {[m
+[32m+[m[32m    color: colors.gold,[m
+[32m+[m[32m    fontFamily: fontFamilies.oswaldBold,[m
+[32m+[m[32m    fontSize: fontSizes['4xl'],[m
+[32m+[m[32m    textAlign: 'center',[m
+[32m+[m[32m    marginBottom: spacing['4xl'],[m
+[32m+[m[32m  },[m
+[32m+[m[32m  title: {[m
+[32m+[m[32m    color: colors.textOnDark,[m
+[32m+[m[32m    fontFamily: fontFamilies.interBold,[m
+[32m+[m[32m    fontSize: fontSizes['2xl'],[m
+[32m+[m[32m    marginBottom: spacing['2xl'],[m
+[32m+[m[32m    textAlign: 'center',[m
+[32m+[m[32m  },[m
+[32m+[m[32m  body: {[m
+[32m+[m[32m    color: colors.textLight,[m
+[32m+[m[32m    fontFamily: fontFamilies.interRegular,[m
+[32m+[m[32m    fontSize: fontSizes.lg,[m
+[32m+[m[32m    textAlign: 'center',[m
+[32m+[m[32m    marginBottom: spacing['3xl'],[m
+[32m+[m[32m  },[m
+[32m+[m[32m  email: {[m
+[32m+[m[32m    color: colors.textOnDark,[m
+[32m+[m[32m    fontFamily: fontFamilies.interBold,[m
+[32m+[m[32m  },[m
+[32m+[m[32m  hint: {[m
+[32m+[m[32m    color: colors.textMuted,[m
+[32m+[m[32m    fontFamily: fontFamilies.interRegular,[m
+[32m+[m[32m    fontSize: fontSizes.md,[m
+[32m+[m[32m    textAlign: 'center',[m
+[32m+[m[32m    marginBottom: spacing['4xl'],[m
+[32m+[m[32m  },[m
+[32m+[m[32m  primaryBtn: {[m
+[32m+[m[32m    backgroundColor: colors.gold,[m
+[32m+[m[32m    borderRadius: radius.lg,[m
+[32m+[m[32m    paddingVertical: spacing['3xl'],[m
+[32m+[m[32m    alignItems: 'center',[m
+[32m+[m[32m  },[m
+[32m+[m[32m  secondaryBtn: {[m
+[32m+[m[32m    borderColor: colors.gold,[m
+[32m+[m[32m    borderWidth: 1,[m
+[32m+[m[32m    borderRadius: radius.lg,[m
+[32m+[m[32m    paddingVertical: spacing['3xl'],[m
+[32m+[m[32m    alignItems: 'center',[m
+[32m+[m[32m    marginTop: spacing['2xl'],[m
+[32m+[m[32m  },[m
+[32m+[m[32m  btnDisabled: { opacity: 0.6 },[m
+[32m+[m[32m  primaryBtnText: {[m
+[32m+[m[32m    color: colors.darkest,[m
+[32m+[m[32m    fontFamily: fontFamilies.interBold,[m
+[32m+[m[32m    fontSize: fontSizes.lg,[m
+[32m+[m[32m    textTransform: 'uppercase',[m
+[32m+[m[32m    letterSpacing: 1,[m
+[32m+[m[32m  },[m
+[32m+[m[32m  secondaryBtnText: {[m
+[32m+[m[32m    color: colors.gold,[m
+[32m+[m[32m    fontFamily: fontFamilies.interBold,[m
+[32m+[m[32m    fontSize: fontSizes.lg,[m
+[32m+[m[32m    textTransform: 'uppercase',[m
+[32m+[m[32m    letterSpacing: 1,[m
+[32m+[m[32m  },[m
+[32m+[m[32m  sentNote: {[m
+[32m+[m[32m    color: colors.textMuted,[m
+[32m+[m[32m    fontFamily: fontFamilies.interRegular,[m
+[32m+[m[32m    fontSize: fontSizes.sm,[m
+[32m+[m[32m    textAlign: 'center',[m
+[32m+[m[32m    marginTop: spacing['2xl'],[m
+[32m+[m[32m  },[m
+[32m+[m[32m  linkBtn: { marginTop: spacing['3xl'], alignItems: 'center' },[m
+[32m+[m[32m  linkText: {[m
+[32m+[m[32m    color: colors.gold,[m
+[32m+[m[32m    fontFamily: fontFamilies.interMedium,[m
+[32m+[m[32m    fontSize: fontSizes.md,[m
+[32m+[m[32m  },[m
+[32m+[m[32m});[m
+[1mdiff --git a/src/screens/Auth/SignUpScreen.tsx b/src/screens/Auth/SignUpScreen.tsx[m
+[1mindex e3caa5c..7c2de6a 100644[m
+[1m--- a/src/screens/Auth/SignUpScreen.tsx[m
+[1m+++ b/src/screens/Auth/SignUpScreen.tsx[m
+[36m@@ -38,9 +38,22 @@[m [mexport default function SignUpScreen({ navigation }: Props) {[m
+     }[m
+     setSubmitting(true);[m
+     try {[m
+[31m-      await signUpParent({ email, password, firstName, lastName, phone: phone || undefined });[m
+[31m-      // Auth state listener will route us into the app; AddKid is shown next[m
+[31m-      // because the family will have zero kids.[m
+[32m+[m[32m      const result = await signUpParent({[m
+[32m+[m[32m        email,[m
+[32m+[m[32m        password,[m
+[32m+[m[32m        firstName,[m
+[32m+[m[32m        lastName,[m
+[32m+[m[32m        phone: phone || undefined,[m
+[32m+[m[32m      });[m
+[32m+[m[32m      if (!result.session) {[m
+[32m+[m[32m        // Supabase has email confirmation enabled — no session is created[m
+[32m+[m[32m        // until the user clicks the link in their inbox. Send them to a[m
+[32m+[m[32m        // dedicated screen instead of silently dropping them into the app.[m
+[32m+[m[32m        navigation.navigate('ConfirmEmail', { email: email.trim(), password });[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m[32m      // Otherwise the auth state listener will route us into the app; AddKid[m
+[32m+[m[32m      // is shown next because the family will have zero kids.[m
+     } catch (err) {[m
+       Alert.alert('Sign-up failed', err instanceof Error ? err.message : 'Unknown error');[m
+     } finally {[m
