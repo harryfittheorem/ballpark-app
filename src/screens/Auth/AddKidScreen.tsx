@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { signOut } from '@/api/auth';
 import { useAddKid } from '@/hooks/useFamily';
 import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
@@ -123,6 +124,24 @@ export default function AddKidScreen() {
               <Text style={styles.primaryBtnText}>Add kid</Text>
             )}
           </TouchableOpacity>
+
+          {/* Escape hatch: a user with a stale or wrong session is otherwise
+              trapped here (no kid → can't reach the Me tab → can't sign out).
+              The auth listener in useAuth flips RootNavigator back to SignIn. */}
+          <TouchableOpacity
+            style={styles.signOutBtn}
+            onPress={async () => {
+              try {
+                await signOut();
+              } catch (err) {
+                console.error('signOut failed', err);
+                Alert.alert('Could not sign out', errorMessage(err));
+              }
+            }}
+            disabled={submitting}
+          >
+            <Text style={styles.signOutText}>Sign out</Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -196,6 +215,18 @@ const styles = StyleSheet.create({
     color: colors.darkest,
     fontFamily: fontFamilies.interBold,
     fontSize: fontSizes.lg,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  signOutBtn: {
+    alignItems: 'center',
+    paddingVertical: spacing['3xl'],
+    marginTop: spacing.lg,
+  },
+  signOutText: {
+    color: colors.textMuted,
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.md,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
