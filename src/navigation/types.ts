@@ -23,3 +23,13 @@ export type MainTabScreenProps<T extends keyof MainTabParamList> = BottomTabScre
   MainTabParamList,
   T
 >;
+
+export type MeStackParamList = {
+  MeHome: undefined;
+  BookingsList: undefined;
+};
+
+export type MeStackScreenProps<T extends keyof MeStackParamList> = NativeStackScreenProps<
+  MeStackParamList,
+  T
+>;

@@ -89,6 +89,34 @@ export async function createBooking(input: BookingInsert): Promise<Booking> {
   return data;
 }
 
+/**
+ * Booking row enriched with the related kid / coach / location names needed
+ * to render a list row. RLS still scopes everything to the caller's tenant.
+ */
+export type FamilyBooking = Booking & {
+  kid: Pick<Tables<'kids'>, 'id' | 'first_name' | 'last_name'> | null;
+  coach: Pick<Tables<'coaches'>, 'id' | 'first_name' | 'last_name'> | null;
+  location: Pick<Tables<'locations'>, 'id' | 'name'> | null;
+};
+
+/**
+ * Fetch all bookings for the given kid ids, embedding the kid / coach /
+ * location names so the bookings list can render without N+1 follow-ups.
+ * Sorted newest scheduled_start first; the caller splits into upcoming/past.
+ */
+export async function listFamilyBookings(kidIds: string[]): Promise<FamilyBooking[]> {
+  if (kidIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(
+      'id, tenant_id, location_id, kid_id, coach_id, session_type_id, scheduled_start, scheduled_end, cage_number, status, attended_at, cancelled_at, cancellation_reason, notes, created_at, updated_at, kid:kids(id, first_name, last_name), coach:coaches(id, first_name, last_name), location:locations(id, name)',
+    )
+    .in('kid_id', kidIds)
+    .order('scheduled_start', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as FamilyBooking[];
+}
+
 export async function getLocationById(id: string): Promise<Location | null> {
   const { data, error } = await supabase
     .from('locations')

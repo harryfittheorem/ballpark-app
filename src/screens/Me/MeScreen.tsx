@@ -1,12 +1,16 @@
+import { ChevronRight } from 'lucide-react-native';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { signOut } from '@/api/auth';
 import { useAuth } from '@/hooks/useAuth';
 import { useFamily } from '@/hooks/useFamily';
-import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
+import type { MeStackScreenProps } from '@/navigation/types';
+import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
-export default function MeScreen() {
+type Props = MeStackScreenProps<'MeHome'>;
+
+export default function MeScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { family, kids } = useFamily();
 
@@ -40,6 +44,14 @@ export default function MeScreen() {
           </View>
         ) : null}
 
+        <TouchableOpacity
+          onPress={() => navigation.navigate('BookingsList')}
+          style={styles.navRow}
+        >
+          <Text style={styles.navRowText}>Bookings</Text>
+          <ChevronRight color={colors.gold} size={20} />
+        </TouchableOpacity>
+
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>
@@ -69,14 +81,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.lg,
     padding: spacing['3xl'],
-    marginBottom: spacing['4xl'],
+    marginBottom: spacing['3xl'],
   },
   cardLabel: {
     color: colors.textMuted,
     fontFamily: fontFamilies.interMedium,
     fontSize: fontSizes.sm,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: tracking.wide,
     marginTop: spacing.lg,
   },
   cardValue: {
@@ -84,6 +96,23 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.lg,
     marginTop: spacing.xs,
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.darker,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: spacing['3xl'],
+    paddingHorizontal: spacing['3xl'],
+    marginBottom: spacing['3xl'],
+  },
+  navRowText: {
+    color: colors.textOnDark,
+    fontFamily: fontFamilies.interSemiBold,
+    fontSize: fontSizes.lg,
   },
   signOutBtn: {
     marginTop: 'auto',
@@ -98,6 +127,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.interBold,
     fontSize: fontSizes.lg,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: tracking.wide,
   },
 });
