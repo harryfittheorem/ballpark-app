@@ -212,6 +212,95 @@ Then generate TypeScript types:
 Show me the generated types and confirm they match what we expect.
 ```
 
+### Step 1.7a — Register the Custom Access Token Hook (per-tenant, REQUIRED)
+
+> **Required for every new tenant deployment.** The local `supabase/config.toml`
+> `[auth.hook.custom_access_token]` block does **not** propagate to hosted
+> Supabase via `supabase db push`. Until the hook is enabled in the dashboard,
+> JWTs will not carry `tenant_id` / `family_id` / `role`, and every RLS policy
+> that depends on those claims will silently deny rows.
+
+**Option A — Dashboard (recommended for humans):**
+1. Open the project in the Supabase dashboard.
+2. **Authentication → Hooks** (sidebar).
+3. Find **Custom Access Token** and click **Enable**.
+4. Set **Hook type:** Postgres function · **Schema:** `public` · **Function:** `custom_access_token_hook`.
+5. Save.
+
+**Option B — Management API (scriptable, used by Replit Agent):**
+
+```bash
+curl -X PATCH \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"hook_custom_access_token_enabled": true,
+       "hook_custom_access_token_uri": "pg-functions://postgres/public/custom_access_token_hook"}' \
+  "https://api.supabase.com/v1/projects/<project-ref>/config/auth"
+```
+
+Verify enablement:
+
+```bash
+curl -s -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  "https://api.supabase.com/v1/projects/<project-ref>/config/auth" \
+  | grep -E 'hook_custom_access_token_(enabled|uri)'
+```
+
+Expected: `"hook_custom_access_token_enabled": true` and the `pg-functions://postgres/public/custom_access_token_hook` URI.
+
+**End-to-end smoke test (proves the hook + `handle_new_user` trigger both fire):**
+
+Once you have a valid `EXPO_PUBLIC_SUPABASE_ANON_KEY` in env, run:
+
+```
+node scripts/verify-auth-hook.mjs
+```
+
+Expected tail:
+
+```
+-> JWT custom claims: { "tenant_id": "...", "family_id": "...", "role": "parent" }
+PASS: tenant_id, family_id, role all present on the issued JWT.
+```
+
+If the project has email confirmations enabled (`mailer_autoconfirm: false`),
+the script may not get a session token from `signup` and will try `signinWithPassword`,
+which fails until the test user is confirmed. In that case verify directly via
+the database (mgmt API SQL or psql):
+
+```sql
+-- Drop-in standalone verification: creates a synthetic user, runs the hook,
+-- cleans up, returns the resulting claims.
+CREATE OR REPLACE FUNCTION public._verify_hook_test() RETURNS jsonb LANGUAGE plpgsql AS $f$
+DECLARE
+  v_uid uuid := gen_random_uuid();
+  v_email text := 'hookprobe_'||substr(md5(random()::text),1,8)||'@example.com';
+  v_tid uuid; v_fid uuid; v_event jsonb; v_result jsonb;
+BEGIN
+  SELECT id INTO v_tid FROM public.tenants WHERE slug='infinitehitting';
+  INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+    confirmation_token, recovery_token, email_change_token_new, email_change)
+    VALUES (v_uid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+      v_email, '', '{}'::jsonb, jsonb_build_object('tenant_slug','infinitehitting'),
+      now(), now(), '', '', '', '');
+  SELECT id INTO v_fid FROM public.families WHERE parent_user_id=v_uid;
+  v_event := jsonb_build_object('user_id', v_uid::text,
+    'claims', jsonb_build_object('sub', v_uid::text, 'email', v_email,
+      'aud','authenticated','role','authenticated'));
+  v_result := public.custom_access_token_hook(v_event);
+  DELETE FROM auth.users WHERE id=v_uid;
+  RETURN jsonb_build_object('expected_tenant_id', v_tid,
+    'expected_family_id', v_fid, 'hook_claims', v_result->'claims');
+END $f$;
+SELECT public._verify_hook_test();
+DROP FUNCTION public._verify_hook_test();
+```
+
+`hook_claims` should include `tenant_id`, `family_id`, and `role: "parent"`,
+and `family_id` should equal `expected_family_id` (proving `handle_new_user`
+auto-created the family row).
+
 ### Step 1.8 (Claude Code) — Supabase client + auth hooks
 
 ```
