@@ -288,6 +288,99 @@ export async function getLatestCoachMessageForKid(
 }
 
 /**
+ * Single coach_message row joined with the attached video — the projection
+ * the parent's playback screen needs (Step 4.13). RLS already restricts
+ * SELECT to messages addressed to the caller's family, so no extra filter
+ * is required.
+ */
+export type CoachMessageDetail = {
+  id: string;
+  recipientKidId: string;
+  viewedAt: string | null;
+  video: {
+    id: string;
+    status: Tables<'videos'>['status'];
+    muxPlaybackId: string | null;
+    durationSeconds: number | null;
+  } | null;
+};
+
+type CoachMessageDetailRow = Pick<
+  Tables<'coach_messages'>,
+  'id' | 'recipient_kid_id' | 'viewed_at'
+> & {
+  video: Pick<
+    Tables<'videos'>,
+    'id' | 'status' | 'mux_playback_id' | 'duration_seconds'
+  > | null;
+};
+
+/**
+ * Fetch a single coach_message row + its attached video by message id.
+ * Returns null if the row isn't visible (RLS) or doesn't exist.
+ */
+export async function getCoachMessageById(
+  messageId: string,
+): Promise<CoachMessageDetail | null> {
+  const { data, error } = await supabase
+    .from('coach_messages')
+    .select(
+      'id, recipient_kid_id, viewed_at, video:videos(id, status, mux_playback_id, duration_seconds)',
+    )
+    .eq('id', messageId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const row = data as unknown as CoachMessageDetailRow;
+  // PostgREST may model the embedded video as object | array | null.
+  const videoRaw = row.video as
+    | CoachMessageDetailRow['video']
+    | NonNullable<CoachMessageDetailRow['video']>[];
+  const v = Array.isArray(videoRaw) ? videoRaw[0] ?? null : videoRaw;
+
+  return {
+    id: row.id,
+    recipientKidId: row.recipient_kid_id,
+    viewedAt: row.viewed_at,
+    video: v
+      ? {
+          id: v.id,
+          status: v.status,
+          muxPlaybackId: v.mux_playback_id,
+          durationSeconds: v.duration_seconds,
+        }
+      : null,
+  };
+}
+
+/**
+ * Idempotently mark a coach_message as viewed. The `viewed_at IS NULL`
+ * filter means re-opening an already-viewed message is a no-op (0 rows
+ * updated, no error). The column-level GRANT on `coach_messages` from
+ * Step 4.1 means an UPDATE that touched any other column would be
+ * rejected by Postgres before RLS even runs.
+ */
+export async function markCoachMessageViewed(messageId: string): Promise<void> {
+  // Routed through the `mark_coach_message_viewed` SQL function (see
+  // 20260505100000_v04_mark_coach_message_viewed_rpc.sql) so `viewed_at`
+  // is stamped with the database's `now()` instead of the client's wall
+  // clock. Avoids clock-skew drift between phones and the server. RLS +
+  // the column-level UPDATE GRANT still apply (SECURITY INVOKER).
+  //
+  // Cast to `any` because the generated `Database` types haven't been
+  // regenerated to include this RPC yet; the migration is the source of
+  // truth and the function signature is fixed.
+  const { error } = await (
+    supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ error: unknown }>
+  )('mark_coach_message_viewed', { p_message_id: messageId });
+  if (error) throw error;
+}
+
+/**
  * Insert a row into `public.coach_messages`. Mirrors `createBooking` in
  * `bookings.ts` — relies on RLS to reject any attempt to smuggle a row
  * into another tenant or impersonate another sender.

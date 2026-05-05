@@ -25,7 +25,13 @@ export default function HomeStackNavigator() {
       <Stack.Screen
         name="VideoPlayback"
         component={VideoPlaybackScreen}
-        options={{ title: 'Coach video' }}
+        options={{
+          // True full-screen player: no header. The screen renders its own
+          // top-left close button overlaid on the video. Modal presentation
+          // hides the tab bar underneath on iOS.
+          presentation: 'modal',
+          headerShown: false,
+        }}
       />
     </Stack.Navigator>
   );
