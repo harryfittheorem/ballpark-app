@@ -1,0 +1,57 @@
+v0.4 Step 4.4 — Mux signed upload Edge Function.
+
+PRE-CHECK: Verify MUX_TOKEN_ID and MUX_TOKEN_SECRET are in
+Replit Secrets. Verify supabase/functions/ directory structure
+exists. Read docs/ARCHITECTURE.md §6 (Mux integration patterns).
+
+Plan-mode first. This is full review tier — first Edge Function,
+external service integration.
+
+What we're building:
+- Edge Function: supabase/functions/mux-create-upload/index.ts
+- Auth: requires authenticated user with app_role='coach'
+- Calls Mux API to create a Direct Upload URL
+- Inserts a row in public.videos with status='uploading' and
+  the returned mux_asset_id
+- Returns to client: { upload_url, video_id }
+- The client uploads bytes directly to Mux (separate step in 4.6)
+
+Why a server-side function instead of client-direct:
+- MUX_TOKEN_SECRET cannot be exposed to mobile clients
+- Centralizes Mux API auth
+- Server-side INSERT into videos table (with service_role) keeps
+  RLS sane
+
+Out of scope:
+- Mux webhook handler (Step 4.5)
+- Mobile client upload code (Step 4.6)
+- Coach UI (Step 4.7+)
+
+Files:
+- supabase/functions/mux-create-upload/index.ts (new)
+- supabase/functions/mux-create-upload/deno.json (new, if needed)
+
+Plan must include:
+1. Full TypeScript code for the Edge Function
+2. How auth is verified (parsing Authorization header,
+   validating JWT, checking app_role='coach')
+3. Mux API call (POST to /video/v1/uploads with cors_origin)
+4. Database INSERT pattern (using SUPABASE_SERVICE_ROLE_KEY
+   from Edge Function env, not user JWT)
+5. Error handling — what happens if Mux returns 5xx, network
+   timeout, invalid response
+6. Idempotency — what if client retries
+7. Deployment command: npx supabase functions deploy mux-create-upload
+
+After plan approval: WRITE the function code, paste back for review
+before deploying. Two-gate review.
+
+Phone test (no UI yet, so test via curl):
+1. Get coach JWT via scripts/check-jwt.mjs (sign in as Coach Mike)
+2. curl POST to deployed function URL with the JWT
+3. Verify response has upload_url and video_id
+4. Verify videos row created in DB with status='uploading'
+5. Verify a NON-coach user (parent JWT) gets 403/401
+6. Verify NO JWT gets 401
+
+Run all 6 verification points. Paste output before merge.
