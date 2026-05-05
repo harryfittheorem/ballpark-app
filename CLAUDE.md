@@ -230,12 +230,12 @@ When implementing a screen, open the corresponding component in `InfiniteHitting
 
 ## Current Status
 
-**Phase:** v0.2 — Home Tab — **DONE** (shipped 2026-05-05)
+**Phase:** v0.3 — Booking System — Phase A in progress (Step 3.1 schema MERGED 2026-05-05)
 **Anchor customer:** Infinite Hitting (17 locations)
 **Target users:** Athletes (kids), Parents
-**Active features:** v0.1 foundation (Expo + theme + Supabase schema/RLS/auth-hook + signup → AddKid → 5-tab shell) plus v0.2 Home Tab: form primitives + RHF/Zod, TanStack Query data layer (`useFamily`), and a 5-card Home screen (Hero, StatTiles, CoachVideo, UpcomingSession, QuickActions) matching `/design/InfiniteHittingApp.jsx`.
-**Verified:** Full smoke pass on a real phone via Expo Go — cold start, sign in/out/up, AddKid, all 5 Home cards, force-quit persistence, tab switching, Me tab + sign-out. `npm run typecheck` + `npm run lint` clean. `node scripts/verify-auth-hook.mjs` PASS.
-**Next milestone:** v0.3 — Booking System.
+**Active features:** v0.1 foundation + v0.2 Home Tab (5 cards, RHF/Zod forms, TanStack Query). v0.3 Step 3.1 added the booking schema: `session_types`, `coach_availability`, `bookings` tables with FK indexes, `updated_at` triggers, RLS (parent CRUD over own family's bookings; coach SELECT for own assignments; tenant-scoped SELECT on `session_types` + `coach_availability`), tenant pin on every write policy, per-table GRANTs to `authenticated`, regenerated `src/types/database.ts`.
+**Verified:** `npm run typecheck` + `npm run lint` clean. `node scripts/verify-auth-hook.mjs` PASS (tenant_id/family_id/app_role injected; reserved `role` preserved). Remote verification: RLS on; functions intact; 7 new policies present; GRANTs visible.
+**Next milestone:** v0.3 Phase B — seed data + `/src/api/bookings.ts` + Book + BookConfirm screens + Resend email.
 
 ---
 

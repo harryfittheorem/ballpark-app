@@ -39,6 +39,163 @@ export type Database = {
   }
   public: {
     Tables: {
+      bookings: {
+        Row: {
+          attended_at: string | null
+          cage_number: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          coach_id: string
+          created_at: string
+          id: string
+          kid_id: string
+          location_id: string
+          notes: string | null
+          scheduled_end: string
+          scheduled_start: string
+          session_type_id: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          attended_at?: string | null
+          cage_number?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          coach_id: string
+          created_at?: string
+          id?: string
+          kid_id: string
+          location_id: string
+          notes?: string | null
+          scheduled_end: string
+          scheduled_start: string
+          session_type_id: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          attended_at?: string | null
+          cage_number?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          coach_id?: string
+          created_at?: string
+          id?: string
+          kid_id?: string
+          location_id?: string
+          notes?: string | null
+          scheduled_end?: string
+          scheduled_start?: string
+          session_type_id?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_session_type_id_fkey"
+            columns: ["session_type_id"]
+            isOneToOne: false
+            referencedRelation: "session_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_availability: {
+        Row: {
+          coach_id: string
+          created_at: string
+          day_of_week: number
+          effective_from: string | null
+          effective_until: string | null
+          end_time: string
+          id: string
+          is_recurring: boolean
+          location_id: string
+          start_time: string
+          tenant_id: string
+        }
+        Insert: {
+          coach_id: string
+          created_at?: string
+          day_of_week: number
+          effective_from?: string | null
+          effective_until?: string | null
+          end_time: string
+          id?: string
+          is_recurring?: boolean
+          location_id: string
+          start_time: string
+          tenant_id: string
+        }
+        Update: {
+          coach_id?: string
+          created_at?: string
+          day_of_week?: number
+          effective_from?: string | null
+          effective_until?: string | null
+          end_time?: string
+          id?: string
+          is_recurring?: boolean
+          location_id?: string
+          start_time?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_availability_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_availability_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_availability_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coaches: {
         Row: {
           avatar_url: string | null
@@ -264,6 +421,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "locations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_types: {
+        Row: {
+          base_price_cents: number
+          created_at: string
+          description: string | null
+          duration_minutes: number
+          id: string
+          is_active: boolean
+          name: string
+          tenant_id: string
+          type_category: string
+          updated_at: string
+        }
+        Insert: {
+          base_price_cents?: number
+          created_at?: string
+          description?: string | null
+          duration_minutes: number
+          id?: string
+          is_active?: boolean
+          name: string
+          tenant_id: string
+          type_category: string
+          updated_at?: string
+        }
+        Update: {
+          base_price_cents?: number
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          tenant_id?: string
+          type_category?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_types_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
