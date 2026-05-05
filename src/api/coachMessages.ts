@@ -151,6 +151,71 @@ export type SentCoachMessage = Tables<'coach_messages'>;
  * the freshly-inserted row (id + created_at) for cache priming on the
  * sent-videos list later.
  */
+/**
+ * Flat row returned by `listSentCoachMessages()` for the coach "My Videos"
+ * list. Denormalised so each row can render without extra fetches.
+ */
+export type SentCoachMessageRow = {
+  id: string;
+  createdAt: string;
+  viewedAt: string | null;
+  messageText: string | null;
+  kidFirstName: string;
+  kidLastName: string;
+  familyLastName: string;
+  videoStatus: Tables<'videos'>['status'] | null;
+  muxPlaybackId: string | null;
+  durationSeconds: number | null;
+};
+
+type SentCoachMessageJoinRow = Pick<
+  Tables<'coach_messages'>,
+  'id' | 'created_at' | 'viewed_at' | 'message_text'
+> & {
+  kid: Pick<Tables<'kids'>, 'first_name' | 'last_name'> | null;
+  family: Pick<Tables<'families'>, 'parent_last_name'> | null;
+  video: Pick<
+    Tables<'videos'>,
+    'status' | 'mux_playback_id' | 'duration_seconds'
+  > | null;
+};
+
+/**
+ * Fetch every coach_messages row sent by `userId`, joined to the recipient
+ * kid + family (for display labels) and the attached video (for the Mux
+ * poster). Sorted newest first.
+ *
+ * RLS already restricts SELECT to the caller's own sent messages via
+ * `coach_messages_select_own_coach`; the explicit `sender_user_id` filter
+ * keeps the planner honest (and matches the index on sender_user_id).
+ */
+export async function listSentCoachMessages(
+  userId: string,
+): Promise<SentCoachMessageRow[]> {
+  const { data, error } = await supabase
+    .from('coach_messages')
+    .select(
+      'id, created_at, viewed_at, message_text, kid:kids(first_name, last_name), family:families(parent_last_name), video:videos(status, mux_playback_id, duration_seconds)',
+    )
+    .eq('sender_user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const rows = (data ?? []) as unknown as SentCoachMessageJoinRow[];
+  return rows.map((r) => ({
+    id: r.id,
+    createdAt: r.created_at,
+    viewedAt: r.viewed_at,
+    messageText: r.message_text,
+    kidFirstName: r.kid?.first_name ?? 'Unknown',
+    kidLastName: r.kid?.last_name ?? '',
+    familyLastName: r.family?.parent_last_name ?? '',
+    videoStatus: r.video?.status ?? null,
+    muxPlaybackId: r.video?.mux_playback_id ?? null,
+    durationSeconds: r.video?.duration_seconds ?? null,
+  }));
+}
+
 export async function sendCoachMessage(
   input: SendCoachMessageInput,
 ): Promise<SentCoachMessage> {
