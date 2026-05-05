@@ -4,12 +4,16 @@ import { colors, fontFamilies, fontSizes } from '@/theme';
 
 import SectionCard from './SectionCard';
 
-export default function DateSection() {
+type Props = {
+  locked: boolean;
+};
+
+export default function DateSection({ locked }: Props) {
   return (
     <SectionCard
       title="Date"
-      locked
-      lockedHint="Pick a session type first."
+      locked={locked}
+      lockedHint={locked ? 'Pick a session type first.' : undefined}
     >
       <View style={styles.placeholder}>
         <Text style={styles.placeholderText}>Calendar will appear here.</Text>
