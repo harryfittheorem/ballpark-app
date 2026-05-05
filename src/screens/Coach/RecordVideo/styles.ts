@@ -7,22 +7,17 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: spacing['3xl'],
-    paddingTop: spacing['3xl'],
-    paddingBottom: spacing['4xl'],
+    paddingTop: spacing['2xl'],
+    paddingBottom: spacing['3xl'],
   },
-  heading: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes['2xl'],
-    color: colors.textOnDark,
-    textTransform: 'uppercase',
-    letterSpacing: tracking.wide,
-    marginBottom: spacing.base,
+  idleBox: {
+    flex: 1,
   },
   subheading: {
     fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.md,
     color: colors.textLight,
-    marginBottom: spacing['5xl'],
+    marginBottom: spacing['4xl'],
     lineHeight: 20,
   },
   bigButton: {

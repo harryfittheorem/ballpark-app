@@ -223,8 +223,7 @@ export default function RecordVideoScreen() {
 
 function IdleView({ onPick }: { onPick: (source: PickerSource) => void }) {
   return (
-    <View>
-      <Text style={styles.heading}>New Video</Text>
+    <View style={styles.idleBox}>
       <Text style={styles.subheading}>
         Record a new clip or pick one from your library. Up next you&apos;ll
         choose which family receives it.

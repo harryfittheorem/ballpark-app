@@ -37,7 +37,7 @@ export default function CoachInboxStackNavigator() {
       <Stack.Screen
         name="RecordVideo"
         component={RecordVideoScreen}
-        options={{ title: 'New Video' }}
+        options={{ title: 'Send a video' }}
       />
       <Stack.Screen
         name="RecipientPicker"
