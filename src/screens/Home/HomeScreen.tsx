@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFamily } from '@/hooks/useFamily';
 import { colors } from '@/theme';
 
+import CoachVideoCard from './components/CoachVideoCard';
 import HeroCard from './components/HeroCard';
 import HomeHeader from './components/HomeHeader';
 import SectionPlaceholder from './components/SectionPlaceholder';
@@ -13,7 +14,6 @@ import StatTilesRow from './components/StatTilesRow';
 import { styles } from './styles';
 
 const PLACEHOLDER_SECTIONS: ReadonlyArray<{ key: string; label: string }> = [
-  { key: 'coachVideo', label: 'Coach video placeholder' },
   { key: 'upcoming', label: 'Upcoming session placeholder' },
   { key: 'quickActions', label: 'Quick actions placeholder' },
 ];
@@ -72,6 +72,9 @@ export default function HomeScreen() {
                 pointsBalance={kid.points_balance}
                 currentStreakDays={kid.current_streak_days}
               />
+            </View>
+            <View style={styles.section}>
+              <CoachVideoCard coachName="Coach Mike" durationSeconds={154} />
             </View>
           </>
         ) : null}
