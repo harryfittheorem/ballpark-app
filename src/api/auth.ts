@@ -44,14 +44,6 @@ export async function signInParent(email: string, password: string) {
   return data;
 }
 
-export async function resendSignUpConfirmation(email: string) {
-  const { error } = await supabase.auth.resend({
-    type: 'signup',
-    email: email.trim(),
-  });
-  if (error) throw error;
-}
-
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
