@@ -24,6 +24,15 @@ export type MainTabScreenProps<T extends keyof MainTabParamList> = BottomTabScre
   T
 >;
 
+export type CoachInboxStackParamList = {
+  InboxHome: undefined;
+  RecordVideo: undefined;
+  RecipientPicker: { videoId: string };
+};
+
+export type CoachInboxStackScreenProps<T extends keyof CoachInboxStackParamList> =
+  NativeStackScreenProps<CoachInboxStackParamList, T>;
+
 export type CoachTabParamList = {
   Inbox: undefined;
 };

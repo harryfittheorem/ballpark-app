@@ -72,7 +72,7 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 
 ## Gotchas
 
--   `npm install` requires `--legacy-peer-deps`.
+-   `npm install` requires `--legacy-peer-deps` (also: `npx expo install <pkg> -- --legacy-peer-deps`).
 -   The Replit preview pane is not for mobile app testing; use Expo Go on a physical device.
 -   If Supabase email confirmation is enabled, signup will appear stuck; disable it in the Supabase dashboard for development.
 -   Existing test sessions might hold stale JWTs after schema changes; sign out and sign back in to refresh tokens.
