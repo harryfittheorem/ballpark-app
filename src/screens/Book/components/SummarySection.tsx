@@ -4,12 +4,17 @@ import { colors, fontFamilies, fontSizes } from '@/theme';
 
 import SectionCard from './SectionCard';
 
-export default function SummarySection() {
+type Props = {
+  locked: boolean;
+  lockedHint?: string;
+};
+
+export default function SummarySection({ locked, lockedHint }: Props) {
   return (
     <SectionCard
       title="Summary"
-      locked
-      lockedHint="Pick a session type first."
+      locked={locked}
+      lockedHint={locked ? lockedHint : undefined}
     >
       <View style={styles.placeholder}>
         <Text style={styles.placeholderText}>Your booking summary will appear here.</Text>
