@@ -45,3 +45,13 @@ externalPort = 3002
 # When in shell, start a Bash environment by default
 [interpreter]
 command = ["bash"]
+
+[agent]
+expertMode = true
+
+[userenv]
+
+[userenv.shared]
+EXPO_PUBLIC_SUPABASE_URL = "https://exjcwvvglthnxerzpukw.supabase.co"
+EXPO_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4amN3dnZnbHRobnhlcnpwdWt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NDIyNjUsImV4cCI6MjA5MzUxODI2NX0.OGeGvjNvc54-czy8OwzHB5ACTbrNcsICeAMlsEhaTl"
+EXPO_PUBLIC_TENANT_SLUG = "infinitehitting"
