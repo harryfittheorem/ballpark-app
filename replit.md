@@ -55,6 +55,7 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 -   **One Kid Per Family (v0.5):** The UI currently enforces one kid per family for simplicity, though the schema supports multiple for future expansion.
 -   **Folder Structure:** The nested per-screen folder structure outlined in `ARCHITECTURE.md §9` is authoritative.
 -   **Stripe Connect Onboarding:** Handled out-of-band via Stripe-hosted dashboards; the app only consumes the `stripe_account_id`.
+-   **Coach Provisioning:** Coaches are admin-created via the Supabase Admin API with `raw_user_meta_data.app_role='coach'`; the `handle_new_user` trigger branches on `app_role` and inserts into `public.coaches` instead of `public.families`. There is no in-app coach signup screen. Use `scripts/provision-coach-mike.mjs` as the reference invocation.
 
 ## Product
 
