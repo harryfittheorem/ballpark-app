@@ -1,4 +1,6 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -14,6 +16,11 @@ import { signOut } from '@/api/auth';
 import { Button, Input, PickerField, type PickerOption } from '@/components/ui';
 import { AGE_GROUPS, type AgeGroup } from '@/constants/kid';
 import { useAddKid } from '@/hooks/useFamily';
+import {
+  addKidSchema,
+  type AddKidFormOutput,
+  type AddKidFormValues,
+} from '@/screens/Auth/schemas';
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
@@ -23,44 +30,53 @@ const AGE_GROUP_OPTIONS: ReadonlyArray<PickerOption<AgeGroup>> = AGE_GROUPS.map(
 }));
 
 export default function AddKidScreen() {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [ageGroup, setAgeGroup] = useState<AgeGroup | null>(null);
-  const [position, setPosition] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
   const addKid = useAddKid();
+  const [signingOut, setSigningOut] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert('Missing info', 'First and last name are required.');
-      return;
-    }
-    setSubmitting(true);
+  const { control, handleSubmit, formState } = useForm<
+    AddKidFormValues,
+    unknown,
+    AddKidFormOutput
+  >({
+    resolver: zodResolver(addKidSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      ageGroup: null,
+      position: '',
+    },
+  });
+
+  const submitting = formState.isSubmitting;
+
+  const onSubmit = handleSubmit(async (values) => {
     try {
       await addKid({
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        age_group: ageGroup,
-        primary_position: position.trim() || null,
+        first_name: values.firstName,
+        last_name: values.lastName,
+        age_group: values.ageGroup,
+        primary_position: values.position,
       });
       // useFamily will re-fetch and the root navigator will swap to MainTabs.
     } catch (err) {
       console.error('addKid failed', err);
       Alert.alert('Could not add kid', errorMessage(err));
-    } finally {
-      setSubmitting(false);
     }
-  };
+  });
 
   const handleSignOut = async () => {
+    setSigningOut(true);
     try {
       await signOut();
     } catch (err) {
       console.error('signOut failed', err);
       Alert.alert('Could not sign out', errorMessage(err));
+    } finally {
+      setSigningOut(false);
     }
   };
+
+  const busy = submitting || signingOut;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -72,42 +88,75 @@ export default function AddKidScreen() {
           <Text style={styles.title}>Add your kid</Text>
           <Text style={styles.subtitle}>You can add more later from the Me tab.</Text>
 
-          <Input
-            label="First name"
-            value={firstName}
-            onChangeText={setFirstName}
-            autoCapitalize="words"
-            required
+          <Controller
+            control={control}
+            name="firstName"
+            render={({ field, fieldState }) => (
+              <Input
+                label="First name"
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                autoCapitalize="words"
+                required
+                error={fieldState.error?.message}
+              />
+            )}
           />
-          <Input
-            label="Last name"
-            value={lastName}
-            onChangeText={setLastName}
-            autoCapitalize="words"
-            required
+          <Controller
+            control={control}
+            name="lastName"
+            render={({ field, fieldState }) => (
+              <Input
+                label="Last name"
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                autoCapitalize="words"
+                required
+                error={fieldState.error?.message}
+              />
+            )}
           />
 
-          <PickerField<AgeGroup>
-            label="Age group (optional)"
-            options={AGE_GROUP_OPTIONS}
-            value={ageGroup}
-            onChange={setAgeGroup}
-            allowClear
-            disabled={submitting}
+          <Controller
+            control={control}
+            name="ageGroup"
+            render={({ field, fieldState }) => (
+              <PickerField<AgeGroup>
+                label="Age group (optional)"
+                options={AGE_GROUP_OPTIONS}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                allowClear
+                disabled={busy}
+                error={fieldState.error?.message}
+              />
+            )}
           />
 
-          <Input
-            label="Primary position (optional)"
-            value={position}
-            onChangeText={setPosition}
-            autoCapitalize="words"
-            placeholder="e.g. Shortstop"
+          <Controller
+            control={control}
+            name="position"
+            render={({ field, fieldState }) => (
+              <Input
+                label="Primary position (optional)"
+                value={field.value ?? ''}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                autoCapitalize="words"
+                placeholder="e.g. Shortstop"
+                error={fieldState.error?.message}
+              />
+            )}
           />
 
           <Button
             label="Add kid"
-            onPress={handleSubmit}
+            onPress={onSubmit}
             loading={submitting}
+            disabled={busy}
             testID="addkid-submit"
           />
 
@@ -120,7 +169,7 @@ export default function AddKidScreen() {
               onPress={handleSignOut}
               variant="tertiary"
               tone="muted"
-              disabled={submitting}
+              disabled={busy}
               testID="addkid-sign-out"
             />
           </View>

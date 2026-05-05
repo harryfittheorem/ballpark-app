@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Controller, useForm } from 'react-hook-form';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -13,39 +14,49 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { signUpParent } from '@/api/auth';
 import { Button, Input } from '@/components/ui';
 import type { AuthStackScreenProps } from '@/navigation/types';
+import {
+  signUpSchema,
+  type SignUpFormOutput,
+  type SignUpFormValues,
+} from '@/screens/Auth/schemas';
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
 type Props = AuthStackScreenProps<'SignUp'>;
 
 export default function SignUpScreen({ navigation }: Props) {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const { control, handleSubmit, formState } = useForm<
+    SignUpFormValues,
+    unknown,
+    SignUpFormOutput
+  >({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      password: '',
+    },
+  });
 
-  const handleSubmit = async () => {
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
-      Alert.alert('Missing info', 'First name, last name, email, and password are required.');
-      return;
-    }
-    if (password.length < 8) {
-      Alert.alert('Weak password', 'Password must be at least 8 characters.');
-      return;
-    }
-    setSubmitting(true);
+  const onSubmit = handleSubmit(async (values) => {
     try {
-      await signUpParent({ email, password, firstName, lastName, phone: phone || undefined });
-      // Auth state listener will route us into the app; AddKid is shown next
+      await signUpParent({
+        email: values.email,
+        password: values.password,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phone: values.phone,
+      });
+      // Auth state listener routes us into the app; AddKid is shown next
       // because the family will have zero kids.
     } catch (err) {
       Alert.alert('Sign-up failed', errorMessage(err));
-    } finally {
-      setSubmitting(false);
     }
-  };
+  });
+
+  const submitting = formState.isSubmitting;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -58,53 +69,94 @@ export default function SignUpScreen({ navigation }: Props) {
           <Text style={styles.title}>Create your account</Text>
           <Text style={styles.subtitle}>Parents — add your kid in the next step.</Text>
 
-          <Input
-            label="First name"
-            value={firstName}
-            onChangeText={setFirstName}
-            autoCapitalize="words"
-            required
+          <Controller
+            control={control}
+            name="firstName"
+            render={({ field, fieldState }) => (
+              <Input
+                label="First name"
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                autoCapitalize="words"
+                required
+                error={fieldState.error?.message}
+              />
+            )}
           />
-          <Input
-            label="Last name"
-            value={lastName}
-            onChangeText={setLastName}
-            autoCapitalize="words"
-            required
+          <Controller
+            control={control}
+            name="lastName"
+            render={({ field, fieldState }) => (
+              <Input
+                label="Last name"
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                autoCapitalize="words"
+                required
+                error={fieldState.error?.message}
+              />
+            )}
           />
-          <Input
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-            textContentType="emailAddress"
-            required
+          <Controller
+            control={control}
+            name="email"
+            render={({ field, fieldState }) => (
+              <Input
+                label="Email"
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+                textContentType="emailAddress"
+                required
+                error={fieldState.error?.message}
+              />
+            )}
           />
-          <Input
-            label="Phone (optional)"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            autoComplete="tel"
-            textContentType="telephoneNumber"
+          <Controller
+            control={control}
+            name="phone"
+            render={({ field, fieldState }) => (
+              <Input
+                label="Phone (optional)"
+                value={field.value ?? ''}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                keyboardType="phone-pad"
+                autoComplete="tel"
+                textContentType="telephoneNumber"
+                error={fieldState.error?.message}
+              />
+            )}
           />
-          <Input
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password-new"
-            textContentType="newPassword"
-            required
+          <Controller
+            control={control}
+            name="password"
+            render={({ field, fieldState }) => (
+              <Input
+                label="Password"
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="password-new"
+                textContentType="newPassword"
+                required
+                error={fieldState.error?.message}
+              />
+            )}
           />
 
           <Button
             label="Sign up"
-            onPress={handleSubmit}
+            onPress={onSubmit}
             loading={submitting}
+            disabled={submitting}
             testID="signup-submit"
           />
 

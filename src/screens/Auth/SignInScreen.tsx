@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Controller, useForm } from 'react-hook-form';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -13,30 +14,35 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInParent } from '@/api/auth';
 import { Button, Input } from '@/components/ui';
 import type { AuthStackScreenProps } from '@/navigation/types';
+import {
+  signInSchema,
+  type SignInFormOutput,
+  type SignInFormValues,
+} from '@/screens/Auth/schemas';
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
 type Props = AuthStackScreenProps<'SignIn'>;
 
 export default function SignInScreen({ navigation }: Props) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const { control, handleSubmit, formState } = useForm<
+    SignInFormValues,
+    unknown,
+    SignInFormOutput
+  >({
+    resolver: zodResolver(signInSchema),
+    defaultValues: { email: '', password: '' },
+  });
 
-  const handleSubmit = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert('Missing info', 'Email and password are required.');
-      return;
-    }
-    setSubmitting(true);
+  const onSubmit = handleSubmit(async (values) => {
     try {
-      await signInParent(email, password);
+      await signInParent(values.email, values.password);
     } catch (err) {
       Alert.alert('Sign-in failed', errorMessage(err));
-    } finally {
-      setSubmitting(false);
     }
-  };
+  });
+
+  const submitting = formState.isSubmitting;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -48,31 +54,48 @@ export default function SignInScreen({ navigation }: Props) {
           <Text style={styles.brand}>BALLPARK</Text>
           <Text style={styles.title}>Welcome back</Text>
 
-          <Input
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-            textContentType="emailAddress"
-            required
+          <Controller
+            control={control}
+            name="email"
+            render={({ field, fieldState }) => (
+              <Input
+                label="Email"
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+                textContentType="emailAddress"
+                required
+                error={fieldState.error?.message}
+              />
+            )}
           />
-          <Input
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password"
-            textContentType="password"
-            required
+          <Controller
+            control={control}
+            name="password"
+            render={({ field, fieldState }) => (
+              <Input
+                label="Password"
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="password"
+                textContentType="password"
+                required
+                error={fieldState.error?.message}
+              />
+            )}
           />
 
           <Button
             label="Sign in"
-            onPress={handleSubmit}
+            onPress={onSubmit}
             loading={submitting}
+            disabled={submitting}
             testID="signin-submit"
           />
 
