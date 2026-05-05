@@ -629,6 +629,10 @@ export type Database = {
     }
     Functions: {
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      mark_coach_message_viewed: {
+        Args: { p_message_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
