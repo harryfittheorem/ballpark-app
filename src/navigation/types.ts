@@ -19,6 +19,16 @@ export type MainTabParamList = {
   Me: undefined;
 };
 
+export type HomeStackParamList = {
+  HomeMain: undefined;
+  VideoPlayback: { messageId: string };
+};
+
+export type HomeStackScreenProps<T extends keyof HomeStackParamList> = NativeStackScreenProps<
+  HomeStackParamList,
+  T
+>;
+
 export type MainTabScreenProps<T extends keyof MainTabParamList> = BottomTabScreenProps<
   MainTabParamList,
   T

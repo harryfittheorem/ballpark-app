@@ -139,19 +139,6 @@ export type SendCoachMessageInput = {
 export type SentCoachMessage = Tables<'coach_messages'>;
 
 /**
- * Insert a row into `public.coach_messages`. Mirrors `createBooking` in
- * `bookings.ts` — relies on RLS to reject any attempt to smuggle a row
- * into another tenant or impersonate another sender.
- *
- * tenant_id is read from the caller's `public.coaches` row (single source
- * of truth on the client; the JWT also carries it but we already keep
- * `coaches.tenant_id` cached via `useCoach`). sender_user_id is taken from
- * `supabase.auth.getUser()` so the value matches what auth.uid() will
- * resolve to inside the RLS policy. We `.select().single()` so callers get
- * the freshly-inserted row (id + created_at) for cache priming on the
- * sent-videos list later.
- */
-/**
  * Flat row returned by `listSentCoachMessages()` for the coach "My Videos"
  * list. Denormalised so each row can render without extra fetches.
  */
@@ -216,6 +203,103 @@ export async function listSentCoachMessages(
   }));
 }
 
+/**
+ * Latest coach message addressed to a kid, denormalised for the Home card.
+ * `video` is null when the row hasn't been linked to a video yet (defensive
+ * — coach_messages.video_id is nullable in the schema). `coach` is null
+ * when the sender isn't found in `public.coaches` (e.g. the row was sent
+ * by a deactivated coach whose row was hard-deleted).
+ */
+export type LatestCoachMessage = {
+  id: string;
+  createdAt: string;
+  viewedAt: string | null;
+  messageText: string | null;
+  video: {
+    status: Tables<'videos'>['status'];
+    muxPlaybackId: string | null;
+    durationSeconds: number | null;
+  } | null;
+  coach: { firstName: string; lastName: string } | null;
+};
+
+/**
+ * Fetch the most recent coach_message addressed to the given kid, with the
+ * related video (status + Mux playback id + duration) and the sending
+ * coach's name attached. Returns null when no message exists.
+ *
+ * Two round-trips because there is no FK between
+ * `coach_messages.sender_user_id` (-> auth.users) and
+ * `coaches.user_id`, so PostgREST can't auto-embed the relation. Doing the
+ * coach lookup as a second query keeps the join explicit and lets RLS on
+ * `public.coaches` (tenant-scoped) handle visibility.
+ *
+ * RLS on `coach_messages` already restricts parents to messages addressed
+ * to their family, so no extra filter beyond `recipient_kid_id` is needed.
+ */
+export async function getLatestCoachMessageForKid(
+  kidId: string,
+): Promise<LatestCoachMessage | null> {
+  const { data: msg, error: msgErr } = await supabase
+    .from('coach_messages')
+    .select(
+      'id, created_at, viewed_at, message_text, sender_user_id, video:videos(status, mux_playback_id, duration_seconds)',
+    )
+    .eq('recipient_kid_id', kidId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (msgErr) throw msgErr;
+  if (!msg) return null;
+
+  // Supabase typings model the embedded video as either array | object | null
+  // depending on inferred cardinality; normalise to a single record.
+  const videoRaw = msg.video as
+    | { status: Tables<'videos'>['status']; mux_playback_id: string | null; duration_seconds: number | null }
+    | { status: Tables<'videos'>['status']; mux_playback_id: string | null; duration_seconds: number | null }[]
+    | null;
+  const v = Array.isArray(videoRaw) ? videoRaw[0] ?? null : videoRaw;
+
+  let coach: LatestCoachMessage['coach'] = null;
+  if (msg.sender_user_id) {
+    const { data: c, error: coachErr } = await supabase
+      .from('coaches')
+      .select('first_name, last_name')
+      .eq('user_id', msg.sender_user_id)
+      .maybeSingle();
+    if (coachErr) throw coachErr;
+    if (c) coach = { firstName: c.first_name, lastName: c.last_name };
+  }
+
+  return {
+    id: msg.id,
+    createdAt: msg.created_at,
+    viewedAt: msg.viewed_at,
+    messageText: msg.message_text,
+    video: v
+      ? {
+          status: v.status,
+          muxPlaybackId: v.mux_playback_id,
+          durationSeconds: v.duration_seconds,
+        }
+      : null,
+    coach,
+  };
+}
+
+/**
+ * Insert a row into `public.coach_messages`. Mirrors `createBooking` in
+ * `bookings.ts` — relies on RLS to reject any attempt to smuggle a row
+ * into another tenant or impersonate another sender.
+ *
+ * tenant_id is read from the caller's `public.coaches` row (single source
+ * of truth on the client; the JWT also carries it but we already keep
+ * `coaches.tenant_id` cached via `useCoach`). sender_user_id is taken from
+ * `supabase.auth.getUser()` so the value matches what auth.uid() will
+ * resolve to inside the RLS policy. We `.select().single()` so callers get
+ * the freshly-inserted row (id + created_at) for cache priming on the
+ * sent-videos list later.
+ */
 export async function sendCoachMessage(
   input: SendCoachMessageInput,
 ): Promise<SentCoachMessage> {

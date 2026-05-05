@@ -3,10 +3,10 @@ import { Calendar, Dumbbell, Home, Trophy, User } from 'lucide-react-native';
 
 import BookScreen from '@/screens/Book/BookScreen';
 import EarnScreen from '@/screens/Earn/EarnScreen';
-import HomeScreen from '@/screens/Home/HomeScreen';
 import WorkScreen from '@/screens/Work/WorkScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
+import HomeStackNavigator from './HomeStackNavigator';
 import MeStackNavigator from './MeStackNavigator';
 import type { MainTabParamList } from './types';
 
@@ -34,7 +34,7 @@ export default function MainTabNavigator() {
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
+        component={HomeStackNavigator}
         options={{ tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
       />
       <Tab.Screen

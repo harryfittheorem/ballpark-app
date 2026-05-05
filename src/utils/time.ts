@@ -1,6 +1,7 @@
 /**
- * Tiny relative-time helper used by the coach Sent Videos list (Step 4.11)
- * and any other "when did this happen" UI we add later.
+ * Tiny relative-time helper used by the coach Sent Videos list (Step 4.11),
+ * the parent Home tab's coach video card (Step 4.12), and any other
+ * "when did this happen" UI we add later.
  *
  * Intentionally framework-free — no date-fns / moment / luxon dependency.
  * Buckets are aligned with the v0.4 design spec:
@@ -26,6 +27,7 @@ export function formatRelativeTime(
 ): string {
   const d = input instanceof Date ? input : new Date(input);
   const diffMs = now.getTime() - d.getTime();
+  if (Number.isNaN(diffMs)) return '';
   if (diffMs < 60_000) return 'Just now';
 
   const diffMin = Math.floor(diffMs / 60_000);

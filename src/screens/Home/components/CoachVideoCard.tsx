@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play } from 'lucide-react-native';
+import { Loader, Mail, Play } from 'lucide-react-native';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -11,10 +11,14 @@ import {
   tracking,
 } from '@/theme';
 
+type Variant = 'ready' | 'processing' | 'empty';
+
 type Props = {
-  coachName: string;
+  variant?: Variant;
+  coachName?: string;
   thumbnail?: string;
   durationSeconds?: number;
+  subtitle?: string;
   onPress?: () => void;
 };
 
@@ -26,15 +30,20 @@ function formatDuration(totalSeconds: number): string {
 }
 
 export default function CoachVideoCard({
+  variant = 'ready',
   coachName,
   thumbnail,
   durationSeconds,
+  subtitle,
   onPress,
 }: Props) {
+  const interactive = variant === 'ready' && !!onPress;
+
   return (
     <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      onPress={interactive ? onPress : undefined}
+      disabled={!interactive}
+      style={({ pressed }) => [styles.card, pressed && interactive && styles.pressed]}
     >
       <View style={styles.thumbWrap}>
         {thumbnail ? (
@@ -47,10 +56,16 @@ export default function CoachVideoCard({
             style={StyleSheet.absoluteFill}
           />
         )}
-        <View style={styles.playIconWrap} pointerEvents="none">
-          <Play size={22} color={colors.gold} fill={colors.gold} />
+        <View style={styles.iconWrap} pointerEvents="none">
+          {variant === 'ready' ? (
+            <Play size={22} color={colors.gold} fill={colors.gold} />
+          ) : variant === 'processing' ? (
+            <Loader size={22} color={colors.gold} />
+          ) : (
+            <Mail size={22} color={colors.gold} />
+          )}
         </View>
-        {durationSeconds != null ? (
+        {variant === 'ready' && durationSeconds != null ? (
           <View style={styles.durationBadge} pointerEvents="none">
             <Text style={styles.durationText}>
               {formatDuration(durationSeconds)}
@@ -60,10 +75,28 @@ export default function CoachVideoCard({
       </View>
 
       <View style={styles.body}>
-        <Text style={styles.eyebrow}>TODAY&apos;S VIDEO</Text>
-        <Text style={styles.coachName} numberOfLines={1}>
-          {coachName}
+        <Text style={styles.eyebrow}>
+          {variant === 'ready'
+            ? "TODAY'S VIDEO"
+            : variant === 'processing'
+              ? 'NEW VIDEO'
+              : 'COACH VIDEOS'}
         </Text>
+        <Text
+          style={styles.title}
+          numberOfLines={variant === 'empty' ? 2 : 1}
+        >
+          {variant === 'ready'
+            ? coachName ?? ''
+            : variant === 'processing'
+              ? 'Processing video…'
+              : 'No coach videos yet — your coach will send one soon!'}
+        </Text>
+        {subtitle ? (
+          <Text style={styles.subtitle} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -100,7 +133,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  playIconWrap: {
+  iconWrap: {
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -129,10 +162,16 @@ const styles = StyleSheet.create({
     color: colors.gold,
     letterSpacing: tracking.wider,
   },
-  coachName: {
+  title: {
     fontFamily: fontFamilies.interBold,
     fontSize: fontSizes.md,
     color: colors.textOnDark,
+    marginTop: spacing.xs,
+  },
+  subtitle: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    color: colors.textMuted,
     marginTop: spacing.xs,
   },
 });
