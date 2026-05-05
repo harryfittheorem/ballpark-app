@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View, Pressable } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
+import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 
 import { useCoaches } from '../hooks/useCoaches';
+import CoachCard from './CoachCard';
 import SectionCard from './SectionCard';
 
 type Props = {
@@ -22,9 +23,93 @@ export default function CoachSection({
   selectedCoachId,
   onSelectCoach,
 }: Props) {
-  const { data: coaches } = useCoaches();
-  const findCoach = (id: string) => coaches?.find((c) => c.id === id) ?? null;
+  const coaches = useCoaches();
+  const findCoach = (id: string) =>
+    coaches.data?.find((c) => c.id === id) ?? null;
   const autoCoach = autoSelectedCoachId ? findCoach(autoSelectedCoachId) : null;
+
+  const renderBody = () => {
+    if (locked) {
+      return (
+        <View style={styles.placeholder}>
+          <Text style={styles.placeholderText}>
+            Available coaches will appear here.
+          </Text>
+        </View>
+      );
+    }
+
+    if (coaches.isPending) {
+      return (
+        <View style={styles.state}>
+          <ActivityIndicator color={colors.gold} />
+        </View>
+      );
+    }
+
+    if (coaches.isError) {
+      return (
+        <View style={styles.state}>
+          <Text style={styles.errorText}>Couldn&apos;t load coaches.</Text>
+          <Text
+            style={styles.retry}
+            onPress={() => {
+              if (!coaches.isRefetching) void coaches.refetch();
+            }}
+          >
+            {coaches.isRefetching ? 'Retrying…' : 'Tap to retry'}
+          </Text>
+        </View>
+      );
+    }
+
+    if (autoCoach) {
+      return (
+        <CoachCard
+          firstName={autoCoach.first_name}
+          lastName={autoCoach.last_name}
+          avatarUrl={autoCoach.avatar_url}
+          specialty={autoCoach.specialty}
+          bio={autoCoach.bio}
+          readOnly
+        />
+      );
+    }
+
+    // Intersect eligible IDs with the resolved coach rows; if the intersection
+    // is empty (no eligible coach, or every eligible ID failed to resolve to
+    // an active coach in the cache), show the defensive empty state.
+    const visibleCoaches = eligibleCoachIds
+      .map((id) => findCoach(id))
+      .filter((c): c is NonNullable<ReturnType<typeof findCoach>> => c !== null);
+
+    if (visibleCoaches.length === 0) {
+      return (
+        <View style={styles.state}>
+          <Text style={styles.emptyText}>
+            No coaches available for this slot.
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.list}>
+        {visibleCoaches.map((coach) => (
+          <CoachCard
+            key={coach.id}
+            firstName={coach.first_name}
+            lastName={coach.last_name}
+            avatarUrl={coach.avatar_url}
+            specialty={coach.specialty}
+            bio={coach.bio}
+            selected={coach.id === selectedCoachId}
+            onPress={() => onSelectCoach(coach.id)}
+          />
+        ))}
+      </View>
+    );
+  };
 
   return (
     <SectionCard
@@ -32,57 +117,7 @@ export default function CoachSection({
       locked={locked}
       lockedHint={locked ? lockedHint : undefined}
     >
-      {locked ? (
-        <View style={styles.placeholder}>
-          <Text style={styles.placeholderText}>Available coaches will appear here.</Text>
-        </View>
-      ) : autoCoach ? (
-        <View style={styles.autoCard}>
-          <View style={styles.autoHeader}>
-            <Text style={styles.autoBadge}>Auto-selected</Text>
-          </View>
-          <Text style={styles.coachName}>
-            {autoCoach.first_name} {autoCoach.last_name}
-          </Text>
-          {autoCoach.specialty ? (
-            <Text style={styles.specialty}>{autoCoach.specialty}</Text>
-          ) : null}
-        </View>
-      ) : eligibleCoachIds.length === 0 ? (
-        <View style={styles.placeholder}>
-          <Text style={styles.placeholderText}>Pick a time to choose a coach.</Text>
-        </View>
-      ) : (
-        <View style={styles.list}>
-          {eligibleCoachIds.map((id) => {
-            const coach = findCoach(id);
-            if (!coach) return null;
-            const selected = id === selectedCoachId;
-            return (
-              <Pressable
-                key={id}
-                onPress={() => onSelectCoach(id)}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                style={({ pressed }) => [
-                  styles.option,
-                  selected && styles.optionSelected,
-                  pressed && !selected && styles.optionPressed,
-                ]}
-              >
-                <Text style={[styles.optionName, selected && styles.optionNameSelected]}>
-                  {coach.first_name} {coach.last_name}
-                </Text>
-                {coach.specialty ? (
-                  <Text style={[styles.specialty, selected && styles.specialtySelected]}>
-                    {coach.specialty}
-                  </Text>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
+      {renderBody()}
     </SectionCard>
   );
 }
@@ -97,64 +132,30 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.base,
     color: colors.textLight,
   },
-  autoCard: {
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderGold,
-    backgroundColor: 'rgba(241, 229, 173, 0.06)',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    gap: spacing.xs,
-  },
-  autoHeader: {
-    flexDirection: 'row',
-  },
-  autoBadge: {
-    fontFamily: fontFamilies.oswaldSemiBold,
-    fontSize: fontSizes.xs,
-    color: colors.gold,
-    letterSpacing: tracking.wider,
-    textTransform: 'uppercase',
-  },
-  coachName: {
-    fontFamily: fontFamilies.interSemiBold,
-    fontSize: fontSizes.lg,
-    color: colors.textOnDark,
-  },
-  specialty: {
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.sm,
-    color: colors.textLight,
-  },
-  specialtySelected: {
-    color: colors.darkest,
-  },
-  list: {
+  state: {
+    minHeight: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.base,
   },
-  option: {
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderGold,
-    backgroundColor: 'rgba(241, 229, 173, 0.06)',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    gap: spacing.xs,
+  errorText: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.base,
+    color: colors.textLight,
+    textAlign: 'center',
   },
-  optionSelected: {
-    backgroundColor: colors.gold,
-    borderColor: colors.gold,
-  },
-  optionPressed: {
-    backgroundColor: 'rgba(241, 229, 173, 0.18)',
-  },
-  optionName: {
+  retry: {
     fontFamily: fontFamilies.interSemiBold,
-    fontSize: fontSizes.lg,
-    color: colors.textOnDark,
+    fontSize: fontSizes.base,
+    color: colors.gold,
   },
-  optionNameSelected: {
-    color: colors.darkest,
-    fontFamily: fontFamilies.interBold,
+  emptyText: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.base,
+    color: colors.textLight,
+    textAlign: 'center',
+  },
+  list: {
+    gap: spacing.lg,
   },
 });
