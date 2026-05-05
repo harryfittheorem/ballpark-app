@@ -41,7 +41,7 @@ Real testing occurs on a physical phone via Expo Go. Replit Deployments are not 
     - Theme: `/src/theme/` (tokens.ts, fonts.ts, index.ts)
     - Supabase Client: `/src/lib/supabase.ts`
 - **Database Schema:** `/supabase/migrations`
-- **Supabase Edge Functions:** `/supabase/functions`
+- **Supabase Edge Functions:** `/supabase/functions` (e.g. `mux-create-upload`)
 - **Supabase Seed Data:** `/supabase/seed`
 - **Design Tokens:** `/src/theme/tokens.ts`
 - **Database Types:** `/src/types/database.ts` (generated)
