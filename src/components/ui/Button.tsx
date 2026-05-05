@@ -104,7 +104,7 @@ function variantContainerStyle(variant: ButtonVariant): ViewStyle {
   if (variant === 'primary') {
     return {
       backgroundColor: colors.gold,
-      borderRadius: radius['2xl'],
+      borderRadius: radius.xl,
     };
   }
   if (variant === 'secondary') {
