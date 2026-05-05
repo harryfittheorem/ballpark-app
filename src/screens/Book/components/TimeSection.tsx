@@ -4,12 +4,17 @@ import { colors, fontFamilies, fontSizes } from '@/theme';
 
 import SectionCard from './SectionCard';
 
-export default function TimeSection() {
+type Props = {
+  locked: boolean;
+  lockedHint?: string;
+};
+
+export default function TimeSection({ locked, lockedHint }: Props) {
   return (
     <SectionCard
       title="Time"
-      locked
-      lockedHint="Pick a session type first."
+      locked={locked}
+      lockedHint={locked ? lockedHint : undefined}
     >
       <View style={styles.placeholder}>
         <Text style={styles.placeholderText}>Available time slots will appear here.</Text>
