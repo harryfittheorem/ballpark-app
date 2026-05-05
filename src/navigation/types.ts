@@ -24,6 +24,15 @@ export type MainTabScreenProps<T extends keyof MainTabParamList> = BottomTabScre
   T
 >;
 
+export type CoachTabParamList = {
+  Inbox: undefined;
+};
+
+export type CoachTabScreenProps<T extends keyof CoachTabParamList> = BottomTabScreenProps<
+  CoachTabParamList,
+  T
+>;
+
 export type MeStackParamList = {
   MeHome: undefined;
   BookingsList: undefined;

@@ -1,9 +1,10 @@
 /**
- * Root navigator — picks between three flows based on auth + family state:
+ * Root navigator — picks between flows based on auth + role + family state:
  *   1. Loading splash (initial session check, family fetch)
  *   2. Auth stack (signed-out)
- *   3. AddKid (signed-in, no kids yet)
- *   4. Main tabs (signed-in with at least one kid)
+ *   3. CoachTabs (signed-in coach — skips family fetch / AddKid entirely)
+ *   4. AddKid (signed-in parent, no kids yet)
+ *   5. Main tabs (signed-in parent with at least one kid)
  *
  * Mounts at the NavigationContainer level. AuthProvider must wrap this.
  */
@@ -17,6 +18,7 @@ import AddKidScreen from '@/screens/Auth/AddKidScreen';
 import { colors } from '@/theme';
 
 import AuthNavigator from './AuthNavigator';
+import CoachTabNavigator from './CoachTabNavigator';
 import MainTabNavigator from './MainTabNavigator';
 
 function Splash() {
@@ -27,17 +29,24 @@ function Splash() {
   );
 }
 
-function Inner() {
-  const { session, loading: authLoading } = useAuth();
+function ParentFlow() {
   const { kids, loading: famLoading, family } = useFamily();
-
-  if (authLoading) return <Splash />;
-  if (!session) return <AuthNavigator />;
-  // Signed in: wait for the first family fetch to settle so we don't flash
-  // the AddKid screen for users who already have kids.
+  // Wait for the first family fetch to settle so we don't flash the AddKid
+  // screen for users who already have kids.
   if (famLoading && !family) return <Splash />;
   if (kids.length === 0) return <AddKidScreen />;
   return <MainTabNavigator />;
+}
+
+function Inner() {
+  const { session, loading: authLoading, appRole } = useAuth();
+
+  if (authLoading) return <Splash />;
+  if (!session) return <AuthNavigator />;
+  // Coaches don't have a family record — skip useFamily entirely so we don't
+  // trigger an unnecessary fetch or block on a query that would never resolve.
+  if (appRole === 'coach') return <CoachTabNavigator />;
+  return <ParentFlow />;
 }
 
 export default function RootNavigator() {
