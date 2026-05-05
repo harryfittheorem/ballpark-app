@@ -1,0 +1,57 @@
+We're in v0.1 Step 1.5 Part B — writing the initial schema migration.
+
+Context: Part A is complete. Supabase CLI is initialized, project is
+linked (ref: exjcwvvglthnxerzpukw), SUPABASE_ACCESS_TOKEN and
+SUPABASE_DB_PASSWORD are in Replit Secrets so db push won't prompt.
+
+Read these docs in full before planning:
+- CLAUDE.md
+- docs/PRD.md section 5 (data model)
+- docs/ARCHITECTURE.md sections 3 (multi-tenant), 4 (auth),
+  11 (RLS policy patterns), 12 (Edge Functions)
+
+DO NOT WRITE ANY SQL YET. First, give me a detailed plan covering:
+
+1. Migration file
+   - Path: supabase/migrations/<timestamp>_initial_schema.sql
+   - Single file or split? (I prefer single file for v0.1 foundation)
+
+2. Tables (all with id uuid PK, created_at, updated_at)
+   - tenants (with brand_colors JSONB, brand_logo_url, stripe_account_id, royalty_config JSONB)
+   - locations (FK to tenants, address, city, state, zip, timezone, stripe_account_id)
+   - families (FK to tenants, primary_location_id FK to locations,
+     parent_user_id FK to auth.users, contact info, stripe_customer_id)
+   - kids (FK to families, age_group, position, jersey_number,
+     points_balance, current_streak_days)
+   - coaches (FK to tenants, primary_location_id FK to locations,
+     user_id FK to auth.users, specialty, bio, is_active)
+
+   Show the exact column types and nullability for each.
+
+3. Foreign key ON DELETE behavior — be explicit for every FK.
+   My preferences:
+   - tenants → cascade no-op (we never delete tenants)
+   - locations.tenant_id → CASCADE (delete tenant = delete locations)
+   - families.tenant_id → CASCADE
+   - families.primary_location_id → SET NULL (location can be deleted
+     without losing the family)
+   - families.parent_user_id → CASCADE (delete auth user = delete family)
+   - kids.family_id → CASCADE
+   - coaches.tenant_id → CASCADE
+   - coaches.primary_location_id → SET NULL
+   - coaches.user_id → CASCADE
+   Confirm or push back if any of these don't make sense.
+
+4. RLS policies for each table
+   - Enable RLS on every table (no exceptions)
+   - Tenant isolation policy on every table that has tenant_id
+   - Family-can-see-own-kids policies on families and kids
+   - Coach-can-see-own-location policies where relevant
+   - Parent can SELECT/INSERT/UPDATE their own family record
+   - List every policy by table with the SQL pattern
+
+5. Auth approach (per the resolution from earlier — Custom Access Token Hook)
+   - Function name: custom_access_token_hook(event jsonb)
+   - It reads the user_id from the event, looks up tenant_id, family_id,
+     role from the families table (or coaches table for staff)
+   - Returns the modified claims
