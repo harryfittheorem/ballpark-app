@@ -24,11 +24,9 @@ pattern = "**/{*.ts,*.tsx}"
 [languages.typescript.languageServer]
 start = "typescript-language-server --stdio"
 
-# Expo dev server runs in tunnel mode for phone connectivity
 [[ports]]
 localPort = 8081
 externalPort = 80
-exposeLocalhost = true
 
 [[ports]]
 localPort = 19000

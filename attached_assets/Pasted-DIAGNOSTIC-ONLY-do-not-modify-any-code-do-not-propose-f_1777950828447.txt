@@ -1,0 +1,101 @@
+DIAGNOSTIC ONLY — do not modify any code, do not propose fixes,
+do not start any new tasks. I need information gathering before
+deciding what to fix.
+
+Context: AddKid screen is failing on submit during the v0.1 phone
+smoke test. Signup succeeded (user can get past the auth screens),
+but adding the first kid throws an error.
+
+Please gather the following and report back:
+
+1. AddKid screen implementation
+   - Show me the full contents of src/screens/Auth/AddKidScreen.tsx
+   - Show me the full contents of src/hooks/useFamily.tsx (the
+     useAddKid mutation specifically)
+   - Show me the full contents of src/api/auth.ts if it has any
+     kid-related code
+
+2. Recent terminal logs
+   - Run: tail -200 ~/.npm/_logs/$(ls -t ~/.npm/_logs/ | head -1)
+     to see the latest npm log
+   - More importantly: are there any red errors in the Metro
+     bundler output from the last 10 minutes? If so, paste them
+     verbatim.
+
+3. Supabase auth state check
+   - Run this script (create as scripts/check-jwt.mjs if it doesn't
+     exist already — there's a verify-auth-hook.mjs that may have
+     similar logic to crib from):
+
+     import { createClient } from '@supabase/supabase-js';
+     const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+     const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+     const sb = createClient(url, anon);
+
+     // Sign in with the test user we just created
+     const TEST_EMAIL = process.argv[2];
+     const TEST_PASSWORD = process.argv[3];
+
+     const { data, error } = await sb.auth.signInWithPassword({
+       email: TEST_EMAIL,
+       password: TEST_PASSWORD,
+     });
+
+     if (error) {
+       console.error('Sign in failed:', error);
+       process.exit(1);
+     }
+
+     // Decode the JWT to see custom claims
+     const token = data.session.access_token;
+     const payload = JSON.parse(
+       Buffer.from(token.split('.')[1], 'base64').toString()
+     );
+
+     console.log('JWT payload:', JSON.stringify(payload, null, 2));
+     console.log('\nKey claims:');
+     console.log('  sub (auth user id):', payload.sub);
+     console.log('  tenant_id:', payload.tenant_id);
+     console.log('  family_id:', payload.family_id);
+     console.log('  role:', payload.role);
+
+     if (!payload.family_id) {
+       console.log('\n❌ family_id MISSING from JWT — the Auth Hook is not firing or the families row is missing for this user');
+     } else {
+       console.log('\n✅ JWT has all custom claims');
+     }
+
+   - Run it with: node scripts/check-jwt.mjs <test-email> <test-password>
+   - Use the credentials I used during the failed AddKid test
+     (you may need to ask me what they were if you don't know)
+   - Paste the full output
+
+4. Database state check via Supabase API
+   - Query the families table for any rows: how many rows are
+     there in public.families right now?
+   - For each row, show: id, tenant_id, parent_user_id, parent_email,
+     created_at, role
+   - Use the Supabase Management API SQL endpoint with
+     SUPABASE_ACCESS_TOKEN (same approach as the verify-auth-hook
+     script you ran in Step 1.5)
+
+5. RLS policy verification
+   - Confirm the kids INSERT policy exists and run a test SELECT to
+     verify the policy SQL:
+
+     SELECT polname, polqual, polwithcheck
+     FROM pg_policy p
+     JOIN pg_class c ON p.polrelid = c.oid
+     WHERE c.relname = 'kids' AND polcmd = 'a';  -- 'a' means INSERT
+
+   - Show me the policy text
+
+After gathering all 5 pieces, summarize what you found WITHOUT
+proposing fixes. Just present the data:
+
+- What the AddKid code is trying to do
+- Whether the JWT has family_id
+- Whether the families row exists for the test user
+- What the kids INSERT policy actually checks
+
+Then stop. I'll diagnose from there.
