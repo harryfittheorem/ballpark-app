@@ -1,16 +1,15 @@
 /**
- * Family + kids hook.
+ * Family + kids hook, backed by TanStack Query.
  *
- * Fetches the parent's family row and their kids on session change.
- * Exposes a callback to insert a kid (RLS-protected by family_id).
- *
- * Lightweight hand-rolled state — we'll fold this into TanStack Query when
- * the broader data layer lands (v0.2). For Step 1.6 we just need to know
- * "does this family already have a kid?" so the root nav can decide between
- * AddKid and the tab shell.
+ * One query per signed-in user (`['family', userId]`) fetches the family row
+ * and, if present, the kids list in a single async function. Consumers get
+ * the same `{ family, kids, loading, error }` shape they relied on before
+ * the migration. `useAddKid` is a `useMutation` that invalidates the family
+ * query on success so the kids list refreshes automatically.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 import { supabase } from '@/lib/supabase';
 import type { Tables, TablesInsert } from '@/types/database';
@@ -20,93 +19,70 @@ import { useAuth } from './useAuth';
 type Family = Tables<'families'>;
 type Kid = Tables<'kids'>;
 
-type FamilyState = {
+type FamilyData = {
   family: Family | null;
   kids: Kid[];
-  loading: boolean;
-  error: Error | null;
 };
 
-const initial: FamilyState = { family: null, kids: [], loading: true, error: null };
+const EMPTY: FamilyData = { family: null, kids: [] };
 
-let memoState: FamilyState = initial;
-const listeners = new Set<(s: FamilyState) => void>();
-let activeUserId: string | null = null;
-
-function setState(next: Partial<FamilyState>) {
-  memoState = { ...memoState, ...next };
-  listeners.forEach((l) => l(memoState));
+function familyKey(userId: string) {
+  return ['family', userId] as const;
 }
 
-async function refresh(userId: string) {
-  setState({ loading: true, error: null });
+async function fetchFamilyAndKids(userId: string): Promise<FamilyData> {
   const { data: family, error: famErr } = await supabase
     .from('families')
     .select('*')
     .eq('parent_user_id', userId)
     .maybeSingle();
+  if (famErr) throw famErr;
+  if (!family) return { family: null, kids: [] };
 
-  if (famErr) {
-    setState({ loading: false, error: famErr });
-    return;
-  }
-  if (!family) {
-    setState({ family: null, kids: [], loading: false });
-    return;
-  }
   const { data: kids, error: kidErr } = await supabase
     .from('kids')
     .select('*')
     .eq('family_id', family.id)
     .order('created_at', { ascending: true });
+  if (kidErr) throw kidErr;
 
-  if (kidErr) {
-    setState({ family, kids: [], loading: false, error: kidErr });
-    return;
-  }
-  setState({ family, kids: kids ?? [], loading: false });
+  return { family, kids: kids ?? [] };
 }
 
 export function useFamily() {
   const { user } = useAuth();
-  const [state, setLocal] = useState<FamilyState>(memoState);
+  const userId = user?.id ?? null;
 
-  useEffect(() => {
-    listeners.add(setLocal);
-    return () => {
-      listeners.delete(setLocal);
-    };
-  }, []);
+  const query = useQuery({
+    queryKey: userId ? familyKey(userId) : ['family', 'anonymous'],
+    queryFn: () => fetchFamilyAndKids(userId as string),
+    enabled: !!userId,
+  });
 
-  useEffect(() => {
-    if (!user) {
-      activeUserId = null;
-      memoState = initial;
-      setLocal(initial);
-      return;
-    }
-    if (activeUserId !== user.id) {
-      activeUserId = user.id;
-      // Clear stale data from a previous account before async refresh so
-      // we never render one user's family/kids under another user's session.
-      memoState = { family: null, kids: [], loading: true, error: null };
-      listeners.forEach((l) => l(memoState));
-      void refresh(user.id);
-    }
-  }, [user]);
-
-  return state;
+  const data = query.data ?? EMPTY;
+  return {
+    family: data.family,
+    kids: data.kids,
+    // When there's no user we resolve to the empty shape rather than
+    // staying in a loading state.
+    loading: !!userId && query.isPending,
+    error: (query.error as Error | null) ?? null,
+  };
 }
 
 export function useAddKid() {
   const { user } = useAuth();
-  return useCallback(
-    async (input: Omit<TablesInsert<'kids'>, 'family_id'>) => {
+  const qc = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (input: Omit<TablesInsert<'kids'>, 'family_id'>) => {
       if (!user) throw new Error('Not authenticated');
-      // Family must exist (provisioned by handle_new_user). Re-fetch in case
-      // it isn't in memo yet (e.g. directly after signup).
-      let family = memoState.family;
-      if (!family || family.parent_user_id !== user.id) {
+
+      // Family must exist (provisioned by handle_new_user). Read from cache
+      // when available, otherwise fetch fresh (e.g. directly after signup).
+      const cached = qc.getQueryData<FamilyData>(familyKey(user.id));
+      let family = cached?.family ?? null;
+      if (!family) {
         const { data, error } = await supabase
           .from('families')
           .select('*')
@@ -116,12 +92,22 @@ export function useAddKid() {
         if (!data) throw new Error('Family not found — auth hook may have failed');
         family = data;
       }
+
       const { error: insertErr } = await supabase
         .from('kids')
         .insert({ ...input, family_id: family.id });
       if (insertErr) throw insertErr;
-      await refresh(user.id);
     },
-    [user],
+    onSuccess: () => {
+      if (user) {
+        void qc.invalidateQueries({ queryKey: familyKey(user.id) });
+      }
+    },
+  });
+
+  // Preserve the existing call signature: `await addKid(input)`.
+  return useCallback(
+    (input: Omit<TablesInsert<'kids'>, 'family_id'>) => mutation.mutateAsync(input),
+    [mutation],
   );
 }

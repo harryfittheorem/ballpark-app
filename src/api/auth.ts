@@ -6,6 +6,7 @@
  * `public.handle_new_user` can resolve the tenant and provision a family row.
  */
 
+import { queryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
 
 const TENANT_SLUG = process.env.EXPO_PUBLIC_TENANT_SLUG ?? 'infinitehitting';
@@ -47,4 +48,7 @@ export async function signInParent(email: string, password: string) {
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+  // Drop all cached queries so a subsequent sign-in never sees the
+  // previous account's family/kids.
+  queryClient.clear();
 }
