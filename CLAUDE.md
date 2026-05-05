@@ -230,12 +230,12 @@ When implementing a screen, open the corresponding component in `InfiniteHitting
 
 ## Current Status
 
-**Phase:** v0.1 — Foundation & Auth — **DONE**
+**Phase:** v0.2 — Home Tab — **DONE** (shipped 2026-05-05)
 **Anchor customer:** Infinite Hitting (17 locations)
 **Target users:** Athletes (kids), Parents
-**Active features:** Expo bootstrap + theme tokens/fonts (BALLPARK splash). Supabase project linked. Schema: tenants, locations, families, kids, coaches with RLS, handle_new_user trigger, and custom_access_token_hook injecting tenant_id/family_id/app_role into JWTs (reserved `role` claim preserved at 'authenticated'). Per-table GRANTs to `authenticated` matching RLS scope. Auth flow wired end-to-end: parent signup → AddKid → 5-tab nav shell. Sign-out escape hatch on AddKid.
-**Verified:** End-to-end signup → add kid → bottom nav works on a real phone via Expo Go.
-**Next milestone:** v0.2 — Home Tab.
+**Active features:** v0.1 foundation (Expo + theme + Supabase schema/RLS/auth-hook + signup → AddKid → 5-tab shell) plus v0.2 Home Tab: form primitives + RHF/Zod, TanStack Query data layer (`useFamily`), and a 5-card Home screen (Hero, StatTiles, CoachVideo, UpcomingSession, QuickActions) matching `/design/InfiniteHittingApp.jsx`.
+**Verified:** Full smoke pass on a real phone via Expo Go — cold start, sign in/out/up, AddKid, all 5 Home cards, force-quit persistence, tab switching, Me tab + sign-out. `npm run typecheck` + `npm run lint` clean. `node scripts/verify-auth-hook.mjs` PASS.
+**Next milestone:** v0.3 — Booking System.
 
 ---
 

@@ -81,6 +81,7 @@ args = "Expo dev server"
 [[workflows.workflow]]
 name = "Expo dev server"
 author = "agent"
+mode = "parallel"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"

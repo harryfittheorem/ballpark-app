@@ -60,10 +60,12 @@
 
 ---
 
-## v0.2 — Home Tab
+## v0.2 — Home Tab ✅ SHIPPED 2026-05-05
 
 **Time estimate:** 5-7 days (Replit) / 4-6 days (local)
 **Goal:** A meaningful Home tab that resembles the prototype, with mock data wired through clean API stubs.
+
+**Sign-off:** Full phone smoke pass on Expo Go (cold start, auth flows, all 5 Home cards, tab switching, persistence). `npm run typecheck` + `npm run lint` clean. `node scripts/verify-auth-hook.mjs` PASS.
 
 ### Build order
 
