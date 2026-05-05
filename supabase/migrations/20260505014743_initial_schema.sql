@@ -215,7 +215,7 @@ DECLARE
   v_role      text;
 BEGIN
   v_user_id := (event->>'user_id')::uuid;
-  v_claims  := event->'claims';
+  v_claims  := COALESCE(event->'claims', '{}'::jsonb);
 
   -- Try parent / family first.
   SELECT tenant_id, id, role
