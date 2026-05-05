@@ -1,9 +1,13 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useToast } from '@/components/ui';
 import { spacing } from '@/theme';
+
+import type { MainTabScreenProps } from '@/navigation/types';
 
 import BookHeader from './components/BookHeader';
 import CoachSection from './components/CoachSection';
@@ -17,6 +21,9 @@ import type { Slot } from './utils/slots';
 
 export default function BookScreen() {
   const tabBarHeight = useBottomTabBarHeight();
+  const navigation =
+    useNavigation<MainTabScreenProps<'Book'>['navigation']>();
+  const { showToast } = useToast();
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -86,6 +93,27 @@ export default function BookScreen() {
     ? `${selectedSlot.coach_id}|${selectedSlot.start}`
     : null;
 
+  const resetSelection = useCallback(() => {
+    setSelectedSessionTypeId(null);
+    setSelectedDate(null);
+    setSelectedSlot(null);
+    setSelectedCoachId(null);
+    setCoachAutoSelected(false);
+    setEligibleCoachIds([]);
+  }, []);
+
+  // Hand-off after a successful booking: clear local state, jump back to the
+  // Home tab, then surface the confirmation toast. Toast fires after nav so
+  // it's visible on the destination screen.
+  const handleBooked = useCallback(
+    (formattedWhen: string) => {
+      resetSelection();
+      navigation.navigate('Home');
+      showToast(`Session booked for ${formattedWhen}`);
+    },
+    [navigation, resetSelection, showToast],
+  );
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <BookHeader />
@@ -132,7 +160,15 @@ export default function BookScreen() {
           />
         </View>
         <View style={styles.section}>
-          <SummarySection locked={summaryLocked} lockedHint={summaryLockedHint} />
+          <SummarySection
+            locked={summaryLocked}
+            lockedHint={summaryLockedHint}
+            sessionType={selectedSessionType}
+            date={selectedDate}
+            slot={selectedSlot}
+            selectedCoachId={selectedCoachId}
+            onBooked={handleBooked}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>

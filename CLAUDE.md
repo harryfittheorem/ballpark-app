@@ -230,12 +230,12 @@ When implementing a screen, open the corresponding component in `InfiniteHitting
 
 ## Current Status
 
-**Phase:** v0.3 — Booking System — Phase A COMPLETE (Steps 3.1 + 3.2 MERGED 2026-05-05). Phase B (API + screens) next.
+**Phase:** v0.3 — Booking System — Phase A + Phase B COMPLETE (Steps 3.1–3.8 MERGED 2026-05-05). Remaining v0.3: 3.9 (Home Upcoming Session pulls real data) + 3.10 (Bookings list in Me tab).
 **Anchor customer:** Infinite Hitting (17 locations)
 **Target users:** Athletes (kids), Parents
-**Active features:** v0.1 foundation + v0.2 Home Tab (5 cards, RHF/Zod forms, TanStack Query). v0.3 Step 3.1 added the booking schema (`session_types`, `coach_availability`, `bookings`) with FK indexes, `updated_at` triggers, RLS (parent CRUD over own family's bookings; coach SELECT; tenant-scoped SELECT on the catalogue tables), tenant pin on every write policy, per-table GRANTs. v0.3 Step 3.2 dropped `coaches.user_id NOT NULL` (admin-provisioned coaches) and seeded Coach Mike + 4 session_types + 3 Tue/Thu/Sat 09:00-12:00 availability windows — idempotent via stable UUIDs + `ON CONFLICT DO NOTHING`.
+**Active features:** v0.1 foundation + v0.2 Home Tab (5 cards, RHF/Zod forms, TanStack Query). v0.3 Phase A: bookings schema + tenant-pinned RLS + dev seed (Coach Mike, 4 session types, Tue/Thu/Sat 09:00–12:00). v0.3 Phase B: end-to-end Book tab — session type → date → time → coach → Summary; Step 3.8 wires the `Confirm Booking` button via `createBooking()` + `useCreateBooking` mutation that inserts a `status='confirmed'` row, invalidates `['day_bookings']` + `['upcoming_bookings']`, resets BookScreen state, navigates to Home, and shows a "Session booked for {date} at {time}" toast via the new `ToastProvider` (`src/components/ui/Toast.tsx`). Failure shows an inline error + Retry under the button (raw error in dev only).
 **Verified:** `npm run typecheck` + `npm run lint` clean. `node scripts/verify-auth-hook.mjs` PASS. Remote verification: 1 coach / 4 session_types / 3 availability rows present.
-**Next milestone:** v0.3 Phase B — `/src/api/bookings.ts` + Book + BookConfirm screens + Resend email.
+**Next milestone:** v0.3 Step 3.9 — Home Upcoming Session pulls real data; then 3.10 — Bookings list in Me tab.
 
 ---
 

@@ -8,13 +8,14 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import type { Tables } from '@/types/database';
+import type { Tables, TablesInsert } from '@/types/database';
 
 export type SessionType = Tables<'session_types'>;
 export type CoachAvailability = Tables<'coach_availability'>;
 export type Location = Tables<'locations'>;
 export type Booking = Tables<'bookings'>;
 export type Coach = Tables<'coaches'>;
+export type BookingInsert = TablesInsert<'bookings'>;
 
 export async function listSessionTypes(): Promise<SessionType[]> {
   const { data, error } = await supabase
@@ -69,6 +70,23 @@ export async function listCoaches(): Promise<Coach[]> {
     .order('first_name', { ascending: true });
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * Insert a new booking row. RLS policies in
+ * `20260505050000_v03_bookings_schema.sql` (and the harden migration) verify
+ * tenant_id, kid_id ownership, and that coach/location/session_type all
+ * belong to the same tenant. We pass `status: 'confirmed'` since v0.3 has no
+ * payment step.
+ */
+export async function createBooking(input: BookingInsert): Promise<Booking> {
+  const { data, error } = await supabase
+    .from('bookings')
+    .insert(input)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export async function getLocationById(id: string): Promise<Location | null> {
