@@ -9,10 +9,10 @@ import { colors } from '@/theme';
 import HeroCard from './components/HeroCard';
 import HomeHeader from './components/HomeHeader';
 import SectionPlaceholder from './components/SectionPlaceholder';
+import StatTilesRow from './components/StatTilesRow';
 import { styles } from './styles';
 
 const PLACEHOLDER_SECTIONS: ReadonlyArray<{ key: string; label: string }> = [
-  { key: 'stats', label: 'Stats placeholder' },
   { key: 'coachVideo', label: 'Coach video placeholder' },
   { key: 'upcoming', label: 'Upcoming session placeholder' },
   { key: 'quickActions', label: 'Quick actions placeholder' },
@@ -57,15 +57,23 @@ export default function HomeScreen() {
         }
       >
         {kid ? (
-          <View style={styles.section}>
-            <HeroCard
-              kidName={`${kid.first_name} ${kid.last_name}`.trim()}
-              ageGroup={kid.age_group ?? ''}
-              jerseyNumber={kid.jersey_number}
-              pointsBalance={kid.points_balance}
-              currentStreakDays={kid.current_streak_days}
-            />
-          </View>
+          <>
+            <View style={styles.section}>
+              <HeroCard
+                kidName={`${kid.first_name} ${kid.last_name}`.trim()}
+                ageGroup={kid.age_group ?? ''}
+                jerseyNumber={kid.jersey_number}
+                pointsBalance={kid.points_balance}
+                currentStreakDays={kid.current_streak_days}
+              />
+            </View>
+            <View style={styles.section}>
+              <StatTilesRow
+                pointsBalance={kid.points_balance}
+                currentStreakDays={kid.current_streak_days}
+              />
+            </View>
+          </>
         ) : null}
         {PLACEHOLDER_SECTIONS.map((s) => (
           <View key={s.key} style={styles.section}>
