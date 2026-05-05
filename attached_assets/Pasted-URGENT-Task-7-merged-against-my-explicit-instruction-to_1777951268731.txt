@@ -1,0 +1,56 @@
+URGENT: Task #7 merged against my explicit instruction to drop it.
+We need to revert to pre-Task-#7 state cleanly. Plan-mode first,
+no execution until I approve the plan.
+
+Target state: codebase as it was at commit 74280aca (the checkpoint
+you mentioned), which should be the state right after Step 1.6
+completed cleanly — auth flow + nav shell, no multi-kid editing.
+
+What to revert (Task #7 changes only):
+- src/hooks/useFamily.tsx — back to pre-Task-#7 version
+- src/navigation/MainTabNavigator.tsx — back to pre-Task-#7 version
+- src/navigation/types.ts — back to pre-Task-#7 version
+- src/screens/Auth/AddKidScreen.tsx — back to pre-Task-#7 version
+- src/screens/Me/MeScreen.tsx — back to pre-Task-#7 version
+- DELETE src/navigation/MeStackNavigator.tsx (added by Task #7)
+- DELETE src/screens/Me/AddKidModalScreen.tsx (added by Task #7)
+- DELETE src/screens/Me/EditKidScreen.tsx (added by Task #7)
+- DELETE src/screens/Me/components/KidForm.tsx (added by Task #7)
+- DELETE supabase/migrations/20260505020000_kid_avatars_storage.sql
+- Remove expo-image-picker from package.json + package-lock.json
+
+Database side:
+- The kid-avatars storage bucket and its 4 RLS policies got applied
+  to the remote DB. We need to drop them. Plan a follow-up migration
+  named YYYYMMDDHHMMSS_drop_kid_avatars_bucket.sql that:
+  - Deletes the kid-avatars storage bucket
+  - Drops the 4 associated RLS policies on storage.objects (whatever
+    Task #7 created)
+  - Run via supabase db push after I approve
+
+What NOT to revert:
+- Anything from Steps 1.1 through 1.6 — keep all that
+- Task #6 (Supabase publishable key refresh) — keep, that was scope-correct
+- The original schema migration from 1.5 — keep
+- All docs (CLAUDE.md, PRD.md, etc.) — keep
+- Theme tokens, fonts, App.tsx setup — keep
+
+Plan to give me before executing:
+1. Show me git log between 74280aca and HEAD so I can see exactly
+   what's there
+2. Show me the exact commits/files Task #7 introduced
+3. Show me the diff that the revert would apply for each modified
+   file (preview the changes before I approve)
+4. Show me the SQL of the cleanup migration for the storage bucket
+5. Confirm Task #9 (email confirmation) status — is it merged too,
+   in progress, or rejected?
+6. List any other in-flight or proposed tasks that should also stop
+7. List anything ambiguous you're not sure should be reverted
+
+After I review and approve the plan, execute and verify with:
+- npm run typecheck (must pass)
+- npm run lint (must pass)
+- ls -la for any deleted files (confirm gone)
+- supabase db push for the cleanup migration
+
+Do not start until I approve the plan.
