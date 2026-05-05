@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Calendar, Dumbbell, Home, Trophy, User } from 'lucide-react-native';
 
+import { useCoachMessageBadge } from '@/hooks/useNewCoachMessage';
 import BookScreen from '@/screens/Book/BookScreen';
 import EarnScreen from '@/screens/Earn/EarnScreen';
 import WorkScreen from '@/screens/Work/WorkScreen';
@@ -13,6 +14,7 @@ import type { MainTabParamList } from './types';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function MainTabNavigator() {
+  const hasNewCoachMessage = useCoachMessageBadge();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -35,7 +37,13 @@ export default function MainTabNavigator() {
       <Tab.Screen
         name="Home"
         component={HomeStackNavigator}
-        options={{ tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
+        options={{
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          // Empty-string badge renders as a small dot indicator (presence,
+          // not a count) — see Step 4.14.
+          tabBarBadge: hasNewCoachMessage ? '' : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.gold },
+        }}
       />
       <Tab.Screen
         name="Work"

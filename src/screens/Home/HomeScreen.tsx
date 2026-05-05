@@ -1,5 +1,5 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
@@ -16,6 +16,7 @@ import type { HomeStackScreenProps } from '@/navigation/types';
 import { colors, spacing } from '@/theme';
 import { formatRelativeTime } from '@/utils/time';
 
+import CoachMessageToast from './components/CoachMessageToast';
 import CoachVideoCard from './components/CoachVideoCard';
 import HeroCard from './components/HeroCard';
 import HomeHeader from './components/HomeHeader';
@@ -42,8 +43,12 @@ export default function HomeScreen() {
   const { kids } = useFamily();
   const kid = kids[0];
   const { session: upcoming } = useUpcomingSession(kid?.id);
+  // Focus-gated so the 60s polling interval (Step 4.14) doesn't run while
+  // the parent is on a non-Home tab. Cached data still renders the
+  // CoachVideoCard when defocused so there's no flash on tab switch.
+  const isFocused = useIsFocused();
   const { data: latestMessage, isPending: latestMessagePending } =
-    useLatestCoachMessage(kid?.id);
+    useLatestCoachMessage(kid?.id, { enabled: isFocused });
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -102,6 +107,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <HomeHeader locationName="Dallas N." />
+      <CoachMessageToast />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
