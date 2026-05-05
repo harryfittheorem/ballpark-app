@@ -81,11 +81,12 @@ Path aliases configured in both `tsconfig.json` and `babel.config.js` (via `babe
 
 ## Current status
 
-- **Phase:** v0.1 — Foundation & Auth
-- **Done:** Expo + TypeScript scaffolding, theme tokens + fonts, Supabase schema + RLS + custom access token hook, **Step 1.6**: Supabase client (`src/lib/supabase.ts`, SecureStore-persisted session), auth API (`src/api/auth.ts`), AuthProvider + useFamily hooks, SignUp/SignIn/AddKid screens, RootNavigator that gates between Auth → AddKid → MainTabs, 5-tab bottom nav (Home/Work/Book/Earn/Me) with placeholder screens. Typecheck + lint clean.
-- **Next:** wire TanStack Query into the data layer, build the real Home/Work/Book/Earn/Me screens, and start booking flow (v0.2).
+- **Phase:** v0.1 — Foundation & Auth — **COMPLETE**
+- **Done:** Expo + TypeScript scaffolding, theme tokens + fonts, Supabase schema + RLS + custom access token hook (with the `app_role` / GRANT fixes from Task #19), Supabase client (`src/lib/supabase.ts`, SecureStore-persisted session), auth API (`src/api/auth.ts`), AuthProvider + useFamily hooks, SignUp/SignIn/AddKid screens, sign-out escape hatch on AddKid, RootNavigator that gates between Auth → AddKid → MainTabs, 5-tab bottom nav (Home/Work/Book/Earn/Me) with placeholder screens. Typecheck + lint clean.
+- **Verified end-to-end on phone via Expo Go:** signup → add kid → bottom nav.
+- **Next milestone:** v0.2 — Home Tab. (Then: TanStack Query data layer, real Work/Book/Earn/Me screens, booking flow.)
 
-### Scope discipline notes (Task #15 + Task #18 reverts)
+### Scope discipline notes (Task #15 + Task #18 reverts; v0.1 closed)
 Task #7 (multi-kid editing — KidForm, MeStackNavigator, EditKid/AddKid modals, avatar picker, `kid-avatars` storage bucket) was merged out of scope and reverted in Task #15. v0.1 stays at "one kid per family, single AddKid screen, Me tab is read-only with sign-out". Multi-kid editing is deferred to v0.6. The `kid-avatars` storage bucket + RLS policies were removed in `supabase/migrations/20260505030000_drop_kid_avatars_storage.sql` (drops the four `kid_avatars_*` policies, then deletes bucket objects + the bucket itself; the migration temporarily disables Supabase's `protect_objects_delete` / `protect_buckets_delete` triggers because those block direct SQL DELETE on `storage.*`). On the live remote DB the bucket was already removed out-of-band via the Storage REST API before the migration was finalized, so the SQL DELETEs ran as a no-op there; on a fresh `supabase db reset` the migration performs the full cleanup itself. `expo-image-picker` was removed from `package.json`.
 
 Task #9 (email-confirmation "check your email" screen + 4s `signInWithPassword` polling loop + `resendSignUpConfirmation` API helper) was also merged out of scope and reverted in Task #18. The polling pattern was a workaround for not having proper deep-link auth handling. v0.1 stays at "signup → AuthProvider's `onAuthStateChange` listener flips RootNavigator forward → AddKid". Email confirmation + deep-link auth handling are deferred to v0.5+. If Supabase's "Confirm email" project setting is left ON, signup returns `{ session: null }` and the parent appears stuck on the SignUp screen with no error — that's the documented pre-#9 behavior; flip the setting OFF in the Supabase dashboard for v0.1 testing.

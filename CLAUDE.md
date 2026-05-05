@@ -230,11 +230,12 @@ When implementing a screen, open the corresponding component in `InfiniteHitting
 
 ## Current Status
 
-**Phase:** v0.1 — Initial setup and authentication
+**Phase:** v0.1 — Foundation & Auth — **DONE**
 **Anchor customer:** Infinite Hitting (17 locations)
 **Target users:** Athletes (kids), Parents
-**Active features:** Expo bootstrap + theme tokens/fonts (BALLPARK splash). Supabase project linked. Initial schema landed: tenants, locations, families, kids, coaches with RLS, handle_new_user trigger, and custom_access_token_hook injecting tenant_id/family_id/role into JWTs.
-**Next milestone:** v0.1 Step 1.6 — Auth flow (parent signup → AddKid → 5-tab nav shell) wired to Supabase.
+**Active features:** Expo bootstrap + theme tokens/fonts (BALLPARK splash). Supabase project linked. Schema: tenants, locations, families, kids, coaches with RLS, handle_new_user trigger, and custom_access_token_hook injecting tenant_id/family_id/app_role into JWTs (reserved `role` claim preserved at 'authenticated'). Per-table GRANTs to `authenticated` matching RLS scope. Auth flow wired end-to-end: parent signup → AddKid → 5-tab nav shell. Sign-out escape hatch on AddKid.
+**Verified:** End-to-end signup → add kid → bottom nav works on a real phone via Expo Go.
+**Next milestone:** v0.2 — Home Tab.
 
 ---
 
