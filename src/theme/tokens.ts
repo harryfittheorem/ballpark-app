@@ -91,6 +91,13 @@ export const fontSizes = {
   '6xl': 48,
 } as const;
 
+export const tracking = {
+  none: 0,
+  tight: 0.5,
+  wide: 1,
+  wider: 1.5,
+} as const;
+
 export const fontWeights = {
   regular: '400',
   medium: '500',
@@ -136,6 +143,7 @@ export const fontFamilies = {
 export type Colors = typeof colors;
 export type Spacing = typeof spacing;
 export type Radius = typeof radius;
+export type Tracking = typeof tracking;
 export type FontSizes = typeof fontSizes;
 export type FontWeights = typeof fontWeights;
 export type Fonts = typeof fonts;

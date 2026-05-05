@@ -11,7 +11,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
+import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -46,11 +46,14 @@ export function Button({
   disabled = false,
   leftIcon,
   rightIcon,
-  fullWidth = true,
+  fullWidth,
   testID,
   accessibilityLabel,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  // Tertiary buttons are link-style and should hug their label by default;
+  // primary/secondary stretch to fill their parent unless explicitly opted out.
+  const shouldFillWidth = fullWidth ?? variant !== 'tertiary';
 
   const handlePress = () => {
     if (isDisabled) return;
@@ -65,7 +68,7 @@ export function Button({
     styles.base,
     sizeStyles[size].container,
     variantContainerStyle(variant),
-    fullWidth && styles.fullWidth,
+    shouldFillWidth && styles.fullWidth,
     isDisabled && styles.disabled,
   ];
 
@@ -128,7 +131,7 @@ function variantTextStyle(variant: ButtonVariant, tone: ButtonTone): TextStyle {
       color: colors.dark,
       fontFamily: fontFamilies.oswaldBold,
       textTransform: 'uppercase',
-      letterSpacing: 1,
+      letterSpacing: tracking.wide,
     };
   }
   if (variant === 'secondary') {
@@ -136,7 +139,7 @@ function variantTextStyle(variant: ButtonVariant, tone: ButtonTone): TextStyle {
       color: colors.gold,
       fontFamily: fontFamilies.oswaldBold,
       textTransform: 'uppercase',
-      letterSpacing: 1,
+      letterSpacing: tracking.wide,
     };
   }
   // tertiary — tone-driven, no uppercase (used for links + sign-out)

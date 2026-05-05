@@ -5,7 +5,7 @@ import {
   View,
 } from 'react-native';
 
-import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
+import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
 export type PickerMode = 'chips' | 'modal';
 
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     marginBottom: spacing.sm,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: tracking.wide,
   },
   requiredMark: {
     color: colors.danger,

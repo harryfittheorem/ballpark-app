@@ -7,7 +7,7 @@ import {
   type TextInputProps,
 } from 'react-native';
 
-import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
+import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
 export interface InputProps {
   label?: string;
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     marginBottom: spacing.sm,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: tracking.wide,
   },
   requiredMark: {
     color: colors.danger,
@@ -164,7 +164,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing['2xl'],
   },
   inputMultiline: {
-    minHeight: 96,
+    // ~4 lines at the body line-height; matches DESIGN.md textarea guidance.
+    minHeight: spacing['7xl'] * 2,
     textAlignVertical: 'top',
   },
   adornment: {
