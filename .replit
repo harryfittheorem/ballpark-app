@@ -1,0 +1,47 @@
+modules = ["nodejs-20"]
+run = "npm run dev"
+hidden = [".config", "package-lock.json", "node_modules"]
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "npm run dev"]
+deploymentTarget = "static"
+
+[env]
+PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin"
+npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm/node_global"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix"]
+
+[languages]
+
+[languages.typescript]
+pattern = "**/{*.ts,*.tsx}"
+
+[languages.typescript.languageServer]
+start = "typescript-language-server --stdio"
+
+# Expo dev server runs in tunnel mode for phone connectivity
+[[ports]]
+localPort = 8081
+externalPort = 80
+exposeLocalhost = true
+
+[[ports]]
+localPort = 19000
+externalPort = 3000
+
+[[ports]]
+localPort = 19001
+externalPort = 3001
+
+[[ports]]
+localPort = 19002
+externalPort = 3002
+
+# When in shell, start a Bash environment by default
+[interpreter]
+command = ["bash"]
