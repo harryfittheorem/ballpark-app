@@ -81,5 +81,11 @@ Path aliases configured in both `tsconfig.json` and `babel.config.js` (via `babe
 ## Current status
 
 - **Phase:** v0.1 — Foundation & Auth
-- **Done:** Expo + TypeScript scaffolding, all locked deps installed, folder structure, path aliases (tsconfig + babel), ESLint config, dark/gold app shell renders. Typecheck + lint clean.
-- **Next:** v0.1 step 1.4 — theme tokens (`/src/theme/tokens.ts`, `fonts.ts`) and font loading in `App.tsx`. Then Supabase schema + RLS + auth screens + 5-tab navigation.
+- **Done:** Expo + TypeScript scaffolding, theme tokens + fonts, Supabase schema + RLS + custom access token hook, **Step 1.6**: Supabase client (`src/lib/supabase.ts`, SecureStore-persisted session), auth API (`src/api/auth.ts`), AuthProvider + useFamily hooks, SignUp/SignIn/AddKid screens, RootNavigator that gates between Auth → AddKid → MainTabs, 5-tab bottom nav (Home/Work/Book/Earn/Me) with placeholder screens. Typecheck + lint clean.
+- **Next:** wire TanStack Query into the data layer, build the real Home/Work/Book/Earn/Me screens, and start booking flow (v0.2).
+
+### Auth flow notes
+- Signup passes `tenant_slug: 'infinitehitting'` in `options.data`; the Postgres `handle_new_user` trigger provisions a `families` row.
+- A new parent lands on AddKid until they add their first kid (kid count drives the root nav switch).
+- Session is persisted via `expo-secure-store` (web fallback: localStorage).
+- `react-native-url-polyfill` is required by `@supabase/supabase-js` on RN.
