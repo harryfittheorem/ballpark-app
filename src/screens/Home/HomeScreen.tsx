@@ -9,13 +9,13 @@ import { colors } from '@/theme';
 import CoachVideoCard from './components/CoachVideoCard';
 import HeroCard from './components/HeroCard';
 import HomeHeader from './components/HomeHeader';
+import QuickActionsRow from './components/QuickActionsRow';
 import SectionPlaceholder from './components/SectionPlaceholder';
 import StatTilesRow from './components/StatTilesRow';
 import { styles } from './styles';
 
 const PLACEHOLDER_SECTIONS: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'upcoming', label: 'Upcoming session placeholder' },
-  { key: 'quickActions', label: 'Quick actions placeholder' },
 ];
 
 export default function HomeScreen() {
@@ -83,6 +83,9 @@ export default function HomeScreen() {
             <SectionPlaceholder label={s.label} />
           </View>
         ))}
+        <View style={styles.section}>
+          <QuickActionsRow />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
