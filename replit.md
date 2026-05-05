@@ -41,7 +41,7 @@ Real testing occurs on a physical phone via Expo Go. Replit Deployments are not 
     - Theme: `/src/theme/` (tokens.ts, fonts.ts, index.ts)
     - Supabase Client: `/src/lib/supabase.ts`
 - **Database Schema:** `/supabase/migrations`
-- **Supabase Edge Functions:** `/supabase/functions` (e.g. `mux-create-upload`)
+- **Supabase Edge Functions:** `/supabase/functions` (`mux-create-upload`, `mux-webhook`)
 - **Supabase Seed Data:** `/supabase/seed`
 - **Design Tokens:** `/src/theme/tokens.ts`
 - **Database Types:** `/src/types/database.ts` (generated)
@@ -56,6 +56,7 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 -   **Folder Structure:** The nested per-screen folder structure outlined in `ARCHITECTURE.md §9` is authoritative.
 -   **Stripe Connect Onboarding:** Handled out-of-band via Stripe-hosted dashboards; the app only consumes the `stripe_account_id`.
 -   **Coach Provisioning:** Coaches are admin-created via the Supabase Admin API with `raw_user_meta_data.app_role='coach'`; the `handle_new_user` trigger branches on `app_role` and inserts into `public.coaches` instead of `public.families`. There is no in-app coach signup screen. Use `scripts/provision-coach-mike.mjs` as the reference invocation.
+-   **Mux Webhook:** `mux-webhook` Edge Function is deployed `--no-verify-jwt`; auth is the `Mux-Signature` HMAC over the raw body against `MUX_WEBHOOK_SECRET` (300s replay window). Idempotent: every UPDATE keys on the UNIQUE `videos.mux_asset_id` and never INSERTs. Unknown asset/upload ids return 503 so Mux retries with backoff; unhandled event types ack 200 ignored.
 
 ## Product
 
