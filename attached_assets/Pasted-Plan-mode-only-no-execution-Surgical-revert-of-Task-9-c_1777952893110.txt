@@ -1,0 +1,62 @@
+Plan-mode only — no execution. Surgical revert of Task #9 (commit
+74280ac), keeping all other commits intact.
+
+Reason: Email confirmation flow is out of v0.1 scope per PRD §7.
+The polling implementation (signInWithPassword every 4s) is a
+workaround for not having deep link auth handling, and we'd
+implement this differently in v0.5+ when email confirmation is
+properly in scope.
+
+Task #9 changes (per git show 74280ac):
+  src/api/auth.ts                         | +8 lines (resendSignUpConfirmation)
+  src/navigation/AuthNavigator.tsx        | +2 lines (ConfirmEmail screen)
+  src/navigation/types.ts                 | +1 line (ConfirmEmail route)
+  src/screens/Auth/ConfirmEmailScreen.tsx | NEW (196 lines)
+  src/screens/Auth/SignUpScreen.tsx       | +19/-3 lines (post-signup branch)
+
+Note: Task #15 (revert of Task #7) sits between Task #9 (74280ac)
+and HEAD. Task #15 may have touched some of the same files. Be
+careful — diff against HEAD's current state, not against eaa7050.
+
+Plan to give me before executing:
+
+1. Show me the current state of each affected file ON MAIN now:
+   - src/api/auth.ts
+   - src/navigation/AuthNavigator.tsx
+   - src/navigation/types.ts
+   - src/screens/Auth/SignUpScreen.tsx
+
+2. Show me the diff that the revert would apply to each:
+   - DELETE src/screens/Auth/ConfirmEmailScreen.tsx
+   - REVERT SignUpScreen.tsx — after signUpParent returns, trust
+     AuthProvider's onAuthStateChange listener and let
+     RootNavigator route forward (this is the pre-Task-#9 behavior)
+   - REVERT AuthNavigator.tsx — remove ConfirmEmail screen registration
+   - REVERT types.ts — remove ConfirmEmail route
+   - REVERT api/auth.ts — remove resendSignUpConfirmation function
+
+3. Confirm: no code outside Task #9's footprint references
+   ConfirmEmail, ConfirmEmailScreen, or resendSignUpConfirmation.
+   Run: grep -rn "ConfirmEmail\|resendSignUpConfirmation" src/
+
+4. Verify steps post-revert:
+   - npm run typecheck (must pass)
+   - npm run lint (must pass)
+   - grep -rn "ConfirmEmail\|resendSignUpConfirmation" src/
+     (must return zero matches after revert)
+   - node scripts/verify-auth-hook.mjs (must still PASS)
+
+What NOT to revert:
+- Anything from Steps 1.1 through 1.6 (keep)
+- Task #6 publishable key refresh (keep)
+- Task #15 surgical revert of Task #7 (keep — that revert is good)
+- Theme tokens, fonts, App.tsx wrapping (keep)
+- scripts/check-jwt.mjs (keep — diagnostic tool)
+
+Commit message after execution:
+"Task #16: Revert Task #9 (email confirmation) — out of v0.1 scope"
+
+Push to main after my explicit approval.
+
+STOP after presenting the plan. Do not modify any files until I
+review the plan and approve.
