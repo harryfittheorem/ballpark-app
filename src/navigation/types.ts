@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 export type AuthStackParamList = {
   SignIn: undefined;
   SignUp: undefined;
+  ConfirmEmail: { email: string; password: string };
 };
 
 export type AuthStackScreenProps<T extends keyof AuthStackParamList> = NativeStackScreenProps<

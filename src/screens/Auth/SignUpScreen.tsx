@@ -38,9 +38,22 @@ export default function SignUpScreen({ navigation }: Props) {
     }
     setSubmitting(true);
     try {
-      await signUpParent({ email, password, firstName, lastName, phone: phone || undefined });
-      // Auth state listener will route us into the app; AddKid is shown next
-      // because the family will have zero kids.
+      const result = await signUpParent({
+        email,
+        password,
+        firstName,
+        lastName,
+        phone: phone || undefined,
+      });
+      if (!result.session) {
+        // Supabase has email confirmation enabled — no session is created
+        // until the user clicks the link in their inbox. Send them to a
+        // dedicated screen instead of silently dropping them into the app.
+        navigation.navigate('ConfirmEmail', { email: email.trim(), password });
+        return;
+      }
+      // Otherwise the auth state listener will route us into the app; AddKid
+      // is shown next because the family will have zero kids.
     } catch (err) {
       Alert.alert('Sign-up failed', err instanceof Error ? err.message : 'Unknown error');
     } finally {
