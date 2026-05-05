@@ -10,13 +10,15 @@ import { useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { Send, Video } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { signOut } from '@/api/auth';
 import { useAuth } from '@/hooks/useAuth';
 import { coachKey, useCoach } from '@/hooks/useCoach';
 import type { CoachInboxStackScreenProps } from '@/navigation/types';
 import { colors } from '@/theme';
+import { errorMessage } from '@/utils/error';
 
 import BookingsStatRow from './components/BookingsStatRow';
 import CoachActionCard from './components/CoachActionCard';
@@ -46,6 +48,23 @@ export default function CoachHomeScreen() {
       setRefreshing(false);
     }
   }, [qc, user]);
+
+  const handleSignOut = useCallback(() => {
+    Alert.alert('Sign out?', 'You will need to sign in again to use Ballpark.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch (err) {
+            Alert.alert('Sign-out failed', errorMessage(err));
+          }
+        },
+      },
+    ]);
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -80,6 +99,9 @@ export default function CoachHomeScreen() {
             onPress={() => navigation.navigate('SentVideos')}
           />
         </View>
+        <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
+          <Text style={styles.signOutText}>Sign out</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

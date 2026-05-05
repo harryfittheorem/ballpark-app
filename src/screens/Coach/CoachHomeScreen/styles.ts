@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { colors, spacing } from '@/theme';
+import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
 export const styles = StyleSheet.create({
   safe: {
@@ -19,5 +19,20 @@ export const styles = StyleSheet.create({
   },
   cards: {
     gap: spacing['2xl'],
+  },
+  signOutBtn: {
+    marginTop: spacing['4xl'],
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: spacing['3xl'],
+    alignItems: 'center',
+  },
+  signOutText: {
+    color: colors.gold,
+    fontFamily: fontFamilies.interBold,
+    fontSize: fontSizes.lg,
+    textTransform: 'uppercase',
+    letterSpacing: tracking.wide,
   },
 });
