@@ -39,8 +39,9 @@ The Replit preview pane is **not** the target — this is a native mobile app. R
 Secrets live in Replit `.replit` userenv (already configured):
 
 - `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY` — **publishable key** from the new Supabase API key system (starts with `sb_publishable_...`, not the legacy `eyJ...` JWT). The project has migrated its legacy JWT secret to JWT Signing Keys, so the old `anon` JWT is verify-only and no longer accepted as an API key. We kept the env-var name as `EXPO_PUBLIC_SUPABASE_ANON_KEY` for code stability — `supabase-js` accepts the publishable key in the same slot.
 - `EXPO_PUBLIC_TENANT_SLUG=infinitehitting`
+- `SUPABASE_SERVICE_ROLE_KEY` — **secret key** from the new key system (`sb_secret_...`). Server/admin-only; never bundle into the mobile app (no `EXPO_PUBLIC_` prefix). Used by `scripts/verify-auth-hook.mjs` to admin-create + clean up throwaway users so the smoke test runs end-to-end regardless of email-confirmation settings.
 
 Server-side keys (Stripe secret, Mux, Resend, Twilio, Anthropic) live in Supabase Edge Functions secrets, **not** in the mobile app bundle. Only `EXPO_PUBLIC_*` vars are bundled into the app.
 
