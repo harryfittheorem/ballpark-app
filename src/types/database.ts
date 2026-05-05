@@ -196,6 +196,74 @@ export type Database = {
           },
         ]
       }
+      coach_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message_text: string | null
+          recipient_family_id: string
+          recipient_kid_id: string
+          sender_user_id: string
+          tenant_id: string
+          updated_at: string
+          video_id: string | null
+          viewed_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_text?: string | null
+          recipient_family_id: string
+          recipient_kid_id: string
+          sender_user_id: string
+          tenant_id: string
+          updated_at?: string
+          video_id?: string | null
+          viewed_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_text?: string | null
+          recipient_family_id?: string
+          recipient_kid_id?: string
+          sender_user_id?: string
+          tenant_id?: string
+          updated_at?: string
+          video_id?: string | null
+          viewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_messages_recipient_family_id_fkey"
+            columns: ["recipient_family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_messages_recipient_kid_id_fkey"
+            columns: ["recipient_kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_messages_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coaches: {
         Row: {
           avatar_url: string | null
@@ -507,6 +575,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      videos: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          mux_asset_id: string
+          mux_playback_id: string | null
+          status: string
+          tenant_id: string
+          title: string | null
+          updated_at: string
+          uploaded_by_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          mux_asset_id: string
+          mux_playback_id?: string | null
+          status?: string
+          tenant_id: string
+          title?: string | null
+          updated_at?: string
+          uploaded_by_user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          mux_asset_id?: string
+          mux_playback_id?: string | null
+          status?: string
+          tenant_id?: string
+          title?: string | null
+          updated_at?: string
+          uploaded_by_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

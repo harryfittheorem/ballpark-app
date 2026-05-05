@@ -230,7 +230,7 @@ When implementing a screen, open the corresponding component in `InfiniteHitting
 
 ## Current Status
 
-**Phase:** v0.3 — Booking System — COMPLETE through Step 3.11 (Phase A + Phase B + Home/Me bookings + family `primary_location_id` defaulting). Next is v0.4 booking detail + cancel.
+**Phase:** v0.4 kickoff — Step 4.1 (videos + coach_messages schema) MERGED. v0.3 closed at Step 3.11.
 **Anchor customer:** Infinite Hitting (17 locations)
 **Target users:** Athletes (kids), Parents
 **Active features:** v0.1 foundation + v0.2 Home Tab (5 cards, RHF/Zod forms, TanStack Query). v0.3 Phase A: bookings schema + tenant-pinned RLS + dev seed (Coach Mike, 4 session types, Tue/Thu/Sat 09:00–12:00). v0.3 Phase B: end-to-end Book tab — session type → date → time → coach → Summary; Step 3.8 wires the `Confirm Booking` button via `createBooking()` + `useCreateBooking` mutation that inserts a `status='confirmed'` row, invalidates `['day_bookings']` + `['upcoming_bookings']`, resets BookScreen state, navigates to Home, and shows a "Session booked for {date} at {time}" toast via the new `ToastProvider` (`src/components/ui/Toast.tsx`). Failure shows an inline error + Retry under the button (raw error in dev only).
