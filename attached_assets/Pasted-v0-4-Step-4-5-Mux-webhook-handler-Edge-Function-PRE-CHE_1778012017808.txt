@@ -1,0 +1,53 @@
+v0.4 Step 4.5 — Mux webhook handler Edge Function.
+
+PRE-CHECK: 4.4 must be deployed and verified working. The
+videos table must have rows with status='uploading' for testing.
+
+Plan-mode first. Full review tier.
+
+What we're building:
+- Edge Function: supabase/functions/mux-webhook/index.ts
+- Receives webhooks from Mux for events: video.asset.ready,
+  video.asset.errored, video.upload.asset_created
+- Updates videos table:
+  - On video.asset.ready: status='ready', sets duration_seconds,
+    sets mux_playback_id
+  - On video.asset.errored: status='errored'
+  - On video.upload.asset_created: links upload to asset_id
+- Webhook signature verification using MUX_WEBHOOK_SECRET
+- Idempotent (Mux retries — UNIQUE constraints on
+  mux_asset_id/mux_playback_id from Step 4.1 help here)
+
+Mux webhook setup:
+- After deploying, the function has a public URL
+- Configure that URL in Mux Dashboard → Webhooks
+- Mux signs webhooks with a secret you set there
+- Add MUX_WEBHOOK_SECRET to Replit Secrets
+
+Out of scope:
+- Mobile client polling for video status (Step 4.14)
+- Email notification on video ready (Step 4.15)
+- Handling all Mux webhook events (just the three above)
+
+Plan must include:
+1. Full TypeScript code
+2. Signature verification logic
+3. Idempotency strategy (re-receiving the same event)
+4. Database update pattern (service role)
+5. What happens if Mux sends an event for a video_id we don't
+   have (race condition — webhook arrives before videos row
+   inserted)
+6. How to test webhook locally without exposing localhost
+
+After plan approval: WRITE the code, paste back for review.
+
+Phone test:
+1. Upload a real video via Mux Dashboard's upload UI to your
+   dev environment (don't use the mobile flow yet — that's 4.6)
+2. Watch the videos table — status should flip uploading →
+   processing → ready as Mux processes
+3. Verify duration_seconds and mux_playback_id populated
+4. Trigger an errored video (upload an invalid file via Mux
+   Dashboard) — verify status flips to 'errored'
+5. Manually re-deliver the same webhook from Mux Dashboard
+   (replay) — verify no duplicate row, no error

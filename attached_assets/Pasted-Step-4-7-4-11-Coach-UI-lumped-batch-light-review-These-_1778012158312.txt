@@ -1,0 +1,120 @@
+Step 4.7-4.11 — Coach UI (lumped batch — light review)
+These are pure UI work after the infrastructure is in place. You can lump these. Send all five plans to the agent at once with this preamble:
+v0.4 Phase C — Coach UI (lumped batch). Steps 4.7 through 4.11.
+
+Steps 4.4-4.6 must be verified working before starting Phase C.
+
+Process: Plan all 5 substeps now. Each substep gets phone-tested
+and merged BEFORE the next starts (so they're sequential in
+execution, but plans are written in advance).
+
+Stop after each substep's phone test for me to merge. Do not
+auto-merge.
+
+[Five substep specs follow]
+4.7 — Coach landing screen
+4.7: Coach landing screen.
+- Replaces the placeholder Inbox screen from 4.3
+- Shows: greeting ("Hey, Coach Mike"), 2 cards:
+  "New Video" (CTA, taps into 4.6 upload flow)
+  "My Videos" (taps into 4.11 sent list)
+- Plus: count of unread/upcoming bookings (mock for now)
+- Files: src/screens/Coach/CoachHomeScreen.tsx (replaces InboxScreen)
+- Phone test: Coach Mike's home tab shows 2 cards, both tappable
+4.8 — Record/select video screen
+4.8: Record/select video flow integration.
+- Already partially built in 4.6 — formalize it as a navigable screen
+- Coach taps "New Video" → RecordVideoScreen
+- After video selected and uploaded → navigate to RecipientPicker (4.9)
+- Files: src/screens/Coach/RecordVideoScreen.tsx (refine)
+- Phone test: navigation flow from CoachHome → RecordVideo → next
+4.9 — Recipient picker
+4.9: Recipient picker.
+- After video uploaded, coach picks which kid receives it
+- Lists all kids in coach's tenant (via Supabase query)
+- Group by family for clarity
+- Single-select for v0.4 (multi-select is v0.6)
+- After pick → navigate to Send confirmation (4.10)
+- Files: src/screens/Coach/RecipientPickerScreen.tsx
+- Phone test: list shows kids, selection works
+4.10 — Send confirmation
+4.10: Send confirmation + INSERT into coach_messages.
+- Shows summary: video preview thumbnail, recipient kid name,
+  optional message text input
+- Coach taps "Send" → INSERT into coach_messages with
+  video_id, sender_user_id (Coach Mike), recipient_family_id,
+  recipient_kid_id, optional message_text
+- Returns to Coach home with success toast
+- Files: src/screens/Coach/SendConfirmationScreen.tsx
+- Phone test: send a message, verify coach_messages row created
+  with correct fields
+4.11 — Coach sent-videos list
+4.11: Coach sent-videos list.
+- New screen accessible from "My Videos" card on coach home
+- Lists all coach_messages where sender_user_id = current user
+- Shows: video thumbnail, recipient kid name, sent_at timestamp,
+  viewed_at indicator (if parent has viewed)
+- Files: src/screens/Coach/SentVideosScreen.tsx
+- Phone test: sent video appears in list with all fields correct
+
+Step 4.12 — Coach Video card pulls real data
+v0.4 Step 4.12 — Home tab Coach Video card pulls real data.
+
+Plan-mode first. Light review.
+
+What changes:
+- src/screens/Home/components/CoachVideoCard.tsx pulls the most
+  recent coach_messages row for the current kid
+- If exists: shows real coach name, thumbnail (Mux poster URL),
+  duration, "X minutes ago"
+- If empty: shows "No coach videos yet — your coach will send one
+  soon!" empty state
+- Tapping the card → navigates to Video Playback (4.13)
+
+Phone test:
+1. As parent test user with the kid Coach Mike sent video to:
+   Home tab shows real video card
+2. As parent test user with no coach messages: Home shows empty state
+
+Step 4.13 — Video playback screen
+v0.4 Step 4.13 — Video playback screen.
+
+Plan-mode first. Light review.
+
+What we're building:
+- New screen: src/screens/Home/VideoPlaybackScreen.tsx
+- Mux player via mux-player-react-native or expo-av
+- Auto-plays Mux HLS URL via mux_playback_id
+- Mark as viewed: UPDATE coach_messages.viewed_at on play
+  (uses RLS column-level GRANT from Step 4.1)
+- Back button returns to Home
+
+Phone test:
+1. Tap coach video card on Home → playback screen opens
+2. Video plays smoothly
+3. Verify coach_messages.viewed_at is set in DB after play
+4. Coach side (sent videos list 4.11) shows "viewed" indicator
+   refreshes
+
+Step 4.14 — In-app polling for new videos
+v0.4 Step 4.14 — In-app polling for new coach videos.
+
+Plan-mode first. Light review.
+
+What we're building:
+- TanStack Query refetch interval (60 seconds) on the
+  coach_messages query for the parent's kid
+- New badge on Home tab when an unviewed coach video lands
+  while parent is in-app
+- Toast notification within app: "Coach Mike sent a new video!"
+  with tap-to-view action
+
+Out of scope:
+- Push notifications (deferred to v0.5)
+- Email notifications (Step 4.15)
+
+Phone test:
+1. As parent in-app on Home tab
+2. As Coach Mike from another device or session, send a video
+3. Within ~60 seconds, parent's app shows badge + toast
+4. Tap toast → navigates to playback
