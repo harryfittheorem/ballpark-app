@@ -31,6 +31,8 @@ export default function SignUpScreen({ navigation }: Props) {
     SignUpFormOutput
   >({
     resolver: zodResolver(signUpSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: {
       firstName: '',
       lastName: '',

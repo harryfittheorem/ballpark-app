@@ -31,6 +31,8 @@ export default function SignInScreen({ navigation }: Props) {
     SignInFormOutput
   >({
     resolver: zodResolver(signInSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: { email: '', password: '' },
   });
 

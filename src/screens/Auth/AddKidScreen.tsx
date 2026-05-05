@@ -39,6 +39,8 @@ export default function AddKidScreen() {
     AddKidFormOutput
   >({
     resolver: zodResolver(addKidSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: {
       firstName: '',
       lastName: '',
