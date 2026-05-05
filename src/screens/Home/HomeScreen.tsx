@@ -1,9 +1,12 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAuth } from '@/hooks/useAuth';
 import { useFamily } from '@/hooks/useFamily';
+import { upcomingSessionKey, useUpcomingSession } from '@/hooks/useUpcomingSession';
 import { colors, spacing } from '@/theme';
 
 import CoachVideoCard from './components/CoachVideoCard';
@@ -14,34 +17,31 @@ import StatTilesRow from './components/StatTilesRow';
 import UpcomingSessionCard from './components/UpcomingSessionCard';
 import { styles } from './styles';
 
-function getMockUpcomingSession(): Date {
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
-  d.setHours(16, 0, 0, 0);
-  return d;
-}
-
 export default function HomeScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const [refreshing, setRefreshing] = useState(false);
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const qc = useQueryClient();
+  const { user } = useAuth();
 
   const { kids } = useFamily();
   const kid = kids[0];
+  const { session: upcoming } = useUpcomingSession(kid?.id);
 
-  useEffect(
-    () => () => {
-      if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    },
-    [],
-  );
-
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    // No-op refresh for v0.2 Step 2.4 — real data wiring lands later.
-    refreshTimer.current = setTimeout(() => setRefreshing(false), 600);
-  }, []);
+    try {
+      await Promise.all([
+        user
+          ? qc.invalidateQueries({ queryKey: ['family', user.id] })
+          : Promise.resolve(),
+        kid
+          ? qc.invalidateQueries({ queryKey: upcomingSessionKey(kid.id) })
+          : Promise.resolve(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [qc, user, kid]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -83,11 +83,13 @@ export default function HomeScreen() {
               <CoachVideoCard coachName="Coach Mike" durationSeconds={154} />
             </View>
             <View style={styles.section}>
+              {/* Tap is intentionally a no-op for v0.3 — navigation to a */}
+              {/* booking detail / list screen lands in v0.4. */}
               <UpcomingSessionCard
-                date={getMockUpcomingSession()}
-                durationMinutes={60}
-                coachName="Coach Mike"
-                location="Dallas N."
+                date={upcoming?.scheduledStart}
+                durationMinutes={upcoming?.durationMinutes}
+                coachName={upcoming?.coachName}
+                location={upcoming?.locationName}
               />
             </View>
           </>
