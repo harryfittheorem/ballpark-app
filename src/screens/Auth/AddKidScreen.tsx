@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAddKid } from '@/hooks/useFamily';
 import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
+import { errorMessage } from '@/utils/error';
 
 const AGE_GROUPS = ['9U', '10U', '11U', '12U', '13U', '14U', '15U+'] as const;
 type AgeGroup = (typeof AGE_GROUPS)[number];
@@ -43,7 +44,8 @@ export default function AddKidScreen() {
       });
       // useFamily will re-fetch and the root navigator will swap to MainTabs.
     } catch (err) {
-      Alert.alert('Could not add kid', err instanceof Error ? err.message : 'Unknown error');
+      console.error('addKid failed', err);
+      Alert.alert('Could not add kid', errorMessage(err));
     } finally {
       setSubmitting(false);
     }
