@@ -3,14 +3,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useFamily } from '@/hooks/useFamily';
 import { colors } from '@/theme';
 
+import HeroCard from './components/HeroCard';
 import HomeHeader from './components/HomeHeader';
 import SectionPlaceholder from './components/SectionPlaceholder';
 import { styles } from './styles';
 
-const SECTIONS: ReadonlyArray<{ key: string; label: string }> = [
-  { key: 'hero', label: 'Hero card placeholder' },
+const PLACEHOLDER_SECTIONS: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'stats', label: 'Stats placeholder' },
   { key: 'coachVideo', label: 'Coach video placeholder' },
   { key: 'upcoming', label: 'Upcoming session placeholder' },
@@ -21,6 +22,9 @@ export default function HomeScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const [refreshing, setRefreshing] = useState(false);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { kids } = useFamily();
+  const kid = kids[0];
 
   useEffect(
     () => () => {
@@ -52,7 +56,18 @@ export default function HomeScreen() {
           />
         }
       >
-        {SECTIONS.map((s) => (
+        {kid ? (
+          <View style={styles.section}>
+            <HeroCard
+              kidName={`${kid.first_name} ${kid.last_name}`.trim()}
+              ageGroup={kid.age_group ?? ''}
+              jerseyNumber={kid.jersey_number}
+              pointsBalance={kid.points_balance}
+              currentStreakDays={kid.current_streak_days}
+            />
+          </View>
+        ) : null}
+        {PLACEHOLDER_SECTIONS.map((s) => (
           <View key={s.key} style={styles.section}>
             <SectionPlaceholder label={s.label} />
           </View>
