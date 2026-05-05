@@ -62,7 +62,7 @@ Replit is the editor + dev environment. Everything else lives elsewhere.
 
 ### The model
 
-Every meaningful record is tenant-scoped via a `tenant_id` column. Infinite Hitting is `tenant_id = 'infinite-hitting'` (the slug, used for readability) or a UUID. We use slugs in URLs and UUIDs internally.
+Every meaningful record is tenant-scoped via a `tenant_id` column. **`tenant_id` is always a UUID** — never a slug. Infinite Hitting's tenant UUID is hardcoded for predictable local dev: `00000000-0000-0000-0000-000000000001`. The human-readable slug (`'infinitehitting'`) lives in `tenants.slug` as a separate column for URL routing only. JWT custom claims always carry the UUID.
 
 ### Tenant resolution
 
@@ -107,12 +107,14 @@ The service role key bypasses RLS. **Use ONLY in:**
 
 ```
 1. Parent signs up (email + password) via Supabase Auth
-2. On signup, an Edge Function creates:
-   - A row in `families` with parent_user_id = auth.uid()
-   - JWT custom claim: tenant_id, family_id
-3. Parent adds a kid → creates row in `kids` table
-4. App switches to "kid mode" via in-app toggle (no separate auth)
-5. JWT refreshed every hour automatically by Supabase client
+2. A trigger on auth.users INSERT calls handle_new_user() which:
+   - Creates a row in `families` with parent_user_id = NEW.id
+   - Sets tenant_id from EXPO_PUBLIC_TENANT_SLUG → tenant lookup
+3. A Supabase Auth Hook (Custom Access Token Hook) injects JWT
+   custom claims (tenant_id, family_id, role) on every token issuance
+4. Parent adds a kid → creates row in `kids` table
+5. App switches to "kid mode" via in-app toggle (no separate auth)
+6. JWT refreshed every hour automatically by Supabase client
 ```
 
 ### Custom JWT claims
@@ -129,7 +131,7 @@ After signup, the JWT includes:
 }
 ```
 
-These claims are added by an `auth.users` trigger that calls a hook function.
+**Implementation:** Use Supabase's Custom Access Token Hook (a Postgres function registered under Auth → Hooks in the Supabase dashboard). A plain trigger on `auth.users` cannot inject claims into the JWT — it can only modify table data. The Custom Access Token Hook receives the default claims and returns the augmented set. The hook function looks up `family_id` and `tenant_id` from the `families` table by `auth.uid()` and merges them into the claims payload.
 
 ### Session storage
 

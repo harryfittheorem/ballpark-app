@@ -1,0 +1,71 @@
+Excellent context check. You caught real contradictions in the docs —
+let's resolve them now and proceed.
+
+RESOLUTIONS TO CONTRADICTIONS:
+
+1. Tenant ID: Use UUID for tenants.id. Slug 'infinitehitting' is a
+   separate `slug` column for URL routing only. JWT claims always
+   use the UUID.
+
+2. JWT custom claims: Use Supabase Auth Hooks (custom access token
+   hook), NOT a plain table trigger. You're right that a trigger on
+   auth.users can't inject JWT claims. Update ARCHITECTURE.md §4
+   to reflect the Auth Hooks approach.
+
+3. One kid per family: Schema supports many kids per family
+   (future-proofing). v0.5 UI enforces single kid via a check at
+   AddKidScreen — if a kid already exists for the family, navigate
+   to MainTab instead of AddKid.
+
+4. Folder structure: ARCHITECTURE.md §9 is authoritative — nested
+   per-screen folders with components/ subfolder. Update CLAUDE.md
+   to match.
+
+5. Replit Deployments: Confirmed not used. Mobile ships via EAS.
+
+6. Stripe Connect onboarding: Confirmed out-of-band via Stripe-hosted
+   Express dashboards. App just consumes stripe_account_id from the
+   location record. No in-app onboarding flow needed in v0.1-v0.5.
+
+7. Coach portal in v0.4: Acknowledged. Decide workspace strategy
+   when we get to v0.4 — not a v0.1 concern.
+
+
+ANSWERS TO BLOCKING QUESTIONS:
+
+1. Supabase project: Already created. Keys are in Replit Secrets:
+   EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.
+
+2. GitHub repo: Already exists at github.com/harryfittheorem/ballpark-app.
+   Replit was imported from this repo.
+
+3. Tunnel testing: Real phone via Expo Go is the primary testing path.
+   Optimize for tunnel mode. Web preview is secondary.
+
+4. JWT claims: Use Supabase Auth Hooks (custom access token hook).
+   Confirmed.
+
+5. Provisioned accounts: Only Supabase exists right now. Defer:
+   - Resend: provision when starting v0.3
+   - Mux: provision when starting v0.4
+   - Stripe: provision when starting v0.5
+   - Twilio: provision when starting v0.6+ (AI Layer)
+   - Anthropic: provision in AI Layer phase
+
+6. Expo SDK version: Latest stable. Use whatever `npx create-expo-app`
+   gives us today.
+
+7. Tenant UUID: Hardcode deterministic UUID for Infinite Hitting:
+   00000000-0000-0000-0000-000000000001
+   All devs share this UUID for predictable local dev.
+
+
+READY FOR v0.1 STEP 1.1 (BOOTSTRAP):
+
+Proceed with the bootstrap prompt:
+
+We're building a React Native + Expo app called Ballpark. Read CLAUDE.md
+and docs/ARCHITECTURE.md first.
+
+I want you to:
+1. Initialize a fresh

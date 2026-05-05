@@ -44,32 +44,36 @@ This project lives on **Replit** as a shared multi-developer workspace.
 
 ## Folder Structure
 
+See `/docs/ARCHITECTURE.md` section 9 for the authoritative folder layout. Summary:
+
 ```
 ballpark-app/
 ├── /src
-│   ├── /screens          # one folder per screen, screen.tsx + styles.ts + types.ts
-│   ├── /components       # reusable UI components
-│   ├── /navigation       # navigation config
-│   ├── /api              # API client functions per resource
-│   ├── /hooks            # custom React hooks
+│   ├── /screens          # one folder PER SCREEN: ScreenName.tsx + styles.ts + types.ts + components/
+│   ├── /components       # globally reusable: /ui, /layout, /feature
+│   ├── /navigation
+│   ├── /api              # one file per resource (auth, bookings, home, ...)
+│   ├── /hooks
 │   ├── /store            # Zustand stores
-│   ├── /theme            # design tokens, fonts, colors
-│   ├── /utils            # pure utility functions
-│   ├── /types            # shared TypeScript types
-│   └── /lib              # third-party client setup (supabase, stripe, etc.)
+│   ├── /theme            # tokens.ts, fonts.ts, index.ts
+│   ├── /utils
+│   ├── /types            # database.ts (generated) + domain.ts
+│   └── /lib              # supabase.ts, stripe.ts, mux.ts
 ├── /supabase
-│   ├── /migrations       # SQL migrations, timestamp-prefixed
-│   ├── /functions        # edge functions
-│   └── /seed             # dev seed data
-├── /docs                 # all project documentation (read these for context)
-├── /design               # JSX prototype files for visual reference
-├── /assets               # images, fonts, icons
-├── App.tsx               # entry point
-├── app.json              # Expo config
-├── .replit               # Replit configuration
-├── replit.nix            # Replit environment config
+│   ├── /migrations
+│   ├── /functions
+│   └── /seed
+├── /docs
+├── /design
+├── /assets
+├── App.tsx
+├── app.json
+├── .replit
+├── replit.nix
 └── package.json
 ```
+
+Each screen lives in its own folder (e.g. `/src/screens/Home/HomeScreen.tsx`) with co-located `styles.ts`, `types.ts`, and a `components/` subfolder for screen-scoped components.
 
 ---
 

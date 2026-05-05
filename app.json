@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Ballpark",
+    "slug": "ballpark-app",
+    "scheme": "ballpark",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F0E0E"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.myagencyos.ballpark"
+    },
+    "android": {
+      "package": "com.myagencyos.ballpark",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F0E0E"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-font"
+    ]
+  }
+}
