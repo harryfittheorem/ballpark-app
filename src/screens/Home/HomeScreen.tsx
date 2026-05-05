@@ -10,13 +10,16 @@ import CoachVideoCard from './components/CoachVideoCard';
 import HeroCard from './components/HeroCard';
 import HomeHeader from './components/HomeHeader';
 import QuickActionsRow from './components/QuickActionsRow';
-import SectionPlaceholder from './components/SectionPlaceholder';
 import StatTilesRow from './components/StatTilesRow';
+import UpcomingSessionCard from './components/UpcomingSessionCard';
 import { styles } from './styles';
 
-const PLACEHOLDER_SECTIONS: ReadonlyArray<{ key: string; label: string }> = [
-  { key: 'upcoming', label: 'Upcoming session placeholder' },
-];
+function getMockUpcomingSession(): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + 3);
+  d.setHours(16, 0, 0, 0);
+  return d;
+}
 
 export default function HomeScreen() {
   const tabBarHeight = useBottomTabBarHeight();
@@ -76,13 +79,16 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <CoachVideoCard coachName="Coach Mike" durationSeconds={154} />
             </View>
+            <View style={styles.section}>
+              <UpcomingSessionCard
+                date={getMockUpcomingSession()}
+                durationMinutes={60}
+                coachName="Coach Mike"
+                location="Dallas N."
+              />
+            </View>
           </>
         ) : null}
-        {PLACEHOLDER_SECTIONS.map((s) => (
-          <View key={s.key} style={styles.section}>
-            <SectionPlaceholder label={s.label} />
-          </View>
-        ))}
         <View style={styles.section}>
           <QuickActionsRow />
         </View>
