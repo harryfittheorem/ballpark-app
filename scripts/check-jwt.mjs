@@ -49,9 +49,10 @@ console.log('\nKey claims:');
 console.log('  sub (auth user id):', payload.sub);
 console.log('  tenant_id:        ', payload.tenant_id);
 console.log('  family_id:        ', payload.family_id);
-console.log('  role:             ', payload.role);
+console.log('  app_role:         ', payload.app_role);
+console.log('  role (reserved):  ', payload.role);
 
-const missing = ['tenant_id', 'family_id', 'role'].filter((k) => payload[k] == null);
+const missing = ['tenant_id', 'family_id', 'app_role'].filter((k) => payload[k] == null);
 if (missing.length) {
   console.log(`\nFAIL: missing claims: ${missing.join(', ')}`);
   process.exit(1);

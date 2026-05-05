@@ -166,7 +166,7 @@ const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('
 const claims = {
   tenant_id: payload.tenant_id,
   family_id: payload.family_id,
-  role: payload.role,
+  app_role: payload.app_role,
 };
 
 console.log('-> JWT custom claims:', JSON.stringify(claims, null, 2));
@@ -187,8 +187,8 @@ if (missing.length > 0) {
 // Signups go through handle_new_user -> families row -> hook resolves role='parent'.
 // If we see anything else (e.g. 'authenticated'), the hook executed but the
 // families branch did not match, which is a partial regression worth catching.
-if (claims.role !== 'parent') {
-  console.error(`FAIL: expected role='parent' for a signup-flow user, got role='${claims.role}'.`);
+if (claims.app_role !== 'parent') {
+  console.error(`FAIL: expected app_role='parent' for a signup-flow user, got app_role='${claims.app_role}'.`);
   console.error('The hook ran but the families lookup did not resolve. Check that:');
   console.error('  1. handle_new_user trigger is installed on auth.users');
   console.error('  2. tenant_slug in raw_user_meta_data matches a row in public.tenants');
@@ -197,9 +197,21 @@ if (claims.role !== 'parent') {
   process.exit(1);
 }
 
+// PostgREST will SET ROLE to whatever `role` claim is present. If the hook
+// overwrites it with anything other than 'authenticated' / 'anon' / a real
+// Postgres role, every authenticated request returns 401 with
+// `role "X" does not exist`. Guard against regressing into that bug.
+if (payload.role !== 'authenticated') {
+  console.error(`FAIL: reserved JWT claim 'role' must remain 'authenticated', got '${payload.role}'.`);
+  console.error("The custom_access_token_hook is overwriting PostgREST's reserved `role` claim.");
+  console.error('Application-level role belongs in `app_role` instead.');
+  await cleanup();
+  process.exit(1);
+}
+
 await cleanup();
-console.log('PASS: tenant_id, family_id, role all present on the issued JWT.');
-console.log(`      (role=${claims.role}; handle_new_user trigger also fired, family_id resolved.)`);
+console.log('PASS: tenant_id, family_id, app_role all present; reserved role=authenticated preserved.');
+console.log(`      (app_role=${claims.app_role}; handle_new_user trigger fired; family_id resolved.)`);
 
 async function cleanup() {
   if (!adminHeaders || !userId) {

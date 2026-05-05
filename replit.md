@@ -95,3 +95,10 @@ Task #9 (email-confirmation "check your email" screen + 4s `signInWithPassword` 
 - A new parent lands on AddKid until they add their first kid (kid count drives the root nav switch).
 - Session is persisted via `expo-secure-store` (web fallback: localStorage).
 - `react-native-url-polyfill` is required by `@supabase/supabase-js` on RN.
+
+### Task #19 fix notes
+Two latent bugs were uncovered while debugging "Add Kid → Unknown error":
+1. `custom_access_token_hook` was overwriting the JWT's reserved `role` claim with the application value (`'parent'` / `'coach'`). PostgREST consumes `role` as the Postgres role to `SET ROLE` into for each request — once we wrote `'parent'` there, every authenticated REST call returned `401 role "parent" does not exist`. Migration `20260505040800_rename_role_to_app_role_in_jwt.sql` renames the application claim to `app_role` and updates the two RLS policies that referenced it (`families_select_coach_stub`, `kids_select_coach_stub`). `verify-auth-hook.mjs` now also asserts `payload.role === 'authenticated'` so we can't regress.
+2. Tables created via raw `CREATE TABLE` migrations don't inherit the default GRANTs Supabase Studio applies when you create tables through the dashboard. RLS runs *on top of* base table privileges, so without an explicit GRANT every query failed with `403 permission denied for table <name>`. Migration `20260505041500_grant_table_privileges_to_authenticated.sql` adds per-table grants matching the RLS scope (e.g. `kids` gets full CRUD; `families` gets SELECT+UPDATE only since INSERT is trigger-driven).
+- Existing test sessions hold a stale JWT with the old broken claims. Sign out + sign back in to mint a fresh token after these migrations apply.
+- Supabase error surfacing: `errorMessage(err)` in `src/utils/error.ts` is the canonical helper for catch blocks; `err instanceof Error` is wrong for PostgrestError/AuthError (plain objects).
