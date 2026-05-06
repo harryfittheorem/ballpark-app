@@ -1,7 +1,7 @@
 /**
  * BookingDetailScreen — full info for a single booking + soft-cancel action.
  *
- * Loads via `useFamilyBooking(bookingId)` so the screen is robust to direct
+ * Loads via `useBooking(bookingId)` so the screen is robust to direct
  * deep-links and refresh (it doesn't depend on the BookingsList cache being
  * warm). The Cancel button only renders when the booking is in a
  * cancellable state: status === 'confirmed' | 'pending' AND
@@ -25,7 +25,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { FamilyBooking } from '@/api/bookings';
-import { useFamilyBooking } from '@/hooks/useFamilyBooking';
+import { useBooking } from '@/hooks/useBooking';
 import { useCancelBooking } from '@/hooks/useCancelBooking';
 import type { MeStackParamList, MeStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
@@ -78,7 +78,7 @@ export default function BookingDetailScreen() {
   const route = useRoute<RouteProp<MeStackParamList, 'BookingDetail'>>();
   const { bookingId } = route.params;
 
-  const { data: booking, isPending, isError, error, refetch } = useFamilyBooking(bookingId);
+  const { data: booking, isPending, isError, error, refetch } = useBooking(bookingId);
   const cancelMut = useCancelBooking();
   const [submitError, setSubmitError] = useState<string | null>(null);
 

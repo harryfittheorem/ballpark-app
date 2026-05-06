@@ -3,7 +3,7 @@
  *
  * On success it invalidates `['family_bookings', ...]` (so the Bookings list
  * moves the row from Upcoming to Past with a "Cancelled" badge),
- * `['family_booking', bookingId]` (so the detail screen re-renders with the
+ * `['booking', bookingId]` (so the detail screen re-renders with the
  * cancelled state), `['day_bookings', ...]` (so the Book tab time picker
  * frees the slot back up), and the `upcomingSessionKey(...)` prefix
  * (`['upcoming-session']`) so the Home "Up Next" card re-fetches and either
@@ -25,7 +25,7 @@ export function useCancelBooking() {
     mutationFn: ({ bookingId, reason }) => cancelBooking(bookingId, reason),
     onSuccess: (booking) => {
       void qc.invalidateQueries({ queryKey: ['family_bookings'] });
-      void qc.invalidateQueries({ queryKey: ['family_booking', booking.id] });
+      void qc.invalidateQueries({ queryKey: ['booking', booking.id] });
       void qc.invalidateQueries({ queryKey: ['day_bookings'] });
       // Prefix match — invalidates every ['upcoming-session', kidId] entry.
       // See `upcomingSessionKey` in src/hooks/useUpcomingSession.tsx.
