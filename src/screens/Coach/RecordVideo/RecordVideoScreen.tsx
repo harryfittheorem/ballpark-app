@@ -1,14 +1,16 @@
 /**
  * RecordVideoScreen — coach-side entry point for sending a new video.
  *
- * Three visual states (see ./types.ts):
+ * Four visual states (see ./types.ts):
  *   idle       Pick: Record New Video / Choose from Library.
+ *   preview    Local <Video> playback + Use this video / Pick another.
  *   uploading  UploadProgress + cancel.
  *   errored    Message + Retry / Pick another.
  *
  * Flow:
- *   pick -> mint Idempotency-Key -> createMuxUpload (Edge Function) ->
- *   uploadVideoToMux PUT to Mux -> navigate to RecipientPicker with videoId.
+ *   pick -> show preview -> on confirm, mint Idempotency-Key ->
+ *   createMuxUpload (Edge Function) -> uploadVideoToMux PUT to Mux ->
+ *   navigate to RecipientPicker with videoId.
  *
  * Idempotency-Key is stable across Retry of the SAME picked file; picking a
  * different file mints a new key. This prevents duplicate `videos` rows
@@ -37,6 +39,7 @@ import {
 import { uuidv4 } from '@/utils/uuid';
 
 import UploadProgress from './components/UploadProgress';
+import VideoPreview from './components/VideoPreview';
 import { styles } from './styles';
 import type { PickedAsset, RecordVideoState } from './types';
 
@@ -154,12 +157,20 @@ export default function RecordVideoScreen() {
         mimeType: a.mimeType ?? undefined,
         durationSec: a.duration ? a.duration / 1000 : undefined,
       };
-      // Fresh pick -> fresh idempotency key. A retry of the SAME pick re-uses
-      // the key so the server returns the existing video_id.
-      void startUpload(asset, uuidv4());
+      // Show the preview first so the coach can confirm the right clip
+      // before any bytes leave the phone. Idempotency key is minted on
+      // confirm — a discarded preview never reserves one.
+      setState({ kind: 'preview', asset });
     },
-    [startUpload],
+    [],
   );
+
+  const handleConfirmPreview = useCallback(() => {
+    if (state.kind !== 'preview') return;
+    // Fresh pick -> fresh idempotency key. A retry of the SAME pick re-uses
+    // the key so the server returns the existing video_id.
+    void startUpload(state.asset, uuidv4());
+  }, [state, startUpload]);
 
   const handleCancelUpload = useCallback(() => {
     if (cancelTokenRef.current) cancelTokenRef.current.cancelled = true;
@@ -184,6 +195,12 @@ export default function RecordVideoScreen() {
       <View style={styles.container}>
         {state.kind === 'idle' ? (
           <IdleView onPick={handlePick} />
+        ) : state.kind === 'preview' ? (
+          <VideoPreview
+            asset={state.asset}
+            onConfirm={handleConfirmPreview}
+            onPickAnother={handlePickAnother}
+          />
         ) : state.kind === 'uploading' ? (
           <View style={styles.uploadingBox}>
             <Text style={styles.uploadingTitle}>Sending your video</Text>

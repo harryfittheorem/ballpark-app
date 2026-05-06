@@ -57,6 +57,37 @@ export const styles = StyleSheet.create({
   bigButtonDisabled: {
     opacity: 0.5,
   },
+  previewBox: {
+    flex: 1,
+    alignItems: 'stretch',
+    gap: spacing['2xl'],
+  },
+  previewTitle: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['2xl'],
+    color: colors.textOnDark,
+    textTransform: 'uppercase',
+    letterSpacing: tracking.wide,
+    textAlign: 'center',
+  },
+  previewHint: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.md,
+    color: colors.textLight,
+    textAlign: 'center',
+  },
+  previewPlayerWrap: {
+    flex: 1,
+    backgroundColor: colors.darkest,
+    borderRadius: radius['2xl'],
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+  },
+  previewPlayer: {
+    flex: 1,
+    backgroundColor: colors.darkest,
+  },
   uploadingBox: {
     flex: 1,
     alignItems: 'stretch',
