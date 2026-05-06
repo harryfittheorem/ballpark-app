@@ -113,10 +113,25 @@ export default function CreateAssignmentScreen() {
     (!Number.isFinite(durationNum as number) || (durationNum as number) < 1 || (durationNum as number) > 240)
       ? 'Minutes must be 1–240'
       : null;
-  const dueError =
-    dueDate.trim() !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate.trim())
-      ? 'Use YYYY-MM-DD'
-      : null;
+  // Reject not just the wrong shape but also impossible calendar dates
+  // (e.g. 2026-02-31, 2026-13-01) before we round-trip to the DB. We
+  // re-parse the components and compare them back to the typed string —
+  // `new Date('2026-02-31')` would silently roll over to March.
+  const dueError = (() => {
+    const v = dueDate.trim();
+    if (v === '') return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return 'Use YYYY-MM-DD';
+    const [y, m, d] = v.split('-').map((s) => Number.parseInt(s, 10));
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    if (
+      dt.getUTCFullYear() !== y ||
+      dt.getUTCMonth() !== m - 1 ||
+      dt.getUTCDate() !== d
+    ) {
+      return 'Not a real date';
+    }
+    return null;
+  })();
 
   const canSubmit =
     !titleError && !kidError && !pointsError && !durationError && !dueError && !create.isPending;
