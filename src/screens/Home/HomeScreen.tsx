@@ -5,7 +5,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { assignmentsKey, useAssignments } from '@/hooks/useAssignments';
+import { useAssignments } from '@/hooks/useAssignments';
 import { useAuth } from '@/hooks/useAuth';
 import { useFamily } from '@/hooks/useFamily';
 import {
@@ -57,7 +57,9 @@ export default function HomeScreen() {
   const isFocused = useIsFocused();
   const { data: latestMessage, isPending: latestMessagePending } =
     useLatestCoachMessage(kid?.id, { enabled: isFocused });
-  const { data: assignments } = useAssignments(kid?.id);
+  // Home only renders the "due now / next" summary, so narrow to pending
+  // server-side instead of fetching the kid's full assignment history.
+  const { data: assignments } = useAssignments(kid?.id, ['pending']);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -72,8 +74,11 @@ export default function HomeScreen() {
         kid
           ? qc.invalidateQueries({ queryKey: latestCoachMessageKey(kid.id) })
           : Promise.resolve(),
+        // Invalidate every assignments cache slot for this kid (Home's
+        // ['pending'] slice and Work's full list both live under the
+        // ['assignments', kid.id, ...] prefix).
         kid
-          ? qc.invalidateQueries({ queryKey: assignmentsKey(kid.id) })
+          ? qc.invalidateQueries({ queryKey: ['assignments', kid.id] })
           : Promise.resolve(),
       ]);
     } finally {

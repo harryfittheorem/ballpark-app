@@ -32,17 +32,25 @@ const ASSIGNMENT_WITH_REFS_SELECT =
   '*, drill_video:videos(id, status, mux_playback_id, duration_seconds), kid:kids(id, first_name, last_name)';
 
 /**
- * List every assignment for the given kid, newest first. RLS already
- * restricts SELECT to the parent's own kids, but we filter explicitly so
- * the planner uses idx_assignments_kid_status when status is supplied
- * separately by the caller.
+ * List assignments for the given kid, newest first. RLS already restricts
+ * SELECT to the parent's own kids; the explicit `kid_id` filter lets the
+ * planner use `idx_assignments_kid_status` when the optional `statuses`
+ * filter is also supplied (e.g. Home only needs 'pending' so we don't
+ * overfetch the kid's full historical list).
  */
-export async function listAssignmentsForKid(kidId: string): Promise<AssignmentWithRefs[]> {
-  const { data, error } = await supabase
+export async function listAssignmentsForKid(
+  kidId: string,
+  statuses?: AssignmentStatus[],
+): Promise<AssignmentWithRefs[]> {
+  let q = supabase
     .from('assignments')
     .select(ASSIGNMENT_WITH_REFS_SELECT)
     .eq('kid_id', kidId)
     .order('created_at', { ascending: false });
+  if (statuses && statuses.length > 0) {
+    q = q.in('status', statuses);
+  }
+  const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as unknown as AssignmentWithRefs[];
 }
