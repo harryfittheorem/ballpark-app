@@ -62,16 +62,31 @@ export async function getAssignment(id: string): Promise<AssignmentWithRefs | nu
 }
 
 /**
- * List every assignment in the coach's tenant, optionally filtered by
- * status. RLS scopes to the tenant; we order by created_at desc so the
- * Review tab shows newest submissions first.
+ * List assignments owned by the caller (the coach who created them),
+ * optionally filtered by status. We filter by `coach_user_id = auth.uid()`
+ * client-side so the Review queue only surfaces drills the caller is
+ * actually authorized to review — `review_assignment` is restricted to
+ * the owning coach (see 20260506100300_v06_review_assignment_owning_coach_fix.sql),
+ * so showing tenant-wide submitted rows would just produce avoidable
+ * RPC failures in multi-coach tenants.
+ *
+ * RLS still scopes by tenant; the coach_user_id filter is an additional
+ * narrowing so the UI matches the RPC's authorization contract.
  */
 export async function listAssignmentsForCoach(
   status?: AssignmentStatus,
 ): Promise<AssignmentWithRefs[]> {
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!user) throw new Error('Not authenticated');
+
   let q = supabase
     .from('assignments')
     .select(ASSIGNMENT_WITH_REFS_SELECT)
+    .eq('coach_user_id', user.id)
     .order('created_at', { ascending: false });
   if (status) q = q.eq('status', status);
   const { data, error } = await q;

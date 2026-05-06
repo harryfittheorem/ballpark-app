@@ -68,7 +68,7 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 -   Displaying upcoming and past bookings
 -   Coach → family video messaging: coach records/uploads via Mux, parent gets email + in-app card, full-screen playback marks viewed (v0.4 ✅ shipped 2026-05-05)
 -   Earn tab with 4 sub-tabs (Rewards, Store, Ranks, Earn rules + history). Parents redeem rewards for points → server-issued 8-char redemption code displayed in-app and in Me → Orders. Live tenant leaderboard. +10 pts auto-credited when a coach marks a booking 'completed' (v0.5 ✅ shipped 2026-05-06).
--   Drill assignments (v0.6 ✅ shipped 2026-05-06): coach assigns a drill (title, notes, optional Mux drill video, duration, due date, point reward, default 25). Parent sees pending drills on Home + Work tab, taps "Mark as done" → +25 pts via SECURITY DEFINER RPC. Coach later reviews from a queue with 1–5 stars + feedback.
+-   Drill assignments (v0.6 ✅ shipped 2026-05-06): coach assigns a drill (title, notes, optional Mux drill video, duration, due date, point reward, default 25). Parent sees pending drills on Home + Work tab, taps "Mark as done" → +25 pts via SECURITY DEFINER RPC. Coach later reviews from a queue scoped to their own assignments with 1–5 stars + feedback. **Deferred:** persistent `videos.purpose='drill'` tagging — drill vs coach-message distinction is currently handled at the navigation layer (RecordVideo `purpose` route param) and via `assignments.drill_video_id`. A schema-level marker can be added if/when we need to query videos by purpose without joining through assignments/coach_messages.
 
 ## Status
 
