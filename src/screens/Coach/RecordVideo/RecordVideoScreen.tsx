@@ -107,7 +107,16 @@ export default function RecordVideoScreen() {
         // on the destination doesn't return to a stale "100% uploaded"
         // screen.
         if (purpose === 'drill_assignment') {
-          navigation.replace('CreateAssignment', { drillVideoId: video_id });
+          // Pop back to the existing CreateAssignment underneath in the
+          // stack and merge the new drillVideoId into its route params,
+          // preserving any title/notes/etc. the coach already typed.
+          // `navigate` with merge:true reuses the existing screen instance
+          // rather than mounting a new one (which `replace` would do).
+          navigation.navigate({
+            name: 'CreateAssignment',
+            params: { drillVideoId: video_id },
+            merge: true,
+          });
         } else {
           navigation.replace('RecipientPicker', { videoId: video_id });
         }

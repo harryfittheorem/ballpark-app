@@ -14,7 +14,7 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Video as VideoIcon, X } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -53,6 +53,15 @@ export default function CreateAssignmentScreen() {
   const [drillVideoId, setDrillVideoId] = useState<string | null>(
     route.params?.drillVideoId ?? null,
   );
+  // When RecordVideo pops back with a new drillVideoId via navigate
+  // (merge:true), this screen instance is reused, so the param flips
+  // *under* our existing form state. Mirror it into local state so the
+  // attached-pill renders without losing the title/notes the coach typed.
+  useEffect(() => {
+    if (route.params?.drillVideoId) {
+      setDrillVideoId(route.params.drillVideoId);
+    }
+  }, [route.params?.drillVideoId]);
   const qc = useQueryClient();
   const { showToast } = useToast();
   const { coach } = useCoach();
