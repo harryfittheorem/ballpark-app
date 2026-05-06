@@ -61,6 +61,7 @@ export type CoachTabScreenProps<T extends keyof CoachTabParamList> = BottomTabSc
 export type MeStackParamList = {
   MeHome: undefined;
   BookingsList: undefined;
+  BookingDetail: { bookingId: string };
 };
 
 export type MeStackScreenProps<T extends keyof MeStackParamList> = NativeStackScreenProps<

@@ -5,6 +5,7 @@
  * everything to the caller's tenant + own family.
  */
 
+import { useNavigation } from '@react-navigation/native';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,9 +20,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { FamilyBooking } from '@/api/bookings';
 import { useFamilyBookings } from '@/hooks/useFamilyBookings';
+import type { MeStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
 import StatusBadge from './components/StatusBadge';
+
+type Nav = MeStackScreenProps<'BookingsList'>['navigation'];
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const MONTHS = [
@@ -68,7 +72,13 @@ function partitionBookings(bookings: FamilyBooking[]): Section[] {
   return sections;
 }
 
-function BookingRow({ booking }: { booking: FamilyBooking }) {
+function BookingRow({
+  booking,
+  onPress,
+}: {
+  booking: FamilyBooking;
+  onPress: () => void;
+}) {
   const kidName = booking.kid
     ? `${booking.kid.first_name} ${booking.kid.last_name}`.trim()
     : 'Unknown kid';
@@ -78,7 +88,7 @@ function BookingRow({ booking }: { booking: FamilyBooking }) {
   const locationName = booking.location?.name ?? 'Location TBD';
 
   return (
-    <View style={styles.row}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.row}>
       <View style={styles.rowHeader}>
         <Text style={styles.kidName}>{kidName}</Text>
         <StatusBadge status={booking.status} />
@@ -87,11 +97,12 @@ function BookingRow({ booking }: { booking: FamilyBooking }) {
       <Text style={styles.meta}>
         {coachName} · {locationName}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 export default function BookingsListScreen() {
+  const navigation = useNavigation<Nav>();
   const { data, isPending, isError, error, refetch, isRefetching } = useFamilyBookings();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -166,7 +177,12 @@ export default function BookingsListScreen() {
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <BookingRow booking={item} />}
+        renderItem={({ item }) => (
+          <BookingRow
+            booking={item}
+            onPress={() => navigation.navigate('BookingDetail', { bookingId: item.id })}
+          />
+        )}
         renderSectionHeader={({ section }) => (
           <Text style={styles.sectionHeader}>{section.title}</Text>
         )}

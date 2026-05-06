@@ -97,7 +97,13 @@ export type FamilyBooking = Booking & {
   kid: Pick<Tables<'kids'>, 'id' | 'first_name' | 'last_name'> | null;
   coach: Pick<Tables<'coaches'>, 'id' | 'first_name' | 'last_name'> | null;
   location: Pick<Tables<'locations'>, 'id' | 'name'> | null;
+  session_type:
+    | Pick<Tables<'session_types'>, 'id' | 'name' | 'type_category' | 'duration_minutes'>
+    | null;
 };
+
+const FAMILY_BOOKING_SELECT =
+  'id, tenant_id, location_id, kid_id, coach_id, session_type_id, scheduled_start, scheduled_end, cage_number, status, attended_at, cancelled_at, cancellation_reason, notes, created_at, updated_at, kid:kids(id, first_name, last_name), coach:coaches(id, first_name, last_name), location:locations(id, name), session_type:session_types(id, name, type_category, duration_minutes)';
 
 /**
  * Fetch all bookings for the given kid ids, embedding the kid / coach /
@@ -108,13 +114,54 @@ export async function listFamilyBookings(kidIds: string[]): Promise<FamilyBookin
   if (kidIds.length === 0) return [];
   const { data, error } = await supabase
     .from('bookings')
-    .select(
-      'id, tenant_id, location_id, kid_id, coach_id, session_type_id, scheduled_start, scheduled_end, cage_number, status, attended_at, cancelled_at, cancellation_reason, notes, created_at, updated_at, kid:kids(id, first_name, last_name), coach:coaches(id, first_name, last_name), location:locations(id, name)',
-    )
+    .select(FAMILY_BOOKING_SELECT)
     .in('kid_id', kidIds)
     .order('scheduled_start', { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as FamilyBooking[];
+}
+
+/**
+ * Fetch a single booking by id with the same embeds used by the list, so the
+ * detail screen can render without depending on cached list rows. RLS scopes
+ * the query to the caller's tenant + own family.
+ */
+export async function getFamilyBookingById(id: string): Promise<FamilyBooking | null> {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(FAMILY_BOOKING_SELECT)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as unknown as FamilyBooking) ?? null;
+}
+
+/**
+ * Cancel a booking by setting status='cancelled', cancelled_at=now(), and
+ * (optionally) cancellation_reason. RLS's `bookings_update_own_family` policy
+ * gates this to the parent of the kid on the booking; coaches don't have an
+ * UPDATE policy on the table.
+ *
+ * Note: this is a soft cancel — the row is preserved for history and shows
+ * up in the Past section of BookingsListScreen with a "Cancelled" badge.
+ */
+export async function cancelBooking(
+  bookingId: string,
+  reason?: string,
+): Promise<Booking> {
+  const trimmed = reason?.trim();
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason: trimmed && trimmed.length > 0 ? trimmed : null,
+    })
+    .eq('id', bookingId)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 /**
