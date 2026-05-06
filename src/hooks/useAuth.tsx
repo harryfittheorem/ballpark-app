@@ -10,9 +10,11 @@
  */
 
 import type { Session, User } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { supabase } from '@/lib/supabase';
+import { parseAuthCallbackCode } from '@/utils/authRedirect';
 
 export type AppRole = 'coach' | 'parent';
 
@@ -72,9 +74,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession);
     });
 
+    // Deep-link handler: when the parent taps the Supabase confirmation
+    // email, the OS opens the app with `ballpark:///auth/callback?code=...`.
+    // We exchange that PKCE code for a session — `onAuthStateChange` then
+    // fires SIGNED_IN and the app navigates past the auth stack
+    // automatically, no polling required.
+    const handleUrl = async (url: string) => {
+      const code = parseAuthCallbackCode(url);
+      if (!code) return;
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) {
+        // Surface to console only; the auth screens stay put and the user
+        // can retry from there. Avoids a noisy modal on cold start.
+        console.warn('[auth] exchangeCodeForSession failed', error.message);
+      }
+    };
+
+    Linking.getInitialURL().then((url) => {
+      if (url) void handleUrl(url);
+    });
+    const linkingSub = Linking.addEventListener('url', ({ url }) => {
+      void handleUrl(url);
+    });
+
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
+      linkingSub.remove();
     };
   }, []);
 

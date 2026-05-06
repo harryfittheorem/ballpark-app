@@ -8,6 +8,7 @@
 
 import { queryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
+import { getEmailRedirectUrl } from '@/utils/authRedirect';
 
 const TENANT_SLUG = process.env.EXPO_PUBLIC_TENANT_SLUG ?? 'infinitehitting';
 
@@ -24,6 +25,10 @@ export async function signUpParent(input: SignUpInput) {
     email: input.email.trim(),
     password: input.password,
     options: {
+      // Tells Supabase where to send the parent after they tap the
+      // confirmation link. The deep-link handler in `useAuth.tsx` picks up
+      // the resulting `?code=...` and exchanges it for a session.
+      emailRedirectTo: getEmailRedirectUrl(),
       data: {
         tenant_slug: TENANT_SLUG,
         first_name: input.firstName.trim(),
@@ -34,6 +39,21 @@ export async function signUpParent(input: SignUpInput) {
   });
   if (error) throw error;
   return data;
+}
+
+/**
+ * Re-send the Supabase signup confirmation email. Uses the same
+ * `emailRedirectTo` as `signUpParent` so the deep-link round-trip works
+ * identically — the parent taps the new email and lands back in the app
+ * with a session.
+ */
+export async function resendConfirmationEmail(email: string) {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: email.trim(),
+    options: { emailRedirectTo: getEmailRedirectUrl() },
+  });
+  if (error) throw error;
 }
 
 export async function signInParent(email: string, password: string) {

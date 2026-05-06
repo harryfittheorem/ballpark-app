@@ -3,7 +3,12 @@
  *
  * - Reads URL + anon key from EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY.
  * - Persists auth session in expo-secure-store (encrypted on-device).
- * - Disables URL-based session detection (we don't use OAuth deep links yet).
+ * - Uses the PKCE auth flow so email confirmation links return a `code`
+ *   query param that the app exchanges for a session via
+ *   `supabase.auth.exchangeCodeForSession` (see `useAuth.tsx`'s deep link
+ *   handler). `detectSessionInUrl` stays off because React Native has no
+ *   `window.location` for supabase-js to inspect; we drive the exchange
+ *   ourselves from the `Linking` listener.
  */
 
 import 'react-native-url-polyfill/auto';
@@ -60,5 +65,6 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    flowType: 'pkce',
   },
 });

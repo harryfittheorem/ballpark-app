@@ -16,6 +16,7 @@ npm run lint         # eslint
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY` (Supabase publishable key)
 - `EXPO_PUBLIC_TENANT_SLUG=infinitehitting`
 - `SUPABASE_SERVICE_ROLE_KEY` (Supabase secret key, server-side only)
+- `EXPO_PUBLIC_AUTH_REDIRECT_HOST` (optional; e.g. `app.ballpark.com`. When set, signup confirmation emails redirect to `https://{host}/auth/callback` and `app.config.js` registers iOS associated domains + Android App Links for that host. When unset, falls back to the `ballpark://` custom scheme.)
 
 Real testing occurs on a physical phone via Expo Go. Replit Deployments are not used; production ships through Expo EAS. `npm install` requires `--legacy-peer-deps`.
 
@@ -87,7 +88,7 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 
 -   `npm install` requires `--legacy-peer-deps` (also: `npx expo install <pkg> -- --legacy-peer-deps`).
 -   The Replit preview pane is not for mobile app testing; use Expo Go on a physical device.
--   If Supabase email confirmation is enabled, signup will appear stuck; disable it in the Supabase dashboard for development.
+-   Supabase email confirmation: signups pass `emailRedirectTo = ballpark:///auth/callback` (PKCE flow). The deep-link handler in `useAuth.tsx` exchanges the returned `?code=...` for a session. Add that URL to Supabase Auth → URL Configuration → Redirect URLs allow-list per environment.
 -   Existing test sessions might hold stale JWTs after schema changes; sign out and sign back in to refresh tokens.
 -   Tables created via raw SQL migrations may lack default GRANTs; explicit `GRANT` statements are required.
 -   `err instanceof Error` is incorrect for Supabase `PostgrestError`/`AuthError`; use `errorMessage(err)` from `src/utils/error.ts`.
