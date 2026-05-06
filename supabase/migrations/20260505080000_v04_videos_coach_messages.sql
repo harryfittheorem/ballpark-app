@@ -43,6 +43,13 @@ CREATE TABLE public.videos (
   id                   uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id            uuid        NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   uploaded_by_user_id  uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  -- INVARIANT: mux_asset_id MUST stay NOT NULL + UNIQUE. The mux-webhook
+  -- Edge Function (supabase/functions/mux-webhook/index.ts) runs as service
+  -- role (bypasses RLS) and keys every UPDATE on this column; uniqueness is
+  -- the only thing keeping a forged Mux event from becoming a cross-tenant
+  -- write. Guarded by scripts/check-mux-asset-id-constraint.mjs (post-merge)
+  -- and supabase/tests/videos_mux_asset_id_constraint.test.sql. Do not relax
+  -- without an explicit replacement and an ALLOW-MUX-ASSET-ID-RELAX marker.
   mux_asset_id         text        NOT NULL UNIQUE,
   mux_playback_id      text        UNIQUE,
   duration_seconds     int,

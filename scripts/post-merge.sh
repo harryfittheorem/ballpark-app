@@ -23,4 +23,7 @@ if [ -f "src/types/database.ts" ]; then
     }
 fi
 
+echo "[post-merge] check videos.mux_asset_id NOT NULL + UNIQUE invariant"
+node scripts/check-mux-asset-id-constraint.mjs
+
 echo "[post-merge] done"
