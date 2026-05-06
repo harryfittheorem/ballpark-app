@@ -1,6 +1,7 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
-const escape = require('escape-string-regexp');
+
+const escape = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const projectRoot = __dirname;
 const config = getDefaultConfig(projectRoot);
