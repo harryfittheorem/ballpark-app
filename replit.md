@@ -93,6 +93,7 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 -   Existing test sessions might hold stale JWTs after schema changes; sign out and sign back in to refresh tokens.
 -   Tables created via raw SQL migrations may lack default GRANTs; explicit `GRANT` statements are required.
 -   `err instanceof Error` is incorrect for Supabase `PostgrestError`/`AuthError`; use `errorMessage(err)` from `src/utils/error.ts`.
+-   Metro must NOT watch `.local/` — the Replit platform constantly creates and removes dirs there (skills, tasks, logs) and Metro crashes with `ENOENT watch …` on bundle. Exclusions live in `metro.config.js` `resolver.blockList`; add any new platform-managed dir there, never under `src/`.
 
 ## Pointers
 
