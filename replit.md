@@ -94,6 +94,7 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 -   Tables created via raw SQL migrations may lack default GRANTs; explicit `GRANT` statements are required.
 -   `err instanceof Error` is incorrect for Supabase `PostgrestError`/`AuthError`; use `errorMessage(err)` from `src/utils/error.ts`.
 -   Metro must NOT watch `.local/` — the Replit platform constantly creates and removes dirs there (skills, tasks, logs) and Metro crashes with `ENOENT watch …` on bundle. Exclusions live in `metro.config.js` `resolver.blockList`; add any new platform-managed dir there, never under `src/`.
+-   The `Expo dev (proxy)` workflow MUST be `outputType: "console"`, not `webview`. Metro is a packager, not a web app — a bare `GET /` from a browser/iframe yields `CommandError: Must specify "expo-platform" header or "platform" query parameter` and the Replit edge surfaces that as 502 in the canvas Mobile App iframe. Test only via Expo Go on a physical phone scanning the QR shown in the workflow console.
 
 ## Pointers
 

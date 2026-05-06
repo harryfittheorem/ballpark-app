@@ -91,9 +91,8 @@ name = "Expo dev (proxy)"
 author = "agent"
 
 [workflows.workflow.metadata]
-outputType = "webview"
+outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "EXPO_PACKAGER_PROXY_URL=\"https://$REPLIT_DEV_DOMAIN\" EXPO_MANIFEST_PROXY_URL=\"https://$REPLIT_DEV_DOMAIN\" npx expo start --port 5000"
-waitForPort = 5000
