@@ -28,6 +28,7 @@ import { useAssignments } from '@/hooks/useAssignments';
 import { useFamily } from '@/hooks/useFamily';
 import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, spacing, tracking } from '@/theme';
+import { todayLocalIso } from '@/utils/date';
 import { errorMessage } from '@/utils/error';
 
 import AssignmentRow from './components/AssignmentRow';
@@ -47,9 +48,10 @@ export default function WorkScreen() {
     const all = data ?? [];
     // "Due now" = pending and either no due_date set or due_date is today/past.
     // "Upcoming" = pending with a due_date strictly in the future.
-    // Today comparison uses YYYY-MM-DD string compare so we don't have to
-    // wrestle with timezones; due_date is a DATE column.
-    const todayIso = new Date().toISOString().slice(0, 10);
+    // Use the LOCAL-timezone date string, not UTC — otherwise an evening
+    // user in Pacific time can see tomorrow's drill mis-bucketed as "Due now"
+    // (or vice versa) once UTC rolls past midnight.
+    const todayIso = todayLocalIso();
     const dueNow = all.filter(
       (a) => a.status === 'pending' && (!a.due_date || a.due_date <= todayIso),
     );
