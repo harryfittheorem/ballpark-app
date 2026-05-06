@@ -60,7 +60,12 @@ export class MuxFunctionError extends Error {
  * user-initiated attempt so we don't create duplicate `videos` rows; only
  * generate a new key when the coach picks a different video.
  */
-export async function createMuxUpload(idempotencyKey: string): Promise<MuxUpload> {
+export type MuxUploadPurpose = 'coach_message' | 'drill';
+
+export async function createMuxUpload(
+  idempotencyKey: string,
+  purpose: MuxUploadPurpose = 'coach_message',
+): Promise<MuxUpload> {
   const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
   if (sessionErr) throw sessionErr;
   const accessToken = sessionData.session?.access_token;
@@ -81,7 +86,7 @@ export async function createMuxUpload(idempotencyKey: string): Promise<MuxUpload
         'Content-Type': 'application/json',
         'Idempotency-Key': idempotencyKey,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ purpose }),
     });
   } catch (err) {
     throw new MuxFunctionError({

@@ -84,7 +84,10 @@ export default function RecordVideoScreen() {
       cancelTokenRef.current = token;
       setState({ kind: 'uploading', asset, progress: 0, idempotencyKey });
       try {
-        const { upload_url, video_id } = await createMuxUpload(idempotencyKey);
+        const { upload_url, video_id } = await createMuxUpload(
+          idempotencyKey,
+          purpose === 'drill_assignment' ? 'drill' : 'coach_message',
+        );
         if (token.cancelled) return;
         const { promise, handle } = uploadVideoToMux({
           uploadUrl: upload_url,

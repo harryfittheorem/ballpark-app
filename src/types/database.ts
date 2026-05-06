@@ -874,6 +874,7 @@ export type Database = {
           id: string
           mux_asset_id: string
           mux_playback_id: string | null
+          purpose: string
           status: string
           tenant_id: string
           title: string | null
@@ -886,6 +887,7 @@ export type Database = {
           id?: string
           mux_asset_id: string
           mux_playback_id?: string | null
+          purpose?: string
           status?: string
           tenant_id: string
           title?: string | null
@@ -898,6 +900,7 @@ export type Database = {
           id?: string
           mux_asset_id?: string
           mux_playback_id?: string | null
+          purpose?: string
           status?: string
           tenant_id?: string
           title?: string | null

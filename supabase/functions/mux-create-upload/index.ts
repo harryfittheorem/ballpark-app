@@ -7,7 +7,8 @@
 //   Headers:
 //     Authorization: Bearer <coach-jwt>     required
 //     Idempotency-Key: <client-uuid>        optional but recommended
-//   Body: ignored (reserved for future fields like message_text/recipient).
+//   Body (optional JSON):
+//     { purpose?: 'coach_message' | 'drill' }   defaults to 'coach_message'
 //   Response 200: { upload_url: string, video_id: string }
 //   Errors:     { error: { code: string, message: string } }
 //                 401 unauthorized | 403 forbidden | 405 method_not_allowed
@@ -56,6 +57,7 @@ type ErrorCode =
   | "method_not_allowed"
   | "unauthorized"
   | "forbidden"
+  | "bad_request"
   | "mux_error"
   | "mux_unreachable"
   | "mux_bad_response"
@@ -130,6 +132,28 @@ serve(async (req) => {
   }
   if (appRole !== "coach") {
     return jsonError(403, "forbidden", "Coach role required");
+  }
+
+  // ---- 3b. Read optional purpose from request body ------------------------
+  // Body is optional; tolerate missing / malformed JSON the same way as
+  // before (treat as empty object). Anything other than the two known
+  // purposes is rejected so the DB CHECK constraint never gets a chance
+  // to surface as a 500.
+  let bodyJson: { purpose?: unknown } = {};
+  try {
+    const raw = await req.text();
+    if (raw) bodyJson = JSON.parse(raw) as { purpose?: unknown };
+  } catch {
+    bodyJson = {};
+  }
+  const purpose: "coach_message" | "drill" =
+    bodyJson.purpose === "drill" ? "drill" : "coach_message";
+  if (
+    bodyJson.purpose !== undefined &&
+    bodyJson.purpose !== "coach_message" &&
+    bodyJson.purpose !== "drill"
+  ) {
+    return jsonError(400, "bad_request", "Invalid purpose");
   }
 
   // ---- 4. Call Mux Direct Upload API --------------------------------------
@@ -220,6 +244,7 @@ serve(async (req) => {
       uploaded_by_user_id: userId,
       mux_asset_id: uploadId,
       status: "uploading",
+      purpose,
     })
     .select("id")
     .single();
