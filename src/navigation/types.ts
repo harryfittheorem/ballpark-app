@@ -63,9 +63,20 @@ export type MeStackParamList = {
   MeHome: undefined;
   BookingsList: undefined;
   BookingDetail: { bookingId: string };
+  Orders: undefined;
 };
 
 export type MeStackScreenProps<T extends keyof MeStackParamList> = NativeStackScreenProps<
   MeStackParamList,
+  T
+>;
+
+export type EarnStackParamList = {
+  EarnHome: undefined;
+  RewardRedeem: { productId: string; kidId: string };
+};
+
+export type EarnStackScreenProps<T extends keyof EarnStackParamList> = NativeStackScreenProps<
+  EarnStackParamList,
   T
 >;

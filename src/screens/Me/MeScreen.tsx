@@ -52,6 +52,14 @@ export default function MeScreen({ navigation }: Props) {
           <ChevronRight color={colors.gold} size={20} />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Orders')}
+          style={styles.navRow}
+        >
+          <Text style={styles.navRowText}>Orders</Text>
+          <ChevronRight color={colors.gold} size={20} />
+        </TouchableOpacity>
+
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>

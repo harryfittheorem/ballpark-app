@@ -66,10 +66,18 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 -   Booking system for private, group, and cage sessions with coaches
 -   Displaying upcoming and past bookings
 -   Coach → family video messaging: coach records/uploads via Mux, parent gets email + in-app card, full-screen playback marks viewed (v0.4 ✅ shipped 2026-05-05)
+-   Earn tab with 4 sub-tabs (Rewards, Store, Ranks, Earn rules + history). Parents redeem rewards for points → server-issued 8-char redemption code displayed in-app and in Me → Orders. Live tenant leaderboard. +10 pts auto-credited when a coach marks a booking 'completed' (v0.5 ✅ shipped 2026-05-06).
 
 ## Status
 
--   v0.1 Foundation, v0.2 Home, v0.3 Booking, **v0.4 Messages** all shipped. Next: v0.5 — Earn (rewards, store, leaderboard).
+-   v0.1 Foundation, v0.2 Home, v0.3 Booking, v0.4 Messages, **v0.5 Earn** all shipped. Next: v0.6 — Work (assignments + drills) per ROADMAP.
+
+## v0.5 Deferred (intentional)
+
+-   **Stripe Connect card checkout** for purchase-only / dual-priced store items. The Store tab today shows items with an Alert that points the parent at the front desk. Schema already supports it (`orders.payment_method='card'`, `amount_paid_cents`, `stripe_payment_intent_id`).
+-   **QR codes** on redemption codes — codes are alphanumeric for now; QR rendering can be added later via `react-native-qrcode-svg`.
+-   **Nightly leaderboard snapshot** — `Ranks` tab queries `kids` live (top 50 by `points_balance`); fine for one tenant, will need a snapshot table at scale.
+-   **Assignment / PR triggers** — only the booking-completion trigger is wired; assignments and swing PRs ship in v0.6 / v0.7.
 
 ## User preferences
 

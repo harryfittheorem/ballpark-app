@@ -3,10 +3,10 @@ import { Calendar, Dumbbell, Home, Trophy, User } from 'lucide-react-native';
 
 import { useCoachMessageBadge } from '@/hooks/useNewCoachMessage';
 import BookScreen from '@/screens/Book/BookScreen';
-import EarnScreen from '@/screens/Earn/EarnScreen';
 import WorkScreen from '@/screens/Work/WorkScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
+import EarnStackNavigator from './EarnStackNavigator';
 import HomeStackNavigator from './HomeStackNavigator';
 import MeStackNavigator from './MeStackNavigator';
 import type { MainTabParamList } from './types';
@@ -57,7 +57,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="Earn"
-        component={EarnScreen}
+        component={EarnStackNavigator}
         options={{ tabBarIcon: ({ color, size }) => <Trophy color={color} size={size} /> }}
       />
       <Tab.Screen

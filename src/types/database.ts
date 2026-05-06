@@ -496,6 +496,202 @@ export type Database = {
           },
         ]
       }
+      orders: {
+        Row: {
+          amount_paid_cents: number | null
+          amount_paid_points: number | null
+          created_at: string
+          family_id: string
+          fulfilled_at: string | null
+          id: string
+          kid_id: string
+          payment_method: string
+          product_id: string
+          redemption_code: string
+          status: string
+          stripe_payment_intent_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_paid_cents?: number | null
+          amount_paid_points?: number | null
+          created_at?: string
+          family_id: string
+          fulfilled_at?: string | null
+          id?: string
+          kid_id: string
+          payment_method: string
+          product_id: string
+          redemption_code: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_paid_cents?: number | null
+          amount_paid_points?: number | null
+          created_at?: string
+          family_id?: string
+          fulfilled_at?: string | null
+          id?: string
+          kid_id?: string
+          payment_method?: string
+          product_id?: string
+          redemption_code?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      points_ledger: {
+        Row: {
+          balance_after: number
+          created_at: string
+          delta: number
+          id: string
+          kid_id: string
+          note: string | null
+          reason: string
+          reference_id: string | null
+          reference_type: string | null
+          tenant_id: string
+        }
+        Insert: {
+          balance_after: number
+          created_at?: string
+          delta: number
+          id?: string
+          kid_id: string
+          note?: string | null
+          reason: string
+          reference_id?: string | null
+          reference_type?: string | null
+          tenant_id: string
+        }
+        Update: {
+          balance_after?: number
+          created_at?: string
+          delta?: number
+          id?: string
+          kid_id?: string
+          note?: string | null
+          reason?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "points_ledger_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "points_ledger_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          dollar_price_cents: number | null
+          id: string
+          image_url: string | null
+          inventory_count: number | null
+          is_active: boolean
+          is_purchasable: boolean
+          is_redeemable: boolean
+          name: string
+          points_cost: number | null
+          sort_order: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          dollar_price_cents?: number | null
+          id?: string
+          image_url?: string | null
+          inventory_count?: number | null
+          is_active?: boolean
+          is_purchasable?: boolean
+          is_redeemable?: boolean
+          name: string
+          points_cost?: number | null
+          sort_order?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          dollar_price_cents?: number | null
+          id?: string
+          image_url?: string | null
+          inventory_count?: number | null
+          is_active?: boolean
+          is_purchasable?: boolean
+          is_redeemable?: boolean
+          name?: string
+          points_cost?: number | null
+          sort_order?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_types: {
         Row: {
           base_price_cents: number
@@ -629,9 +825,18 @@ export type Database = {
     }
     Functions: {
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      gen_redemption_code: { Args: never; Returns: string }
       mark_coach_message_viewed: {
         Args: { p_message_id: string }
         Returns: undefined
+      }
+      redeem_reward_for_kid: {
+        Args: { p_kid_id: string; p_product_id: string }
+        Returns: {
+          new_balance: number
+          order_id: string
+          redemption_code: string
+        }[]
       }
     }
     Enums: {
