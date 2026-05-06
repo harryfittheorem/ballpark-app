@@ -25,24 +25,13 @@ const blockListPatterns = [
   new RegExp(`^${escape(projectRoot)}[\\\\/].*[\\\\/]\\.old-[^\\\\/]+(?:[\\\\/].*)?$`),
 ];
 
+config.watchFolders = [projectRoot];
 config.resolver = config.resolver || {};
 config.resolver.blockList = blockListPatterns;
-
 config.watcher = config.watcher || {};
-config.watcher.additionalExts = config.watcher.additionalExts || [];
 config.watcher.healthCheck = {
   ...(config.watcher.healthCheck || {}),
   enabled: false,
 };
-config.watcher.watchman = {
-  ...(config.watcher.watchman || {}),
-  deferStates: ['hg.update'],
-};
-config.watcher.unstable_autoSaveCache = {
-  ...(config.watcher.unstable_autoSaveCache || {}),
-  enabled: false,
-};
-
-config.resolver.unstable_enablePackageExports = config.resolver.unstable_enablePackageExports ?? true;
 
 module.exports = config;
