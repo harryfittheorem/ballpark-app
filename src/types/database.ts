@@ -39,6 +39,101 @@ export type Database = {
   }
   public: {
     Tables: {
+      assignments: {
+        Row: {
+          coach_user_id: string
+          created_at: string
+          description: string | null
+          drill_video_id: string | null
+          due_date: string | null
+          duration_estimate_minutes: number | null
+          family_id: string
+          feedback: string | null
+          id: string
+          kid_id: string
+          point_reward: number
+          rating: number | null
+          reviewed_at: string | null
+          status: string
+          submitted_at: string | null
+          submitted_video_url: string | null
+          tenant_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          coach_user_id: string
+          created_at?: string
+          description?: string | null
+          drill_video_id?: string | null
+          due_date?: string | null
+          duration_estimate_minutes?: number | null
+          family_id: string
+          feedback?: string | null
+          id?: string
+          kid_id: string
+          point_reward?: number
+          rating?: number | null
+          reviewed_at?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_video_url?: string | null
+          tenant_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          coach_user_id?: string
+          created_at?: string
+          description?: string | null
+          drill_video_id?: string | null
+          due_date?: string | null
+          duration_estimate_minutes?: number | null
+          family_id?: string
+          feedback?: string | null
+          id?: string
+          kid_id?: string
+          point_reward?: number
+          rating?: number | null
+          reviewed_at?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_video_url?: string | null
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignments_drill_video_id_fkey"
+            columns: ["drill_video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignments_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignments_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           attended_at: string | null
@@ -824,6 +919,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      complete_assignment_for_kid: {
+        Args: { p_assignment_id: string }
+        Returns: {
+          assignment_id: string
+          new_balance: number
+          points_credited: number
+        }[]
+      }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       gen_redemption_code: { Args: never; Returns: string }
       mark_coach_message_viewed: {
@@ -837,6 +940,36 @@ export type Database = {
           order_id: string
           redemption_code: string
         }[]
+      }
+      review_assignment: {
+        Args: { p_assignment_id: string; p_feedback: string; p_rating: number }
+        Returns: {
+          coach_user_id: string
+          created_at: string
+          description: string | null
+          drill_video_id: string | null
+          due_date: string | null
+          duration_estimate_minutes: number | null
+          family_id: string
+          feedback: string | null
+          id: string
+          kid_id: string
+          point_reward: number
+          rating: number | null
+          reviewed_at: string | null
+          status: string
+          submitted_at: string | null
+          submitted_video_url: string | null
+          tenant_id: string
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {

@@ -1,4 +1,5 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 export type AuthStackParamList = {
@@ -11,9 +12,19 @@ export type AuthStackScreenProps<T extends keyof AuthStackParamList> = NativeSta
   T
 >;
 
+export type WorkStackParamList = {
+  WorkHome: undefined;
+  AssignmentDetail: { assignmentId: string };
+};
+
+export type WorkStackScreenProps<T extends keyof WorkStackParamList> = CompositeScreenProps<
+  NativeStackScreenProps<WorkStackParamList, T>,
+  BottomTabScreenProps<MainTabParamList>
+>;
+
 export type MainTabParamList = {
   Home: undefined;
-  Work: undefined;
+  Work: NavigatorScreenParams<WorkStackParamList>;
   Book: undefined;
   Earn: undefined;
   Me: undefined;
@@ -25,9 +36,9 @@ export type HomeStackParamList = {
   AddKid: undefined;
 };
 
-export type HomeStackScreenProps<T extends keyof HomeStackParamList> = NativeStackScreenProps<
-  HomeStackParamList,
-  T
+export type HomeStackScreenProps<T extends keyof HomeStackParamList> = CompositeScreenProps<
+  NativeStackScreenProps<HomeStackParamList, T>,
+  BottomTabScreenProps<MainTabParamList>
 >;
 
 export type MainTabScreenProps<T extends keyof MainTabParamList> = BottomTabScreenProps<
@@ -37,7 +48,7 @@ export type MainTabScreenProps<T extends keyof MainTabParamList> = BottomTabScre
 
 export type CoachInboxStackParamList = {
   InboxHome: undefined;
-  RecordVideo: undefined;
+  RecordVideo: { purpose?: 'coach_message' | 'drill_assignment' } | undefined;
   RecipientPicker: { videoId: string };
   SendConfirmation: {
     videoId: string;
@@ -45,6 +56,9 @@ export type CoachInboxStackParamList = {
     recipientKidId: string;
   };
   SentVideos: undefined;
+  CreateAssignment: { drillVideoId?: string } | undefined;
+  ReviewQueue: undefined;
+  ReviewAssignment: { assignmentId: string };
 };
 
 export type CoachInboxStackScreenProps<T extends keyof CoachInboxStackParamList> =

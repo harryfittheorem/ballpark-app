@@ -8,7 +8,7 @@
 
 import { useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
-import { Send, Video } from 'lucide-react-native';
+import { ClipboardCheck, Dumbbell, Send, Video } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -97,6 +97,18 @@ export default function CoachHomeScreen() {
             subtitle="See videos you've already sent."
             icon={Send}
             onPress={() => navigation.navigate('SentVideos')}
+          />
+          <CoachActionCard
+            title="Assign Drill"
+            subtitle="Send a kid a drill to practice this week."
+            icon={Dumbbell}
+            onPress={() => navigation.navigate('CreateAssignment')}
+          />
+          <CoachActionCard
+            title="Review Drills"
+            subtitle="Rate and respond to submitted drills."
+            icon={ClipboardCheck}
+            onPress={() => navigation.navigate('ReviewQueue')}
           />
         </View>
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>

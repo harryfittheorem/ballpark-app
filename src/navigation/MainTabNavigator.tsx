@@ -3,12 +3,12 @@ import { Calendar, Dumbbell, Home, Trophy, User } from 'lucide-react-native';
 
 import { useCoachMessageBadge } from '@/hooks/useNewCoachMessage';
 import BookScreen from '@/screens/Book/BookScreen';
-import WorkScreen from '@/screens/Work/WorkScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
 import EarnStackNavigator from './EarnStackNavigator';
 import HomeStackNavigator from './HomeStackNavigator';
 import MeStackNavigator from './MeStackNavigator';
+import WorkStackNavigator from './WorkStackNavigator';
 import type { MainTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -47,7 +47,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="Work"
-        component={WorkScreen}
+        component={WorkStackNavigator}
         options={{ tabBarIcon: ({ color, size }) => <Dumbbell color={color} size={size} /> }}
       />
       <Tab.Screen

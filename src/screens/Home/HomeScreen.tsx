@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAssignments } from '@/hooks/useAssignments';
 import { useAuth } from '@/hooks/useAuth';
 import { useFamily } from '@/hooks/useFamily';
 import {
@@ -20,6 +21,7 @@ import CoachMessageToast from './components/CoachMessageToast';
 import CoachVideoCard from './components/CoachVideoCard';
 import EmptyHomeCard from './components/EmptyHomeCard';
 import HeroCard from './components/HeroCard';
+import HomeAssignmentsCard from './components/HomeAssignmentsCard';
 import HomeHeader from './components/HomeHeader';
 import QuickActionsRow from './components/QuickActionsRow';
 import StatTilesRow from './components/StatTilesRow';
@@ -55,6 +57,7 @@ export default function HomeScreen() {
   const isFocused = useIsFocused();
   const { data: latestMessage, isPending: latestMessagePending } =
     useLatestCoachMessage(kid?.id, { enabled: isFocused });
+  const { data: assignments } = useAssignments(kid?.id);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -149,6 +152,22 @@ export default function HomeScreen() {
               />
             </View>
             <View style={styles.section}>{renderCoachVideo()}</View>
+            {assignments && assignments.some((a) => a.status === 'pending') ? (
+              <View style={styles.section}>
+                <HomeAssignmentsCard
+                  assignments={assignments}
+                  onPressAssignment={(assignmentId) =>
+                    navigation.navigate('Work', {
+                      screen: 'AssignmentDetail',
+                      params: { assignmentId },
+                    })
+                  }
+                  onSeeAll={() =>
+                    navigation.navigate('Work', { screen: 'WorkHome' })
+                  }
+                />
+              </View>
+            ) : null}
             <View style={styles.section}>
               {/* Tap is intentionally a no-op for v0.3 — navigation to a */}
               {/* booking detail / list screen lands in v0.4. */}

@@ -7,8 +7,11 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import CoachHomeScreen from '@/screens/Coach/CoachHomeScreen/CoachHomeScreen';
+import CreateAssignmentScreen from '@/screens/Coach/CreateAssignment/CreateAssignmentScreen';
 import RecipientPickerScreen from '@/screens/Coach/RecipientPicker/RecipientPickerScreen';
 import RecordVideoScreen from '@/screens/Coach/RecordVideo/RecordVideoScreen';
+import ReviewAssignmentScreen from '@/screens/Coach/ReviewAssignment/ReviewAssignmentScreen';
+import ReviewQueueScreen from '@/screens/Coach/ReviewQueue/ReviewQueueScreen';
 import SendConfirmationScreen from '@/screens/Coach/SendConfirmation/SendConfirmationScreen';
 import SentVideosScreen from '@/screens/Coach/SentVideos/SentVideosScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
@@ -54,6 +57,21 @@ export default function CoachInboxStackNavigator() {
         name="SentVideos"
         component={SentVideosScreen}
         options={{ title: 'My Videos' }}
+      />
+      <Stack.Screen
+        name="CreateAssignment"
+        component={CreateAssignmentScreen}
+        options={{ title: 'New Drill' }}
+      />
+      <Stack.Screen
+        name="ReviewQueue"
+        component={ReviewQueueScreen}
+        options={{ title: 'Review Drills' }}
+      />
+      <Stack.Screen
+        name="ReviewAssignment"
+        component={ReviewAssignmentScreen}
+        options={{ title: 'Review' }}
       />
     </Stack.Navigator>
   );
