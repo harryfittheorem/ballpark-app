@@ -16,4 +16,9 @@ export const styles = StyleSheet.create({
   section: {
     marginBottom: spacing['3xl'],
   },
+  loadingWrap: {
+    paddingVertical: spacing['5xl'],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

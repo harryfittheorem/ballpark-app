@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import AddKidScreen from '@/screens/Auth/AddKidScreen';
 import HomeScreen from '@/screens/Home/HomeScreen';
 import VideoPlaybackScreen from '@/screens/VideoPlayback/VideoPlaybackScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
@@ -30,6 +31,17 @@ export default function HomeStackNavigator() {
           // top-left close button overlaid on the video. Modal presentation
           // hides the tab bar underneath on iOS.
           presentation: 'modal',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="AddKid"
+        component={AddKidScreen}
+        options={{
+          // AddKidScreen renders its own headline + sign-out escape, so
+          // the native header would just be visual noise. Keeping it
+          // hidden matches how AddKidScreen looks when shown as the root
+          // (signed-in parent with no kid yet).
           headerShown: false,
         }}
       />

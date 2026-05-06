@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useNavigation } from '@react-navigation/native';
 import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
@@ -34,6 +35,13 @@ export default function AddKidScreen() {
   const addKid = useAddKid();
   const { family } = useFamily();
   const locations = useTenantLocations();
+  const navigation = useNavigation();
+  // When AddKid is pushed from the Home empty state, we want to pop back
+  // to Home after a successful add. When AddKid is the top of the
+  // navigator (no back stack) it's only reachable as the first thing a
+  // freshly-signed-up parent sees, but with the kids list now flipping
+  // RootNavigator/MainTabs render Home directly — there's no `canGoBack`
+  // to use, and the screen unmounts naturally.
   const [signingOut, setSigningOut] = useState(false);
 
   const locationOptions = useMemo<ReadonlyArray<PickerOption<string>>>(
@@ -90,7 +98,10 @@ export default function AddKidScreen() {
         primary_position: values.position,
         primary_location_id: values.locationId,
       });
-      // useFamily will re-fetch and the root navigator will swap to MainTabs.
+      // useFamily will re-fetch; if we were pushed from Home's empty
+      // state, pop back so the parent lands on the freshly-populated
+      // Home view instead of being stuck on this form.
+      if (navigation.canGoBack()) navigation.goBack();
     } catch (err) {
       console.error('addKid failed', err);
       Alert.alert('Could not add kid', errorMessage(err));

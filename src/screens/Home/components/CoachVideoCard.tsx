@@ -20,6 +20,12 @@ type Props = {
   durationSeconds?: number;
   subtitle?: string;
   onPress?: () => void;
+  /**
+   * When true and variant === 'ready', renders a small gold "unread" dot
+   * on the thumbnail. Ignored on the processing/empty variants since
+   * there's no message to be unread on those.
+   */
+  unread?: boolean;
 };
 
 function formatDuration(totalSeconds: number): string {
@@ -36,6 +42,7 @@ export default function CoachVideoCard({
   durationSeconds,
   subtitle,
   onPress,
+  unread = false,
 }: Props) {
   const interactive = variant === 'ready' && !!onPress;
 
@@ -71,6 +78,13 @@ export default function CoachVideoCard({
               {formatDuration(durationSeconds)}
             </Text>
           </View>
+        ) : null}
+        {variant === 'ready' && unread ? (
+          <View
+            style={styles.unreadDot}
+            pointerEvents="none"
+            accessibilityLabel="Unread"
+          />
         ) : null}
       </View>
 
@@ -151,6 +165,17 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     color: colors.textOnDark,
     letterSpacing: tracking.tight,
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: spacing.xs,
+    right: spacing.xs,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.gold,
+    borderWidth: 2,
+    borderColor: colors.darker,
   },
   body: {
     flex: 1,

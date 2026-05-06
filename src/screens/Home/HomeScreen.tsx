@@ -2,7 +2,7 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/hooks/useAuth';
@@ -18,6 +18,7 @@ import { formatRelativeTime } from '@/utils/time';
 
 import CoachMessageToast from './components/CoachMessageToast';
 import CoachVideoCard from './components/CoachVideoCard';
+import EmptyHomeCard from './components/EmptyHomeCard';
 import HeroCard from './components/HeroCard';
 import HomeHeader from './components/HomeHeader';
 import QuickActionsRow from './components/QuickActionsRow';
@@ -40,8 +41,13 @@ export default function HomeScreen() {
   const qc = useQueryClient();
   const { user } = useAuth();
 
-  const { kids } = useFamily();
+  const { kids, loading: familyLoading } = useFamily();
   const kid = kids[0];
+  // Gate the empty-state render on the first family fetch settling so
+  // existing parents don't see a flash of the "Add your kid" CTA while
+  // the kids list loads. Once we have a cached kid (re-mount after a
+  // tab switch, etc.) `familyLoading` is false and we render normally.
+  const showEmpty = !kid && !familyLoading;
   const { session: upcoming } = useUpcomingSession(kid?.id);
   // Focus-gated so the 60s polling interval (Step 4.14) doesn't run while
   // the parent is on a non-Home tab. Cached data still renders the
@@ -97,6 +103,7 @@ export default function HomeScreen() {
         thumbnail={muxPosterUrl(video.muxPlaybackId)}
         durationSeconds={video.durationSeconds ?? undefined}
         subtitle={formatRelativeTime(latestMessage.createdAt)}
+        unread={!latestMessage.viewedAt}
         onPress={() =>
           navigation.navigate('VideoPlayback', { messageId: latestMessage.id })
         }
@@ -152,11 +159,22 @@ export default function HomeScreen() {
                 location={upcoming?.locationName}
               />
             </View>
+            <View style={styles.section}>
+              <QuickActionsRow />
+            </View>
           </>
-        ) : null}
-        <View style={styles.section}>
-          <QuickActionsRow />
-        </View>
+        ) : showEmpty ? (
+          <View style={styles.section}>
+            <EmptyHomeCard onAddKid={() => navigation.navigate('AddKid')} />
+          </View>
+        ) : (
+          // First family fetch in flight — render a quiet spinner so we
+          // don't flash the "Add your kid" CTA at parents who already
+          // have a kid.
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color={colors.gold} />
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

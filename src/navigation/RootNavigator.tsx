@@ -2,9 +2,10 @@
  * Root navigator — picks between flows based on auth + role + family state:
  *   1. Loading splash (initial session check, family fetch)
  *   2. Auth stack (signed-out)
- *   3. CoachTabs (signed-in coach — skips family fetch / AddKid entirely)
- *   4. AddKid (signed-in parent, no kids yet)
- *   5. Main tabs (signed-in parent with at least one kid)
+ *   3. CoachTabs (signed-in coach)
+ *   4. Main tabs (signed-in parent — Home tab shows a friendly empty state
+ *      with an "Add your kid" CTA when no kid has been added yet, instead
+ *      of trapping the parent in a forced full-screen AddKid prompt).
  *
  * Mounts at the NavigationContainer level. AuthProvider must wrap this.
  */
@@ -13,8 +14,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/hooks/useAuth';
-import { useFamily } from '@/hooks/useFamily';
-import AddKidScreen from '@/screens/Auth/AddKidScreen';
 import { colors } from '@/theme';
 
 import AuthNavigator from './AuthNavigator';
@@ -29,24 +28,15 @@ function Splash() {
   );
 }
 
-function ParentFlow() {
-  const { kids, loading: famLoading, family } = useFamily();
-  // Wait for the first family fetch to settle so we don't flash the AddKid
-  // screen for users who already have kids.
-  if (famLoading && !family) return <Splash />;
-  if (kids.length === 0) return <AddKidScreen />;
-  return <MainTabNavigator />;
-}
-
 function Inner() {
   const { session, loading: authLoading, appRole } = useAuth();
 
   if (authLoading) return <Splash />;
   if (!session) return <AuthNavigator />;
-  // Coaches don't have a family record — skip useFamily entirely so we don't
-  // trigger an unnecessary fetch or block on a query that would never resolve.
+  // Coaches don't have a family record — `useFamily` is only mounted under
+  // MainTabNavigator (parent surface), so coaches never trigger that fetch.
   if (appRole === 'coach') return <CoachTabNavigator />;
-  return <ParentFlow />;
+  return <MainTabNavigator />;
 }
 
 export default function RootNavigator() {
