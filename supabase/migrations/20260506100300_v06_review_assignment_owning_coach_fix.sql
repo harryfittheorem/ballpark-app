@@ -6,8 +6,11 @@
 -- the v0.5 booking-completion pattern. The v0.6 spec
 -- (.local/tasks/v06-work-assignments.md, Step 1) explicitly requires the
 -- review RPC to be restricted to the owning coach (the coach who created
--- the assignment). This migration replaces the function body to enforce
--- that ownership check before flipping status to 'reviewed'.
+-- the assignment).
+--
+-- Note: the assignments table stores the creating coach as `coach_user_id`
+-- (auth.users FK), so the ownership check compares directly against
+-- auth.uid() — there is no separate `coaches.id` linkage on this table.
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION public.review_assignment(
@@ -24,7 +27,6 @@ DECLARE
   v_user_id        uuid := auth.uid();
   v_jwt_tenant_id  uuid;
   v_app_role       text;
-  v_caller_coach   uuid;
   v_assignment     public.assignments%ROWTYPE;
 BEGIN
   IF v_user_id IS NULL THEN
@@ -45,16 +47,6 @@ BEGIN
     RAISE EXCEPTION 'review_assignment: rating must be 1-5' USING ERRCODE = '22023';
   END IF;
 
-  -- Resolve the caller's coach row (one-per-user invariant from v0.4).
-  SELECT id INTO v_caller_coach
-    FROM public.coaches
-   WHERE user_id = v_user_id
-     AND tenant_id = v_jwt_tenant_id;
-
-  IF v_caller_coach IS NULL THEN
-    RAISE EXCEPTION 'review_assignment: no coach row for caller' USING ERRCODE = '42501';
-  END IF;
-
   SELECT * INTO v_assignment
     FROM public.assignments
    WHERE id = p_assignment_id
@@ -68,8 +60,10 @@ BEGIN
     RAISE EXCEPTION 'review_assignment: tenant mismatch' USING ERRCODE = '42501';
   END IF;
 
-  -- Owning coach only (per v0.6 task requirement).
-  IF v_assignment.coach_id IS DISTINCT FROM v_caller_coach THEN
+  -- Owning coach only (per v0.6 task requirement). The assignments table
+  -- stores the assigning coach's auth.users id as coach_user_id, so we
+  -- compare directly against auth.uid().
+  IF v_assignment.coach_user_id IS DISTINCT FROM v_user_id THEN
     RAISE EXCEPTION 'review_assignment: only the assigning coach can review this drill' USING ERRCODE = '42501';
   END IF;
 
