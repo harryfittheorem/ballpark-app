@@ -5,7 +5,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useAssignments } from '@/hooks/useAssignments';
+import { assignmentsKey, useAssignments } from '@/hooks/useAssignments';
 import { useAuth } from '@/hooks/useAuth';
 import { useFamily } from '@/hooks/useFamily';
 import {
@@ -71,6 +71,9 @@ export default function HomeScreen() {
           : Promise.resolve(),
         kid
           ? qc.invalidateQueries({ queryKey: latestCoachMessageKey(kid.id) })
+          : Promise.resolve(),
+        kid
+          ? qc.invalidateQueries({ queryKey: assignmentsKey(kid.id) })
           : Promise.resolve(),
       ]);
     } finally {
