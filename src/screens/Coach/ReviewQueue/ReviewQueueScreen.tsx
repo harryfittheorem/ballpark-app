@@ -1,7 +1,9 @@
 /**
  * ReviewQueueScreen — coach-side list of drills awaiting review.
  *
- * Pulls every assignment in the coach's tenant with status='submitted'.
+ * Pulls assignments owned by the current coach (coach_user_id = auth.uid())
+ * with status='submitted'. Scoped to the caller because review_assignment
+ * is restricted to the owning coach.
  * Tap a row → ReviewAssignment.
  */
 

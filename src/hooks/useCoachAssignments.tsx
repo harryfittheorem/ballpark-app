@@ -1,5 +1,6 @@
 /**
- * useCoachAssignments — tenant-wide assignments list for the coach side.
+ * useCoachAssignments — assignments owned by the current coach
+ * (filtered by coach_user_id = auth.uid()), used by the coach review queue.
  * Optional status filter narrows to e.g. 'submitted' for the Review tab.
  */
 
