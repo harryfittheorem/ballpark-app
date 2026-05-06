@@ -13,11 +13,13 @@
 
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Video as VideoIcon, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -44,7 +46,13 @@ const DEFAULT_POINTS = 25;
 export default function CreateAssignmentScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const drillVideoId = route.params?.drillVideoId ?? null;
+  // The drillVideoId is forwarded back to this screen by the
+  // RecordVideo flow (navigation.replace with purpose='drill_assignment').
+  // We hold it in local state so the coach can clear / re-record without
+  // losing the rest of the form they typed.
+  const [drillVideoId, setDrillVideoId] = useState<string | null>(
+    route.params?.drillVideoId ?? null,
+  );
   const qc = useQueryClient();
   const { showToast } = useToast();
   const { coach } = useCoach();
@@ -203,10 +211,33 @@ export default function CreateAssignmentScreen() {
           />
 
           {drillVideoId ? (
-            <View style={styles.attachedPill}>
-              <Text style={styles.attachedText}>Drill video attached</Text>
+            <View style={styles.attachedRow}>
+              <View style={styles.attachedPill}>
+                <VideoIcon size={14} color={colors.gold} />
+                <Text style={styles.attachedText}>Drill video attached</Text>
+              </View>
+              <Pressable
+                onPress={() => setDrillVideoId(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Remove drill video"
+                style={styles.removeBtn}
+                hitSlop={8}
+              >
+                <X size={14} color={colors.textLight} />
+              </Pressable>
             </View>
-          ) : null}
+          ) : (
+            <TouchableOpacity
+              style={styles.attachBtn}
+              onPress={() =>
+                navigation.navigate('RecordVideo', { purpose: 'drill_assignment' })
+              }
+              accessibilityRole="button"
+            >
+              <VideoIcon size={16} color={colors.gold} />
+              <Text style={styles.attachBtnText}>Attach drill video (optional)</Text>
+            </TouchableOpacity>
+          )}
 
           {create.error ? (
             <Text style={styles.fieldError}>{errorMessage(create.error)}</Text>
@@ -279,17 +310,54 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     color: colors.textMuted,
   },
+  attachedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing['2xl'],
+  },
   attachedPill: {
-    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.borderGold,
     backgroundColor: colors.darker,
-    marginBottom: spacing['2xl'],
   },
   attachedText: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.sm,
+    color: colors.gold,
+    textTransform: 'uppercase',
+    letterSpacing: tracking.wider,
+  },
+  removeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.darker,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  attachBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    borderStyle: 'dashed',
+    backgroundColor: colors.darker,
+    marginBottom: spacing['2xl'],
+  },
+  attachBtnText: {
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.sm,
     color: colors.gold,

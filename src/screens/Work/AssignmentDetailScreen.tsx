@@ -3,19 +3,21 @@
  *
  * States:
  *   pending   → "Mark as done" button calls completeAssignment, then
- *               renders an inline success affirmation with the points
- *               credited.
+ *               renders an inline success Alert with the points credited.
  *   submitted → "Submitted, waiting on coach" pill.
  *   reviewed  → coach rating (1–5 stars) + feedback shown.
  *
- * Drill video preview is intentionally a poster + Play overlay that
- * pushes nothing yet — full Mux playback for drills can ride on the
- * existing VideoPlaybackScreen later. v0.6 keeps the surface area tight.
+ * Drill video playback uses expo-av's <Video /> with native controls,
+ * the same pattern as v0.4 VideoPlaybackScreen. The Mux HLS URL is
+ * `https://stream.mux.com/{playback_id}.m3u8`. While Mux is still
+ * processing the asset (status != 'ready' or no playback id) we render
+ * a "Drill video processing…" placeholder.
  */
 
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { CheckCircle2, Clock, Coins, Play, Star } from 'lucide-react-native';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ResizeMode, Video } from 'expo-av';
+import { CheckCircle2, Clock, Coins, Star } from 'lucide-react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
@@ -28,9 +30,8 @@ import { errorMessage } from '@/utils/error';
 type Route = WorkStackScreenProps<'AssignmentDetail'>['route'];
 type Nav = WorkStackScreenProps<'AssignmentDetail'>['navigation'];
 
-const POSTER_WIDTH = 480;
-function muxPosterUrl(playbackId: string) {
-  return `https://image.mux.com/${playbackId}/thumbnail.jpg?width=${POSTER_WIDTH}`;
+function muxHlsUrl(playbackId: string) {
+  return `https://stream.mux.com/${playbackId}.m3u8`;
 }
 
 function formatDue(date: string | null): string | null {
@@ -96,31 +97,18 @@ export default function AssignmentDetailScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         {drillVideo ? (
-          <Pressable
-            disabled={!drillReady}
-            onPress={() => {
-              // Drill video full-screen playback can hook into the existing
-              // VideoPlaybackScreen in a follow-up. For v0.6 the poster is
-              // enough to confirm the drill demo exists.
-              if (!drillReady) {
-                Alert.alert('Still processing', 'The drill video is still being prepared. Try again in a moment.');
-              }
-            }}
-            style={({ pressed }) => [styles.videoWrap, pressed && drillReady && { opacity: 0.85 }]}
-          >
+          <View style={styles.videoWrap}>
             {drillReady ? (
-              <Image
-                source={{ uri: muxPosterUrl(drillVideo.mux_playback_id as string) }}
+              <Video
+                source={{ uri: muxHlsUrl(drillVideo.mux_playback_id as string) }}
                 style={StyleSheet.absoluteFillObject}
+                useNativeControls
+                resizeMode={ResizeMode.CONTAIN}
               />
-            ) : null}
-            <View style={styles.playOverlay} pointerEvents="none">
-              <Play size={32} color={colors.gold} fill={colors.gold} />
-            </View>
-            {!drillReady ? (
+            ) : (
               <Text style={styles.processingText}>Drill video processing…</Text>
-            ) : null}
-          </Pressable>
+            )}
+          </View>
         ) : null}
 
         <Text style={styles.title}>{assignment.title}</Text>
@@ -244,17 +232,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing['2xl'],
   },
-  playOverlay: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(15, 14, 14, 0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   processingText: {
-    position: 'absolute',
-    bottom: spacing.lg,
     fontFamily: fontFamilies.interMedium,
     fontSize: fontSizes.sm,
     color: colors.textLight,

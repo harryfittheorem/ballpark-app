@@ -45,13 +45,24 @@ export default function WorkScreen() {
 
   const sections = useMemo<Section[]>(() => {
     const all = data ?? [];
-    const todo = all.filter((a) => a.status === 'pending');
+    // "Due now" = pending and either no due_date set or due_date is today/past.
+    // "Upcoming" = pending with a due_date strictly in the future.
+    // Today comparison uses YYYY-MM-DD string compare so we don't have to
+    // wrestle with timezones; due_date is a DATE column.
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const dueNow = all.filter(
+      (a) => a.status === 'pending' && (!a.due_date || a.due_date <= todayIso),
+    );
+    const upcoming = all.filter(
+      (a) => a.status === 'pending' && !!a.due_date && a.due_date > todayIso,
+    );
     const submitted = all.filter((a) => a.status === 'submitted');
-    const reviewed = all.filter((a) => a.status === 'reviewed');
+    const done = all.filter((a) => a.status === 'reviewed');
     return [
-      { title: 'To do', data: todo },
+      { title: 'Due now', data: dueNow },
+      { title: 'Upcoming', data: upcoming },
       { title: 'Submitted', data: submitted },
-      { title: 'Completed', data: reviewed },
+      { title: 'Done', data: done },
     ].filter((s) => s.data.length > 0);
   }, [data]);
 

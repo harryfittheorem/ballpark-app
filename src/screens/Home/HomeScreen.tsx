@@ -156,13 +156,7 @@ export default function HomeScreen() {
               <View style={styles.section}>
                 <HomeAssignmentsCard
                   assignments={assignments}
-                  onPressAssignment={(assignmentId) =>
-                    navigation.navigate('Work', {
-                      screen: 'AssignmentDetail',
-                      params: { assignmentId },
-                    })
-                  }
-                  onSeeAll={() =>
+                  onPress={() =>
                     navigation.navigate('Work', { screen: 'WorkHome' })
                   }
                 />

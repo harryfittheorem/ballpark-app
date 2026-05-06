@@ -20,7 +20,7 @@
  * deny we surface a friendly Alert pointing the coach at Settings.
  */
 
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, FolderOpen } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -44,11 +44,20 @@ import { styles } from './styles';
 import type { PickedAsset, RecordVideoState } from './types';
 
 type Nav = CoachInboxStackScreenProps<'RecordVideo'>['navigation'];
+type RouteT = CoachInboxStackScreenProps<'RecordVideo'>['route'];
 
 type PickerSource = 'camera' | 'library';
 
 export default function RecordVideoScreen() {
   const navigation = useNavigation<Nav>();
+  const route = useRoute<RouteT>();
+  // Two callers reuse this screen:
+  //   - default (purpose 'coach_message'): hand off to RecipientPicker so
+  //     the coach can pick which family to send the video to.
+  //   - 'drill_assignment': pop back to CreateAssignment with the new
+  //     videoId attached as drillVideoId. Same Mux upload path, just a
+  //     different post-upload destination.
+  const purpose = route.params?.purpose ?? 'coach_message';
   const [state, setState] = useState<RecordVideoState>({ kind: 'idle' });
   const uploadHandleRef = useRef<UploadHandle | null>(null);
   // Per-attempt cancellation flag. Bumped on every new attempt so Cancel can
@@ -94,10 +103,14 @@ export default function RecordVideoScreen() {
         await promise;
         uploadHandleRef.current = null;
         if (token.cancelled) return;
-        // Navigate to the placeholder recipient picker with the new video_id.
-        // We `replace` so the back button on the picker takes the coach back
-        // to the Inbox, not to a stale "100% uploaded" screen.
-        navigation.replace('RecipientPicker', { videoId: video_id });
+        // Branch on purpose. We `replace` either way so the back button
+        // on the destination doesn't return to a stale "100% uploaded"
+        // screen.
+        if (purpose === 'drill_assignment') {
+          navigation.replace('CreateAssignment', { drillVideoId: video_id });
+        } else {
+          navigation.replace('RecipientPicker', { videoId: video_id });
+        }
       } catch (err) {
         uploadHandleRef.current = null;
         if (token.cancelled || err instanceof UploadCancelledError) {
@@ -112,7 +125,7 @@ export default function RecordVideoScreen() {
         });
       }
     },
-    [navigation],
+    [navigation, purpose],
   );
 
   const handlePick = useCallback(
