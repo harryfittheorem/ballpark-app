@@ -14,7 +14,7 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Video as VideoIcon, X } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -35,6 +35,7 @@ import { useToast } from '@/components/ui';
 import { useCoach } from '@/hooks/useCoach';
 import { useTenantKids } from '@/hooks/useTenantKids';
 import type { CoachInboxStackScreenProps } from '@/navigation/types';
+import { useDraftAssignmentStore } from '@/store/draftAssignment';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
@@ -46,33 +47,54 @@ const DEFAULT_POINTS = 25;
 export default function CreateAssignmentScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  // The drillVideoId is forwarded back to this screen by the
-  // RecordVideo flow (navigation.replace with purpose='drill_assignment').
-  // We hold it in local state so the coach can clear / re-record without
-  // losing the rest of the form they typed.
-  const [drillVideoId, setDrillVideoId] = useState<string | null>(
-    route.params?.drillVideoId ?? null,
-  );
-  // When RecordVideo pops back with a new drillVideoId via navigate
-  // (merge:true), this screen instance is reused, so the param flips
-  // *under* our existing form state. Mirror it into local state so the
-  // attached-pill renders without losing the title/notes the coach typed.
-  useEffect(() => {
-    if (route.params?.drillVideoId) {
-      setDrillVideoId(route.params.drillVideoId);
-    }
-  }, [route.params?.drillVideoId]);
   const qc = useQueryClient();
   const { showToast } = useToast();
   const { coach } = useCoach();
   const { kids, loading: kidsLoading } = useTenantKids();
 
-  const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [duration, setDuration] = useState('15');
-  const [dueDate, setDueDate] = useState(''); // YYYY-MM-DD
-  const [points, setPoints] = useState(String(DEFAULT_POINTS));
+  // The drill draft is persisted to AsyncStorage via this store. iOS will
+  // routinely terminate Expo Go's JS process while the system camera is
+  // recording a long video clip; React Navigation restores the route's
+  // `drillVideoId` param on relaunch but every screen's local useState
+  // resets to its initial value. Without this hydration the coach would
+  // come back to a blank form with the drill video pre-attached and have
+  // to retype the title / kid / notes / due date.
+  const draft = useDraftAssignmentStore((s) => s.draft);
+  const hydrated = useDraftAssignmentStore((s) => s.hydrated);
+  const setDraftPatch = useDraftAssignmentStore((s) => s.setDraft);
+  const clearDraft = useDraftAssignmentStore((s) => s.clearDraft);
+  const hydrate = useDraftAssignmentStore((s) => s.hydrate);
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  const selectedKidId = draft?.selectedKidId ?? null;
+  const title = draft?.title ?? '';
+  const description = draft?.description ?? '';
+  const duration = draft?.duration ?? '15';
+  const dueDate = draft?.dueDate ?? '';
+  const points = draft?.points ?? String(DEFAULT_POINTS);
+  const drillVideoId = draft?.drillVideoId ?? null;
+
+  const setSelectedKidId = (v: string | null) => setDraftPatch({ selectedKidId: v });
+  const setTitle = (v: string) => setDraftPatch({ title: v });
+  const setDescription = (v: string) => setDraftPatch({ description: v });
+  const setDuration = (v: string) => setDraftPatch({ duration: v });
+  const setDueDate = (v: string) => setDraftPatch({ dueDate: v });
+  const setPoints = (v: string) => setDraftPatch({ points: v });
+  const setDrillVideoId = (v: string | null) => setDraftPatch({ drillVideoId: v });
+
+  // When RecordVideo pops back with a new drillVideoId via navigate
+  // (merge:true), or when the app was relaunched after an iOS camera
+  // memory-kill and React Navigation restored the param, mirror it into
+  // the persisted draft so the attached-pill renders.
+  useEffect(() => {
+    if (!hydrated) return;
+    const incoming = route.params?.drillVideoId;
+    if (incoming && incoming !== drillVideoId) {
+      setDraftPatch({ drillVideoId: incoming });
+    }
+  }, [hydrated, route.params?.drillVideoId, drillVideoId, setDraftPatch]);
 
   const sections = useMemo(() => {
     const byFamily = new Map<string, typeof kids>();
@@ -95,6 +117,7 @@ export default function CreateAssignmentScreen() {
     onSuccess: (row) => {
       qc.invalidateQueries({ queryKey: ['coachAssignments', coach?.tenant_id] });
       qc.invalidateQueries({ queryKey: ['assignments', row.kid_id] });
+      clearDraft();
       showToast('Drill assigned');
       navigation.popToTop();
     },
@@ -278,7 +301,10 @@ export default function CreateAssignmentScreen() {
             <Button
               label="Cancel"
               variant="secondary"
-              onPress={() => navigation.goBack()}
+              onPress={() => {
+                clearDraft();
+                navigation.goBack();
+              }}
               fullWidth
             />
           </View>
