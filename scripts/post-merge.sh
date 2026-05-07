@@ -26,4 +26,23 @@ fi
 echo "[post-merge] check videos.mux_asset_id NOT NULL + UNIQUE invariant"
 node scripts/check-mux-asset-id-constraint.mjs
 
+# Re-deploy edge functions whenever their source has changed. Local edits to
+# supabase/functions/* are NOT served by Supabase until they're pushed — a
+# stale deploy causes the coach Record Video screen to fail with
+# `Upload service returned status 404 [function_error]`.
+if [ -d "supabase/functions" ]; then
+  for fn in mux-create-upload; do
+    if [ -f "supabase/functions/$fn/index.ts" ]; then
+      echo "[post-merge] supabase functions deploy $fn"
+      npx --yes supabase functions deploy "$fn" >/dev/null 2>&1 || \
+        echo "[post-merge] WARN: deploy $fn failed (env not configured?); continuing"
+    fi
+  done
+  if [ -f "supabase/functions/mux-webhook/index.ts" ]; then
+    echo "[post-merge] supabase functions deploy mux-webhook --no-verify-jwt"
+    npx --yes supabase functions deploy mux-webhook --no-verify-jwt >/dev/null 2>&1 || \
+      echo "[post-merge] WARN: deploy mux-webhook failed (env not configured?); continuing"
+  fi
+fi
+
 echo "[post-merge] done"
