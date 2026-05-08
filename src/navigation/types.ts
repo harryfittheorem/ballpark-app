@@ -59,6 +59,7 @@ export type CoachInboxStackParamList = {
   CreateAssignment: { drillVideoId?: string } | undefined;
   ReviewQueue: undefined;
   ReviewAssignment: { assignmentId: string };
+  CoachVideoPlayback: { playbackId: string };
 };
 
 export type CoachInboxStackScreenProps<T extends keyof CoachInboxStackParamList> =

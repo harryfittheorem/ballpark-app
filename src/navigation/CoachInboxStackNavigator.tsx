@@ -7,6 +7,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import CoachHomeScreen from '@/screens/Coach/CoachHomeScreen/CoachHomeScreen';
+import CoachVideoPlaybackScreen from '@/screens/Coach/CoachVideoPlayback/CoachVideoPlaybackScreen';
 import CreateAssignmentScreen from '@/screens/Coach/CreateAssignment/CreateAssignmentScreen';
 import RecipientPickerScreen from '@/screens/Coach/RecipientPicker/RecipientPickerScreen';
 import RecordVideoScreen from '@/screens/Coach/RecordVideo/RecordVideoScreen';
@@ -72,6 +73,11 @@ export default function CoachInboxStackNavigator() {
         name="ReviewAssignment"
         component={ReviewAssignmentScreen}
         options={{ title: 'Review' }}
+      />
+      <Stack.Screen
+        name="CoachVideoPlayback"
+        component={CoachVideoPlaybackScreen}
+        options={{ headerShown: false, presentation: 'fullScreenModal' }}
       />
     </Stack.Navigator>
   );

@@ -5,18 +5,23 @@
  * isn't ready), recipient kid name + family line, relative sent time, and a
  * "Viewed" / "Sent" badge driven by `viewedAt`.
  *
- * Press is a deliberate no-op for now — the playback / detail screen for a
- * sent message is future work (PRD v0.6). We still render as a Pressable so
- * the row gives tactile feedback and is ready to wire up later without a
- * markup churn.
+ * Press: when the Mux asset is `ready`, navigates to CoachVideoPlayback
+ * so the coach can review what they sent. Coaches do NOT mark messages
+ * viewed — that field is parent-only telemetry. Rows that are still
+ * processing or errored are non-tappable (the press is swallowed) so we
+ * don't open a black player on a missing playback id.
  */
 
+import { useNavigation } from '@react-navigation/native';
 import { Image, Pressable, Text, View } from 'react-native';
 
 import type { SentCoachMessageRow } from '@/api/coachMessages';
+import type { CoachInboxStackScreenProps } from '@/navigation/types';
 import { formatRelativeTime } from '@/utils/time';
 
 import { styles } from '../styles';
+
+type Nav = CoachInboxStackScreenProps<'SentVideos'>['navigation'];
 
 const POSTER_WIDTH = 240;
 
@@ -36,22 +41,29 @@ type Props = {
 };
 
 export default function SentMessageRow({ message }: Props) {
+  const navigation = useNavigation<Nav>();
   const recipient = `${message.kidFirstName} ${message.kidLastName}`.trim();
   const familyLine = message.familyLastName
     ? `${message.familyLastName} Family`
     : '';
   const sent = formatRelativeTime(message.createdAt);
   const viewed = message.viewedAt != null;
-  const showPoster =
+  const playable =
     message.videoStatus === 'ready' && !!message.muxPlaybackId;
+  const showPoster = playable;
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Video sent to ${recipient}, ${viewed ? 'viewed' : 'not yet viewed'}`}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      accessibilityState={{ disabled: !playable }}
+      disabled={!playable}
+      style={({ pressed }) => [styles.row, pressed && playable && styles.rowPressed]}
       onPress={() => {
-        // Detail screen is future work — intentional no-op for now.
+        if (!playable) return;
+        navigation.navigate('CoachVideoPlayback', {
+          playbackId: message.muxPlaybackId as string,
+        });
       }}
     >
       <View style={styles.thumbWrap}>
