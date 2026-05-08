@@ -3,10 +3,12 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { signOut } from '@/api/auth';
+import { deleteAccount } from '@/api/account';
 import { useAuth } from '@/hooks/useAuth';
 import { useFamily } from '@/hooks/useFamily';
 import type { MeStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
+import { errorMessage } from '@/utils/error';
 
 type Props = MeStackScreenProps<'MeHome'>;
 
@@ -20,6 +22,44 @@ export default function MeScreen({ navigation }: Props) {
     } catch (err) {
       Alert.alert('Sign-out failed', err instanceof Error ? err.message : 'Unknown error');
     }
+  };
+
+  // Account deletion is an irreversible, COPPA/GDPR-significant action.
+  // We confirm twice (Alert + destructive role) and then call the
+  // account-delete Edge Function, which:
+  //   1. Walks every kid_capture_link for this parent and fires the
+  //      outbound HitTrax RemoveThirdPartyAssociation so HitTrax stops
+  //      sending us data and the parent's data leaves HitTrax's billing
+  //      side too.
+  //   2. Hard-deletes the kid_capture_links rows (destroys the password
+  //      column on disk).
+  //   3. Calls auth.admin.deleteUser, which cascades to families/kids/
+  //      swings/bookings/orders via FK.
+  // After success, signOut() flips RootNavigator back to SignIn.
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      "This permanently deletes your family, your kid's stats, bookings, " +
+        'orders, and HitTrax connection. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteAccount();
+              // The auth user is gone — the auth listener will route us
+              // back to SignIn, but call signOut explicitly to clear the
+              // local session immediately.
+              await signOut().catch(() => undefined);
+            } catch (err) {
+              Alert.alert('Could not delete account', errorMessage(err));
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -70,6 +110,14 @@ export default function MeScreen({ navigation }: Props) {
 
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
           <Text style={styles.signOutText}>Sign out</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleDeleteAccount}
+          style={styles.deleteBtn}
+          testID="me-delete-account"
+        >
+          <Text style={styles.deleteText}>Delete account</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -144,5 +192,16 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     textTransform: 'uppercase',
     letterSpacing: tracking.wide,
+  },
+  deleteBtn: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+  },
+  deleteText: {
+    color: colors.textMuted,
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
+    textDecorationLine: 'underline',
   },
 });

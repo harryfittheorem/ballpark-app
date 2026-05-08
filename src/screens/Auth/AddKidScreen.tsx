@@ -17,6 +17,7 @@ import { signOut } from '@/api/auth';
 import { Button, Input, PickerField, type PickerOption } from '@/components/ui';
 import { AGE_GROUPS, type AgeGroup } from '@/constants/kid';
 import { useFamily, useAddKid } from '@/hooks/useFamily';
+import type { HomeStackScreenProps } from '@/navigation/types';
 import {
   addKidSchema,
   type AddKidFormOutput,
@@ -35,7 +36,8 @@ export default function AddKidScreen() {
   const addKid = useAddKid();
   const { family } = useFamily();
   const locations = useTenantLocations();
-  const navigation = useNavigation();
+  // Typed nav so we can push ConnectHitTraxOnboarding (in HomeStack).
+  const navigation = useNavigation<HomeStackScreenProps<'AddKid'>['navigation']>();
   // When AddKid is pushed from the Home empty state, we want to pop back
   // to Home after a successful add. When AddKid is the top of the
   // navigator (no back stack) it's only reachable as the first thing a
@@ -98,10 +100,12 @@ export default function AddKidScreen() {
         primary_position: values.position,
         primary_location_id: values.locationId,
       });
-      // useFamily will re-fetch; if we were pushed from Home's empty
-      // state, pop back so the parent lands on the freshly-populated
-      // Home view instead of being stuck on this form.
-      if (navigation.canGoBack()) navigation.goBack();
+      // useFamily will re-fetch. After a successful add we push the
+      // ConnectHitTrax onboarding gate (with explicit Skip), then the
+      // parent lands on the freshly-populated Home view. The gate uses
+      // navigation.replace() conventions on its own buttons so back
+      // swipe doesn't strand the parent — see ConnectHitTraxOnboardingScreen.
+      navigation.navigate('ConnectHitTraxOnboarding');
     } catch (err) {
       console.error('addKid failed', err);
       Alert.alert('Could not add kid', errorMessage(err));

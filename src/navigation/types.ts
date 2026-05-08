@@ -34,6 +34,10 @@ export type HomeStackParamList = {
   HomeMain: undefined;
   VideoPlayback: { messageId: string };
   AddKid: undefined;
+  // Onboarding gate shown immediately after a successful AddKid; renders
+  // the Connect HitTrax CTA + an explicit "Skip for now" button so a
+  // parent without a HitTrax membership is never blocked.
+  ConnectHitTraxOnboarding: undefined;
 };
 
 export type HomeStackScreenProps<T extends keyof HomeStackParamList> = CompositeScreenProps<
