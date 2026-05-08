@@ -179,7 +179,7 @@ export default function VideoPlaybackScreen() {
   return (
     <View style={styles.fill}>
       <Video
-        style={styles.fill}
+        style={styles.video}
         source={{ uri: muxHlsUrl(video.muxPlaybackId) }}
         resizeMode={ResizeMode.CONTAIN}
         shouldPlay
@@ -197,6 +197,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.darkest,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Mirror of the fix in CoachVideoPlaybackScreen: <Video> must NOT be
+  // sized via flex inside a centering container, or iOS collapses the
+  // AVPlayerLayer to 0x0 (audio plays, picture is invisible). Absolute-
+  // fill it so the native layer always has explicit screen-sized bounds.
+  video: {
+    ...StyleSheet.absoluteFillObject,
   },
   closeOverlay: {
     position: 'absolute',
