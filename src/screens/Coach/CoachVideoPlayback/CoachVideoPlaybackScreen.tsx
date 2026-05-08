@@ -10,14 +10,21 @@
  */
 
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { ResizeMode, Video } from 'expo-av';
+import { ResizeMode, Video, type AVPlaybackStatus } from 'expo-av';
 import { X } from 'lucide-react-native';
-import { useCallback } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { CoachInboxStackScreenProps } from '@/navigation/types';
-import { colors, spacing } from '@/theme';
+import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 
 type Route = CoachInboxStackScreenProps<'CoachVideoPlayback'>['route'];
 type Nav = CoachInboxStackScreenProps<'CoachVideoPlayback'>['navigation'];
@@ -26,24 +33,67 @@ function muxHlsUrl(playbackId: string): string {
   return `https://stream.mux.com/${playbackId}.m3u8`;
 }
 
+function muxPosterUrl(playbackId: string): string {
+  return `https://image.mux.com/${playbackId}/thumbnail.jpg?width=1280`;
+}
+
 export default function CoachVideoPlaybackScreen() {
   const route = useRoute<Route>();
   const navigation = useNavigation<Nav>();
   const { playbackId } = route.params;
 
+  // Three reasons the screen can look "black" without this state:
+  //  1. expo-av takes a beat to fetch the HLS manifest — show a poster
+  //     + spinner so the coach has something to look at.
+  //  2. The native controls only appear after the player tells us it's
+  //     loaded; until then there's no visible chrome AT ALL except our
+  //     overlay close button.
+  //  3. If Mux returns an error (asset deleted, signing required, etc.)
+  //     expo-av silently keeps a black surface — surface it as text.
+  const [loaded, setLoaded] = useState(false);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
   const goBack = useCallback(() => {
     if (navigation.canGoBack()) navigation.goBack();
   }, [navigation]);
 
+  const onStatusUpdate = useCallback((status: AVPlaybackStatus) => {
+    if (status.isLoaded) {
+      setLoaded(true);
+      setErrMsg(null);
+    } else if (status.error) {
+      setErrMsg(status.error);
+    }
+  }, []);
+
   return (
     <View style={styles.fill}>
+      <Image
+        source={{ uri: muxPosterUrl(playbackId) }}
+        style={styles.poster}
+        resizeMode="contain"
+        accessibilityIgnoresInvertColors
+      />
       <Video
         style={styles.fill}
         source={{ uri: muxHlsUrl(playbackId) }}
         resizeMode={ResizeMode.CONTAIN}
         shouldPlay
         useNativeControls
+        onPlaybackStatusUpdate={onStatusUpdate}
+        onError={(e: string) => setErrMsg(e)}
       />
+      {!loaded && !errMsg ? (
+        <View style={styles.loadingOverlay} pointerEvents="none">
+          <ActivityIndicator color={colors.gold} size="large" />
+        </View>
+      ) : null}
+      {errMsg ? (
+        <View style={styles.errorOverlay}>
+          <Text style={styles.errorTitle}>Couldn&rsquo;t play this video</Text>
+          <Text style={styles.errorBody}>{errMsg}</Text>
+        </View>
+      ) : null}
       <SafeAreaView
         pointerEvents="box-none"
         style={styles.closeOverlay}
@@ -69,6 +119,35 @@ const styles = StyleSheet.create({
     backgroundColor: colors.darkest,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  poster: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.4,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 14, 14, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing['4xl'],
+    gap: spacing.md,
+  },
+  errorTitle: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xl,
+    color: colors.gold,
+    textAlign: 'center',
+  },
+  errorBody: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.md,
+    color: colors.textOnDark,
+    textAlign: 'center',
   },
   closeOverlay: {
     position: 'absolute',
