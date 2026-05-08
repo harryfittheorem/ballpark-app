@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import BookingDetailScreen from '@/screens/Me/BookingDetailScreen';
 import BookingsListScreen from '@/screens/Me/BookingsListScreen';
+import ConnectHitTraxScreen from '@/screens/Me/ConnectHitTraxScreen';
 import MeScreen from '@/screens/Me/MeScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
@@ -38,6 +39,11 @@ export default function MeStackNavigator() {
         name="Orders"
         component={OrdersListScreen}
         options={{ title: 'Orders' }}
+      />
+      <Stack.Screen
+        name="ConnectHitTrax"
+        component={ConnectHitTraxScreen}
+        options={{ title: 'HitTrax' }}
       />
     </Stack.Navigator>
   );

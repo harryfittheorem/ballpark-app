@@ -1,0 +1,44 @@
+{
+  "_comment": "Sample GetAvailableThirdPartyData response used by scripts/replay-hittrax-fixture.mjs and the polling-worker tests. The exact field names HitTrax returns are contract-dependent (pages 6-12 of the spec) — this fixture covers the common variants accepted by parseSwingsPayload(). Update + add cases as we learn the canonical shape.",
+  "Data": [
+    {
+      "SwingID": "ht-evt-0001",
+      "SessionID": "ht-sess-001",
+      "FacilityID": "104",
+      "TimeStamp": "2026-05-08T18:00:12.000Z",
+      "Velo": 68.4,
+      "LaunchAngle": 14.2,
+      "Distance": 312,
+      "ContactQuality": "sweet",
+      "Result": "LD",
+      "PitchSpeed": 62.1,
+      "SprayAngle": -12.5
+    },
+    {
+      "SwingID": "ht-evt-0002",
+      "SessionID": "ht-sess-001",
+      "FacilityID": "104",
+      "TimeStamp": "2026-05-08T18:00:34.000Z",
+      "Velo": 71.0,
+      "LaunchAngle": 22.7,
+      "Distance": 348,
+      "ContactQuality": "solid",
+      "Result": "FB",
+      "PitchSpeed": 60.5,
+      "SprayAngle": 4.0
+    },
+    {
+      "SwingID": "ht-evt-0003",
+      "SessionID": "ht-sess-001",
+      "FacilityID": "104",
+      "TimeStamp": "2026-05-08T18:01:02.000Z",
+      "Velo": 65.2,
+      "LaunchAngle": -3.8,
+      "Distance": 105,
+      "ContactQuality": "off-bat",
+      "Result": "GB",
+      "PitchSpeed": 63.0,
+      "SprayAngle": -22.1
+    }
+  ]
+}

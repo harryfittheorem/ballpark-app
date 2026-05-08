@@ -1,0 +1,414 @@
+// =============================================================================
+// supabase/functions/hittrax-poll/index.ts
+// =============================================================================
+// Task #118 Step 5 — Polling worker for active HitTrax links.
+//
+// Trigger: Supabase scheduled invocation (every 2 minutes via pg_cron — see
+// runbook). May also be invoked on-demand via POST with the service-role
+// bearer for ops / fixture replay.
+//
+// For each active kid_capture_links row (oldest last_polled_at first),
+// calls HitTrax GetAvailableThirdPartyData with:
+//   StartDate = last_polled_through (or associated_at on first poll)
+//   EndDate   = now() - SLACK_SECONDS  (small safety margin so HitTrax
+//               isn't still buffering swings at the boundary)
+//
+// On success:
+//   * Parses the returned JSON via parseSwingsPayload.
+//   * For each swing: UPSERT into sessions (one per session_id) + UPSERT
+//     into swings (idempotent on (capture_source, capture_event_id)).
+//   * Advances last_polled_through to EndDate, clears last_poll_error.
+//   * Best-effort fans out a push notification per detected PR via
+//     send-push-notification (Promise.allSettled — never blocks the cursor).
+//
+// On HitTrax error / timeout:
+//   * Records last_poll_error on the link, leaves last_polled_through
+//     untouched so the next run retries the same window.
+//
+// Concurrency: Edge Functions are stateless and may overlap if a poll runs
+// longer than 2 min. Per-link work is naturally serialised because we
+// advance last_polled_through atomically on success — overlapping runs
+// would re-fetch the same window and dedupe via the swings UNIQUE.
+//
+// Auth model: this endpoint is service-role only. The caller (pg_cron via
+// pg_net, or an operator script) MUST pass SERVICE_ROLE_KEY in Authorization.
+// =============================================================================
+
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+
+import {
+  buildHitTraxUrl,
+  formatHitTraxDate,
+  jsonError,
+  jsonOk,
+  parseHitTraxTextResponse,
+  parseSwingsPayload,
+  readHitTraxConfig,
+  type HitTraxConfig,
+  type ParsedSwing,
+} from "../_shared/hittrax.ts";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// HitTrax content type for swing data. The exact value is contract-dependent
+// — set this via `npx supabase secrets set HITTRAX_CONTENT_TYPE=...` per
+// the spec's "Content Types: This is a list of data types you can request
+// from HitTrax". Defaults to "Swings" until we have the contracted value.
+const HITTRAX_CONTENT_TYPE = Deno.env.get("HITTRAX_CONTENT_TYPE") ?? "Swings";
+
+const POLL_TIMEOUT_MS = 20_000;
+const SLACK_SECONDS = 30;        // back EndDate off by 30s to avoid boundary misses
+const MAX_LINKS_PER_RUN = 50;    // cap per invocation so a stalled link can't starve others
+
+const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+type LinkRow = {
+  id: string;
+  tenant_id: string;
+  kid_id: string;
+  third_party_user_id: string;
+  third_party_user_password: string | null;
+  associated_at: string | null;
+  last_polled_through: string | null;
+};
+
+type PollOutcome = {
+  link_id: string;
+  ok: boolean;
+  swings_inserted: number;
+  prs_detected: number;
+  error?: string;
+};
+
+async function fanOutPrPush(
+  parentUserId: string,
+  kidFirstName: string,
+  metric: string,
+  value: number,
+): Promise<void> {
+  if (!parentUserId) return;
+  try {
+    const niceMetric =
+      metric === "exit_velocity_mph"
+        ? `${Math.round(value)} mph exit velo`
+        : metric === "distance_ft"
+          ? `${Math.round(value)} ft distance`
+          : metric === "pitch_speed_mph"
+            ? `${Math.round(value)} mph pitch`
+            : `${value}`;
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push-notification`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_ids: [parentUserId],
+        title: `New PR! ${niceMetric}`,
+        body: `${kidFirstName} just set a personal best.`,
+        data: { kind: "swing_pr", metric, value },
+      }),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      console.error(`hittrax-poll push failed status=${res.status} body=${txt.slice(0, 200)}`);
+    }
+  } catch (err) {
+    console.error("hittrax-poll push error", err);
+  }
+}
+
+async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutcome> {
+  const outcome: PollOutcome = { link_id: link.id, ok: false, swings_inserted: 0, prs_detected: 0 };
+
+  if (!link.third_party_user_password) {
+    outcome.error = "missing_password";
+    await adminClient
+      .from("kid_capture_links")
+      .update({ last_polled_at: new Date().toISOString(), last_poll_error: "missing_password" })
+      .eq("id", link.id);
+    return outcome;
+  }
+
+  const startDate = new Date(link.last_polled_through ?? link.associated_at ?? new Date(Date.now() - 60 * 60 * 1000).toISOString());
+  const endDate = new Date(Date.now() - SLACK_SECONDS * 1000);
+  if (endDate <= startDate) {
+    // Nothing to do this run — back off until next tick.
+    await adminClient
+      .from("kid_capture_links")
+      .update({ last_polled_at: new Date().toISOString(), last_poll_error: null })
+      .eq("id", link.id);
+    outcome.ok = true;
+    return outcome;
+  }
+
+  const url = buildHitTraxUrl(cfg, "GetAvailableThirdPartyData", {
+    ThirdPartyUserID: link.third_party_user_id,
+    ThirdPartyUserPassword: link.third_party_user_password,
+    ContentType: HITTRAX_CONTENT_TYPE,
+    StartDate: formatHitTraxDate(startDate),
+    EndDate: formatHitTraxDate(endDate),
+  });
+
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(url, { method: "GET", signal: controller.signal });
+  } catch (err) {
+    clearTimeout(timeoutHandle);
+    const code = (err as Error)?.name === "AbortError" ? "hittrax_timeout" : "hittrax_unreachable";
+    outcome.error = code;
+    await adminClient
+      .from("kid_capture_links")
+      .update({ last_polled_at: new Date().toISOString(), last_poll_error: code })
+      .eq("id", link.id);
+    return outcome;
+  }
+  clearTimeout(timeoutHandle);
+
+  if (!res.ok) {
+    outcome.error = `hittrax_status_${res.status}`;
+    await adminClient
+      .from("kid_capture_links")
+      .update({ last_polled_at: new Date().toISOString(), last_poll_error: outcome.error })
+      .eq("id", link.id);
+    return outcome;
+  }
+  const bodyText = await res.text();
+  // HitTrax may return "Error <reason>" in 200-OK responses (their convention).
+  const checkErr = parseHitTraxTextResponse(bodyText);
+  if (!checkErr.ok) {
+    outcome.error = checkErr.error.slice(0, 200);
+    await adminClient
+      .from("kid_capture_links")
+      .update({ last_polled_at: new Date().toISOString(), last_poll_error: outcome.error })
+      .eq("id", link.id);
+    return outcome;
+  }
+
+  const swings = parseSwingsPayload(checkErr.body);
+
+  // Look up parent + kid name once for push fan-out.
+  let parentUserId = "";
+  let kidFirstName = "your kid";
+  try {
+    const { data: kid } = await adminClient
+      .from("kids")
+      .select("first_name, family_id")
+      .eq("id", link.kid_id)
+      .maybeSingle();
+    if (kid) {
+      kidFirstName = kid.first_name ?? kidFirstName;
+      const { data: family } = await adminClient
+        .from("families")
+        .select("parent_user_id")
+        .eq("id", kid.family_id)
+        .maybeSingle();
+      parentUserId = family?.parent_user_id ?? "";
+    }
+  } catch (e) {
+    console.error("hittrax-poll lookup parent failed", e);
+  }
+
+  // UPSERT sessions (one per distinct capture_session_id), then UPSERT swings.
+  const sessionIdMap = new Map<string, string>(); // hittrax session id -> our uuid
+  const distinctSessions = new Map<string, ParsedSwing[]>();
+  for (const s of swings) {
+    const sid = s.capture_session_id ?? `solo:${s.capture_event_id}`;
+    if (!distinctSessions.has(sid)) distinctSessions.set(sid, []);
+    distinctSessions.get(sid)!.push(s);
+  }
+
+  // Track per-link success. The cursor (last_polled_through) only advances
+  // if EVERY upsert in this window succeeded. Partial failure leaves the
+  // cursor untouched so the next poll re-fetches the same window — duplicate
+  // rows are absorbed by the swings UNIQUE on (capture_source, capture_event_id).
+  let allOk = true;
+
+  for (const [hittraxSessionId, members] of distinctSessions.entries()) {
+    if (!hittraxSessionId.startsWith("solo:")) {
+      // Real HitTrax session — UPSERT.
+      const startedAt = members.reduce(
+        (min, s) => (s.occurred_at < min ? s.occurred_at : min),
+        members[0].occurred_at,
+      );
+      const endedAt = members.reduce(
+        (max, s) => (s.occurred_at > max ? s.occurred_at : max),
+        members[0].occurred_at,
+      );
+      const evs = members.map((m) => m.exit_velocity_mph).filter((v): v is number => v != null);
+      const dists = members.map((m) => m.distance_ft).filter((v): v is number => v != null);
+      const facility = members.find((m) => m.facility_id)?.facility_id ?? null;
+
+      const { data: upserted, error: sessErr } = await adminClient
+        .from("sessions")
+        .upsert(
+          {
+            tenant_id: link.tenant_id,
+            kid_id: link.kid_id,
+            capture_source: "hittrax",
+            capture_session_id: hittraxSessionId,
+            facility_id: facility,
+            started_at: startedAt,
+            ended_at: endedAt,
+            swing_count: members.length,
+            best_exit_velocity_mph: evs.length ? Math.max(...evs) : null,
+            avg_exit_velocity_mph: evs.length ? Math.round((evs.reduce((a, b) => a + b, 0) / evs.length) * 10) / 10 : null,
+            max_distance_ft: dists.length ? Math.max(...dists) : null,
+          },
+          { onConflict: "capture_source,capture_session_id" },
+        )
+        .select("id")
+        .single();
+      if (sessErr) {
+        console.error("hittrax-poll session upsert failed", sessErr);
+        allOk = false;
+        continue;
+      }
+      sessionIdMap.set(hittraxSessionId, upserted.id);
+    }
+  }
+
+  // PR detection in this run = swings that the trigger flips to is_personal_best.
+  // We can detect them after-the-fact by selecting back rows with is_personal_best
+  // matching our just-inserted ids. To keep things simple, count returned PRs
+  // by comparing against the personal_bests table BEFORE insert.
+  const beforePbs = new Map<string, number>();
+  try {
+    const { data: pbs } = await adminClient
+      .from("personal_bests")
+      .select("metric, value")
+      .eq("kid_id", link.kid_id);
+    for (const p of pbs ?? []) {
+      beforePbs.set(p.metric, Number(p.value));
+    }
+  } catch (e) {
+    console.error("hittrax-poll fetch beforePbs failed", e);
+  }
+
+  for (const swing of swings) {
+    const hittraxSessionId = swing.capture_session_id ?? null;
+    const ourSessionId = hittraxSessionId ? sessionIdMap.get(hittraxSessionId) ?? null : null;
+    const { error: insertErr } = await adminClient.from("swings").upsert(
+      {
+        tenant_id: link.tenant_id,
+        kid_id: link.kid_id,
+        session_id: ourSessionId,
+        capture_source: "hittrax",
+        capture_event_id: swing.capture_event_id,
+        occurred_at: swing.occurred_at,
+        exit_velocity_mph: swing.exit_velocity_mph,
+        launch_angle_deg: swing.launch_angle_deg,
+        distance_ft: swing.distance_ft,
+        contact_quality: swing.contact_quality,
+        result: swing.result,
+        pitch_speed_mph: swing.pitch_speed_mph,
+        spray_angle_deg: swing.spray_angle_deg,
+        raw: swing.raw,
+      },
+      { onConflict: "capture_source,capture_event_id", ignoreDuplicates: false },
+    );
+    if (insertErr) {
+      console.error(`hittrax-poll swing upsert failed event=${swing.capture_event_id}`, insertErr);
+      allOk = false;
+      continue;
+    }
+    outcome.swings_inserted++;
+
+    // PR detection (best-effort for push fan-out — the canonical PR write
+    // happens inside the detect_swing_pr trigger). We fan out a push if any
+    // metric in this swing beats what we cached BEFORE the upserts.
+    const checks: Array<{ metric: string; value: number | null }> = [
+      { metric: "exit_velocity_mph", value: swing.exit_velocity_mph },
+      { metric: "distance_ft", value: swing.distance_ft },
+      { metric: "pitch_speed_mph", value: swing.pitch_speed_mph },
+    ];
+    for (const c of checks) {
+      if (c.value === null) continue;
+      const before = beforePbs.get(c.metric);
+      if (before === undefined || c.value > before) {
+        outcome.prs_detected++;
+        // Update local cache so a later swing in the same payload doesn't
+        // double-fire a push for the same metric.
+        beforePbs.set(c.metric, c.value);
+        // Best-effort — never block the cursor advance.
+        await fanOutPrPush(parentUserId, kidFirstName, c.metric, c.value);
+      }
+    }
+  }
+
+  // Cursor only advances on FULL success. On partial failure we record the
+  // failure on the link and leave last_polled_through where it was so the
+  // next run re-fetches and the swings UNIQUE absorbs the dupes.
+  if (allOk) {
+    await adminClient
+      .from("kid_capture_links")
+      .update({
+        last_polled_through: endDate.toISOString(),
+        last_polled_at: new Date().toISOString(),
+        last_poll_error: null,
+      })
+      .eq("id", link.id);
+    outcome.ok = true;
+  } else {
+    outcome.error = "partial_upsert_failure";
+    await adminClient
+      .from("kid_capture_links")
+      .update({
+        last_polled_at: new Date().toISOString(),
+        last_poll_error: outcome.error,
+      })
+      .eq("id", link.id);
+  }
+  return outcome;
+}
+
+serve(async (req) => {
+  const startedAt = Date.now();
+
+  // Service-role auth — same convention as send-push-notification.
+  const authHeader = req.headers.get("Authorization") ?? req.headers.get("authorization");
+  if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
+    return jsonError(401, "unauthorized", "Missing or malformed Authorization header");
+  }
+  const token = authHeader.slice(7).trim();
+  if (token !== SUPABASE_SERVICE_ROLE_KEY) {
+    return jsonError(401, "unauthorized", "Service role required");
+  }
+
+  const cfg = readHitTraxConfig();
+  if (!cfg) {
+    return jsonError(503, "hittrax_not_configured", "HitTrax credentials not provisioned");
+  }
+
+  const { data: links, error: linksErr } = await adminClient
+    .from("kid_capture_links")
+    .select("id, tenant_id, kid_id, third_party_user_id, third_party_user_password, associated_at, last_polled_through")
+    .eq("capture_source", "hittrax")
+    .eq("association_status", "active")
+    .order("last_polled_at", { ascending: true, nullsFirst: true })
+    .limit(MAX_LINKS_PER_RUN);
+  if (linksErr) {
+    console.error("hittrax-poll fetch links failed", linksErr);
+    return jsonError(500, "db_error", "Failed to fetch active links");
+  }
+
+  const outcomes: PollOutcome[] = [];
+  for (const link of links ?? []) {
+    const o = await pollOneLink(cfg, link as LinkRow);
+    outcomes.push(o);
+  }
+
+  const totalSwings = outcomes.reduce((a, o) => a + o.swings_inserted, 0);
+  const totalPrs = outcomes.reduce((a, o) => a + o.prs_detected, 0);
+  const errors = outcomes.filter((o) => !o.ok).length;
+  console.log(
+    `hittrax-poll links=${outcomes.length} swings=${totalSwings} prs=${totalPrs} errors=${errors} ms=${Date.now() - startedAt}`,
+  );
+
+  return jsonOk({ ok: true, outcomes, totals: { links: outcomes.length, swings: totalSwings, prs: totalPrs, errors } });
+});

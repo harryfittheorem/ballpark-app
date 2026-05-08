@@ -31,18 +31,23 @@ node scripts/check-mux-asset-id-constraint.mjs
 # stale deploy causes the coach Record Video screen to fail with
 # `Upload service returned status 404 [function_error]`.
 if [ -d "supabase/functions" ]; then
-  for fn in mux-create-upload send-push-notification send-coach-video-notification; do
+  for fn in mux-create-upload send-push-notification send-coach-video-notification \
+            hittrax-associate hittrax-poll hittrax-disconnect; do
     if [ -f "supabase/functions/$fn/index.ts" ]; then
       echo "[post-merge] supabase functions deploy $fn"
       npx --yes supabase functions deploy "$fn" >/dev/null 2>&1 || \
         echo "[post-merge] WARN: deploy $fn failed (env not configured?); continuing"
     fi
   done
-  if [ -f "supabase/functions/mux-webhook/index.ts" ]; then
-    echo "[post-merge] supabase functions deploy mux-webhook --no-verify-jwt"
-    npx --yes supabase functions deploy mux-webhook --no-verify-jwt >/dev/null 2>&1 || \
-      echo "[post-merge] WARN: deploy mux-webhook failed (env not configured?); continuing"
-  fi
+  # --no-verify-jwt deploys: callers (Mux, HitTrax) authenticate with their
+  # own signature/credential schemes and never carry a Supabase JWT.
+  for fn in mux-webhook hittrax-registration-complete hittrax-forget; do
+    if [ -f "supabase/functions/$fn/index.ts" ]; then
+      echo "[post-merge] supabase functions deploy $fn --no-verify-jwt"
+      npx --yes supabase functions deploy "$fn" --no-verify-jwt >/dev/null 2>&1 || \
+        echo "[post-merge] WARN: deploy $fn failed (env not configured?); continuing"
+    fi
+  done
 fi
 
 echo "[post-merge] done"
