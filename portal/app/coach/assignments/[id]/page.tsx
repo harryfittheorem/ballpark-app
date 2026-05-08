@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MuxVideo } from "@/components/MuxVideo";
 import { ReviewForm } from "./ReviewForm";
+import { CancelAssignmentButton } from "./CancelAssignmentButton";
 
 type Status = "pending" | "submitted" | "reviewed";
 
@@ -88,10 +89,13 @@ function pickOne<T>(v: T | T[] | null): T | null {
 
 export default async function AssignmentDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { id } = await params;
+  const { error: errParam } = await searchParams;
   const supabase = await createClient();
 
   const [{ data, error }, { data: { user } }] = await Promise.all([
@@ -161,7 +165,37 @@ export default async function AssignmentDetailPage({
             {fmtDate(row.created_at)}
           </p>
         </div>
+        {row.status === "pending" && user && row.coach_user_id === user.id ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <CancelAssignmentButton assignmentId={row.id} />
+            <Link
+              href={`/coach/assignments/${row.id}/edit`}
+              className="inline-flex shrink-0 items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Edit
+            </Link>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled
+            title={
+              row.status !== "pending"
+                ? "The family has already marked this drill submitted."
+                : "Only the assigning coach can edit this drill."
+            }
+            className="inline-flex shrink-0 cursor-not-allowed items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-400"
+          >
+            Edit
+          </button>
+        )}
       </div>
+
+      {errParam ? (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          {errParam}
+        </div>
+      ) : null}
 
       <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
         <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">

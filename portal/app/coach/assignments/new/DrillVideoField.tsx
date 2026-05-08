@@ -44,13 +44,16 @@ function fmtBytes(n: number): string {
 export function DrillVideoField({
   recent,
   onBusyChange,
+  initialPickedId = "",
 }: {
   recent: RecentVideo[];
   onBusyChange?: (busy: boolean) => void;
+  /** Pre-select an existing drill video id (used by the edit form). */
+  initialPickedId?: string;
 }) {
   const hasRecent = recent.length > 0;
   const [mode, setMode] = useState<Mode>(hasRecent ? "pick" : "upload");
-  const [pickedId, setPickedId] = useState<string>("");
+  const [pickedId, setPickedId] = useState<string>(initialPickedId);
   const [status, setStatus] = useState<UploadStatus>({ kind: "idle" });
   const [pickedFileName, setPickedFileName] = useState<string>("");
   const xhrRef = useRef<XMLHttpRequest | null>(null);
