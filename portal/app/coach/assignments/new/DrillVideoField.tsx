@@ -317,7 +317,12 @@ export function DrillVideoField({
               {status.canRetry ? (
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    // Clear value first so re-picking the SAME file still
+                    // fires onChange — otherwise browsers suppress it.
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                    fileInputRef.current?.click();
+                  }}
                   className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
                 >
                   Pick a file and retry
