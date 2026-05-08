@@ -37,7 +37,7 @@ purge runs. The two functions cover the two propagation directions:
 |---------------------------------|-----------------------------------|--------------------------------|---------------|
 | Parent taps Disconnect          | `hittrax-disconnect`              | `RemoveThirdPartyAssociation`  | flips link only — historical swings retained |
 | HitTrax-side delete-my-data     | `hittrax-forget` (this endpoint)  | (inbound — no outbound call)   | swings + PBs + link row purged |
-| Parent deletes Ballpark account | `account-delete` (parent JWT)     | `RemoveThirdPartyAssociation` per active link | family-wide cascade via auth.admin.deleteUser + FKs |
+| Parent deletes Ballpark account | `account-delete` (parent JWT)     | `RemoveThirdPartyAssociation` + `ForgetHitTraxUser` per active link | family-wide cascade via auth.admin.deleteUser + FKs |
 
 ## Secrets (Supabase Edge Function env)
 

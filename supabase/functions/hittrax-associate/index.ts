@@ -148,9 +148,14 @@ serve(async (req) => {
     return jsonError(503, "hittrax_not_configured", "HitTrax credentials not provisioned for this environment");
   }
 
-  // ---- 5. UPSERT the kid_capture_links row in 'pending' -------------------
+  // ---- 5. Pre-flight existing-link check (NO write yet) -------------------
   // If a row already exists for (kid, hittrax) and is 'active', refuse so the
   // parent goes through Disconnect first (HitTrax bills per active link).
+  // We DO NOT touch the row here — atomic lifecycle requires that we only
+  // mutate kid_capture_links AFTER HitTrax has accepted the call. Otherwise
+  // a transient HitTrax outage would strand the row in 'pending' and the
+  // UI would render the "waiting on email" card forever (bug filed during
+  // architect review #5).
   const { data: existing, error: existingErr } = await adminClient
     .from("kid_capture_links")
     .select("id, association_status")
@@ -164,52 +169,15 @@ serve(async (req) => {
 
   // Generate a fresh ThirdPartyUserID for THIS association attempt. Never
   // reused across attempts — HitTrax's spec implies these are user-scoped
-  // and we want the audit trail per attempt.
+  // and we want the audit trail per attempt. This UUID lives only in
+  // memory until step 7 (post-HitTrax success).
   const thirdPartyUserId = crypto.randomUUID();
 
-  let linkId: string;
-  if (existing) {
-    const { data: updated, error: updateErr } = await adminClient
-      .from("kid_capture_links")
-      .update({
-        third_party_user_id: thirdPartyUserId,
-        external_user_id: externalUserId,
-        third_party_user_password: null,
-        hittrax_registration_status: null,
-        hittrax_release_status: null,
-        association_status: "pending",
-        associated_at: null,
-        removed_at: null,
-        last_polled_through: null,
-        last_polled_at: null,
-        last_poll_error: null,
-      })
-      .eq("id", existing.id)
-      .select("id")
-      .single();
-    if (updateErr || !updated) return jsonError(500, "db_error", "Failed to refresh existing link");
-    linkId = updated.id;
-  } else {
-    const { data: inserted, error: insertErr } = await adminClient
-      .from("kid_capture_links")
-      .insert({
-        tenant_id: tenantId,
-        kid_id: kidId,
-        capture_source: "hittrax",
-        third_party_user_id: thirdPartyUserId,
-        external_user_id: externalUserId,
-        association_status: "pending",
-      })
-      .select("id")
-      .single();
-    if (insertErr || !inserted) {
-      console.error("hittrax-associate insert failed", insertErr);
-      return jsonError(500, "db_error", "Failed to create link row");
-    }
-    linkId = inserted.id;
-  }
-
-  // ---- 6. Call HitTrax AssociateThirdPartyAccount -------------------------
+  // ---- 6. Call HitTrax AssociateThirdPartyAccount FIRST -------------------
+  // Atomic lifecycle: HitTrax success/failure decides whether we ever
+  // persist a 'pending' row. On any HitTrax error the local row is left in
+  // its prior state (or never created), so the parent can immediately
+  // retry with a corrected UserID — they're not stranded in 'pending'.
   const url = buildHitTraxUrl(cfg, "AssociateThirdPartyAccount", {
     UserID: externalUserId,
     ThirdPartyUserID: thirdPartyUserId,
@@ -236,26 +204,62 @@ serve(async (req) => {
   const text = await res.text();
   const parsed = parseHitTraxTextResponse(text);
   if (!parsed.ok) {
-    console.error(`hittrax-associate hittrax_error link=${linkId} body=${parsed.error.slice(0, 200)}`);
+    console.error(`hittrax-associate hittrax_error kid=${kidId} body=${parsed.error.slice(0, 200)}`);
     return jsonError(502, "hittrax_error", parsed.error);
   }
   const booleans = parseAssociateResponse(parsed.body);
   if (!booleans) {
-    console.error(`hittrax-associate hittrax_bad_response link=${linkId} body=${parsed.body.slice(0, 200)}`);
+    console.error(`hittrax-associate hittrax_bad_response kid=${kidId} body=${parsed.body.slice(0, 200)}`);
     return jsonError(502, "hittrax_bad_response", `Unexpected HitTrax response: ${parsed.body.slice(0, 80)}`);
   }
 
-  // ---- 7. Persist the booleans -------------------------------------------
-  const { error: persistErr } = await adminClient
-    .from("kid_capture_links")
-    .update({
-      hittrax_registration_status: booleans.registration,
-      hittrax_release_status: booleans.release,
-    })
-    .eq("id", linkId);
-  if (persistErr) {
-    console.error("hittrax-associate persist booleans failed", persistErr);
-    // Non-fatal — the link is in pending and the booleans are informational.
+  // ---- 7. NOW persist (UPSERT) the kid_capture_links row in 'pending' ----
+  // We've passed the HitTrax outbound — write the row carrying the booleans
+  // we just received. If this DB write fails the row is unchanged (or never
+  // existed) and the parent retries; HitTrax has no concept of partial
+  // state for us to roll back.
+  let linkId: string;
+  if (existing) {
+    const { data: updated, error: updateErr } = await adminClient
+      .from("kid_capture_links")
+      .update({
+        third_party_user_id: thirdPartyUserId,
+        external_user_id: externalUserId,
+        third_party_user_password: null,
+        hittrax_registration_status: booleans.registration,
+        hittrax_release_status: booleans.release,
+        association_status: "pending",
+        associated_at: null,
+        removed_at: null,
+        last_polled_through: null,
+        last_polled_at: null,
+        last_poll_error: null,
+      })
+      .eq("id", existing.id)
+      .select("id")
+      .single();
+    if (updateErr || !updated) return jsonError(500, "db_error", "Failed to refresh existing link");
+    linkId = updated.id;
+  } else {
+    const { data: inserted, error: insertErr } = await adminClient
+      .from("kid_capture_links")
+      .insert({
+        tenant_id: tenantId,
+        kid_id: kidId,
+        capture_source: "hittrax",
+        third_party_user_id: thirdPartyUserId,
+        external_user_id: externalUserId,
+        hittrax_registration_status: booleans.registration,
+        hittrax_release_status: booleans.release,
+        association_status: "pending",
+      })
+      .select("id")
+      .single();
+    if (insertErr || !inserted) {
+      console.error("hittrax-associate insert failed", insertErr);
+      return jsonError(500, "db_error", "Failed to create link row");
+    }
+    linkId = inserted.id;
   }
 
   console.log(

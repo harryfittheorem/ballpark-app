@@ -67,12 +67,13 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
-async function callHitTraxRemove(
+async function callHitTraxOutbound(
   cfg: { baseUrl: string; partnerId: string; apiKey: string },
+  endpoint: "RemoveThirdPartyAssociation" | "ForgetHitTraxUser",
   thirdPartyUserId: string,
   thirdPartyUserPassword: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const url = buildHitTraxUrl(cfg, "RemoveThirdPartyAssociation", {
+  const url = buildHitTraxUrl(cfg, endpoint, {
     ThirdPartyUserID: thirdPartyUserId,
     ThirdPartyUserPassword: thirdPartyUserPassword,
   });
@@ -149,9 +150,19 @@ serve(async (req) => {
         .in("kid_id", kidIds);
 
       const cfg = readHitTraxConfig();
-      // Outbound HitTrax disconnects in parallel — best-effort. A HitTrax
-      // failure must NOT block the deletion (the parent asked us to
-      // delete; we cannot hold them hostage to a third-party outage).
+      // Outbound HitTrax cleanup in parallel — best-effort. Two calls per
+      // active link, in this order:
+      //   (a) RemoveThirdPartyAssociation — stops HitTrax from sending us
+      //       new data and decrements the active-association count on
+      //       their billing side.
+      //   (b) ForgetHitTraxUser — GDPR/COPPA outbound: instructs HitTrax
+      //       to forget the per-association credential they minted for
+      //       this kid. Without this the HitTrax-side ThirdPartyUserID
+      //       persists indefinitely even though we've deleted the row
+      //       on our side.
+      // A HitTrax failure on either call MUST NOT block the deletion (the
+      // parent asked us to delete; we cannot hold them hostage to a
+      // third-party outage). Failures are logged for ops follow-up.
       const outbound: Promise<unknown>[] = [];
       for (const link of links ?? []) {
         if (
@@ -161,13 +172,21 @@ serve(async (req) => {
           link.third_party_user_password &&
           cfg
         ) {
+          const tpid = link.third_party_user_id;
+          const tpwd = link.third_party_user_password;
           outbound.push(
-            callHitTraxRemove(cfg, link.third_party_user_id, link.third_party_user_password)
-              .then((r) => {
-                if (!r.ok) {
-                  console.error(`account-delete hittrax outbound failed link=${link.id} reason=${r.reason}`);
-                }
-              }),
+            callHitTraxOutbound(cfg, "RemoveThirdPartyAssociation", tpid, tpwd).then((r) => {
+              if (!r.ok) {
+                console.error(`account-delete hittrax remove failed link=${link.id} reason=${r.reason}`);
+              }
+            }),
+          );
+          outbound.push(
+            callHitTraxOutbound(cfg, "ForgetHitTraxUser", tpid, tpwd).then((r) => {
+              if (!r.ok) {
+                console.error(`account-delete hittrax forget failed link=${link.id} reason=${r.reason}`);
+              }
+            }),
           );
         }
       }
