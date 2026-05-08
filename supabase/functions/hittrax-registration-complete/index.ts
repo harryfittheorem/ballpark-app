@@ -24,13 +24,21 @@
 // Deploy:
 //   npx supabase functions deploy hittrax-registration-complete --no-verify-jwt
 //
-// Idempotency:
-//   * The same Accepted=true callback may be re-delivered. Look-up by
-//     third_party_user_id is unique per (capture_source, tpuid); the UPDATE
-//     is shape-guarded so a re-flip is a no-op.
+// Idempotency (CRITICAL — re-delivery must NEVER lose data):
+//   * The same Accepted=true callback may be re-delivered (HitTrax network
+//     retry, at-least-once delivery semantics). The active-link branch
+//     short-circuits BEFORE touching last_polled_through or associated_at
+//     because re-running the UPDATE would jump the cursor forward to "now"
+//     and silently skip every swing the poller hasn't yet ingested in the
+//     window between original activation and re-delivery. The only state
+//     we refresh on re-delivery is the password (in case HitTrax rotated
+//     it) — and that's gated by `.neq()` so it's a no-op when unchanged.
 //   * If a callback for an already-removed link arrives, we treat it as a
 //     no-op and return "true" — there's nothing to do, and erroring would
 //     make HitTrax retry forever.
+//   * declined → accepted re-delivery is a real state change (parent
+//     re-tried via associate), so we proceed with the normal activate
+//     path and seed the cursor at "now".
 // =============================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -111,6 +119,35 @@ serve(async (req) => {
   }
 
   if (accepted) {
+    // IDEMPOTENCY: HitTrax may re-deliver the same Accepted=true callback
+    // (network retry, at-least-once delivery). A re-delivery for an
+    // already-active link MUST be a true no-op — re-running the UPDATE
+    // would clobber `last_polled_through` back to "now", silently
+    // skipping every swing the poller has not yet ingested in the
+    // window between the original activation and the re-delivery. The
+    // only state we are willing to refresh on a re-delivery is the
+    // password, in case HitTrax rotated it (the spec doesn't mandate it
+    // but the password we store is the one HitTrax just sent — keeping
+    // them in sync is safe). The cursor + activation timestamp are
+    // ABSOLUTELY frozen post-activation.
+    if (link.association_status === "active") {
+      if (password) {
+        const { error: pwErr } = await adminClient
+          .from("kid_capture_links")
+          .update({ third_party_user_password: password })
+          .eq("id", link.id)
+          .neq("third_party_user_password", password); // skip write if unchanged
+        if (pwErr) {
+          console.error("hittrax-registration-complete db error on password refresh", pwErr);
+          // Best-effort: still ack so HitTrax doesn't retry forever.
+        }
+      }
+      console.log(
+        `hittrax-registration-complete noop_active link=${link.id} ms=${Date.now() - startedAt}`,
+      );
+      return hittraxText("true");
+    }
+
     const now = new Date().toISOString();
     const { error: updateErr } = await adminClient
       .from("kid_capture_links")
@@ -120,8 +157,13 @@ serve(async (req) => {
         associated_at: now,
         // Seed cursor at activation time so the first poll only fetches
         // swings recorded from now onward. Backfill is intentionally not
-        // attempted in v1 — see runbook.
+        // attempted in v1 — see runbook. Guarded above so this only ever
+        // runs on the first accepted callback.
         last_polled_through: now,
+        // Reset any backoff state from previous failed pending attempts.
+        retry_count: 0,
+        next_poll_at: null,
+        last_poll_error: null,
       })
       .eq("id", link.id);
     if (updateErr) {
