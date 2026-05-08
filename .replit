@@ -25,6 +25,10 @@ pattern = "**/{*.ts,*.tsx}"
 start = "typescript-language-server --stdio"
 
 [[ports]]
+localPort = 3000
+externalPort = 5000
+
+[[ports]]
 localPort = 5000
 externalPort = 80
 

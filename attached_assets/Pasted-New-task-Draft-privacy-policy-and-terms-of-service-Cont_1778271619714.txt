@@ -1,0 +1,59 @@
+New task — Draft privacy policy and terms of service.
+
+Context:
+- We're preparing for pilot launch with Infinite Hitting
+- App Store submission requires privacy policy
+- Need both documents drafted, will be lawyer-reviewed before
+  finalization
+
+What I need:
+
+1. docs/legal/privacy-policy.md
+   Cover specifically:
+   - What data we collect (email, name, phone for parents; kid
+     first name, age, position; coach_messages content; bookings;
+     points, redemptions, orders)
+   - How we use it (service operation, not advertising)
+   - Multi-tenant isolation guarantees
+   - Children's data (under 13) — COPPA considerations since we
+     have kid profiles
+   - Push notification data
+   - Mux video storage (third-party processor)
+   - Resend email (third-party processor)
+   - Supabase database hosting (third-party processor)
+   - Stripe (will be added — note as "future")
+   - Data retention policy (how long videos kept, how long
+     messages kept)
+   - User rights (delete account, export data)
+   - Contact: privacy@fittheorem.com
+
+2. docs/legal/terms-of-service.md
+   Cover:
+   - Service description
+   - Account responsibilities
+   - Acceptable use (no abusive content, no impersonating
+     coaches/parents)
+   - Coach video content guidelines
+   - Points and rewards (no cash value, can be revoked, etc.)
+   - Bookings and cancellation policies
+   - Payment terms (placeholder language, will update with
+     Stripe)
+   - Limitation of liability
+   - Termination
+   - Governing law (Texas, since IH is Texas-based)
+   - Changes to terms
+
+Important:
+- Mark every document clearly as "DRAFT — REQUIRES LEGAL REVIEW"
+- Use plain English, not legalese where avoidable
+- Cite specific data tables/flows from the actual codebase so
+  it's not generic
+- Reference Anthropic/Apple/Google's policy templates as
+  starting points but customize for our actual data practices
+
+Out of scope:
+- Do not implement any policy enforcement code
+- Do not modify ./portal/
+- Do not modify any source code
+- Do not modify the database
+- Do not commit final versions — these are drafts

@@ -1,0 +1,63 @@
+New task — Push notification trigger Edge Functions.
+
+Context:
+- Push notification token registration is already working (see
+  src/services/notifications.ts and src/hooks/useAuth.tsx)
+- expo-notifications + expo-device are installed
+- We need to ACTUALLY fire push notifications when events occur
+- This is server-side work in supabase/functions/
+
+What I need:
+
+1. New table: device_tokens
+   - user_id uuid FK auth.users CASCADE
+   - tenant_id uuid FK tenants CASCADE
+   - expo_push_token text NOT NULL UNIQUE
+   - platform text CHECK ('ios','android','web')
+   - last_seen_at timestamptz
+   - created_at, updated_at
+   - RLS: user can SELECT/INSERT/UPDATE/DELETE own tokens, scoped
+     by tenant_id
+
+2. Update src/services/notifications.ts:
+   - After getting Expo push token, INSERT/UPDATE into
+     device_tokens table for current user
+   - Handle the upsert idempotently
+
+3. New Edge Function: supabase/functions/send-push-notification/
+   - Accepts { user_id, title, body, data } as payload
+   - Looks up user's device_tokens
+   - Sends via Expo Push API (https://exp.host/--/api/v2/push/send)
+   - Logs response, handles errors gracefully
+   - Service role only (never called from client)
+
+4. Update existing Edge Functions to fire push:
+   - supabase/functions/send-coach-video-notification — when coach
+     sends video, also call send-push-notification with title
+     "Coach [name] sent [kid] a new video"
+   - Optional but helpful: when points awarded, when redemption
+     ships, etc. (defer if it expands scope too much)
+
+Two-gate review:
+- Gate 1: SQL migration for device_tokens table — show me the SQL
+  before db push
+- Gate 2: Edge Function code — show me the index.ts before deploy
+
+Out of scope:
+- Do not modify ./portal/ (parallel task is working there)
+- Do not modify auth hook
+- Do not modify any v0.4-v0.6 existing tables
+- Do not change useAuth.tsx (already updated for push registration)
+- Do not deploy to production-only environments (dev only)
+
+Verification:
+1. After db push, verify device_tokens table exists with RLS
+2. After Edge Function deploy, test by:
+   - Signing in as parent on physical device
+   - Verify device_tokens row appears in DB
+   - Trigger send-push-notification with my user_id
+   - Verify push arrives on phone
+3. Send a coach video as Coach Mike — verify parent gets BOTH
+   email (existing) AND push notification (new)
+
+Plan-then-execute. Stop after each gate for my review.
