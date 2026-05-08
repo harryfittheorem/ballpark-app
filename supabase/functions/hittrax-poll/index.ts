@@ -43,7 +43,7 @@ import {
   jsonError,
   jsonOk,
   parseHitTraxTextResponse,
-  parseSwingsPayload,
+  parseSwingsPayloadStrict,
   readHitTraxConfig,
   type HitTraxConfig,
   type ParsedSwing,
@@ -196,7 +196,40 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutco
     return outcome;
   }
 
-  const swings = parseSwingsPayload(checkErr.body);
+  // Strict parser distinguishes "empty window" from "malformed body". A
+  // contract-drift / HTML error page / truncated body must NOT advance the
+  // cursor — otherwise we'd silently skip every event in this window
+  // forever. Treat as a hard poll failure: cursor untouched, error logged.
+  const parseResult = parseSwingsPayloadStrict(checkErr.body);
+  if (!parseResult.ok) {
+    outcome.error = `parse_${parseResult.code}`;
+    console.error(
+      `hittrax-poll parse failure link=${link.id} code=${parseResult.code} sample=${parseResult.sample}`,
+    );
+    await adminClient
+      .from("kid_capture_links")
+      .update({ last_polled_at: new Date().toISOString(), last_poll_error: outcome.error })
+      .eq("id", link.id);
+    return outcome;
+  }
+  const swings = parseResult.swings;
+  // Partial parse: some rows looked like swings but couldn't be coerced.
+  // If we got at least one good swing, proceed (the dropped ones will be
+  // re-attempted on the next poll because the cursor only advances on
+  // FULL upsert success and the swings UNIQUE absorbs dupes). If EVERY
+  // row was dropped, fail loud — that's almost certainly a schema drift.
+  if (parseResult.dropped > 0 && swings.length === 0) {
+    outcome.error = `parse_all_dropped_count_${parseResult.dropped}`;
+    console.error(`hittrax-poll all rows dropped link=${link.id} dropped=${parseResult.dropped}`);
+    await adminClient
+      .from("kid_capture_links")
+      .update({ last_polled_at: new Date().toISOString(), last_poll_error: outcome.error })
+      .eq("id", link.id);
+    return outcome;
+  }
+  if (parseResult.dropped > 0) {
+    console.warn(`hittrax-poll partial parse link=${link.id} kept=${swings.length} dropped=${parseResult.dropped}`);
+  }
 
   // Look up parent + kid name once for push fan-out.
   let parentUserId = "";

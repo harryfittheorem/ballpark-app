@@ -24,6 +24,7 @@ import {
   parseAssociateResponse,
   parseHitTraxTextResponse,
   parseSwingsPayload,
+  parseSwingsPayloadStrict,
   timingSafeEqual,
   verifyHitTraxInbound,
   type HitTraxConfig,
@@ -197,4 +198,57 @@ Deno.test("parseSwingsPayload: malformed TimeStamp falls back rather than droppi
   assertEquals(swings.length, 1);
   // occurred_at is set to a parseable ISO string from Date.now() fallback.
   assert(!Number.isNaN(Date.parse(swings[0].occurred_at)));
+});
+
+// ---------------------------------------------------------------------------
+// parseSwingsPayloadStrict — fail-loud variant used by the poll worker so a
+// malformed 200 body is never silently confused with "empty window".
+// ---------------------------------------------------------------------------
+Deno.test("parseSwingsPayloadStrict: legitimate empty window -> ok with 0 swings", () => {
+  const r = parseSwingsPayloadStrict("[]");
+  assert(r.ok);
+  if (r.ok) {
+    assertEquals(r.swings.length, 0);
+    assertEquals(r.dropped, 0);
+  }
+});
+
+Deno.test("parseSwingsPayloadStrict: legitimate empty Data envelope -> ok", () => {
+  const r = parseSwingsPayloadStrict(JSON.stringify({ Data: [] }));
+  assert(r.ok);
+  if (r.ok) assertEquals(r.swings.length, 0);
+});
+
+Deno.test("parseSwingsPayloadStrict: malformed JSON -> invalid_json with sample", () => {
+  const r = parseSwingsPayloadStrict("<html>503 Service Unavailable</html>");
+  assertFalse(r.ok);
+  if (!r.ok) {
+    assertEquals(r.code, "invalid_json");
+    assert(r.sample.includes("503"));
+  }
+});
+
+Deno.test("parseSwingsPayloadStrict: object without recognised swings array -> unexpected_envelope", () => {
+  const r = parseSwingsPayloadStrict(JSON.stringify({ status: "ok", message: "no data" }));
+  assertFalse(r.ok);
+  if (!r.ok) assertEquals(r.code, "unexpected_envelope");
+});
+
+Deno.test("parseSwingsPayloadStrict: counts dropped rows separately from kept", () => {
+  const r = parseSwingsPayloadStrict(JSON.stringify([
+    { SwingID: "ok-1", Velo: 90 },
+    { TimeStamp: "no event id", Velo: 91 },  // dropped: no event id
+    { SwingID: "ok-2", Velo: 92 },
+  ]));
+  assert(r.ok);
+  if (r.ok) {
+    assertEquals(r.swings.length, 2);
+    assertEquals(r.dropped, 1);
+  }
+});
+
+Deno.test("parseSwingsPayloadStrict: top-level null -> unexpected_envelope (not ok-with-zero)", () => {
+  const r = parseSwingsPayloadStrict("null");
+  assertFalse(r.ok);
+  if (!r.ok) assertEquals(r.code, "unexpected_envelope");
 });

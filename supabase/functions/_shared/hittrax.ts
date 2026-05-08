@@ -234,14 +234,44 @@ export function parseSwingRow(raw: unknown): ParsedSwing | null {
 //   * A bare array of swing objects: [ {...}, {...} ]
 //   * An object with a `Data` / `Swings` / `Records` array property.
 // Anything else returns an empty array.
+//
+// LEGACY shape kept for callers that already accept "no swings" silently
+// (the fixture replay script). Production poll path MUST use
+// parseSwingsPayloadStrict so a malformed 200 is never confused with an
+// empty window — see the discriminated-union version below.
 export function parseSwingsPayload(rawJson: string): ParsedSwing[] {
+  const r = parseSwingsPayloadStrict(rawJson);
+  return r.ok ? r.swings : [];
+}
+
+// Strict variant — distinguishes a legitimate empty window from a parse
+// failure. The poll worker uses this to fail-loud (cursor untouched,
+// last_poll_error set) when HitTrax returns an unexpected 200 body
+// (contract drift, HTML error page, body truncation). Without this guard
+// a malformed response would silently advance the cursor and skip every
+// event in that window forever.
+//
+// Failure cases (returns { ok: false }):
+//   - JSON.parse throws (`invalid_json`)
+//   - top-level value is not an array AND has no recognised swings array
+//     property (`unexpected_envelope`)
+//   - one or more rows look like swings (have an event id) but failed to
+//     parse — we keep the good ones in `swings` and surface the count via
+//     `dropped` so callers can decide whether to treat partial parse as
+//     failure (poll worker treats dropped > 0 with zero successful as
+//     hard failure).
+export type ParsedSwingsResult =
+  | { ok: true; swings: ParsedSwing[]; dropped: number }
+  | { ok: false; code: "invalid_json" | "unexpected_envelope"; sample: string };
+
+export function parseSwingsPayloadStrict(rawJson: string): ParsedSwingsResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawJson);
   } catch {
-    return [];
+    return { ok: false, code: "invalid_json", sample: rawJson.slice(0, 200) };
   }
-  let arr: unknown[] = [];
+  let arr: unknown[] | null = null;
   if (Array.isArray(parsed)) {
     arr = parsed;
   } else if (parsed && typeof parsed === "object") {
@@ -254,12 +284,25 @@ export function parseSwingsPayload(rawJson: string): ParsedSwing[] {
       }
     }
   }
-  const out: ParsedSwing[] = [];
+  if (arr === null) {
+    // Top-level was an object with no recognised swings array — this is a
+    // contract violation (we don't ever expect e.g. a bare object response).
+    const sample = (() => {
+      try { return JSON.stringify(parsed).slice(0, 200); } catch { return "<unstringifiable>"; }
+    })();
+    return { ok: false, code: "unexpected_envelope", sample };
+  }
+  const swings: ParsedSwing[] = [];
+  let dropped = 0;
   for (const row of arr) {
     const swing = parseSwingRow(row);
-    if (swing) out.push(swing);
+    if (swing) {
+      swings.push(swing);
+    } else {
+      dropped++;
+    }
   }
-  return out;
+  return { ok: true, swings, dropped };
 }
 
 // =============================================================================
