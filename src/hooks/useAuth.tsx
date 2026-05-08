@@ -9,14 +9,22 @@
  *   `'parent'` so existing parent users without the claim keep working.
  */
 
-import type { Session, User } from '@supabase/supabase-js';
-import * as Linking from 'expo-linking';
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { Session, User } from "@supabase/supabase-js";
+import * as Linking from "expo-linking";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
-import { supabase } from '@/lib/supabase';
-import { parseAuthCallbackCode } from '@/utils/authRedirect';
+import { supabase } from "@/lib/supabase";
+import { registerForPushNotifications } from "@/services/notifications";
+import { parseAuthCallbackCode } from "@/utils/authRedirect";
 
-export type AppRole = 'coach' | 'parent';
+export type AppRole = "coach" | "parent";
 
 type AuthContextValue = {
   session: Session | null;
@@ -34,11 +42,11 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
  */
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
-    const parts = token.split('.');
+    const parts = token.split(".");
     if (parts.length < 2) return null;
-    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
     const pad = b64.length % 4;
-    if (pad) b64 += '='.repeat(4 - pad);
+    if (pad) b64 += "=".repeat(4 - pad);
     // `globalThis.atob` is available in Hermes/React Native.
     const json = globalThis.atob(b64);
     return JSON.parse(json) as Record<string, unknown>;
@@ -51,10 +59,10 @@ function readAppRole(session: Session | null): AppRole | null {
   if (!session?.access_token) return null;
   const payload = decodeJwtPayload(session.access_token);
   const claim = payload?.app_role;
-  if (claim === 'coach') return 'coach';
+  if (claim === "coach") return "coach";
   // Treat anything else (missing, 'parent', unknown) as parent so existing
   // users without the claim continue to land in the parent flow.
-  return 'parent';
+  return "parent";
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -67,12 +75,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       setSession(data.session);
+      if (data.session?.user) {
+        void registerForPushNotifications();
+      }
       setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      async (_event, newSession) => {
+        setSession(newSession);
+
+        // Register push token after successful auth session
+        if (newSession?.user) {
+          try {
+            const token = await registerForPushNotifications();
+
+            if (token) {
+              console.log("[push] token registered", token);
+
+              // TODO:
+              // Save token to Supabase once push_tokens column exists.
+            }
+          } catch (err) {
+            console.warn("[push] registration failed", err);
+          }
+        }
+      },
+    );
 
     // Deep-link handler: when the parent taps the Supabase confirmation
     // email, the OS opens the app with `ballpark:///auth/callback?code=...`.
@@ -86,14 +115,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         // Surface to console only; the auth screens stay put and the user
         // can retry from there. Avoids a noisy modal on cold start.
-        console.warn('[auth] exchangeCodeForSession failed', error.message);
+        console.warn("[auth] exchangeCodeForSession failed", error.message);
       }
     };
 
     Linking.getInitialURL().then((url) => {
       if (url) void handleUrl(url);
     });
-    const linkingSub = Linking.addEventListener('url', ({ url }) => {
+    const linkingSub = Linking.addEventListener("url", ({ url }) => {
       void handleUrl(url);
     });
 
@@ -119,6 +148,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
+  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
   return ctx;
 }

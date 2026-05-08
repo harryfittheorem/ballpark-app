@@ -10,13 +10,20 @@
  * device but won't work for users who don't yet have the app installed.
  */
 
-const base = require('./app.json');
+const base = require("./app.json");
 
 module.exports = () => {
   const config = JSON.parse(JSON.stringify(base));
   const expo = config.expo;
   const authHost = process.env.EXPO_PUBLIC_AUTH_REDIRECT_HOST;
 
+  // EAS config
+  expo.owner = "harjinderharry";
+  expo.extra = expo.extra ?? {};
+  expo.extra.eas = expo.extra.eas ?? {};
+  expo.extra.eas.projectId = "4ce07796-bc3a-4c22-b3a1-502a1d5d6dfc";
+
+  // Universal links / deep links
   if (authHost) {
     expo.ios = expo.ios ?? {};
     expo.ios.associatedDomains = Array.from(
@@ -27,11 +34,15 @@ module.exports = () => {
     expo.android.intentFilters = [
       ...(expo.android.intentFilters ?? []),
       {
-        action: 'VIEW',
+        action: "VIEW",
         autoVerify: true,
-        category: ['DEFAULT', 'BROWSABLE'],
+        category: ["DEFAULT", "BROWSABLE"],
         data: [
-          { scheme: 'https', host: authHost, pathPrefix: '/auth/callback' },
+          {
+            scheme: "https",
+            host: authHost,
+            pathPrefix: "/auth/callback",
+          },
         ],
       },
     ];

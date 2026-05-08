@@ -68,7 +68,7 @@ expertMode = true
 [userenv.shared]
 EXPO_PUBLIC_SUPABASE_URL = "https://exjcwvvglthnxerzpukw.supabase.co"
 EXPO_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_xyXVBy2HN2pvbDTZC15jQQ_et3pskXc"
-EXPO_PUBLIC_TENANT_SLUG = "test-tenant-two"
+EXPO_PUBLIC_TENANT_SLUG = "infinitehitting"
 
 [postMerge]
 path = "scripts/post-merge.sh"
