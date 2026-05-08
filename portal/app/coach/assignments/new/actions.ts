@@ -64,6 +64,22 @@ export async function createAssignment(formData: FormData) {
     backToForm("That kid is not in your tenant.");
   }
 
+  // Defence-in-depth: if a drill_video_id was submitted, confirm it belongs
+  // to this coach. Form tampering or a stale UUID from another coach would
+  // otherwise be accepted by the assignments INSERT (videos.id has no
+  // FK-level uploader check).
+  if (drillVideoIdRaw) {
+    const { data: video, error: vidErr } = await supabase
+      .from("videos")
+      .select("id")
+      .eq("id", drillVideoIdRaw)
+      .eq("uploaded_by_user_id", user!.id)
+      .maybeSingle();
+    if (vidErr || !video) {
+      backToForm("That drill video isn\u2019t one of yours.");
+    }
+  }
+
   const insert: Record<string, unknown> = {
     tenant_id: tenantId,
     kid_id: kidId,
