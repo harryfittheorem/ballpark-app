@@ -32,6 +32,9 @@ externalPort = 80
 localPort = 8080
 externalPort = 8080
 
+[[ports]]
+localPort = 8081
+externalPort = 8081
 
 [[ports]]
 localPort = 8082
@@ -65,7 +68,7 @@ expertMode = true
 [userenv.shared]
 EXPO_PUBLIC_SUPABASE_URL = "https://exjcwvvglthnxerzpukw.supabase.co"
 EXPO_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_xyXVBy2HN2pvbDTZC15jQQ_et3pskXc"
-EXPO_PUBLIC_TENANT_SLUG = "infinitehitting"
+EXPO_PUBLIC_TENANT_SLUG = "test-tenant-two"
 
 [postMerge]
 path = "scripts/post-merge.sh"
