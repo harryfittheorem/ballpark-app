@@ -74,6 +74,12 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 
 -   v0.1 Foundation, v0.2 Home, v0.3 Booking, v0.4 Messages, v0.5 Earn, **v0.6 Work** all shipped. Next: v0.7 per ROADMAP.
 
+## Cross-tenant RLS audit (task #86, 2026-05-08)
+
+-   Run `node scripts/audit-tenant-isolation.mjs 'AuditFixtures2026!'` to re-execute the 14-table × 4-user adversarial probe matrix (170 probes, 0 skipped after seeding). Exit 0 = PASS. One-time setup per environment: `node scripts/provision-audit-fixtures.mjs 'AuditFixtures2026!'` then `node scripts/seed-audit-rows.mjs`.
+-   Full results, methodology, and migration SQL: `docs/TENANT_ISOLATION_AUDIT.md`.
+-   `kids` policies (`kids_insert_own_family`, `kids_update_own_family`) now pin `families.tenant_id = JWT tenant_id` inside the families sub-select. Defence-in-depth — `public.kids` has no direct `tenant_id` column, so the pin must live in the join.
+
 ## v0.5 Deferred (intentional)
 
 -   **Stripe Connect card checkout** for purchase-only / dual-priced store items. The Store tab today shows items with an Alert that points the parent at the front desk. Schema already supports it (`orders.payment_method='card'`, `amount_paid_cents`, `stripe_payment_intent_id`).
