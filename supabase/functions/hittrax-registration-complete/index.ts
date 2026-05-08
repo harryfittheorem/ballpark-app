@@ -87,7 +87,14 @@ serve(async (req) => {
 
   if (!tpuid) return hittraxText("Error Missing Third Party UserID", 400);
   if (acceptedRaw === null) return hittraxText("Error Missing Accepted", 400);
-  const accepted = acceptedRaw.toLowerCase() === "true";
+  // Strict ∈ {true,false} parse — anything else is a malformed callback and
+  // MUST 400 rather than silently being treated as decline (which would
+  // mutate the link to 'declined' on a spec-violating payload).
+  const acceptedNorm = acceptedRaw.trim().toLowerCase();
+  if (acceptedNorm !== "true" && acceptedNorm !== "false") {
+    return hittraxText("Error Invalid Accepted value", 400);
+  }
+  const accepted = acceptedNorm === "true";
 
   if (accepted && (!password || password.length === 0)) {
     return hittraxText("Error Missing Third Party User Password", 400);

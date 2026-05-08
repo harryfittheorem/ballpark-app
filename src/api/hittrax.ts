@@ -66,7 +66,11 @@ export async function getHitTraxLinkForKid(
 
 export type AssociateResponse = {
   link_id: string;
-  association_status: 'pending';
+  // 'pending' when HitTrax accepted and is sending the confirmation email,
+  // 'declined' when HitTrax has no eligible subscription for the UserID.
+  // The UI branches on this — declined leaves the connect form visible so
+  // the parent can upgrade and retry without backend intervention.
+  association_status: 'pending' | 'declined';
   hittrax_registration_status: boolean;
   hittrax_release_status: boolean;
 };

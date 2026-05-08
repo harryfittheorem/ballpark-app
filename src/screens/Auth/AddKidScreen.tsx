@@ -93,19 +93,17 @@ export default function AddKidScreen() {
       return;
     }
     try {
-      await addKid({
+      const created = await addKid({
         first_name: values.firstName,
         last_name: values.lastName,
         age_group: values.ageGroup,
         primary_position: values.position,
         primary_location_id: values.locationId,
       });
-      // useFamily will re-fetch. After a successful add we push the
-      // ConnectHitTrax onboarding gate (with explicit Skip), then the
-      // parent lands on the freshly-populated Home view. The gate uses
-      // navigation.replace() conventions on its own buttons so back
-      // swipe doesn't strand the parent — see ConnectHitTraxOnboardingScreen.
-      navigation.navigate('ConnectHitTraxOnboarding');
+      // Pass the freshly-created kid id explicitly so the onboarding gate
+      // doesn't race the family refetch (kids[0] could be stale or empty
+      // for a tick). The screen falls back to kids[0] when not provided.
+      navigation.navigate('ConnectHitTraxOnboarding', { kidId: created.id });
     } catch (err) {
       console.error('addKid failed', err);
       Alert.alert('Could not add kid', errorMessage(err));

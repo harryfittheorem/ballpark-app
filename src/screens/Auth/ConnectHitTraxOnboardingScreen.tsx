@@ -22,7 +22,7 @@
  * 'pending' on this screen.
  */
 
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useState } from 'react';
 import {
   Alert,
@@ -44,8 +44,13 @@ import { errorMessage } from '@/utils/error';
 
 export default function ConnectHitTraxOnboardingScreen() {
   const navigation = useNavigation<HomeStackScreenProps<'ConnectHitTraxOnboarding'>['navigation']>();
+  const route = useRoute<HomeStackScreenProps<'ConnectHitTraxOnboarding'>['route']>();
   const { kids } = useFamily();
-  const kid = kids[0];
+  // Prefer the explicit kidId routed from AddKidScreen so we never race
+  // the family refetch. Falls back to kids[0] for direct navigations
+  // (e.g. Home → onboarding banner) where no param is supplied.
+  const routedKidId = route.params?.kidId;
+  const kid = routedKidId ? kids.find((k) => k.id === routedKidId) ?? { id: routedKidId } : kids[0];
   const { data: link } = useHitTraxLink(kid?.id);
   const associate = useAssociateHitTrax(kid?.id);
   const [hittraxUserId, setHittraxUserId] = useState('');

@@ -109,10 +109,16 @@ export function useAddKid() {
         if (famErr) throw famErr;
       }
 
-      const { error: insertErr } = await supabase
+      const { data: inserted, error: insertErr } = await supabase
         .from('kids')
-        .insert({ ...kidFields, family_id: family.id });
+        .insert({ ...kidFields, family_id: family.id })
+        .select('id')
+        .single();
       if (insertErr) throw insertErr;
+      // Return the new kid's id so callers (e.g. AddKidScreen) can pass an
+      // explicit kidId into the post-AddKid HitTrax onboarding gate
+      // instead of relying on `kids[0]` racing the family refetch.
+      return { id: inserted.id };
     },
     onSuccess: () => {
       if (user) {
