@@ -15,7 +15,6 @@ import { X } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -68,15 +67,12 @@ export default function CoachVideoPlaybackScreen() {
 
   return (
     <View style={styles.fill}>
-      <Image
-        source={{ uri: muxPosterUrl(playbackId) }}
-        style={styles.poster}
-        resizeMode="contain"
-        accessibilityIgnoresInvertColors
-      />
       <Video
         style={styles.fill}
         source={{ uri: muxHlsUrl(playbackId) }}
+        posterSource={{ uri: muxPosterUrl(playbackId) }}
+        posterStyle={{ resizeMode: 'contain' }}
+        usePoster
         resizeMode={ResizeMode.CONTAIN}
         shouldPlay
         useNativeControls
@@ -119,10 +115,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.darkest,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  poster: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.4,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
