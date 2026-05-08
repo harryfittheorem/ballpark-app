@@ -32,10 +32,6 @@ function muxHlsUrl(playbackId: string): string {
   return `https://stream.mux.com/${playbackId}.m3u8`;
 }
 
-function muxPosterUrl(playbackId: string): string {
-  return `https://image.mux.com/${playbackId}/thumbnail.jpg?width=1280`;
-}
-
 export default function CoachVideoPlaybackScreen() {
   const route = useRoute<Route>();
   const navigation = useNavigation<Nav>();
@@ -68,11 +64,8 @@ export default function CoachVideoPlaybackScreen() {
   return (
     <View style={styles.fill}>
       <Video
-        style={styles.fill}
+        style={styles.video}
         source={{ uri: muxHlsUrl(playbackId) }}
-        posterSource={{ uri: muxPosterUrl(playbackId) }}
-        posterStyle={{ resizeMode: 'contain' }}
-        usePoster
         resizeMode={ResizeMode.CONTAIN}
         shouldPlay
         useNativeControls
@@ -113,8 +106,14 @@ const styles = StyleSheet.create({
   fill: {
     flex: 1,
     backgroundColor: colors.darkest,
-    alignItems: 'center',
-    justifyContent: 'center',
+  },
+  // The Video element MUST NOT live inside a flex container that
+  // centers / collapses its children — on iOS the AVPlayerLayer renders
+  // an invisible (audio-only) frame when its host view is sized to 0.
+  // Absolute-fill it instead so the native layer always has explicit
+  // bounds matching the screen.
+  video: {
+    ...StyleSheet.absoluteFillObject,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
