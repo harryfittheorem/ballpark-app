@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAssignments } from '@/hooks/useAssignments';
 import { useAuth } from '@/hooks/useAuth';
 import { useFamily } from '@/hooks/useFamily';
+import { useHitTraxLink } from '@/hooks/useHitTraxLink';
 import {
   latestCoachMessageKey,
   useLatestCoachMessage,
@@ -19,6 +20,7 @@ import { formatRelativeTime } from '@/utils/time';
 
 import CoachMessageToast from './components/CoachMessageToast';
 import CoachVideoCard from './components/CoachVideoCard';
+import ConnectHitTraxBanner from './components/ConnectHitTraxBanner';
 import EmptyHomeCard from './components/EmptyHomeCard';
 import HeroCard from './components/HeroCard';
 import HomeAssignmentsCard from './components/HomeAssignmentsCard';
@@ -60,6 +62,10 @@ export default function HomeScreen() {
   // Home only renders the "due now / next" summary, so narrow to pending
   // server-side instead of fetching the kid's full assignment history.
   const { data: assignments } = useAssignments(kid?.id, ['pending']);
+  // HitTrax onboarding banner — hidden when link is active, surfaces a
+  // "connect" CTA when there's no link yet, a "re-connect" CTA when the
+  // last attempt was declined/removed, and a "pending" pill in between.
+  const { data: hittraxLink } = useHitTraxLink(kid?.id);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -159,6 +165,16 @@ export default function HomeScreen() {
                 currentStreakDays={kid.current_streak_days}
               />
             </View>
+            {hittraxLink?.association_status !== 'active' ? (
+              <View style={styles.section}>
+                <ConnectHitTraxBanner
+                  link={hittraxLink}
+                  onPress={() =>
+                    navigation.navigate('Me', { screen: 'ConnectHitTrax' })
+                  }
+                />
+              </View>
+            ) : null}
             <View style={styles.section}>{renderCoachVideo()}</View>
             {assignments && assignments.some((a) => a.status === 'pending') ? (
               <View style={styles.section}>

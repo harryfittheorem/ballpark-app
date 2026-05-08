@@ -27,7 +27,7 @@ export type MainTabParamList = {
   Work: NavigatorScreenParams<WorkStackParamList>;
   Book: undefined;
   Earn: undefined;
-  Me: undefined;
+  Me: NavigatorScreenParams<MeStackParamList> | undefined;
 };
 
 export type HomeStackParamList = {

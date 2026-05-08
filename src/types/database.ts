@@ -908,6 +908,66 @@ export type Database = {
         }
         Relationships: []
       }
+      kid_capture_links: {
+        Row: {
+          association_status: string
+          associated_at: string | null
+          capture_source: string
+          created_at: string
+          external_user_id: string | null
+          hittrax_registration_status: boolean | null
+          hittrax_release_status: boolean | null
+          id: string
+          kid_id: string
+          last_poll_error: string | null
+          last_polled_at: string | null
+          last_polled_through: string | null
+          removed_at: string | null
+          tenant_id: string
+          third_party_user_id: string
+          third_party_user_password: string | null
+          updated_at: string
+        }
+        Insert: {
+          association_status?: string
+          associated_at?: string | null
+          capture_source: string
+          created_at?: string
+          external_user_id?: string | null
+          hittrax_registration_status?: boolean | null
+          hittrax_release_status?: boolean | null
+          id?: string
+          kid_id: string
+          last_poll_error?: string | null
+          last_polled_at?: string | null
+          last_polled_through?: string | null
+          removed_at?: string | null
+          tenant_id: string
+          third_party_user_id: string
+          third_party_user_password?: string | null
+          updated_at?: string
+        }
+        Update: {
+          association_status?: string
+          associated_at?: string | null
+          capture_source?: string
+          created_at?: string
+          external_user_id?: string | null
+          hittrax_registration_status?: boolean | null
+          hittrax_release_status?: boolean | null
+          id?: string
+          kid_id?: string
+          last_poll_error?: string | null
+          last_polled_at?: string | null
+          last_polled_through?: string | null
+          removed_at?: string | null
+          tenant_id?: string
+          third_party_user_id?: string
+          third_party_user_password?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       videos: {
         Row: {
           created_at: string
