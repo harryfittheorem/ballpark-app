@@ -1,0 +1,108 @@
+Continuing v0.7 work — adding the coach/admin web portal.
+
+Context you already have:
+- We just shipped push notifications + EAS Build setup (committed
+  in the last few commits)
+- The mobile Expo app at the repo root is fully working
+- Supabase backend is multi-tenant with v0.4-v0.6 schema
+  (videos, coach_messages, points_ledger, products, orders,
+  assignments, plus existing tenants/locations/families/kids/coaches)
+- Coach Mike (coach.mike@infinitehitting.com) exists in the DB
+  with app_role='coach'
+- We have one real coach_message in the DB to display
+
+What I need next:
+Build a Next.js 15 App Router portal alongside the mobile app, in
+a new ./portal/ directory at the repo root. Do NOT do the monorepo
+conversion yet — that's a separate task. Just create ./portal/
+as a sibling to the existing app, sharing the same git repo and
+the same Supabase backend.
+
+The portal is for coaches and admins on laptops. Parents stay on
+mobile. v0.7 is the foundation only — auth, role routing, and one
+real screen as proof the foundation works.
+
+Goals (in order):
+
+1. Scaffold ./portal/ with Next.js 15 App Router
+   - TypeScript strict
+   - Tailwind for styling
+   - ESLint
+   - Standalone package.json (will fold into monorepo in a later
+     task — for now treat ./portal/ as its own self-contained app)
+
+2. Auth via @supabase/ssr (NOT @supabase/supabase-js alone)
+   - Cookie-based session, server-side validatable
+   - ./portal/lib/supabase/server.ts and client.ts
+   - ./portal/middleware.ts enforces auth on /coach/* and /admin/*
+   - /login route with email + password form (server action)
+   - /logout server action
+
+3. Role-based routing reading app_role claim from JWT:
+   - 'coach' → /coach/inbox
+   - 'admin' → /admin (just a "Coming soon" page for now)
+   - 'parent' → reject with "This portal is for coaches and admins.
+     Parents please use the mobile app."
+
+4. Coach inbox at /coach/inbox (the proof-of-concept screen):
+   - Server Component reading coach_messages
+     WHERE sender_user_id = auth.uid()
+   - Each row shows: recipient kid first name, message text or
+     "Video message" if video_id is set, sent date (relative time),
+     and a viewed indicator if viewed_at IS NOT NULL
+   - Empty state if no messages
+
+5. Admin placeholder at /admin
+   - Just a simple "Admin features coming in v0.8" page
+   - Auth-gated (admins only) so we know the role check works
+
+6. Logout button visible on all authenticated pages
+
+Environment:
+Use the same Supabase project as the mobile app. Set in
+./portal/.env.local:
+  NEXT_PUBLIC_SUPABASE_URL=https://exjcwvvglthnxerzpukw.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_xyXVBy2HN2pvbDTZC15jQQ_et3pskXc
+
+Same values as EXPO_PUBLIC_* in the mobile app, just different
+prefix because Next.js convention.
+
+CRITICAL — out of scope:
+- Do not modify ANY file outside ./portal/ (no exceptions — not
+  src/, not supabase/, not scripts/, not the root package.json,
+  not app.config.js, nothing)
+- Do not start the monorepo conversion
+- Do not extract shared types into a packages/ directory
+- Do not modify any database schema, RLS policy, trigger, or
+  Edge Function
+- Do not run `npx supabase db push` for any reason
+- Do not create new Supabase migrations
+- Do not add new tables
+- Do not touch the auth hook
+- Do not configure Netlify deployment yet (I'll do it manually
+  later)
+- Do not pixel-match the mobile app's brand colors (use sensible
+  Tailwind defaults — branding comes in v0.8)
+
+If you find yourself wanting to do any of the above, STOP and ask
+me first.
+
+Use plan-then-execute discipline:
+1. Show me a project_tasks plan before writing code
+2. After plan approval, build it
+3. Verify locally before declaring complete:
+   - cd portal && npm run build (must succeed)
+   - cd portal && npx tsc --noEmit (must pass)
+   - cd portal && npm run dev (must start dev server)
+4. Report back with: build output, typecheck output, the localhost
+   URL where it's running, and a list of every file created
+
+I'll be away for ~2 hours. If you hit a real ambiguity or need a
+decision I haven't covered, stop and post the question — don't
+guess. You can keep going on anything that has a clear answer
+from this spec.
+
+When you mark this task complete, the deliverable is: I can
+visit lthe portal, get redirected to /login, sign in as
+coach.mike@infinitehitting.com / CoachMike!2026, land on
+/coach/inbox, and see the one coach_message that exists in the DB.
