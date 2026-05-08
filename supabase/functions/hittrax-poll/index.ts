@@ -61,6 +61,35 @@ const POLL_TIMEOUT_MS = 20_000;
 const SLACK_SECONDS = 30;        // back EndDate off by 30s to avoid boundary misses
 const MAX_LINKS_PER_RUN = 50;    // cap per invocation so a stalled link can't starve others
 
+// Exponential backoff on transient failures. The poller runs every 2 minutes;
+// a healthy link is poll-eligible every tick. A failing link's next_poll_at
+// is pushed out by min(BACKOFF_BASE_SEC * 2^(retry_count-1), BACKOFF_MAX_SEC),
+// so the schedule looks like: 30s → 1m → 2m → 4m → 8m → 16m → 30m (capped).
+// Cleared (next_poll_at = NULL, retry_count = 0) on the next success.
+const BACKOFF_BASE_SEC = 30;
+const BACKOFF_MAX_SEC = 30 * 60;
+
+function backoffSeconds(retryCount: number): number {
+  // retryCount is the count AFTER incrementing for this failure.
+  const exp = Math.min(retryCount - 1, 30);
+  return Math.min(BACKOFF_BASE_SEC * Math.pow(2, exp), BACKOFF_MAX_SEC);
+}
+
+async function recordFailure(linkId: string, retryCount: number, error: string): Promise<void> {
+  const nextRetry = retryCount + 1;
+  const delay = backoffSeconds(nextRetry);
+  const nextPollAt = new Date(Date.now() + delay * 1000).toISOString();
+  await adminClient
+    .from("kid_capture_links")
+    .update({
+      last_polled_at: new Date().toISOString(),
+      last_poll_error: error,
+      retry_count: nextRetry,
+      next_poll_at: nextPollAt,
+    })
+    .eq("id", linkId);
+}
+
 const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
@@ -73,6 +102,7 @@ type LinkRow = {
   third_party_user_password: string | null;
   associated_at: string | null;
   last_polled_through: string | null;
+  retry_count: number;
 };
 
 type PollOutcome = {
@@ -86,24 +116,38 @@ type PollOutcome = {
 // Per-push budget. A hung downstream push must not delay cursor advance.
 const PUSH_TIMEOUT_MS = 5_000;
 
-async function fanOutPrPush(
+// One push per swing-PR EVENT, regardless of how many metrics the swing
+// just topped. Task intent (and the trigger) is one PR event per qualifying
+// swing — emitting per-metric pushes was a duplicate-notification bug.
+// We pick the most exciting metric for the title (priority: exit velo →
+// distance → pitch speed) but include all metrics that PR'd in `data` for
+// the client to render however it likes.
+type PrSummary = {
+  metrics: Array<{ metric: string; value: number }>;
+};
+
+async function fanOutSwingPrPush(
   parentUserId: string,
   kidFirstName: string,
-  metric: string,
-  value: number,
+  pr: PrSummary,
 ): Promise<void> {
-  if (!parentUserId) return;
+  if (!parentUserId || pr.metrics.length === 0) return;
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), PUSH_TIMEOUT_MS);
+  // Headline metric — first match in priority order, falling back to the
+  // first reported metric if no priority match (futureproofing).
+  const priority = ["exit_velocity_mph", "distance_ft", "pitch_speed_mph"];
+  const headline =
+    pr.metrics.find((m) => priority.includes(m.metric)) ?? pr.metrics[0];
+  const niceMetric =
+    headline.metric === "exit_velocity_mph"
+      ? `${Math.round(headline.value)} mph exit velo`
+      : headline.metric === "distance_ft"
+        ? `${Math.round(headline.value)} ft distance`
+        : headline.metric === "pitch_speed_mph"
+          ? `${Math.round(headline.value)} mph pitch`
+          : `${headline.value}`;
   try {
-    const niceMetric =
-      metric === "exit_velocity_mph"
-        ? `${Math.round(value)} mph exit velo`
-        : metric === "distance_ft"
-          ? `${Math.round(value)} ft distance`
-          : metric === "pitch_speed_mph"
-            ? `${Math.round(value)} mph pitch`
-            : `${value}`;
     const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push-notification`, {
       method: "POST",
       headers: {
@@ -114,7 +158,7 @@ async function fanOutPrPush(
         user_ids: [parentUserId],
         title: `New PR! ${niceMetric}`,
         body: `${kidFirstName} just set a personal best.`,
-        data: { kind: "swing_pr", metric, value },
+        data: { kind: "swing_pr", metrics: pr.metrics },
       }),
       signal: ac.signal,
     });
@@ -124,6 +168,8 @@ async function fanOutPrPush(
     }
   } catch (err) {
     console.error("hittrax-poll push error", err);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -132,20 +178,23 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutco
 
   if (!link.third_party_user_password) {
     outcome.error = "missing_password";
-    await adminClient
-      .from("kid_capture_links")
-      .update({ last_polled_at: new Date().toISOString(), last_poll_error: "missing_password" })
-      .eq("id", link.id);
+    await recordFailure(link.id, link.retry_count, "missing_password");
     return outcome;
   }
 
   const startDate = new Date(link.last_polled_through ?? link.associated_at ?? new Date(Date.now() - 60 * 60 * 1000).toISOString());
   const endDate = new Date(Date.now() - SLACK_SECONDS * 1000);
   if (endDate <= startDate) {
-    // Nothing to do this run — back off until next tick.
+    // Nothing to do this run — note the timestamp and clear any backoff;
+    // this is a healthy "empty window" outcome, not a failure.
     await adminClient
       .from("kid_capture_links")
-      .update({ last_polled_at: new Date().toISOString(), last_poll_error: null })
+      .update({
+        last_polled_at: new Date().toISOString(),
+        last_poll_error: null,
+        retry_count: 0,
+        next_poll_at: null,
+      })
       .eq("id", link.id);
     outcome.ok = true;
     return outcome;
@@ -168,20 +217,14 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutco
     clearTimeout(timeoutHandle);
     const code = (err as Error)?.name === "AbortError" ? "hittrax_timeout" : "hittrax_unreachable";
     outcome.error = code;
-    await adminClient
-      .from("kid_capture_links")
-      .update({ last_polled_at: new Date().toISOString(), last_poll_error: code })
-      .eq("id", link.id);
+    await recordFailure(link.id, link.retry_count, code);
     return outcome;
   }
   clearTimeout(timeoutHandle);
 
   if (!res.ok) {
     outcome.error = `hittrax_status_${res.status}`;
-    await adminClient
-      .from("kid_capture_links")
-      .update({ last_polled_at: new Date().toISOString(), last_poll_error: outcome.error })
-      .eq("id", link.id);
+    await recordFailure(link.id, link.retry_count, outcome.error);
     return outcome;
   }
   const bodyText = await res.text();
@@ -189,10 +232,7 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutco
   const checkErr = parseHitTraxTextResponse(bodyText);
   if (!checkErr.ok) {
     outcome.error = checkErr.error.slice(0, 200);
-    await adminClient
-      .from("kid_capture_links")
-      .update({ last_polled_at: new Date().toISOString(), last_poll_error: outcome.error })
-      .eq("id", link.id);
+    await recordFailure(link.id, link.retry_count, outcome.error);
     return outcome;
   }
 
@@ -206,29 +246,24 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutco
     console.error(
       `hittrax-poll parse failure link=${link.id} code=${parseResult.code} sample=${parseResult.sample}`,
     );
-    await adminClient
-      .from("kid_capture_links")
-      .update({ last_polled_at: new Date().toISOString(), last_poll_error: outcome.error })
-      .eq("id", link.id);
+    await recordFailure(link.id, link.retry_count, outcome.error);
     return outcome;
   }
   const swings = parseResult.swings;
-  // Partial parse: some rows looked like swings but couldn't be coerced.
-  // If we got at least one good swing, proceed (the dropped ones will be
-  // re-attempted on the next poll because the cursor only advances on
-  // FULL upsert success and the swings UNIQUE absorbs dupes). If EVERY
-  // row was dropped, fail loud — that's almost certainly a schema drift.
-  if (parseResult.dropped > 0 && swings.length === 0) {
-    outcome.error = `parse_all_dropped_count_${parseResult.dropped}`;
-    console.error(`hittrax-poll all rows dropped link=${link.id} dropped=${parseResult.dropped}`);
-    await adminClient
-      .from("kid_capture_links")
-      .update({ last_polled_at: new Date().toISOString(), last_poll_error: outcome.error })
-      .eq("id", link.id);
-    return outcome;
-  }
+  // ANY dropped row is treated as a hard failure: the cursor stays put and
+  // we apply backoff, so a partial schema drift never silently skips
+  // events. Without this guard, an unparseable row inside a window with
+  // valid rows would be permanently lost when last_polled_through advanced
+  // past it. Fail-loud is correct here — the next poll re-fetches the same
+  // window and the swings UNIQUE absorbs the now-already-stored good rows
+  // while we wait for the contract-drift fix to land.
   if (parseResult.dropped > 0) {
-    console.warn(`hittrax-poll partial parse link=${link.id} kept=${swings.length} dropped=${parseResult.dropped}`);
+    outcome.error = `parse_partial_dropped_count_${parseResult.dropped}_kept_${swings.length}`;
+    console.error(
+      `hittrax-poll partial parse rejected link=${link.id} kept=${swings.length} dropped=${parseResult.dropped}`,
+    );
+    await recordFailure(link.id, link.retry_count, outcome.error);
+    return outcome;
   }
 
   // Look up parent + kid name once for push fan-out.
@@ -362,27 +397,32 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutco
     }
     outcome.swings_inserted++;
 
-    // PR detection (best-effort for push fan-out — the canonical PR write
-    // happens inside the detect_swing_pr trigger). We fan out a push if any
-    // metric in this swing beats what we cached BEFORE the upserts.
+    // PR detection (best-effort mirror of the canonical detect_swing_pr
+    // trigger). We collapse all metrics this swing topped into ONE push
+    // event, matching the ledger semantics: detect_swing_pr writes a
+    // single points_ledger row per qualifying swing, so the user sees a
+    // single +15 — they should also see a single notification, not three.
     const checks: Array<{ metric: string; value: number | null }> = [
       { metric: "exit_velocity_mph", value: swing.exit_velocity_mph },
       { metric: "distance_ft", value: swing.distance_ft },
       { metric: "pitch_speed_mph", value: swing.pitch_speed_mph },
     ];
+    const pr: PrSummary = { metrics: [] };
     for (const c of checks) {
       if (c.value === null) continue;
       const before = beforePbs.get(c.metric);
       if (before === undefined || c.value > before) {
-        outcome.prs_detected++;
         // Update local cache so a later swing in the same payload doesn't
-        // double-fire a push for the same metric.
+        // re-detect this metric as a PR.
         beforePbs.set(c.metric, c.value);
-        // Best-effort — never block the cursor advance. fanOutPrPush has
-        // its own AbortController + 5s timeout so a hung push can't stall
-        // the Promise.allSettled below.
-        pushPromises.push(fanOutPrPush(parentUserId, kidFirstName, c.metric, c.value));
+        pr.metrics.push({ metric: c.metric, value: c.value });
       }
+    }
+    if (pr.metrics.length > 0) {
+      outcome.prs_detected++;
+      // ONE push per swing-PR event regardless of metric count — see
+      // fanOutSwingPrPush. Best-effort, never blocks cursor advance.
+      pushPromises.push(fanOutSwingPrPush(parentUserId, kidFirstName, pr));
     }
   }
 
@@ -396,7 +436,9 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutco
 
   // Cursor only advances on FULL success. On partial failure we record the
   // failure on the link and leave last_polled_through where it was so the
-  // next run re-fetches and the swings UNIQUE absorbs the dupes.
+  // next run re-fetches and the swings UNIQUE absorbs the dupes. Successful
+  // polls clear retry_count + next_poll_at so the link returns to "every
+  // tick" cadence.
   if (allOk) {
     await adminClient
       .from("kid_capture_links")
@@ -404,18 +446,14 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutco
         last_polled_through: endDate.toISOString(),
         last_polled_at: new Date().toISOString(),
         last_poll_error: null,
+        retry_count: 0,
+        next_poll_at: null,
       })
       .eq("id", link.id);
     outcome.ok = true;
   } else {
     outcome.error = "partial_upsert_failure";
-    await adminClient
-      .from("kid_capture_links")
-      .update({
-        last_polled_at: new Date().toISOString(),
-        last_poll_error: outcome.error,
-      })
-      .eq("id", link.id);
+    await recordFailure(link.id, link.retry_count, outcome.error);
   }
   return outcome;
 }
@@ -438,11 +476,20 @@ serve(async (req) => {
     return jsonError(503, "hittrax_not_configured", "HitTrax credentials not provisioned");
   }
 
+  // Backoff filter: a link is poll-eligible when next_poll_at is NULL
+  // (healthy, never-backed-off) OR has elapsed (backoff window expired).
+  // PostgREST `.or()` with two clauses keeps the cron tick cheap and lets
+  // healthy links continue to poll on every tick while backed-off links
+  // wait for their delay to pass. The index on (association_status,
+  // next_poll_at NULLS FIRST, last_polled_at NULLS FIRST) added in
+  // 20260508070000_v07_hittrax_backoff supports this read pattern.
+  const nowIso = new Date().toISOString();
   const { data: links, error: linksErr } = await adminClient
     .from("kid_capture_links")
-    .select("id, tenant_id, kid_id, third_party_user_id, third_party_user_password, associated_at, last_polled_through")
+    .select("id, tenant_id, kid_id, third_party_user_id, third_party_user_password, associated_at, last_polled_through, retry_count")
     .eq("capture_source", "hittrax")
     .eq("association_status", "active")
+    .or(`next_poll_at.is.null,next_poll_at.lte.${nowIso}`)
     .order("last_polled_at", { ascending: true, nullsFirst: true })
     .limit(MAX_LINKS_PER_RUN);
   if (linksErr) {

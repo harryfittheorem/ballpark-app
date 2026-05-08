@@ -922,7 +922,9 @@ export type Database = {
           last_poll_error: string | null
           last_polled_at: string | null
           last_polled_through: string | null
+          next_poll_at: string | null
           removed_at: string | null
+          retry_count: number
           tenant_id: string
           third_party_user_id: string
           third_party_user_password: string | null
@@ -941,7 +943,9 @@ export type Database = {
           last_poll_error?: string | null
           last_polled_at?: string | null
           last_polled_through?: string | null
+          next_poll_at?: string | null
           removed_at?: string | null
+          retry_count?: number
           tenant_id: string
           third_party_user_id: string
           third_party_user_password?: string | null
@@ -960,7 +964,9 @@ export type Database = {
           last_poll_error?: string | null
           last_polled_at?: string | null
           last_polled_through?: string | null
+          next_poll_at?: string | null
           removed_at?: string | null
+          retry_count?: number
           tenant_id?: string
           third_party_user_id?: string
           third_party_user_password?: string | null

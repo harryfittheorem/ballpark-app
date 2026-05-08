@@ -39,6 +39,39 @@ purge runs. The two functions cover the two propagation directions:
 | HitTrax-side delete-my-data     | `hittrax-forget` (this endpoint)  | (inbound — no outbound call)   | swings + PBs + link row purged |
 | Parent deletes Ballpark account | `account-delete` (parent JWT)     | `RemoveThirdPartyAssociation` + `ForgetHitTraxUser` per active link | family-wide cascade via auth.admin.deleteUser + FKs |
 
+## Polling cadence + backoff
+
+`hittrax-poll` runs every 2 minutes via pg_cron. For each active link the
+worker selects rows where `next_poll_at IS NULL OR next_poll_at <= now()`,
+so a healthy link is poll-eligible on every tick and a backed-off link
+sits out until its delay elapses.
+
+On any transient failure (HitTrax timeout, unreachable, 5xx, "Error …" 200
+body, parse drift, partial parse with ANY dropped row, partial swing-upsert
+failure) the worker calls `recordFailure(link, retry_count, error)` which:
+
+- increments `retry_count` (capped exponent 30)
+- writes `next_poll_at = now() + min(30 * 2^(retry_count-1), 30m)`
+- leaves `last_polled_through` untouched so the next eligible poll
+  re-fetches the same window (the swings UNIQUE absorbs already-stored
+  rows).
+
+Backoff schedule: 30s → 1m → 2m → 4m → 8m → 16m → 30m (capped). On the
+next successful poll both columns reset (`retry_count = 0`,
+`next_poll_at = null`).
+
+## PR push fan-out (one push per swing)
+
+Personal-best detection inside `hittrax-poll` collapses every metric a
+swing topped (`exit_velocity_mph`, `distance_ft`, `pitch_speed_mph`) into
+a SINGLE push notification per swing — matching the canonical
+`detect_swing_pr` trigger which writes one `points_ledger reason='pr_hit'`
+row per qualifying swing. The push title uses a priority order
+(exit velo → distance → pitch speed) for the headline metric, and the
+push `data.metrics` array carries every metric that PR'd so the client
+can render however it likes. Per-metric notifications were a
+duplicate-notification bug.
+
 ## Secrets (Supabase Edge Function env)
 
 Set via `npx supabase secrets set KEY=...`. **Never** prefix `EXPO_PUBLIC_`.
