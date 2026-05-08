@@ -24,11 +24,16 @@ type DrillVideo =
 
 type Row = {
   id: string;
+  tenant_id: string;
+  kid_id: string;
+  family_id: string;
+  coach_user_id: string;
   title: string;
   description: string | null;
   status: Status;
   due_date: string | null;
   created_at: string;
+  updated_at: string;
   submitted_at: string | null;
   submitted_video_url: string | null;
   reviewed_at: string | null;
@@ -87,13 +92,16 @@ export default async function AssignmentDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("assignments")
-    .select(
-      "id, title, description, status, due_date, created_at, submitted_at, submitted_video_url, reviewed_at, rating, feedback, point_reward, duration_estimate_minutes, drill_video_id, kid:kid_id(first_name, last_name), drill_video:drill_video_id(id, mux_playback_id, status)",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data, error }, { data: { user } }] = await Promise.all([
+    supabase
+      .from("assignments")
+      .select(
+        "id, tenant_id, kid_id, family_id, coach_user_id, title, description, status, due_date, created_at, updated_at, submitted_at, submitted_video_url, reviewed_at, rating, feedback, point_reward, duration_estimate_minutes, drill_video_id, kid:kid_id(first_name, last_name), drill_video:drill_video_id(id, mux_playback_id, status)",
+      )
+      .eq("id", id)
+      .maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
 
   if (error) {
     return (
@@ -107,6 +115,20 @@ export default async function AssignmentDetailPage({
   const row = data as Row;
   const kid = pickOne(row.kid);
   const drillVideo = pickOne(row.drill_video);
+
+  // Coach name: scoped to this signed-in coach per spec ("the signed-in
+  // coach for now"). Looked up from public.coaches.
+  let coachName: string | null = null;
+  if (user && row.coach_user_id === user.id) {
+    const { data: coachRow } = await supabase
+      .from("coaches")
+      .select("first_name, last_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (coachRow) {
+      coachName = `${coachRow.first_name} ${coachRow.last_name}`.trim();
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -128,7 +150,8 @@ export default async function AssignmentDetailPage({
           </h1>
           <p className="mt-1 text-sm text-slate-600">
             For {kid ? `${kid.first_name} ${kid.last_name}` : "Unknown kid"} •
-            created {fmtDate(row.created_at)}
+            assigned by {coachName ?? "you"} • created{" "}
+            {fmtDate(row.created_at)}
           </p>
         </div>
         <button
@@ -208,6 +231,47 @@ export default async function AssignmentDetailPage({
             ) : (
               <p className="text-sm text-slate-400">—</p>
             )}
+          </Field>
+        </div>
+      </section>
+
+      <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
+          Identifiers
+        </h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Assignment id">
+            <p className="break-all font-mono text-xs text-slate-700">
+              {row.id}
+            </p>
+          </Field>
+          <Field label="Tenant id">
+            <p className="break-all font-mono text-xs text-slate-700">
+              {row.tenant_id}
+            </p>
+          </Field>
+          <Field label="Kid id">
+            <p className="break-all font-mono text-xs text-slate-700">
+              {row.kid_id}
+            </p>
+          </Field>
+          <Field label="Family id">
+            <p className="break-all font-mono text-xs text-slate-700">
+              {row.family_id}
+            </p>
+          </Field>
+          <Field label="Coach user id">
+            <p className="break-all font-mono text-xs text-slate-700">
+              {row.coach_user_id}
+            </p>
+          </Field>
+          <Field label="Drill video id">
+            <p className="break-all font-mono text-xs text-slate-700">
+              {row.drill_video_id ?? "—"}
+            </p>
+          </Field>
+          <Field label="Last updated">
+            <p className="text-sm text-slate-800">{fmtDate(row.updated_at)}</p>
           </Field>
         </div>
       </section>
