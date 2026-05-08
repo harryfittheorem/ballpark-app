@@ -69,6 +69,92 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const MUX_WEBHOOK_SECRET = Deno.env.get("MUX_WEBHOOK_SECRET")!;
 
+// Best-effort fan-out for coach-video notifications (task #93). Fired from
+// inside the video.asset.ready success path AFTER the row is updated to
+// status='ready'. Both invocations run via Promise.allSettled and any
+// failure is logged but never changes the 200 response to Mux — otherwise
+// a flaky notification would make Mux retry and double-write the videos
+// row. The push side (`send-push-notification`) and the email side
+// (`send-coach-video-notification`) are independent: one failing does not
+// block the other.
+async function fanOutCoachVideoNotifications(videoId: string): Promise<void> {
+  const { data: video, error: vErr } = await adminClient
+    .from("videos")
+    .select("id, purpose")
+    .eq("id", videoId)
+    .maybeSingle();
+  if (vErr || !video || video.purpose !== "coach_message") return;
+
+  // Look up the message + recipient parent for push targeting + push title.
+  const { data: msg } = await adminClient
+    .from("coach_messages")
+    .select("recipient_family_id, recipient_kid_id, sender_user_id")
+    .eq("video_id", videoId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!msg) return;
+
+  const [familyRes, kidRes, coachRes] = await Promise.all([
+    adminClient
+      .from("families")
+      .select("parent_user_id")
+      .eq("id", msg.recipient_family_id)
+      .maybeSingle(),
+    adminClient
+      .from("kids")
+      .select("first_name")
+      .eq("id", msg.recipient_kid_id)
+      .maybeSingle(),
+    adminClient
+      .from("coaches")
+      .select("first_name")
+      .eq("user_id", msg.sender_user_id)
+      .maybeSingle(),
+  ]);
+
+  const parentUserId = familyRes.data?.parent_user_id ?? "";
+  const kidFirst = kidRes.data?.first_name ?? "your kid";
+  const coachFirst = coachRes.data?.first_name ?? "Your coach";
+
+  const authHeader = { Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` };
+  const fnBase = `${SUPABASE_URL}/functions/v1`;
+
+  await Promise.allSettled([
+    parentUserId
+      ? fetch(`${fnBase}/send-push-notification`, {
+          method: "POST",
+          headers: { ...authHeader, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_ids: [parentUserId],
+            title: `Coach ${coachFirst} sent ${kidFirst} a new video`,
+            body: "Tap to watch in Ballpark",
+            data: { kind: "coach_message", video_id: videoId },
+          }),
+        }).then(async (r) => {
+          if (!r.ok) {
+            const txt = await r.text().catch(() => "");
+            console.error(
+              `mux-webhook fanout push status=${r.status} body=${txt.slice(0, 200)}`,
+            );
+          }
+        })
+      : Promise.resolve(),
+    fetch(`${fnBase}/send-coach-video-notification`, {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ video_id: videoId }),
+    }).then(async (r) => {
+      if (!r.ok) {
+        const txt = await r.text().catch(() => "");
+        console.error(
+          `mux-webhook fanout email status=${r.status} body=${txt.slice(0, 200)}`,
+        );
+      }
+    }),
+  ]);
+}
+
 const TOLERANCE_SECONDS = 300; // 5 min replay window — Stripe convention.
 
 type ErrorCode =
@@ -339,6 +425,13 @@ serve(async (req) => {
           return jsonError(500, "db_error", "Failed to update video row");
         }
         if (updateA.data) {
+          // Best-effort coach-video notification fan-out (task #93).
+          // Wrapped so any failure is logged but never changes the 200.
+          try {
+            await fanOutCoachVideoNotifications(updateA.data.id);
+          } catch (e) {
+            console.error("mux-webhook fanout error", e);
+          }
           logLine(eventType, dataId, "applied", Date.now() - startedAt);
           return jsonOk({ ok: true });
         }
@@ -366,6 +459,11 @@ serve(async (req) => {
             return jsonError(500, "db_error", "Failed to update video row");
           }
           if (updateB.data) {
+            try {
+              await fanOutCoachVideoNotifications(updateB.data.id);
+            } catch (e) {
+              console.error("mux-webhook fanout error", e);
+            }
             logLine(eventType, dataId, "applied", Date.now() - startedAt);
             return jsonOk({ ok: true });
           }

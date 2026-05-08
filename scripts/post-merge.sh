@@ -31,7 +31,7 @@ node scripts/check-mux-asset-id-constraint.mjs
 # stale deploy causes the coach Record Video screen to fail with
 # `Upload service returned status 404 [function_error]`.
 if [ -d "supabase/functions" ]; then
-  for fn in mux-create-upload; do
+  for fn in mux-create-upload send-push-notification send-coach-video-notification; do
     if [ -f "supabase/functions/$fn/index.ts" ]; then
       echo "[post-merge] supabase functions deploy $fn"
       npx --yes supabase functions deploy "$fn" >/dev/null 2>&1 || \
