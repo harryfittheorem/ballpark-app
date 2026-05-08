@@ -6,8 +6,9 @@ hidden = [".config", "package-lock.json", "node_modules"]
 channel = "stable-24_05"
 
 [deployment]
-run = ["sh", "-c", "npm run dev"]
-deploymentTarget = "static"
+run = ["bash", "-c", "cd portal && npx next start -p 5000 -H 0.0.0.0"]
+deploymentTarget = "autoscale"
+build = ["bash", "-c", "cd portal && npm install && npm run build"]
 
 [env]
 PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin"
@@ -27,6 +28,10 @@ start = "typescript-language-server --stdio"
 [[ports]]
 localPort = 3000
 externalPort = 5000
+
+[[ports]]
+localPort = 3001
+externalPort = 5173
 
 [[ports]]
 localPort = 5000
@@ -91,6 +96,10 @@ author = "agent"
 task = "workflow.run"
 args = "Expo dev (proxy)"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Portal dev"
+
 [[workflows.workflow]]
 name = "Expo dev (proxy)"
 author = "agent"
@@ -101,3 +110,15 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "EXPO_PACKAGER_PROXY_URL=\"https://$REPLIT_DEV_DOMAIN\" EXPO_MANIFEST_PROXY_URL=\"https://$REPLIT_DEV_DOMAIN\" npx expo start --port 5000"
+
+[[workflows.workflow]]
+name = "Portal dev"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd portal && npm run dev"
+waitForPort = 3000
+
+[workflows.workflow.metadata]
+outputType = "console"
