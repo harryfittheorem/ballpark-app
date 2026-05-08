@@ -1,17 +1,18 @@
 /**
  * useHitTraxLink — TanStack Query hook for the (kid, hittrax) link row.
  *
- * Polls every 5s while the link is in 'pending' so the UI flips to
- * Connected as soon as hittrax-registration-complete fires. Once the link
- * is in a terminal state (active / declined / removed) we drop back to a
- * 60s refetch interval — the UI shows the cursor freshness anyway.
+ * Primary transport is a Realtime postgres_changes subscription on
+ * `kid_capture_links` — when hittrax-registration-complete or hittrax-poll
+ * UPDATEs the row, we invalidate the cache and the UI flips immediately.
  *
- * Realtime postgres_changes would be lighter on requests but requires the
- * publication setup not done in v0.7; the 5s poll is a deliberately small
- * tax for the pending window only.
+ * A short refetch interval (5s while pending, 60s while active) is kept as
+ * a fallback for environments where the Realtime channel hasn't connected
+ * yet (cold start, network flap) so the parent never gets stuck staring at
+ * a stale "Pending" state.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 import {
   associateHitTrax,
@@ -20,23 +21,51 @@ import {
   type AssociateResponse,
   type KidCaptureLink,
 } from '@/api/hittrax';
+import { supabase } from '@/lib/supabase';
 
 export function hittraxLinkKey(kidId: string) {
   return ['hittrax-link', kidId] as const;
 }
 
 export function useHitTraxLink(kidId: string | undefined) {
+  const qc = useQueryClient();
+
+  // Realtime subscription on the kid_capture_links row for this kid. Any
+  // INSERT/UPDATE/DELETE invalidates the query so the UI re-reads via the
+  // SAFE_COLUMNS allow-list (the realtime payload itself isn't trusted —
+  // we never touch the password column even if it appears in the diff).
+  useEffect(() => {
+    if (!kidId) return;
+    const channel = supabase
+      .channel(`hittrax-link-${kidId}`)
+      .on(
+        // postgres_changes is typed with `any` upstream; cast keeps strict mode happy.
+        'postgres_changes' as never,
+        {
+          event: '*',
+          schema: 'public',
+          table: 'kid_capture_links',
+          filter: `kid_id=eq.${kidId}`,
+        },
+        () => {
+          void qc.invalidateQueries({ queryKey: hittraxLinkKey(kidId) });
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [kidId, qc]);
+
   return useQuery<KidCaptureLink | null>({
     queryKey: kidId ? hittraxLinkKey(kidId) : ['hittrax-link', 'none'],
     queryFn: () => getHitTraxLinkForKid(kidId as string),
     enabled: !!kidId,
     refetchInterval: (query) => {
       const link = query.state.data;
-      // While we're waiting on the parent to tap the HitTrax email, poll fast.
+      // Fallback for when the Realtime channel hasn't connected yet.
       if (link?.association_status === 'pending') return 5_000;
-      // Once active, refresh occasionally so last_polled_through stays fresh.
       if (link?.association_status === 'active') return 60_000;
-      // No link / declined / removed — let pull-to-refresh drive it.
       return false;
     },
   });

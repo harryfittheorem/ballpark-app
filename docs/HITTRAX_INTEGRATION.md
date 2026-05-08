@@ -12,11 +12,32 @@ detail), #122 (PR notifications hardening).
 | `supabase/functions/hittrax-registration-complete` | `--no-verify-jwt` HitTrax inbound (Accepted/Declined) |
 | `supabase/functions/hittrax-poll` | service-role; pg_cron; pulls GetAvailableThirdPartyData |
 | `supabase/functions/hittrax-disconnect` | parent JWT → POST RemoveThirdPartyAssociation |
-| `supabase/functions/hittrax-forget` | `--no-verify-jwt` HitTrax inbound (GDPR purge) |
+| `supabase/functions/hittrax-forget` | `--no-verify-jwt` HitTrax inbound (GDPR purge from HitTrax → us) |
 | `supabase/functions/_shared/hittrax.ts` | URL builder, response parser, swing-payload mapper, constant-time auth |
 | `src/api/hittrax.ts` + `src/hooks/useHitTraxLink.tsx` | client SDK |
 | `src/screens/Me/ConnectHitTraxScreen.tsx` | parent connect/disconnect UI |
 | `scripts/replay-hittrax-fixture.mjs` | local fixture replay (no HitTrax keys needed) |
+
+### `hittrax-forget` direction (inbound, by design)
+
+HitTrax v1.0 spec defines `ForgetHitTraxUser` as a **HitTrax-initiated**
+callback we host: when a HitTrax user requests data deletion through HitTrax,
+HitTrax POSTs us, and we purge that user's locally-cached HitTrax data
+(swings + HitTrax-sourced personal_bests + the link row). Our endpoint
+returns `text/plain` per spec and authenticates with the same constant-time
+PartnerID + APIKey check as `hittrax-registration-complete`.
+
+The **parent-initiated outbound disconnect** is the separate
+`hittrax-disconnect` Edge Function: it calls HitTrax's
+`RemoveThirdPartyAssociation` first and only then flips our local link to
+`removed`, so HitTrax stops sending us further data even before our local
+purge runs. The two functions cover the two propagation directions:
+
+| Trigger                         | Function                          | Calls                          | Purges local? |
+|---------------------------------|-----------------------------------|--------------------------------|---------------|
+| Parent taps Disconnect          | `hittrax-disconnect`              | `RemoveThirdPartyAssociation`  | flips link only — historical swings retained |
+| HitTrax-side delete-my-data     | `hittrax-forget` (this endpoint)  | (inbound — no outbound call)   | swings + PBs + link row purged |
+| Parent deletes Ballpark account | (future) account-delete trigger   | `RemoveThirdPartyAssociation`  | family-wide cascade; tracked under follow-up #125 |
 
 ## Secrets (Supabase Edge Function env)
 

@@ -83,6 +83,9 @@ type PollOutcome = {
   error?: string;
 };
 
+// Per-push budget. A hung downstream push must not delay cursor advance.
+const PUSH_TIMEOUT_MS = 5_000;
+
 async function fanOutPrPush(
   parentUserId: string,
   kidFirstName: string,
@@ -90,6 +93,8 @@ async function fanOutPrPush(
   value: number,
 ): Promise<void> {
   if (!parentUserId) return;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), PUSH_TIMEOUT_MS);
   try {
     const niceMetric =
       metric === "exit_velocity_mph"
@@ -111,6 +116,7 @@ async function fanOutPrPush(
         body: `${kidFirstName} just set a personal best.`,
         data: { kind: "swing_pr", metric, value },
       }),
+      signal: ac.signal,
     });
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
@@ -228,6 +234,10 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutco
   // cursor untouched so the next poll re-fetches the same window — duplicate
   // rows are absorbed by the swings UNIQUE on (capture_source, capture_event_id).
   let allOk = true;
+  // Push fan-out is best-effort. We collect every PR push as a promise here
+  // and Promise.allSettled them at the end of the link — pushes never block
+  // a swing UPSERT and never block cursor advance.
+  const pushPromises: Promise<void>[] = [];
 
   for (const [hittraxSessionId, members] of distinctSessions.entries()) {
     if (!hittraxSessionId.startsWith("solo:")) {
@@ -335,10 +345,20 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutco
         // Update local cache so a later swing in the same payload doesn't
         // double-fire a push for the same metric.
         beforePbs.set(c.metric, c.value);
-        // Best-effort — never block the cursor advance.
-        await fanOutPrPush(parentUserId, kidFirstName, c.metric, c.value);
+        // Best-effort — never block the cursor advance. fanOutPrPush has
+        // its own AbortController + 5s timeout so a hung push can't stall
+        // the Promise.allSettled below.
+        pushPromises.push(fanOutPrPush(parentUserId, kidFirstName, c.metric, c.value));
       }
     }
+  }
+
+  // Drain push fan-out before returning. Each push has its own 5s timeout,
+  // so worst-case wall-clock here is bounded. allSettled means a single
+  // push failure doesn't poison the link — failures are already logged
+  // inside fanOutPrPush.
+  if (pushPromises.length > 0) {
+    await Promise.allSettled(pushPromises);
   }
 
   // Cursor only advances on FULL success. On partial failure we record the
