@@ -213,11 +213,29 @@ serve(async (req) => {
     return jsonError(502, "hittrax_bad_response", `Unexpected HitTrax response: ${parsed.body.slice(0, 80)}`);
   }
 
-  // ---- 7. NOW persist (UPSERT) the kid_capture_links row in 'pending' ----
-  // We've passed the HitTrax outbound — write the row carrying the booleans
-  // we just received. If this DB write fails the row is unchanged (or never
-  // existed) and the parent retries; HitTrax has no concept of partial
-  // state for us to roll back.
+  // ---- 7. NOW persist (UPSERT) the kid_capture_links row -----------------
+  // Status semantics:
+  //   * registration=true  → 'pending'  : HitTrax accepted and is sending
+  //                                       the confirmation email; we wait
+  //                                       for hittrax-registration-complete
+  //                                       to flip us to 'active'.
+  //   * registration=false → 'declined' : HitTrax has no eligible
+  //                                       subscription for this UserID.
+  //                                       Persisting 'pending' here would
+  //                                       strand the parent because the UI
+  //                                       hides the connect form whenever
+  //                                       status==='pending'. 'declined' is
+  //                                       the correct terminal-but-retryable
+  //                                       state — the Me/Onboarding screens
+  //                                       render a "previously declined"
+  //                                       affordance + the form again, so a
+  //                                       parent who upgrades HitTrax can
+  //                                       immediately retry without manual
+  //                                       backend intervention.
+  //
+  // If this DB write fails the row is unchanged (or never existed) and the
+  // parent retries; HitTrax has no concept of partial state to roll back.
+  const associationStatus = booleans.registration ? "pending" : "declined";
   let linkId: string;
   if (existing) {
     const { data: updated, error: updateErr } = await adminClient
@@ -228,12 +246,14 @@ serve(async (req) => {
         third_party_user_password: null,
         hittrax_registration_status: booleans.registration,
         hittrax_release_status: booleans.release,
-        association_status: "pending",
+        association_status: associationStatus,
         associated_at: null,
         removed_at: null,
         last_polled_through: null,
         last_polled_at: null,
         last_poll_error: null,
+        retry_count: 0,
+        next_poll_at: null,
       })
       .eq("id", existing.id)
       .select("id")
@@ -251,7 +271,7 @@ serve(async (req) => {
         external_user_id: externalUserId,
         hittrax_registration_status: booleans.registration,
         hittrax_release_status: booleans.release,
-        association_status: "pending",
+        association_status: associationStatus,
       })
       .select("id")
       .single();
@@ -263,12 +283,12 @@ serve(async (req) => {
   }
 
   console.log(
-    `hittrax-associate ok link=${linkId} reg=${booleans.registration} rel=${booleans.release} ms=${Date.now() - startedAt}`,
+    `hittrax-associate ok link=${linkId} status=${associationStatus} reg=${booleans.registration} rel=${booleans.release} ms=${Date.now() - startedAt}`,
   );
 
   return jsonOk({
     link_id: linkId,
-    association_status: "pending",
+    association_status: associationStatus,
     hittrax_registration_status: booleans.registration,
     hittrax_release_status: booleans.release,
   });

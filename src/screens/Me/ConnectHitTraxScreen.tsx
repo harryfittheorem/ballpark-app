@@ -129,13 +129,26 @@ export default function ConnectHitTraxScreen() {
             />
           </View>
         ) : link?.association_status === 'pending' ? (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Waiting on email</Text>
-            <Text style={styles.cardValue}>
-              HitTrax sent a confirmation email to your athlete&apos;s HitTrax
-              account. Tap the link in that email — this screen updates as soon
-              as HitTrax tells us.
-            </Text>
+          <View>
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>Waiting on email</Text>
+              <Text style={styles.cardValue}>
+                HitTrax sent a confirmation email to your athlete&apos;s HitTrax
+                account. Tap the link in that email — this screen updates as soon
+                as HitTrax tells us.
+              </Text>
+            </View>
+            {/* Recovery action — never strand the parent in 'pending' if the
+                email never arrives or they entered the wrong UserID. Cancel
+                flips this row to 'removed' so the form re-appears for a
+                fresh attempt. */}
+            <Button
+              variant="secondary"
+              tone="danger"
+              label="Cancel and start over"
+              onPress={onDisconnect}
+              loading={disconnect.isPending}
+            />
           </View>
         ) : (
           <View>
