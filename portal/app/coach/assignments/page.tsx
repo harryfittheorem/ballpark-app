@@ -84,10 +84,16 @@ export default async function CoachAssignmentsPage() {
   const rows = (data ?? []) as Row[];
 
   const groups: Array<{ status: Status; rows: Row[] }> = [
-    { status: "pending", rows: rows.filter((r) => r.status === "pending") },
     { status: "submitted", rows: rows.filter((r) => r.status === "submitted") },
+    { status: "pending", rows: rows.filter((r) => r.status === "pending") },
     { status: "reviewed", rows: rows.filter((r) => r.status === "reviewed") },
   ];
+
+  const emptyCopy: Record<Status, string> = {
+    submitted: "No submissions waiting.",
+    pending: "Nothing here.",
+    reviewed: "Nothing here.",
+  };
 
   return (
     <div className="space-y-8">
@@ -126,7 +132,7 @@ export default async function CoachAssignmentsPage() {
               </h2>
               {group.rows.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-400">
-                  Nothing here.
+                  {emptyCopy[group.status]}
                 </div>
               ) : (
                 <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -146,6 +152,11 @@ export default async function CoachAssignmentsPage() {
                             >
                               {STATUS_LABEL[row.status]}
                             </span>
+                            {row.status === "submitted" ? (
+                              <span className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700 ring-1 ring-inset ring-orange-600/20">
+                                Needs review
+                              </span>
+                            ) : null}
                           </div>
                           <p className="mt-1 truncate text-sm text-slate-600">
                             For {kidName(row)}

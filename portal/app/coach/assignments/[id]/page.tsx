@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { MuxVideo } from "@/components/MuxVideo";
+import { ReviewForm } from "./ReviewForm";
 
 type Status = "pending" | "submitted" | "reviewed";
 
@@ -9,7 +11,7 @@ type Kid =
   | { first_name: string; last_name: string }[]
   | null;
 
-type DrillVideo =
+type Video =
   | {
       id: string;
       mux_playback_id: string | null;
@@ -43,7 +45,7 @@ type Row = {
   duration_estimate_minutes: number | null;
   drill_video_id: string | null;
   kid: Kid;
-  drill_video: DrillVideo;
+  drill_video: Video;
 };
 
 const STATUS_LABEL: Record<Status, string> = {
@@ -147,6 +149,11 @@ export default async function AssignmentDetailPage({
             >
               {STATUS_LABEL[row.status]}
             </span>
+            {row.status === "submitted" ? (
+              <span className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700 ring-1 ring-inset ring-orange-600/20">
+                Needs review
+              </span>
+            ) : null}
           </h1>
           <p className="mt-1 text-sm text-slate-600">
             For {kid ? `${kid.first_name} ${kid.last_name}` : "Unknown kid"} •
@@ -154,14 +161,6 @@ export default async function AssignmentDetailPage({
             {fmtDate(row.created_at)}
           </p>
         </div>
-        <button
-          type="button"
-          disabled
-          title="Coming soon"
-          className="inline-flex shrink-0 cursor-not-allowed items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-400"
-        >
-          Edit
-        </button>
       </div>
 
       <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
@@ -193,14 +192,16 @@ export default async function AssignmentDetailPage({
           </Field>
         </div>
         <Field label="Drill video">
-          {drillVideo ? (
-            <p className="text-sm text-slate-800">
-              <span className="font-mono text-xs text-slate-500">
-                {drillVideo.id}
-              </span>
-              <span className="ml-2 text-slate-500">
-                ({drillVideo.status ?? "unknown"})
-              </span>
+          {drillVideo?.mux_playback_id &&
+          (drillVideo.status === "ready" || drillVideo.status == null) ? (
+            <MuxVideo
+              playbackId={drillVideo.mux_playback_id}
+              title={row.title}
+            />
+          ) : drillVideo ? (
+            <p className="text-sm text-slate-500">
+              Video attached but not ready yet (status:{" "}
+              {drillVideo.status ?? "unknown"}).
             </p>
           ) : (
             <p className="text-sm text-slate-400">No video attached</p>
@@ -208,32 +209,97 @@ export default async function AssignmentDetailPage({
         </Field>
       </section>
 
-      <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          Status
-        </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {row.status === "pending" ? (
+        <section className="space-y-2 rounded-lg border border-dashed border-slate-300 bg-white p-6">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
+            Waiting on the family
+          </h2>
+          <p className="text-sm text-slate-600">
+            This drill hasn&apos;t been submitted yet. You&apos;ll be able to
+            review it once {kid ? kid.first_name : "the kid"} marks it done.
+          </p>
+        </section>
+      ) : (
+        <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
+            Submission
+          </h2>
           <Field label="Submitted at">
             <p className="text-sm text-slate-800">
               {fmtDate(row.submitted_at)}
             </p>
           </Field>
-          <Field label="Submitted video">
+          <Field label="Kid&apos;s video">
             {row.submitted_video_url ? (
-              <a
-                href={row.submitted_video_url}
-                target="_blank"
-                rel="noreferrer"
-                className="break-all text-sm text-sky-700 underline hover:text-sky-900"
-              >
-                {row.submitted_video_url}
-              </a>
+              <MuxVideo
+                src={row.submitted_video_url}
+                title={`${row.title} — submission`}
+              />
+            ) : (
+              <p className="text-sm text-slate-500">
+                The family marked this drill done without attaching a video.
+              </p>
+            )}
+          </Field>
+        </section>
+      )}
+
+      {row.status === "submitted" ? (
+        <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+          <div>
+            <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
+              Leave a review
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Rate the drill 1–5 stars and write a short note for the family.
+            </p>
+          </div>
+          <ReviewForm assignmentId={row.id} />
+        </section>
+      ) : null}
+
+      {row.status === "reviewed" ? (
+        <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
+            Your review
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Reviewed at">
+              <p className="text-sm text-slate-800">
+                {fmtDate(row.reviewed_at)}
+              </p>
+            </Field>
+            <Field label="Rating">
+              <div className="flex items-center gap-1 text-2xl leading-none">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <span
+                    key={n}
+                    className={
+                      row.rating != null && n <= row.rating
+                        ? "text-amber-500"
+                        : "text-slate-300"
+                    }
+                  >
+                    {row.rating != null && n <= row.rating ? "★" : "☆"}
+                  </span>
+                ))}
+                <span className="ml-2 text-sm text-slate-500">
+                  {row.rating != null ? `${row.rating} / 5` : "—"}
+                </span>
+              </div>
+            </Field>
+          </div>
+          <Field label="Feedback">
+            {row.feedback?.trim() ? (
+              <p className="whitespace-pre-wrap text-sm text-slate-800">
+                {row.feedback}
+              </p>
             ) : (
               <p className="text-sm text-slate-400">—</p>
             )}
           </Field>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
         <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
@@ -274,31 +340,6 @@ export default async function AssignmentDetailPage({
             <p className="text-sm text-slate-800">{fmtDate(row.updated_at)}</p>
           </Field>
         </div>
-      </section>
-
-      <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          Review
-        </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Reviewed at">
-            <p className="text-sm text-slate-800">{fmtDate(row.reviewed_at)}</p>
-          </Field>
-          <Field label="Rating">
-            <p className="text-sm text-slate-800">
-              {row.rating != null ? `${row.rating} / 5` : "—"}
-            </p>
-          </Field>
-        </div>
-        <Field label="Feedback">
-          {row.feedback?.trim() ? (
-            <p className="whitespace-pre-wrap text-sm text-slate-800">
-              {row.feedback}
-            </p>
-          ) : (
-            <p className="text-sm text-slate-400">—</p>
-          )}
-        </Field>
       </section>
     </div>
   );
