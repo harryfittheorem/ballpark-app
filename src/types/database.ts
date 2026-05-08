@@ -967,6 +967,10 @@ export type Database = {
         Args: { p_tenant_id: string; p_video_id: string }
         Returns: boolean
       }
+      cancel_assignment_for_coach: {
+        Args: { p_assignment_id: string }
+        Returns: string
+      }
       complete_assignment_for_kid: {
         Args: { p_assignment_id: string }
         Returns: {
@@ -995,6 +999,42 @@ export type Database = {
       }
       review_assignment: {
         Args: { p_assignment_id: string; p_feedback: string; p_rating: number }
+        Returns: {
+          coach_user_id: string
+          created_at: string
+          description: string | null
+          drill_video_id: string | null
+          due_date: string | null
+          duration_estimate_minutes: number | null
+          family_id: string
+          feedback: string | null
+          id: string
+          kid_id: string
+          point_reward: number
+          rating: number | null
+          reviewed_at: string | null
+          status: string
+          submitted_at: string | null
+          submitted_video_url: string | null
+          tenant_id: string
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_assignment_for_coach: {
+        Args: {
+          p_assignment_id: string
+          p_description: string
+          p_drill_video_id: string
+          p_due_date: string
+          p_title: string
+        }
         Returns: {
           coach_user_id: string
           created_at: string
