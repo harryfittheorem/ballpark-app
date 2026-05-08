@@ -40,3 +40,21 @@ export function readAppRole(session: Session | null): AppRole {
   if (claim === "admin") return "admin";
   return "parent";
 }
+
+/**
+ * Read the `tenant_id` claim from the access token. Returns null when
+ * there is no session or no claim. The Custom Access Token Hook on the
+ * Supabase project injects `tenant_id` for every authenticated user, so
+ * a null return for a signed-in user indicates a misconfigured hook.
+ *
+ * @supabase/ssr does not surface custom JWT claims directly, so we
+ * decode the access token payload ourselves (signature already verified
+ * by Supabase). Same shape as the mobile app's `useAuth.tsx` decoder,
+ * implemented fresh here — never imported from `src/`.
+ */
+export function readTenantId(session: Session | null): string | null {
+  if (!session?.access_token) return null;
+  const payload = decodeJwtPayload(session.access_token);
+  const claim = payload?.tenant_id;
+  return typeof claim === "string" && claim.length > 0 ? claim : null;
+}
