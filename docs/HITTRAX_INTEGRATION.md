@@ -199,6 +199,13 @@ to bump `Velo` past the prior best to see a fresh PR + ledger row.
 - **Backfill on link activation.** `last_polled_through` is seeded to the
   activation timestamp — historical swings before that are NOT pulled in v1.
   Backfill ships as a follow-up if/when product asks.
-- **Realtime UI flip.** `useHitTraxLink` polls every 5s while pending. A
-  postgres_changes Realtime channel would be lighter; deferred until the
-  publication setup is added (no Realtime in v0.7).
+- **Realtime UI flip.** `useHitTraxLink` subscribes to a postgres_changes
+  Realtime channel scoped to the family's `kid_capture_links` rows and
+  invalidates the React Query cache on UPDATE — so the Home banner and
+  Me → HitTrax screen flip from "pending" → "active" the instant
+  `hittrax-registration-complete` writes the row, with no manual refresh.
+  A 5-second `refetchInterval` is kept as a defense-in-depth fallback in
+  case the websocket is dropped (airplane mode, background → foreground,
+  etc.). To disable the fallback once Realtime delivery is fully trusted
+  in production, set the `refetchInterval` in `src/hooks/useHitTraxLink.tsx`
+  to `false`.

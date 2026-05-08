@@ -6,6 +6,7 @@ import { signOut } from '@/api/auth';
 import { deleteAccount } from '@/api/account';
 import { useAuth } from '@/hooks/useAuth';
 import { useFamily } from '@/hooks/useFamily';
+import { useHitTraxLink } from '@/hooks/useHitTraxLink';
 import type { MeStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
@@ -15,6 +16,19 @@ type Props = MeStackScreenProps<'MeHome'>;
 export default function MeScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { family, kids } = useFamily();
+  // Step-10 UX contract: surface the HitTrax link state inline in the row
+  // subtitle so the parent can see Connected / Pending / Declined / Not
+  // connected at a glance without opening the screen. Hook is cheap (the
+  // realtime+poll fallback are already mounted from Home).
+  const { data: hittraxLink } = useHitTraxLink(kids[0]?.id);
+  const hittraxStatus: 'Connected' | 'Pending' | 'Declined' | 'Not connected' =
+    hittraxLink?.association_status === 'active'
+      ? 'Connected'
+      : hittraxLink?.association_status === 'pending'
+        ? 'Pending'
+        : hittraxLink?.association_status === 'declined'
+          ? 'Declined'
+          : 'Not connected';
 
   const handleSignOut = async () => {
     try {
@@ -103,8 +117,26 @@ export default function MeScreen({ navigation }: Props) {
         <TouchableOpacity
           onPress={() => navigation.navigate('ConnectHitTrax')}
           style={styles.navRow}
+          testID="me-row-hittrax"
         >
-          <Text style={styles.navRowText}>HitTrax</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.navRowText}>HitTrax</Text>
+            <Text
+              style={[
+                styles.navRowSubtitle,
+                hittraxStatus === 'Connected'
+                  ? styles.statusActive
+                  : hittraxStatus === 'Pending'
+                    ? styles.statusPending
+                    : hittraxStatus === 'Declined'
+                      ? styles.statusDeclined
+                      : styles.statusMuted,
+              ]}
+              testID="me-row-hittrax-status"
+            >
+              {hittraxStatus}
+            </Text>
+          </View>
           <ChevronRight color={colors.gold} size={20} />
         </TouchableOpacity>
 
@@ -178,6 +210,17 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.interSemiBold,
     fontSize: fontSizes.lg,
   },
+  navRowSubtitle: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
+    marginTop: spacing.xs,
+    letterSpacing: tracking.wide,
+    textTransform: 'uppercase',
+  },
+  statusActive:   { color: colors.success },
+  statusPending:  { color: colors.gold },
+  statusDeclined: { color: colors.textLight },
+  statusMuted:    { color: colors.textMuted },
   signOutBtn: {
     marginTop: 'auto',
     borderColor: colors.border,
