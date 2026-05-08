@@ -922,6 +922,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _video_in_tenant: {
+        Args: { p_tenant_id: string; p_video_id: string }
+        Returns: boolean
+      }
       complete_assignment_for_kid: {
         Args: { p_assignment_id: string }
         Returns: {
