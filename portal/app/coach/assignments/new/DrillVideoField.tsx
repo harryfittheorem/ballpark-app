@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { fieldClasses } from "@/components/ui/Input";
 
 type RecentVideo = {
   id: string;
@@ -59,8 +60,6 @@ export function DrillVideoField({
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // The hidden form input the Server Action reads. Only one of the two modes
-  // contributes a value at any time; the other contributes "".
   const submittedVideoId =
     mode === "upload"
       ? status.kind === "done"
@@ -68,7 +67,6 @@ export function DrillVideoField({
         : ""
       : pickedId;
 
-  // The form should disable Create while an upload is in flight.
   const isBusy = status.kind === "minting" || status.kind === "uploading";
 
   useEffect(() => {
@@ -127,8 +125,6 @@ export function DrillVideoField({
     const uploadUrl = mintBody.upload_url;
     const videoId = mintBody.video_id;
 
-    // PUT the file bytes directly to Mux. We use XHR because fetch() does not
-    // expose upload progress events in the browser.
     const xhr = new XMLHttpRequest();
     xhrRef.current = xhr;
     setStatus({ kind: "uploading", progress: 0 });
@@ -192,14 +188,16 @@ export function DrillVideoField({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="block text-sm font-medium text-slate-900">
-          Drill video{" "}
-          <span className="font-normal text-slate-500">(optional)</span>
+        <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gold-deep">
+          <span>Drill video</span>
+          <span className="text-[10px] font-normal normal-case tracking-normal text-text-light">
+            optional
+          </span>
         </label>
         {hasRecent ? (
           <div
             role="tablist"
-            className="inline-flex overflow-hidden rounded-md border border-slate-300 text-xs"
+            className="inline-flex overflow-hidden rounded-xl border border-border-gold text-xs"
           >
             <button
               type="button"
@@ -207,7 +205,7 @@ export function DrillVideoField({
               aria-selected={mode === "upload"}
               onClick={() => setMode("upload")}
               disabled={isBusy}
-              className={`px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50 ${mode === "upload" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+              className={`px-3 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${mode === "upload" ? "bg-gold text-darkest" : "bg-darkest text-text-light hover:text-cream-light"}`}
             >
               Upload new
             </button>
@@ -217,7 +215,7 @@ export function DrillVideoField({
               aria-selected={mode === "pick"}
               onClick={() => setMode("pick")}
               disabled={isBusy}
-              className={`border-l border-slate-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50 ${mode === "pick" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+              className={`border-l border-border-gold px-3 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${mode === "pick" ? "bg-gold text-darkest" : "bg-darkest text-text-light hover:text-cream-light"}`}
             >
               Pick from recent
             </button>
@@ -225,8 +223,6 @@ export function DrillVideoField({
         ) : null}
       </div>
 
-      {/* Hidden field the Server Action reads. Always present so the form has
-          a stable contract — value is "" when no video is selected. */}
       <input type="hidden" name="drill_video_id" value={submittedVideoId} />
 
       {mode === "upload" ? (
@@ -238,9 +234,9 @@ export function DrillVideoField({
                 type="file"
                 accept="video/*"
                 onChange={onFile}
-                className="block w-full cursor-pointer rounded-md border border-slate-300 bg-white text-sm file:mr-4 file:cursor-pointer file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+                className="block w-full cursor-pointer rounded-xl border border-border-gold bg-darkest text-sm text-cream file:mr-4 file:cursor-pointer file:border-0 file:bg-gold file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-darkest hover:file:bg-gold-hover"
               />
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-text-light">
                 MP4 / MOV / WebM up to {fmtBytes(MAX_BYTES)}. Uploads stream
                 directly to Mux.
               </p>
@@ -248,40 +244,40 @@ export function DrillVideoField({
           ) : null}
 
           {status.kind === "minting" ? (
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <div className="rounded-xl border border-border-gold bg-darkest/60 px-4 py-3 text-sm text-text-light">
               Preparing upload…
             </div>
           ) : null}
 
           {status.kind === "uploading" ? (
-            <div className="space-y-2 rounded-md border border-slate-200 bg-white p-3">
+            <div className="space-y-2 rounded-xl border border-border-gold bg-darkest/60 px-4 py-3">
               <div className="flex items-center justify-between text-xs">
                 <span
-                  className="truncate pr-3 font-medium text-slate-700"
+                  className="truncate pr-3 font-medium text-cream-light"
                   title={pickedFileName}
                 >
                   {pickedFileName || "Uploading…"}
                 </span>
-                <span className="shrink-0 text-slate-500">
+                <span className="shrink-0 text-text-light">
                   {status.progress}%
                 </span>
               </div>
               <div
-                className="h-2 overflow-hidden rounded-full bg-slate-200"
+                className="h-2 overflow-hidden rounded-full bg-darkest"
                 role="progressbar"
                 aria-valuenow={status.progress}
                 aria-valuemin={0}
                 aria-valuemax={100}
               >
                 <div
-                  className="h-full bg-slate-900 transition-[width] duration-150"
+                  className="h-full bg-gold transition-[width] duration-150"
                   style={{ width: `${status.progress}%` }}
                 />
               </div>
               <button
                 type="button"
                 onClick={cancel}
-                className="text-xs text-slate-600 underline hover:text-slate-900"
+                className="text-xs text-text-light underline-offset-2 hover:text-gold hover:underline"
               >
                 Cancel
               </button>
@@ -289,25 +285,23 @@ export function DrillVideoField({
           ) : null}
 
           {status.kind === "done" ? (
-            <div className="flex items-start justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-success/40 bg-success-bg px-4 py-3 text-sm">
               <div className="min-w-0">
-                <p className="font-medium text-emerald-800">
-                  Upload complete
-                </p>
+                <p className="font-semibold text-success">Upload complete</p>
                 <p
-                  className="mt-0.5 truncate text-xs text-emerald-700"
+                  className="mt-0.5 truncate text-xs text-success/80"
                   title={status.fileName}
                 >
                   {status.fileName} • Mux is processing
                 </p>
-                <p className="mt-1 font-mono text-[10px] text-emerald-700/80">
+                <p className="mt-1 font-mono text-[10px] text-success/70">
                   {status.videoId}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={reset}
-                className="shrink-0 text-xs text-emerald-800 underline hover:text-emerald-900"
+                className="shrink-0 text-xs text-success underline-offset-2 hover:underline"
               >
                 Replace
               </button>
@@ -315,7 +309,7 @@ export function DrillVideoField({
           ) : null}
 
           {status.kind === "error" ? (
-            <div className="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div className="space-y-2 rounded-xl border border-danger/40 bg-danger-bg px-4 py-3 text-sm text-danger">
               <p>{status.message}</p>
               {status.canRetry ? (
                 <button
@@ -326,7 +320,7 @@ export function DrillVideoField({
                     if (fileInputRef.current) fileInputRef.current.value = "";
                     fileInputRef.current?.click();
                   }}
-                  className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+                  className="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-cream-light hover:bg-danger/90"
                 >
                   Pick a file and retry
                 </button>
@@ -335,11 +329,11 @@ export function DrillVideoField({
           ) : null}
         </div>
       ) : (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <select
             value={pickedId}
             onChange={(e) => setPickedId(e.target.value)}
-            className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+            className={fieldClasses()}
           >
             <option value="">No video / link later</option>
             {recent.map((v) => (
@@ -350,7 +344,7 @@ export function DrillVideoField({
               </option>
             ))}
           </select>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-text-light">
             Pick from your last 20 drill videos uploaded via the mobile app.
           </p>
         </div>

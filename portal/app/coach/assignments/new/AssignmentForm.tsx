@@ -5,6 +5,9 @@ import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { createAssignment } from "./actions";
 import { DrillVideoField } from "./DrillVideoField";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input, Select, TextArea } from "@/components/ui/Input";
 
 type Kid = {
   id: string;
@@ -22,13 +25,9 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   const isDisabled = disabled || pending;
   return (
-    <button
-      type="submit"
-      disabled={isDisabled}
-      className="inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-    >
+    <Button type="submit" disabled={isDisabled}>
       {pending ? "Creating…" : "Create assignment"}
-    </button>
+    </Button>
   );
 }
 
@@ -42,23 +41,14 @@ export function AssignmentForm({
   const [uploadBusy, setUploadBusy] = useState(false);
 
   return (
-    <form
-      action={createAssignment}
-      className="space-y-5 rounded-lg border border-slate-200 bg-white p-6"
-    >
-      <div className="space-y-1">
-        <label
-          htmlFor="kid_id"
-          className="block text-sm font-medium text-slate-900"
-        >
-          Recipient kid
-        </label>
-        <select
+    <Card accent padding="lg">
+      <form action={createAssignment} className="space-y-5">
+        <Select
           id="kid_id"
           name="kid_id"
           required
           defaultValue=""
-          className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          label="Recipient kid"
         >
           <option value="" disabled>
             Choose a kid…
@@ -68,76 +58,52 @@ export function AssignmentForm({
               {k.first_name} {k.last_name}
             </option>
           ))}
-        </select>
-      </div>
+        </Select>
 
-      <div className="space-y-1">
-        <label
-          htmlFor="title"
-          className="block text-sm font-medium text-slate-900"
-        >
-          Drill title
-        </label>
-        <input
+        <Input
           id="title"
           name="title"
           type="text"
           required
           maxLength={120}
           placeholder="e.g. 50 tee swings, top hand only"
-          className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          label="Drill title"
         />
-      </div>
 
-      <div className="space-y-1">
-        <label
-          htmlFor="description"
-          className="block text-sm font-medium text-slate-900"
-        >
-          Drill description
-        </label>
-        <textarea
+        <TextArea
           id="description"
           name="description"
           required
           rows={4}
           placeholder="What should they do, how many reps, focus cues, etc."
-          className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          label="Drill description"
         />
-      </div>
 
-      <DrillVideoField recent={recentVideos} onBusyChange={setUploadBusy} />
+        <DrillVideoField recent={recentVideos} onBusyChange={setUploadBusy} />
 
-      <div className="space-y-1">
-        <label
-          htmlFor="due_date"
-          className="block text-sm font-medium text-slate-900"
-        >
-          Due date{" "}
-          <span className="font-normal text-slate-500">(optional)</span>
-        </label>
-        <input
+        <Input
           id="due_date"
           name="due_date"
           type="date"
-          className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          label="Due date"
+          optional
         />
-      </div>
 
-      <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
-        {uploadBusy ? (
-          <span className="text-xs text-slate-500">
-            Waiting for video upload to finish…
-          </span>
-        ) : null}
-        <Link
-          href="/coach/assignments"
-          className="text-sm text-slate-600 hover:text-slate-900"
-        >
-          Cancel
-        </Link>
-        <SubmitButton disabled={uploadBusy} />
-      </div>
-    </form>
+        <div className="flex items-center justify-end gap-3 border-t border-border-gold pt-5">
+          {uploadBusy ? (
+            <span className="text-xs text-text-light">
+              Waiting for video upload to finish…
+            </span>
+          ) : null}
+          <Link
+            href="/coach/assignments"
+            className="text-sm text-text-light transition-colors hover:text-gold"
+          >
+            Cancel
+          </Link>
+          <SubmitButton disabled={uploadBusy} />
+        </div>
+      </form>
+    </Card>
   );
 }

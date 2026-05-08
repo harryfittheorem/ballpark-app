@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AssignmentForm } from "./AssignmentForm";
+import { Card } from "@/components/ui/Card";
 
 type Kid = {
   id: string;
@@ -47,32 +48,34 @@ export default async function NewAssignmentPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="font-display text-4xl font-semibold uppercase tracking-wide text-cream-light">
             New assignment
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-text-light">
             Send a drill to one of your families.
           </p>
         </div>
         <Link
           href="/coach/assignments"
-          className="text-sm text-slate-600 hover:text-slate-900"
+          className="text-sm text-text-light transition-colors hover:text-gold"
         >
           ← Back
         </Link>
       </div>
 
       {errParam ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {errParam}
-        </div>
+        <Card padding="sm" className="border-danger/40 bg-danger-bg">
+          <p className="text-sm text-danger">{errParam}</p>
+        </Card>
       ) : null}
 
       {kids.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-600">
-          There are no kids in your tenant yet, so there&apos;s no one to
-          assign a drill to.
-        </div>
+        <Card padding="lg" className="border-dashed text-center">
+          <p className="text-sm text-text-light">
+            There are no kids in your tenant yet, so there&apos;s no one to
+            assign a drill to.
+          </p>
+        </Card>
       ) : (
         <AssignmentForm kids={kids} recentVideos={videos} />
       )}

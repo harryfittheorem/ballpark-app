@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LogoutButton } from "./LogoutButton";
+import { NavLink } from "./NavLink";
 
 export function SiteHeader({
   email,
@@ -9,37 +10,34 @@ export function SiteHeader({
   role: "coach" | "admin";
 }) {
   return (
-    <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
+    <header className="border-b border-border-gold bg-darker/95 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
         <div className="flex items-center gap-6">
-          <Link href={role === "admin" ? "/admin" : "/coach/inbox"}>
-            <span className="text-base font-semibold tracking-tight">
-              Ballpark Portal
+          <Link
+            href={role === "admin" ? "/admin" : "/coach/inbox"}
+            className="group flex items-center gap-2.5"
+          >
+            <span
+              aria-hidden
+              className="inline-block h-2.5 w-2.5 rounded-full bg-gold shadow-[0_0_12px_rgba(241,229,173,0.7)] transition-transform group-hover:scale-110"
+            />
+            <span className="font-display text-2xl font-semibold uppercase tracking-[0.18em] text-cream-light">
+              Ball<span className="text-gold">park</span>
             </span>
           </Link>
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-600">
+          <span className="hidden rounded-full border border-border-gold-strong bg-darkest px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gold sm:inline-flex">
             {role}
           </span>
           {role === "coach" ? (
-            <nav className="flex items-center gap-4 text-sm">
-              <Link
-                href="/coach/inbox"
-                className="text-slate-600 hover:text-slate-900"
-              >
-                Inbox
-              </Link>
-              <Link
-                href="/coach/assignments"
-                className="text-slate-600 hover:text-slate-900"
-              >
-                Assignments
-              </Link>
+            <nav className="flex items-center gap-1 text-sm">
+              <NavLink href="/coach/inbox">Inbox</NavLink>
+              <NavLink href="/coach/assignments">Assignments</NavLink>
             </nav>
           ) : null}
         </div>
         <div className="flex items-center gap-4">
           {email ? (
-            <span className="hidden text-xs text-slate-500 sm:inline">
+            <span className="hidden text-xs text-text-light sm:inline">
               {email}
             </span>
           ) : null}

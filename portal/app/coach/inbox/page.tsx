@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { Card } from "@/components/ui/Card";
 
 type Row = {
   id: string;
@@ -37,9 +38,6 @@ function kidName(row: Row): string {
 export default async function CoachInboxPage() {
   const supabase = await createClient();
 
-  // RLS already restricts coach_messages SELECT to sender_user_id = auth.uid()
-  // when the JWT carries app_role='coach'. The eq() filter is redundant but
-  // makes the query intent obvious.
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -54,9 +52,11 @@ export default async function CoachInboxPage() {
 
   if (error) {
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-        Failed to load messages: {error.message}
-      </div>
+      <Card padding="md" className="border-danger/40 bg-danger-bg">
+        <p className="text-sm text-danger">
+          Failed to load messages: {error.message}
+        </p>
+      </Card>
     );
   }
 
@@ -65,65 +65,69 @@ export default async function CoachInboxPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Inbox</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <h1 className="font-display text-4xl font-semibold uppercase tracking-wide text-cream-light">
+          Inbox
+        </h1>
+        <p className="mt-1 text-sm text-text-light">
           Messages you have sent to families.
         </p>
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
-          <p className="text-sm text-slate-600">
+        <Card padding="lg" className="border-dashed text-center">
+          <p className="text-sm text-text-light">
             You haven&apos;t sent any messages yet. Use the Ballpark mobile
             app to record a video for a family — it will show up here.
           </p>
-        </div>
+        </Card>
       ) : (
-        <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          {rows.map((row) => {
-            const isVideo = !!row.video_id;
-            const preview = isVideo
-              ? "Video message"
-              : (row.message_text ?? "").trim() || "(empty message)";
-            return (
-              <li
-                key={row.id}
-                className="flex items-start justify-between gap-4 px-5 py-4"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-900">
-                      To {kidName(row)}
-                    </span>
-                    {isVideo ? (
-                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-600">
-                        Video
+        <Card padding="none" className="overflow-hidden">
+          <ul className="divide-y divide-border-gold">
+            {rows.map((row) => {
+              const isVideo = !!row.video_id;
+              const preview = isVideo
+                ? "Video message"
+                : (row.message_text ?? "").trim() || "(empty message)";
+              return (
+                <li
+                  key={row.id}
+                  className="flex items-start justify-between gap-4 px-6 py-4 transition-colors hover:bg-darkest/40"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-cream-light">
+                        To {kidName(row)}
                       </span>
-                    ) : null}
+                      {isVideo ? (
+                        <span className="inline-flex items-center rounded-full border border-border-gold bg-darkest px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gold">
+                          Video
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 truncate text-sm text-text-light">
+                      {preview}
+                    </p>
                   </div>
-                  <p className="mt-1 truncate text-sm text-slate-600">
-                    {preview}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="text-xs text-slate-500">
-                    {relativeTime(row.created_at)}
-                  </span>
-                  {row.viewed_at ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      Viewed
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="text-xs text-text-light">
+                      {relativeTime(row.created_at)}
                     </span>
-                  ) : (
-                    <span className="text-[11px] text-slate-400">
-                      Not viewed
-                    </span>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                    {row.viewed_at ? (
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-success">
+                        <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                        Viewed
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-text-light/70">
+                        Not viewed
+                      </span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
     </div>
   );

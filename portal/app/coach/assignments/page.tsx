@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { Card } from "@/components/ui/Card";
+import { LinkButton } from "@/components/ui/Button";
 
 type Status = "pending" | "submitted" | "reviewed";
 
@@ -53,9 +55,9 @@ const STATUS_LABEL: Record<Status, string> = {
 };
 
 const STATUS_PILL: Record<Status, string> = {
-  pending: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  submitted: "bg-sky-50 text-sky-700 ring-sky-600/20",
-  reviewed: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+  pending: "bg-warning-bg text-warning border-warning/40",
+  submitted: "bg-info-bg text-info border-info/40",
+  reviewed: "bg-success-bg text-success border-success/40",
 };
 
 export default async function CoachAssignmentsPage() {
@@ -75,9 +77,11 @@ export default async function CoachAssignmentsPage() {
 
   if (error) {
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-        Failed to load assignments: {error.message}
-      </div>
+      <Card className="border-danger/40 bg-danger-bg">
+        <p className="text-sm text-danger">
+          Failed to load assignments: {error.message}
+        </p>
+      </Card>
     );
   }
 
@@ -99,81 +103,86 @@ export default async function CoachAssignmentsPage() {
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Assignments</h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <h1 className="font-display text-4xl font-semibold uppercase tracking-wide text-cream-light">
+            Assignments
+          </h1>
+          <p className="mt-1 text-sm text-text-light">
             Drills you have assigned to your families.
           </p>
         </div>
-        <Link
-          href="/coach/assignments/new"
-          className="inline-flex shrink-0 items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-        >
+        <LinkButton href="/coach/assignments/new">
           New assignment
-        </Link>
+        </LinkButton>
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
-          <p className="text-sm text-slate-600">
+        <Card padding="lg" className="border-dashed text-center">
+          <p className="text-sm text-text-light">
             You haven&apos;t created any assignments yet. Tap{" "}
-            <span className="font-medium">New assignment</span> to send a drill
-            to one of your families.
+            <span className="font-semibold text-cream-light">
+              New assignment
+            </span>{" "}
+            to send a drill to one of your families.
           </p>
-        </div>
+        </Card>
       ) : (
         <div className="space-y-8">
           {groups.map((group) => (
             <section key={group.status}>
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-slate-500">
+              <h2 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-deep">
                 {STATUS_LABEL[group.status]}
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                <span className="rounded-full border border-border-gold bg-darker px-2 py-0.5 text-[10px] font-semibold text-gold">
                   {group.rows.length}
                 </span>
               </h2>
               {group.rows.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-400">
-                  {emptyCopy[group.status]}
-                </div>
+                <Card padding="sm" className="border-dashed text-center">
+                  <p className="text-xs text-text-light/70">
+                    {emptyCopy[group.status]}
+                  </p>
+                </Card>
               ) : (
-                <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
-                  {group.rows.map((row) => (
-                    <li key={row.id}>
-                      <Link
-                        href={`/coach/assignments/${row.id}`}
-                        className="flex items-start justify-between gap-4 px-5 py-4 hover:bg-slate-50"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-slate-900">
-                              {row.title}
-                            </span>
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset ${STATUS_PILL[row.status]}`}
-                            >
-                              {STATUS_LABEL[row.status]}
+                <Card padding="none" className="overflow-hidden">
+                  <ul className="divide-y divide-border-gold">
+                    {group.rows.map((row) => (
+                      <li key={row.id}>
+                        <Link
+                          href={`/coach/assignments/${row.id}`}
+                          className="flex items-start justify-between gap-4 px-6 py-4 transition-colors hover:bg-darkest/40"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-cream-light">
+                                {row.title}
+                              </span>
+                              <span
+                                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${STATUS_PILL[row.status]}`}
+                              >
+                                {STATUS_LABEL[row.status]}
+                              </span>
+                            </div>
+                            <p className="mt-1 truncate text-sm text-text-light">
+                              For {kidName(row)}
+                              {row.due_date
+                                ? ` • due ${formatDueDate(row.due_date)}`
+                                : ""}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <span className="text-xs text-text-light">
+                              {relativeTime(row.created_at)}
                             </span>
                             {row.status === "submitted" ? (
-                              <span className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700 ring-1 ring-inset ring-orange-600/20">
+                              <span className="inline-flex items-center rounded-full border border-warning/40 bg-warning-bg px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning">
                                 Needs review
                               </span>
                             ) : null}
                           </div>
-                          <p className="mt-1 truncate text-sm text-slate-600">
-                            For {kidName(row)}
-                            {row.due_date
-                              ? ` • due ${formatDueDate(row.due_date)}`
-                              : ""}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <span className="text-xs text-slate-500">
-                            {relativeTime(row.created_at)}
-                          </span>
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
               )}
             </section>
           ))}

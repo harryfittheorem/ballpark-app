@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MuxVideo } from "@/components/MuxVideo";
+import { Card, CardSectionLabel } from "@/components/ui/Card";
+import { Button, LinkButton } from "@/components/ui/Button";
 import { ReviewForm } from "./ReviewForm";
 import { CancelAssignmentButton } from "./CancelAssignmentButton";
 
@@ -56,9 +58,9 @@ const STATUS_LABEL: Record<Status, string> = {
 };
 
 const STATUS_PILL: Record<Status, string> = {
-  pending: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  submitted: "bg-sky-50 text-sky-700 ring-sky-600/20",
-  reviewed: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+  pending: "bg-warning-bg text-warning border-warning/40",
+  submitted: "bg-info-bg text-info border-info/40",
+  reviewed: "bg-success-bg text-success border-success/40",
 };
 
 function fmtDate(iso: string | null): string {
@@ -111,9 +113,11 @@ export default async function AssignmentDetailPage({
 
   if (error) {
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-        Failed to load assignment: {error.message}
-      </div>
+      <Card className="border-danger/40 bg-danger-bg">
+        <p className="text-sm text-danger">
+          Failed to load assignment: {error.message}
+        </p>
+      </Card>
     );
   }
   if (!data) notFound();
@@ -122,8 +126,6 @@ export default async function AssignmentDetailPage({
   const kid = pickOne(row.kid);
   const drillVideo = pickOne(row.drill_video);
 
-  // Coach name: scoped to this signed-in coach per spec ("the signed-in
-  // coach for now"). Looked up from public.coaches.
   let coachName: string | null = null;
   if (user && row.coach_user_id === user.id) {
     const { data: coachRow } = await supabase
@@ -136,89 +138,96 @@ export default async function AssignmentDetailPage({
     }
   }
 
+  const canEdit =
+    row.status === "pending" && !!user && row.coach_user_id === user.id;
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <Link
             href="/coach/assignments"
-            className="text-sm text-slate-600 hover:text-slate-900"
+            className="text-sm text-text-light transition-colors hover:text-gold"
           >
             ← Back to assignments
           </Link>
-          <h1 className="mt-2 flex items-center gap-3 text-2xl font-semibold tracking-tight">
+          <h1 className="mt-3 flex flex-wrap items-center gap-3 font-display text-3xl font-semibold uppercase tracking-wide text-cream-light">
             {row.title}
             <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset ${STATUS_PILL[row.status]}`}
+              className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${STATUS_PILL[row.status]}`}
             >
               {STATUS_LABEL[row.status]}
             </span>
             {row.status === "submitted" ? (
-              <span className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700 ring-1 ring-inset ring-orange-600/20">
+              <span className="inline-flex items-center rounded-full border border-warning/40 bg-warning-bg px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-warning">
                 Needs review
               </span>
             ) : null}
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            For {kid ? `${kid.first_name} ${kid.last_name}` : "Unknown kid"} •
-            assigned by {coachName ?? "you"} • created{" "}
-            {fmtDate(row.created_at)}
+          <p className="mt-2 text-sm text-text-light">
+            For{" "}
+            <span className="text-cream-light">
+              {kid ? `${kid.first_name} ${kid.last_name}` : "Unknown kid"}
+            </span>{" "}
+            • assigned by{" "}
+            <span className="text-cream-light">{coachName ?? "you"}</span> •
+            created {fmtDate(row.created_at)}
           </p>
         </div>
-        {row.status === "pending" && user && row.coach_user_id === user.id ? (
+        {canEdit ? (
           <div className="flex shrink-0 items-center gap-2">
             <CancelAssignmentButton assignmentId={row.id} />
-            <Link
-              href={`/coach/assignments/${row.id}/edit`}
-              className="inline-flex shrink-0 items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-            >
+            <LinkButton href={`/coach/assignments/${row.id}/edit`} size="md">
               Edit
-            </Link>
+            </LinkButton>
           </div>
         ) : (
-          <button
+          <Button
             type="button"
             disabled
+            variant="secondary"
             title={
               row.status !== "pending"
                 ? "The family has already marked this drill submitted."
                 : "Only the assigning coach can edit this drill."
             }
-            className="inline-flex shrink-0 cursor-not-allowed items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-400"
           >
             Edit
-          </button>
+          </Button>
         )}
       </div>
 
       {errParam ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {errParam}
-        </div>
+        <Card padding="sm" className="border-danger/40 bg-danger-bg">
+          <p className="text-sm text-danger">{errParam}</p>
+        </Card>
       ) : null}
 
-      <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          Drill
-        </h2>
+      <Card accent padding="lg" className="space-y-4">
+        <CardSectionLabel>Drill</CardSectionLabel>
         <Field label="Description">
           {row.description?.trim() ? (
-            <p className="whitespace-pre-wrap text-sm text-slate-800">
+            <p className="whitespace-pre-wrap text-sm text-cream">
               {row.description}
             </p>
           ) : (
-            <p className="text-sm text-slate-400">—</p>
+            <p className="text-sm text-text-light/70">—</p>
           )}
         </Field>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="Due date">
-            <p className="text-sm text-slate-800">{fmtDay(row.due_date)}</p>
+            <p className="text-sm text-cream">{fmtDay(row.due_date)}</p>
           </Field>
           <Field label="Point reward">
-            <p className="text-sm text-slate-800">{row.point_reward} pts</p>
+            <p className="text-sm text-cream">
+              <span className="font-semibold text-gold">
+                {row.point_reward}
+              </span>{" "}
+              pts
+            </p>
           </Field>
           <Field label="Estimated time">
-            <p className="text-sm text-slate-800">
+            <p className="text-sm text-cream">
               {row.duration_estimate_minutes != null
                 ? `${row.duration_estimate_minutes} min`
                 : "—"}
@@ -233,75 +242,67 @@ export default async function AssignmentDetailPage({
               title={row.title}
             />
           ) : drillVideo ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-text-light">
               Video attached but not ready yet (status:{" "}
               {drillVideo.status ?? "unknown"}).
             </p>
           ) : (
-            <p className="text-sm text-slate-400">No video attached</p>
+            <p className="text-sm text-text-light/70">No video attached</p>
           )}
         </Field>
-      </section>
+      </Card>
 
       {row.status === "pending" ? (
-        <section className="space-y-2 rounded-lg border border-dashed border-slate-300 bg-white p-6">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-            Waiting on the family
-          </h2>
-          <p className="text-sm text-slate-600">
+        <Card padding="lg" className="space-y-2 border-dashed">
+          <CardSectionLabel>Waiting on the family</CardSectionLabel>
+          <p className="text-sm text-text-light">
             This drill hasn&apos;t been submitted yet. You&apos;ll be able to
             review it once {kid ? kid.first_name : "the kid"} marks it done.
           </p>
-        </section>
+        </Card>
       ) : (
-        <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-            Submission
-          </h2>
-          <Field label="Submitted at">
-            <p className="text-sm text-slate-800">
-              {fmtDate(row.submitted_at)}
-            </p>
-          </Field>
-          <Field label="Kid&apos;s video">
-            {row.submitted_video_url ? (
-              <MuxVideo
-                src={row.submitted_video_url}
-                title={`${row.title} — submission`}
-              />
-            ) : (
-              <p className="text-sm text-slate-500">
-                The family marked this drill done without attaching a video.
+        <Card padding="lg" className="space-y-4">
+          <CardSectionLabel>Submission</CardSectionLabel>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Submitted at">
+              <p className="text-sm text-cream">
+                {fmtDate(row.submitted_at)}
               </p>
-            )}
-          </Field>
-        </section>
+            </Field>
+            <Field label="Kid&apos;s video">
+              {row.submitted_video_url ? (
+                <MuxVideo
+                  src={row.submitted_video_url}
+                  title={`${row.title} — submission`}
+                />
+              ) : (
+                <p className="text-sm text-text-light">
+                  The family marked this drill done without attaching a video.
+                </p>
+              )}
+            </Field>
+          </div>
+        </Card>
       )}
 
       {row.status === "submitted" ? (
-        <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+        <Card accent padding="lg" className="space-y-4">
           <div>
-            <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-              Leave a review
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
+            <CardSectionLabel>Leave a review</CardSectionLabel>
+            <p className="mt-1 text-sm text-text-light">
               Rate the drill 1–5 stars and write a short note for the family.
             </p>
           </div>
           <ReviewForm assignmentId={row.id} />
-        </section>
+        </Card>
       ) : null}
 
       {row.status === "reviewed" ? (
-        <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-            Your review
-          </h2>
+        <Card padding="lg" className="space-y-4">
+          <CardSectionLabel>Your review</CardSectionLabel>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Reviewed at">
-              <p className="text-sm text-slate-800">
-                {fmtDate(row.reviewed_at)}
-              </p>
+              <p className="text-sm text-cream">{fmtDate(row.reviewed_at)}</p>
             </Field>
             <Field label="Rating">
               <div className="flex items-center gap-1 text-2xl leading-none">
@@ -310,14 +311,14 @@ export default async function AssignmentDetailPage({
                     key={n}
                     className={
                       row.rating != null && n <= row.rating
-                        ? "text-amber-500"
-                        : "text-slate-300"
+                        ? "text-gold"
+                        : "text-text-light/40"
                     }
                   >
                     {row.rating != null && n <= row.rating ? "★" : "☆"}
                   </span>
                 ))}
-                <span className="ml-2 text-sm text-slate-500">
+                <span className="ml-2 text-sm text-text-light">
                   {row.rating != null ? `${row.rating} / 5` : "—"}
                 </span>
               </div>
@@ -325,56 +326,52 @@ export default async function AssignmentDetailPage({
           </div>
           <Field label="Feedback">
             {row.feedback?.trim() ? (
-              <p className="whitespace-pre-wrap text-sm text-slate-800">
+              <p className="whitespace-pre-wrap text-sm text-cream">
                 {row.feedback}
               </p>
             ) : (
-              <p className="text-sm text-slate-400">—</p>
+              <p className="text-sm text-text-light/70">—</p>
             )}
           </Field>
-        </section>
+        </Card>
       ) : null}
 
-      <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          Identifiers
-        </h2>
+      <Card padding="lg" className="space-y-4">
+        <CardSectionLabel>Identifiers</CardSectionLabel>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Assignment id">
-            <p className="break-all font-mono text-xs text-slate-700">
-              {row.id}
-            </p>
+            <p className="break-all font-mono text-xs text-cream">{row.id}</p>
           </Field>
           <Field label="Tenant id">
-            <p className="break-all font-mono text-xs text-slate-700">
+            <p className="break-all font-mono text-xs text-cream">
               {row.tenant_id}
             </p>
           </Field>
           <Field label="Kid id">
-            <p className="break-all font-mono text-xs text-slate-700">
+            <p className="break-all font-mono text-xs text-cream">
               {row.kid_id}
             </p>
           </Field>
           <Field label="Family id">
-            <p className="break-all font-mono text-xs text-slate-700">
+            <p className="break-all font-mono text-xs text-cream">
               {row.family_id}
             </p>
           </Field>
           <Field label="Coach user id">
-            <p className="break-all font-mono text-xs text-slate-700">
+            <p className="break-all font-mono text-xs text-cream">
               {row.coach_user_id}
             </p>
           </Field>
           <Field label="Drill video id">
-            <p className="break-all font-mono text-xs text-slate-700">
+            <p className="break-all font-mono text-xs text-cream">
               {row.drill_video_id ?? "—"}
             </p>
           </Field>
           <Field label="Last updated">
-            <p className="text-sm text-slate-800">{fmtDate(row.updated_at)}</p>
+            <p className="text-sm text-cream">{fmtDate(row.updated_at)}</p>
           </Field>
         </div>
-      </section>
+      </Card>
     </div>
   );
 }
@@ -388,7 +385,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gold-deep">
         {label}
       </p>
       {children}

@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { signIn } from "./actions";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 
 const REASON_MESSAGES: Record<string, string> = {
   parent:
@@ -17,78 +20,73 @@ export default async function LoginPage({
 }) {
   const { reason } = await searchParams;
   const message = reason ? REASON_MESSAGES[reason] : null;
+  const isSignedOut = reason === "signedout";
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Ballpark Portal
-          </h1>
-          <p className="text-sm text-slate-600">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(241,229,173,0.12),transparent_55%)]"
+      />
+      <div className="relative w-full max-w-md space-y-6">
+        <div className="space-y-3 text-center">
+          <div className="inline-flex items-center gap-2.5">
+            <span
+              aria-hidden
+              className="inline-block h-2.5 w-2.5 rounded-full bg-gold shadow-[0_0_14px_rgba(241,229,173,0.7)]"
+            />
+            <span className="font-display text-3xl font-semibold uppercase tracking-[0.22em] text-cream-light">
+              Ball<span className="text-gold">park</span>
+            </span>
+          </div>
+          <p className="text-sm text-text-light">
             Sign in to access the coach + admin tools.
           </p>
         </div>
 
-        {message ? (
-          <div
-            role="alert"
-            className={
-              reason === "signedout"
-                ? "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
-                : "rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
-            }
-          >
-            {message}
-          </div>
-        ) : null}
-
-        <form action={signIn} className="space-y-4">
-          <div className="space-y-1">
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-slate-700"
+        <Card accent padding="lg" className="space-y-5">
+          {message ? (
+            <div
+              role="alert"
+              className={
+                isSignedOut
+                  ? "rounded-xl border border-success/40 bg-success-bg px-4 py-3 text-sm text-success"
+                  : "rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-sm text-warning"
+              }
             >
-              Email
-            </label>
-            <input
+              {message}
+            </div>
+          ) : null}
+
+          <form action={signIn} className="space-y-4">
+            <Input
               id="email"
               name="email"
               type="email"
               autoComplete="email"
               required
-              className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              label="Email"
             />
-          </div>
-
-          <div className="space-y-1">
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-slate-700"
-            >
-              Password
-            </label>
-            <input
+            <Input
               id="password"
               name="password"
               type="password"
               autoComplete="current-password"
               required
-              className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              label="Password"
             />
-          </div>
+            <Button type="submit" size="lg" className="w-full">
+              Sign in
+            </Button>
+          </form>
+        </Card>
 
-          <button
-            type="submit"
-            className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2"
-          >
-            Sign in
-          </button>
-        </form>
-
-        <p className="text-center text-xs text-slate-500">
+        <p className="text-center text-xs text-text-light">
           Parents — open the Ballpark mobile app instead.{" "}
-          <Link href="/" className="underline">
+          <Link
+            href="/"
+            className="text-gold underline-offset-2 hover:underline"
+          >
             Home
           </Link>
         </p>
