@@ -1,5 +1,6 @@
 { pkgs }: {
   deps = [
+    pkgs.watchman
     pkgs.nodejs_20
     pkgs.nodePackages.typescript
     pkgs.nodePackages.typescript-language-server

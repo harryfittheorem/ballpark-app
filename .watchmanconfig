@@ -1,0 +1,15 @@
+{
+  "ignore_dirs": [
+    "node_modules",
+    ".git",
+    ".local",
+    ".cache",
+    ".upm",
+    ".config",
+    "attached_assets",
+    "supabase/.branches",
+    "supabase/.temp",
+    "portal/.next",
+    "portal/node_modules"
+  ]
+}
