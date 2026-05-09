@@ -134,9 +134,14 @@ BEGIN
   SELECT * INTO v_achievement FROM public.achievements WHERE key = p_key;
   IF NOT FOUND THEN RETURN; END IF;
 
-  -- Resolve the kid's tenant. If the kid was deleted between trigger fire
-  -- and now, no-op.
-  SELECT tenant_id INTO v_tenant_id FROM public.kids WHERE id = p_kid_id;
+  -- Resolve the kid's tenant. `kids` has no direct tenant_id column —
+  -- tenant lives on families. If the kid was deleted between trigger
+  -- fire and now, no-op.
+  SELECT f.tenant_id
+    INTO v_tenant_id
+    FROM public.kids k
+    JOIN public.families f ON f.id = k.family_id
+   WHERE k.id = p_kid_id;
   IF v_tenant_id IS NULL THEN RETURN; END IF;
 
   -- Idempotent insert. RETURNING surfaces the new id only on a real
