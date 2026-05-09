@@ -1,6 +1,5 @@
 {
   "ignore_dirs": [
-    "node_modules",
     ".git",
     ".local",
     ".cache",
@@ -10,6 +9,7 @@
     "supabase/.branches",
     "supabase/.temp",
     "portal/.next",
-    "portal/node_modules"
+    "portal/node_modules",
+    "node_modules/.pnpm"
   ]
 }
