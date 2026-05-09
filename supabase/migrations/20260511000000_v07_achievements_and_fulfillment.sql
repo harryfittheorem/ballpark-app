@@ -604,7 +604,12 @@ BEGIN
     RAISE EXCEPTION 'get_kid_weekly_rank_delta: missing tenant_id claim' USING ERRCODE = '28000';
   END IF;
 
-  SELECT tenant_id INTO v_kid_tenant_id FROM public.kids WHERE id = p_kid_id;
+  -- `kids` has no direct tenant_id column — tenant lives on families.
+  SELECT f.tenant_id
+    INTO v_kid_tenant_id
+    FROM public.kids k
+    JOIN public.families f ON f.id = k.family_id
+   WHERE k.id = p_kid_id;
   IF v_kid_tenant_id IS NULL OR v_kid_tenant_id <> v_jwt_tenant_id THEN
     -- Refuse to leak across tenants. NULL signals "no rank data".
     RETURN NULL;
@@ -613,7 +618,8 @@ BEGIN
   WITH top50 AS (
     SELECT k.id, k.points_balance
       FROM public.kids k
-     WHERE k.tenant_id = v_jwt_tenant_id
+      JOIN public.families f ON f.id = k.family_id
+     WHERE f.tenant_id = v_jwt_tenant_id
      ORDER BY k.points_balance DESC
      LIMIT 50
   ),
