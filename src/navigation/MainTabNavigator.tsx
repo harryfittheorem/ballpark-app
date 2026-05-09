@@ -1,36 +1,25 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import {
-  Coins,
-  Dumbbell,
-  Home,
-  PlayCircle,
-  Sparkles,
-  Trophy,
-  User,
-} from 'lucide-react-native';
+import { Calendar, Coins, Dumbbell, Home, User } from 'lucide-react-native';
 
 import { useCoachMessageBadge } from '@/hooks/useNewCoachMessage';
-import RanksScreen from '@/screens/Ranks/RanksScreen';
+import BookScreen from '@/screens/Book/BookScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
+import EarnStackNavigator from './EarnStackNavigator';
 import HomeStackNavigator from './HomeStackNavigator';
 import MeStackNavigator from './MeStackNavigator';
-import RewardsStackNavigator from './RewardsStackNavigator';
-import TrainStackNavigator from './TrainStackNavigator';
-import VideosStackNavigator from './VideosStackNavigator';
 import WorkStackNavigator from './WorkStackNavigator';
 import type { MainTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 /**
- * v0.7 task #119: 5 → 7 tabs.
- *   Home · Videos · Work · Train · Rewards · Ranks · Me
+ * Task #135 — consolidated 5-tab nav (customer-finalized v0.4 design):
+ *   Home · Work · Book · Earn · Me
  *
- * Book is no longer a tab — it lives at Me → Book and as a Quick Action
- * on Home. Earn split into Rewards (pill switcher inside) + Ranks (own
- * tab). Tab labels are kept short so 7 tabs fit comfortably on the
- * narrowest supported viewport (iPhone SE 1st gen, 320pt wide).
+ * Work absorbs Videos + Train + Messages + Send-to-coach as in-screen
+ * sub-tabs. Earn re-merges Rewards + Store + Ranks + Rules. Book is back
+ * as a top-level tab. Me is slimmed (profile + settings).
  */
 export default function MainTabNavigator() {
   const hasNewCoachMessage = useCoachMessageBadge();
@@ -58,16 +47,9 @@ export default function MainTabNavigator() {
         component={HomeStackNavigator}
         options={{
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
-          // Empty-string badge renders as a small dot indicator (presence,
-          // not a count) — see Step 4.14.
           tabBarBadge: hasNewCoachMessage ? '' : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.gold },
         }}
-      />
-      <Tab.Screen
-        name="Videos"
-        component={VideosStackNavigator}
-        options={{ tabBarIcon: ({ color, size }) => <PlayCircle color={color} size={size} /> }}
       />
       <Tab.Screen
         name="Work"
@@ -75,19 +57,14 @@ export default function MainTabNavigator() {
         options={{ tabBarIcon: ({ color, size }) => <Dumbbell color={color} size={size} /> }}
       />
       <Tab.Screen
-        name="Train"
-        component={TrainStackNavigator}
-        options={{ tabBarIcon: ({ color, size }) => <Sparkles color={color} size={size} /> }}
+        name="Book"
+        component={BookScreen}
+        options={{ tabBarIcon: ({ color, size }) => <Calendar color={color} size={size} /> }}
       />
       <Tab.Screen
-        name="Rewards"
-        component={RewardsStackNavigator}
+        name="Earn"
+        component={EarnStackNavigator}
         options={{ tabBarIcon: ({ color, size }) => <Coins color={color} size={size} /> }}
-      />
-      <Tab.Screen
-        name="Ranks"
-        component={RanksScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Trophy color={color} size={size} /> }}
       />
       <Tab.Screen
         name="Me"

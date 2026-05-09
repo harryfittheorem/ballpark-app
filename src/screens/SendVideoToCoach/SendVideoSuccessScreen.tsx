@@ -4,11 +4,11 @@ import { useEffect, useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import type { VideosStackScreenProps } from '@/navigation/types';
+import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
-type Nav = VideosStackScreenProps<'SendVideoSuccess'>['navigation'];
-type Route = VideosStackScreenProps<'SendVideoSuccess'>['route'];
+type Nav = WorkStackScreenProps<'SendVideoSuccess'>['navigation'];
+type Route = WorkStackScreenProps<'SendVideoSuccess'>['route'];
 
 const AUTO_REDIRECT_MS = 2000;
 

@@ -77,7 +77,8 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 
 ## Status
 
--   v0.1 Foundation, v0.2 Home, v0.3 Booking, v0.4 Messages, v0.5 Earn, v0.6 Work all shipped. v0.7 tasks #119 (Videos + 7-tab nav), #120 (Share Card + Send Video to Coach), #121 (Train library), and **#122 (Profile / Achievements / Leaderboard polish / QR codes)** all in progress.
+-   v0.1 Foundation, v0.2 Home, v0.3 Booking, v0.4 Messages, v0.5 Earn, v0.6 Work all shipped. v0.7 tasks #119 (Videos + 7-tab nav), #120 (Share Card + Send Video to Coach), #121 (Train library), and #122 (Profile / Achievements / Leaderboard polish / QR codes) all in progress.
+-   **Task #135 (in progress 2026-05-09)** — UI consolidation back to the customer-finalized v0.4 5-tab nav: **HOME · WORK · BOOK · EARN · ME**. WORK absorbs Videos+Train+Messages+Send-to-coach behind 5 in-screen sub-tabs (Swings / Assign / Messages / HW / Drills). BOOK is a top-level tab again. EARN re-merges Rewards/Store/Ranks/Rules behind 4 pill sub-tabs. UI/navigation only — all v0.6/v0.7 DB schema, RLS, RPCs, and edge functions are intact and the absorbed screens (SwingDetail / SessionDetail / TrainingVideoPlayer / MessageThread / SendVideoToCoach / ShareCard / RewardRedeem) are reused verbatim under the consolidated stacks. New nav surfaces: `WorkStackParamList.WorkHome.params.initialSubTab` and `EarnStackParamList.EarnHome.params.initialSubTab` so Home Quick Actions can deep-link straight into the Ranks / Rewards pill. Deleted: `src/navigation/{Videos,Train,Rewards}StackNavigator.tsx`, `src/screens/Videos/VideosScreen.tsx`, `src/screens/Train/TrainScreen.tsx`, and the `src/screens/{Rewards,Ranks}/` dirs (their bodies were already extracted to `src/screens/Earn/components/{RewardsTab,RanksTab}.tsx`).
 
 ## v0.7 task #122 — Profile / Achievements / Leaderboard polish / QR codes (in progress 2026-05-09)
 

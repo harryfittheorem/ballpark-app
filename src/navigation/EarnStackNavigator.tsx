@@ -1,22 +1,22 @@
 /**
- * Rewards tab stack — task #119.
+ * EarnStackNavigator — task #135.
  *
- * Replaces the old EarnStackNavigator. The Rewards screen wraps the
- * existing Rewards / Store / Earn-rules tab components behind a
- * SubTabBar; Ranks has been promoted to its own bottom tab.
+ * Hosts the consolidated Earn tab. EarnHome contains an in-screen pill
+ * switcher (Rewards / Store / Ranks / Rules); RewardRedeem is the only
+ * push destination.
  */
 
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import RewardsScreen from '@/screens/Rewards/RewardsScreen';
+import EarnScreen from '@/screens/Earn/EarnScreen';
 import RewardRedeemScreen from '@/screens/Earn/RewardRedeemScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
-import type { RewardsStackParamList } from './types';
+import type { EarnStackParamList } from './types';
 
-const Stack = createNativeStackNavigator<RewardsStackParamList>();
+const Stack = createNativeStackNavigator<EarnStackParamList>();
 
-export default function RewardsStackNavigator() {
+export default function EarnStackNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
@@ -29,11 +29,11 @@ export default function RewardsStackNavigator() {
         contentStyle: { backgroundColor: colors.darkest },
       }}
     >
-      <Stack.Screen name="RewardsHome" component={RewardsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="EarnHome" component={EarnScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="RewardRedeem"
         component={RewardRedeemScreen}
-        options={{ presentation: 'modal', headerShown: false }}
+        options={{ title: 'Redeem reward' }}
       />
     </Stack.Navigator>
   );

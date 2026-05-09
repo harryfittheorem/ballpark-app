@@ -42,12 +42,12 @@ import {
   useSwing,
   useToggleFavorite,
 } from '@/hooks/useSwings';
-import type { VideosStackScreenProps } from '@/navigation/types';
+import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
-type Route = VideosStackScreenProps<'SwingDetail'>['route'];
-type Nav = VideosStackScreenProps<'SwingDetail'>['navigation'];
+type Route = WorkStackScreenProps<'SwingDetail'>['route'];
+type Nav = WorkStackScreenProps<'SwingDetail'>['navigation'];
 
 const METRIC_LABELS: Record<string, string> = {
   exit_velocity_mph: 'Exit velo',

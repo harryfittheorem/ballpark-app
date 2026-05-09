@@ -29,12 +29,12 @@ import {
   useMessageThread,
   useTenantCoachesForParent,
 } from '@/hooks/useParentMessages';
-import type { VideosStackScreenProps } from '@/navigation/types';
+import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
-type Nav = VideosStackScreenProps<'MessageThread'>['navigation'];
-type Route = VideosStackScreenProps<'MessageThread'>['route'];
+type Nav = WorkStackScreenProps<'MessageThread'>['navigation'];
+type Route = WorkStackScreenProps<'MessageThread'>['route'];
 
 const POSTER_WIDTH = 480;
 

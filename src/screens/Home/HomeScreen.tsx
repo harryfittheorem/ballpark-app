@@ -190,7 +190,7 @@ export default function HomeScreen() {
                 onPress={
                   latestPr?.swing_id
                     ? () =>
-                        navigation.navigate('Videos', {
+                        navigation.navigate('Work', {
                           screen: 'SwingDetail',
                           params: { swingId: latestPr.swing_id as string },
                         })

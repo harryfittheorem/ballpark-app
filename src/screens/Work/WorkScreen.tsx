@@ -1,192 +1,98 @@
 /**
- * WorkScreen — parent-side v0.6 Work tab.
+ * WorkScreen — task #135.
  *
- * Sectioned list of every assignment for the family's (single) kid:
- *   To do      assignments where status='pending'
- *   Submitted  status='submitted', waiting on coach review
- *   Completed  status='reviewed', shows the coach rating
+ * The consolidated Work tab. Five in-screen sub-tabs:
+ *   Swings   — HitTrax sessions / swings (was Videos → Swings)
+ *   Assign   — drill assignments queue (the original v0.6 Work tab)
+ *   Messages — coach video rail + per-coach inbox
+ *   HW       — homework / drill submission view
+ *   Drills   — self-serve training video library (was Train tab)
  *
- * Tap any row → AssignmentDetail. Empty / no-kid states mirror the
- * tone of EmptyHomeCard / SentVideosScreen so the surface feels native.
+ * Sub-tab routing is intentionally in-screen — the WorkStack only
+ * registers push destinations (AssignmentDetail, SwingDetail, etc).
  */
 
-import { useNavigation } from '@react-navigation/native';
-import { Dumbbell } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  SectionList,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useRoute } from '@react-navigation/native';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import type { AssignmentWithRefs } from '@/api/assignments';
-import { useAssignments } from '@/hooks/useAssignments';
-import { useFamily } from '@/hooks/useFamily';
 import type { WorkStackScreenProps } from '@/navigation/types';
-import { colors, fontFamilies, fontSizes, spacing, tracking } from '@/theme';
-import { todayLocalIso } from '@/utils/date';
-import { errorMessage } from '@/utils/error';
+import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
-import AssignmentRow from './components/AssignmentRow';
+import AssignBody from './subtabs/AssignBody';
+import DrillsBody from './subtabs/DrillsBody';
+import HwBody from './subtabs/HwBody';
+import MessagesBody from './subtabs/MessagesBody';
+import SwingsBody from './subtabs/SwingsBody';
 
-type Nav = WorkStackScreenProps<'WorkHome'>['navigation'];
+type SubTab = NonNullable<WorkStackScreenProps<'WorkHome'>['route']['params']>['initialSubTab'];
+type Route = WorkStackScreenProps<'WorkHome'>['route'];
 
-type Section = { title: string; data: AssignmentWithRefs[] };
+const TABS: { key: NonNullable<SubTab>; label: string }[] = [
+  { key: 'swings', label: 'Swings' },
+  { key: 'assign', label: 'Assign' },
+  { key: 'messages', label: 'Messages' },
+  { key: 'hw', label: 'HW' },
+  { key: 'drills', label: 'Drills' },
+];
 
 export default function WorkScreen() {
-  const navigation = useNavigation<Nav>();
-  const { kids, loading: familyLoading } = useFamily();
-  const kid = kids[0] ?? null;
-  const { data, isPending, isError, error, refetch, isRefetching } = useAssignments(kid?.id);
-  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const route = useRoute<Route>();
+  const initial = route.params?.initialSubTab ?? 'swings';
+  const [tab, setTab] = useState<NonNullable<SubTab>>(initial);
 
-  const sections = useMemo<Section[]>(() => {
-    const all = data ?? [];
-    // "Due now" = pending and either no due_date set or due_date is today/past.
-    // "Upcoming" = pending with a due_date strictly in the future.
-    // Use the LOCAL-timezone date string, not UTC — otherwise an evening
-    // user in Pacific time can see tomorrow's drill mis-bucketed as "Due now"
-    // (or vice versa) once UTC rolls past midnight.
-    const todayIso = todayLocalIso();
-    const dueNow = all.filter(
-      (a) => a.status === 'pending' && (!a.due_date || a.due_date <= todayIso),
-    );
-    const upcoming = all.filter(
-      (a) => a.status === 'pending' && !!a.due_date && a.due_date > todayIso,
-    );
-    const submitted = all.filter((a) => a.status === 'submitted');
-    const done = all.filter((a) => a.status === 'reviewed');
-    return [
-      { title: 'Due now', data: dueNow },
-      { title: 'Upcoming', data: upcoming },
-      { title: 'Submitted', data: submitted },
-      { title: 'Done', data: done },
-    ].filter((s) => s.data.length > 0);
-  }, [data]);
+  // If the tab is re-focused with a new initialSubTab param, honour it.
+  useEffect(() => {
+    if (route.params?.initialSubTab) setTab(route.params.initialSubTab);
+  }, [route.params?.initialSubTab]);
 
-  const onRefresh = useCallback(async () => {
-    setManualRefreshing(true);
-    try {
-      await refetch();
-    } finally {
-      setManualRefreshing(false);
+  const Body = useMemo(() => {
+    switch (tab) {
+      case 'assign':
+        return AssignBody;
+      case 'messages':
+        return MessagesBody;
+      case 'hw':
+        return HwBody;
+      case 'drills':
+        return DrillsBody;
+      case 'swings':
+      default:
+        return SwingsBody;
     }
-  }, [refetch]);
-
-  const refreshControl = (
-    <RefreshControl
-      refreshing={manualRefreshing || isRefetching}
-      onRefresh={onRefresh}
-      tintColor={colors.gold}
-      colors={[colors.gold]}
-    />
-  );
-
-  // No kid yet → friendly nudge to Home (where the AddKid flow lives).
-  if (!kid && !familyLoading) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <Header />
-        <View style={styles.centered}>
-          <View style={styles.emptyIconWrap}>
-            <Dumbbell size={32} color={colors.gold} />
-          </View>
-          <Text style={styles.emptyTitle}>No drills yet</Text>
-          <Text style={styles.emptyBody}>
-            Add your kid on the Home tab to start receiving drill assignments
-            from your coach.
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (familyLoading || (kid && isPending)) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <Header />
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.gold} size="large" />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (isError) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <Header />
-        <View style={styles.centered}>
-          <Text style={styles.errorTitle}>Couldn&apos;t load drills</Text>
-          <Text style={styles.emptyBody}>{errorMessage(error)}</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (sections.length === 0) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <Header />
-        <SectionList
-          sections={[]}
-          keyExtractor={() => 'noop'}
-          renderItem={() => null}
-          refreshControl={refreshControl}
-          contentContainerStyle={styles.centered}
-          ListEmptyComponent={
-            <View style={styles.centered}>
-              <View style={styles.emptyIconWrap}>
-                <Dumbbell size={32} color={colors.gold} />
-              </View>
-              <Text style={styles.emptyTitle}>No drills yet</Text>
-              <Text style={styles.emptyBody}>
-                Your coach will send drill assignments here. Pull down to refresh.
-              </Text>
-            </View>
-          }
-        />
-      </SafeAreaView>
-    );
-  }
+  }, [tab]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <Header />
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={styles.listContent}
-        refreshControl={refreshControl}
-        renderSectionHeader={({ section }) => (
-          <Text style={styles.sectionHeader}>{section.title}</Text>
-        )}
-        renderItem={({ item }) => (
-          <View style={styles.rowWrap}>
-            <AssignmentRow
-              assignment={item}
-              onPress={() =>
-                navigation.navigate('AssignmentDetail', { assignmentId: item.id })
-              }
-            />
-          </View>
-        )}
-      />
+      <View style={styles.header}>
+        <Text style={styles.title}>Work</Text>
+        <Text style={styles.subtitle}>Train, review, and message your coach</Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabBar}
+      >
+        {TABS.map((t) => {
+          const active = tab === t.key;
+          return (
+            <Pressable
+              key={t.key}
+              onPress={() => setTab(t.key)}
+              style={[styles.pill, active && styles.pillActive]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+            >
+              <Text style={[styles.pillText, active && styles.pillTextActive]}>{t.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <View style={{ flex: 1 }}>
+        <Body />
+      </View>
     </SafeAreaView>
-  );
-}
-
-function Header() {
-  return (
-    <View style={styles.header}>
-      <Text style={styles.title}>Work</Text>
-      <Text style={styles.subtitle}>Drills assigned by your coach</Text>
-    </View>
   );
 }
 
@@ -195,7 +101,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: spacing['3xl'],
     paddingTop: spacing['2xl'],
-    paddingBottom: spacing['2xl'],
+    paddingBottom: spacing.lg,
   },
   title: {
     color: colors.gold,
@@ -208,53 +114,26 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     marginTop: spacing.xs,
   },
-  listContent: {
+  tabBar: {
     paddingHorizontal: spacing['3xl'],
-    paddingBottom: spacing['6xl'],
+    paddingVertical: spacing.lg,
+    gap: spacing.base,
   },
-  sectionHeader: {
+  pill: {
+    paddingHorizontal: spacing['2xl'],
+    paddingVertical: spacing.lg,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.darker,
+  },
+  pillActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  pillText: {
+    color: colors.textLight,
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.sm,
-    color: colors.gold,
+    letterSpacing: tracking.wide,
     textTransform: 'uppercase',
-    letterSpacing: tracking.wider,
-    marginTop: spacing['2xl'],
-    marginBottom: spacing.lg,
   },
-  rowWrap: { marginBottom: spacing.lg },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing['4xl'],
-  },
-  emptyIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.darker,
-    borderWidth: 1,
-    borderColor: colors.borderGold,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing['2xl'],
-  },
-  emptyTitle: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.xl,
-    color: colors.gold,
-    marginBottom: spacing.sm,
-  },
-  emptyBody: {
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.md,
-    color: colors.textLight,
-    textAlign: 'center',
-  },
-  errorTitle: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.xl,
-    color: colors.danger,
-    marginBottom: spacing.lg,
-  },
+  pillTextActive: { color: colors.dark },
 });

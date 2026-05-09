@@ -1,11 +1,10 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import BookScreen from '@/screens/Book/BookScreen';
 import BookingDetailScreen from '@/screens/Me/BookingDetailScreen';
 import BookingsListScreen from '@/screens/Me/BookingsListScreen';
 import ConnectHitTraxScreen from '@/screens/Me/ConnectHitTraxScreen';
-import ProfileScreen from '@/screens/Me/ProfileScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
+import ProfileScreen from '@/screens/Me/ProfileScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
 import type { MeStackParamList } from './types';
@@ -26,11 +25,6 @@ export default function MeStackNavigator() {
       }}
     >
       <Stack.Screen name="MeHome" component={ProfileScreen} options={{ headerShown: false }} />
-      <Stack.Screen
-        name="Book"
-        component={BookScreen}
-        options={{ title: 'Book a session' }}
-      />
       <Stack.Screen
         name="BookingsList"
         component={BookingsListScreen}

@@ -49,7 +49,7 @@ import {
   useSendParentMessage,
   useTenantCoachesForParent,
 } from '@/hooks/useParentMessages';
-import type { VideosStackScreenProps } from '@/navigation/types';
+import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
 import { uploadVideoToMux } from '@/utils/uploadVideo';
@@ -57,8 +57,8 @@ import { uuidv4 } from '@/utils/uuid';
 
 import { styles } from './styles';
 
-type Nav = VideosStackScreenProps<'SendVideoToCoach'>['navigation'];
-type Route = VideosStackScreenProps<'SendVideoToCoach'>['route'];
+type Nav = WorkStackScreenProps<'SendVideoToCoach'>['navigation'];
+type Route = WorkStackScreenProps<'SendVideoToCoach'>['route'];
 
 type Step = 1 | 2 | 3 | 4;
 

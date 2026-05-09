@@ -1,42 +1,48 @@
 /**
- * RewardsScreen — task #119.
+ * EarnScreen — task #135.
  *
- * Hosts the three "spend points" surfaces previously buried under the
- * Earn tab: Rewards (point-only redemptions), Store (purchase-only /
- * dual-priced items), and Earn rules + ledger history. Ranks was
- * promoted to its own top-level tab.
- *
- * The component shape mirrors the old EarnScreen so the existing
- * RewardsTab / StoreTab / EarnRulesTab components keep working unchanged.
+ * Re-merges the v0.4 Earn tab: Rewards / Store / Ranks / Rules behind a
+ * pill-style sub-tab switcher. Sub-tab body components are unchanged from
+ * the v0.5 split (RewardsTab / StoreTab / RanksTab / EarnRulesTab).
  */
 
-import { useNavigation } from '@react-navigation/native';
-import { useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Product } from '@/api/earn';
-import EarnRulesTab from '@/screens/Earn/components/EarnRulesTab';
-import RewardsTab from '@/screens/Earn/components/RewardsTab';
-import StoreTab from '@/screens/Earn/components/StoreTab';
 import { useFamily } from '@/hooks/useFamily';
-import type { RewardsStackScreenProps } from '@/navigation/types';
+import type { EarnStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
-type Nav = RewardsStackScreenProps<'RewardsHome'>['navigation'];
+import EarnRulesTab from './components/EarnRulesTab';
+import RanksTab from './components/RanksTab';
+import RewardsTab from './components/RewardsTab';
+import StoreTab from './components/StoreTab';
 
-type SubTab = 'rewards' | 'store' | 'earn';
+type Nav = EarnStackScreenProps<'EarnHome'>['navigation'];
+type Route = EarnStackScreenProps<'EarnHome'>['route'];
+
+type SubTab = 'rewards' | 'store' | 'ranks' | 'rules';
 const TABS: { key: SubTab; label: string }[] = [
   { key: 'rewards', label: 'Rewards' },
   { key: 'store', label: 'Store' },
-  { key: 'earn', label: 'Rules' },
+  { key: 'ranks', label: 'Ranks' },
+  { key: 'rules', label: 'Rules' },
 ];
 
-export default function RewardsScreen() {
+export default function EarnScreen() {
   const navigation = useNavigation<Nav>();
+  const route = useRoute<Route>();
   const { kids } = useFamily();
   const kid = kids[0] ?? null;
-  const [tab, setTab] = useState<SubTab>('rewards');
+  const initial = route.params?.initialSubTab ?? 'rewards';
+  const [tab, setTab] = useState<SubTab>(initial);
+
+  useEffect(() => {
+    if (route.params?.initialSubTab) setTab(route.params.initialSubTab);
+  }, [route.params?.initialSubTab]);
 
   const handleSelect = (p: Product) => {
     if (!kid) return;
@@ -46,8 +52,10 @@ export default function RewardsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Rewards</Text>
-        <Text style={styles.subtitle}>Redeem points, browse the store, and see how you earn</Text>
+        <Text style={styles.title}>Earn</Text>
+        <Text style={styles.subtitle}>
+          Redeem points, browse the store, climb the leaderboard
+        </Text>
       </View>
 
       <View style={styles.bar}>
@@ -72,7 +80,8 @@ export default function RewardsScreen() {
           <RewardsTab pointsBalance={kid?.points_balance ?? 0} onSelect={handleSelect} />
         )}
         {tab === 'store' && <StoreTab />}
-        {tab === 'earn' && <EarnRulesTab kidId={kid?.id ?? null} />}
+        {tab === 'ranks' && <RanksTab ownKidIds={kid ? [kid.id] : []} />}
+        {tab === 'rules' && <EarnRulesTab kidId={kid?.id ?? null} />}
       </View>
     </SafeAreaView>
   );
@@ -115,7 +124,7 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: colors.gold },
   pillText: {
     fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.sm,
     color: colors.textLight,
     textTransform: 'uppercase',
     letterSpacing: tracking.wide,

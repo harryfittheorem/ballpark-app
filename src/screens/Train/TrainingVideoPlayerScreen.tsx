@@ -30,13 +30,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TRAINING_CATEGORIES } from '@/api/trainingVideos';
 import { useFamily } from '@/hooks/useFamily';
 import { useRecordTrainingView, useTrainingVideo } from '@/hooks/useTrainingVideos';
-import type { TrainStackScreenProps } from '@/navigation/types';
+import type { WorkStackScreenProps } from '@/navigation/types';
 import { readProgress, writeProgress } from '@/store/trainingProgress';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
-type Nav = TrainStackScreenProps<'TrainingVideoPlayer'>['navigation'];
-type Route = TrainStackScreenProps<'TrainingVideoPlayer'>['route'];
+type Nav = WorkStackScreenProps<'TrainingVideoPlayer'>['navigation'];
+type Route = WorkStackScreenProps<'TrainingVideoPlayer'>['route'];
 
 function muxHlsUrl(id: string): string {
   return `https://stream.mux.com/${id}.m3u8`;

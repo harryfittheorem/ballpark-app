@@ -25,7 +25,7 @@ import {
   useSession,
   useSwingsForSession,
 } from '@/hooks/useSwings';
-import type { VideosStackScreenProps } from '@/navigation/types';
+import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
@@ -33,8 +33,8 @@ import EmptyState from './components/EmptyState';
 import StatsBar from './components/StatsBar';
 import SwingThumbnail from './components/SwingThumbnail';
 
-type Route = VideosStackScreenProps<'SessionDetail'>['route'];
-type Nav = VideosStackScreenProps<'SessionDetail'>['navigation'];
+type Route = WorkStackScreenProps<'SessionDetail'>['route'];
+type Nav = WorkStackScreenProps<'SessionDetail'>['navigation'];
 
 type FilterKey = 'all' | 'pr' | 'best' | 'contact';
 const FILTERS: { key: FilterKey; label: string }[] = [

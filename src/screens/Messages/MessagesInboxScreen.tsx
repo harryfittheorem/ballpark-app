@@ -19,11 +19,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useFamily } from '@/hooks/useFamily';
 import { useParentInbox } from '@/hooks/useParentMessages';
-import type { VideosStackScreenProps } from '@/navigation/types';
+import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
-type Nav = VideosStackScreenProps<'MessagesInbox'>['navigation'];
+type Nav = WorkStackScreenProps<'MessagesInbox'>['navigation'];
 
 export default function MessagesInboxScreen() {
   const navigation = useNavigation<Nav>();

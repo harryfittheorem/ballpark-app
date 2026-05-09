@@ -39,15 +39,15 @@ import { captureRef } from 'react-native-view-shot';
 
 import { useFamily } from '@/hooks/useFamily';
 import { usePersonalBestsForKid, useSwing } from '@/hooks/useSwings';
-import type { VideosStackScreenProps } from '@/navigation/types';
+import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
 import ShareCardArtwork from './components/ShareCardArtwork';
 import { styles } from './styles';
 
-type Route = VideosStackScreenProps<'ShareCard'>['route'];
-type Nav = VideosStackScreenProps<'ShareCard'>['navigation'];
+type Route = WorkStackScreenProps<'ShareCard'>['route'];
+type Nav = WorkStackScreenProps<'ShareCard'>['navigation'];
 
 const PREVIEW_WIDTH = 220;
 const FULL_WIDTH = 1080;
