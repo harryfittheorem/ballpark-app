@@ -39,7 +39,7 @@ export type MainTabParamList = {
   Home: NavigatorScreenParams<HomeStackParamList>;
   Videos: NavigatorScreenParams<VideosStackParamList>;
   Work: NavigatorScreenParams<WorkStackParamList>;
-  Train: undefined;
+  Train: NavigatorScreenParams<TrainStackParamList>;
   Rewards: NavigatorScreenParams<RewardsStackParamList>;
   Ranks: undefined;
   Me: NavigatorScreenParams<MeStackParamList> | undefined;
@@ -88,6 +88,22 @@ export type MainTabScreenProps<T extends keyof MainTabParamList> = BottomTabScre
   MainTabParamList,
   T
 >;
+
+/**
+ * Train tab stack — list root + full-screen training video player.
+ * Mirrors the Videos tab's pattern so back affordance stays inside
+ * the tab. (v0.7 task #121)
+ */
+export type TrainStackParamList = {
+  TrainHome: undefined;
+  TrainingVideoPlayer: { videoId: string };
+};
+
+export type TrainStackScreenProps<T extends keyof TrainStackParamList> =
+  CompositeScreenProps<
+    NativeStackScreenProps<TrainStackParamList, T>,
+    BottomTabScreenProps<MainTabParamList>
+  >;
 
 export type CoachInboxStackParamList = {
   InboxHome: undefined;

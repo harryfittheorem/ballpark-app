@@ -11,12 +11,12 @@ import {
 
 import { useCoachMessageBadge } from '@/hooks/useNewCoachMessage';
 import RanksScreen from '@/screens/Ranks/RanksScreen';
-import TrainScreen from '@/screens/Train/TrainScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
 import HomeStackNavigator from './HomeStackNavigator';
 import MeStackNavigator from './MeStackNavigator';
 import RewardsStackNavigator from './RewardsStackNavigator';
+import TrainStackNavigator from './TrainStackNavigator';
 import VideosStackNavigator from './VideosStackNavigator';
 import WorkStackNavigator from './WorkStackNavigator';
 import type { MainTabParamList } from './types';
@@ -76,7 +76,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="Train"
-        component={TrainScreen}
+        component={TrainStackNavigator}
         options={{ tabBarIcon: ({ color, size }) => <Sparkles color={color} size={size} /> }}
       />
       <Tab.Screen

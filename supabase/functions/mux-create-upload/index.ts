@@ -143,7 +143,7 @@ serve(async (req) => {
   } catch {
     bodyJson = {};
   }
-  const allowedPurposes = ["coach_message", "drill", "parent_to_coach"] as const;
+  const allowedPurposes = ["coach_message", "drill", "parent_to_coach", "training"] as const;
   type Purpose = typeof allowedPurposes[number];
   if (
     bodyJson.purpose !== undefined &&
@@ -153,12 +153,18 @@ serve(async (req) => {
   }
   const purpose: Purpose = (bodyJson.purpose as Purpose | undefined) ?? "coach_message";
 
-  // Role check: coach owns coach_message + drill; parent owns parent_to_coach.
-  // The DB also enforces this via RLS on the videos INSERT policies, so this
-  // guard is defence-in-depth + a clearer 403 message.
+  // Role check, defence-in-depth on top of DB RLS:
+  //   coach_message / drill   -> app_role='coach'
+  //   parent_to_coach         -> app_role='parent'
+  //   training                -> app_role='admin' (HQ-curated catalog;
+  //                             v0.7 task #121)
   if (purpose === "parent_to_coach") {
     if (appRole !== "parent") {
       return jsonError(403, "forbidden", "Parent role required for parent_to_coach uploads");
+    }
+  } else if (purpose === "training") {
+    if (appRole !== "admin") {
+      return jsonError(403, "forbidden", "Admin role required for training uploads");
     }
   } else {
     if (appRole !== "coach") {
