@@ -47,14 +47,18 @@ export default function MainTabNavigator() {
         component={HomeStackNavigator}
         options={{
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
-          tabBarBadge: hasNewCoachMessage ? '' : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.gold },
         }}
       />
       <Tab.Screen
         name="Work"
         component={WorkStackNavigator}
-        options={{ tabBarIcon: ({ color, size }) => <Dumbbell color={color} size={size} /> }}
+        options={{
+          tabBarIcon: ({ color, size }) => <Dumbbell color={color} size={size} />,
+          // Task #135: Messages now lives under Work, so the "new coach
+          // message" badge follows it from the old Home tab.
+          tabBarBadge: hasNewCoachMessage ? '' : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.gold },
+        }}
       />
       <Tab.Screen
         name="Book"

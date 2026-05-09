@@ -17,6 +17,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAssignments } from '@/hooks/useAssignments';
+import { useCoachMessagesForKid } from '@/hooks/useCoachMessages';
+import { useFamily } from '@/hooks/useFamily';
+import { useSwingsForKid } from '@/hooks/useSwings';
+import { useTrainingVideos } from '@/hooks/useTrainingVideos';
 import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
@@ -29,7 +34,8 @@ import SwingsBody from './subtabs/SwingsBody';
 type SubTab = NonNullable<WorkStackScreenProps<'WorkHome'>['route']['params']>['initialSubTab'];
 type Route = WorkStackScreenProps<'WorkHome'>['route'];
 
-const TABS: { key: NonNullable<SubTab>; label: string }[] = [
+type TabKey = NonNullable<SubTab>;
+const TABS: { key: TabKey; label: string }[] = [
   { key: 'swings', label: 'Swings' },
   { key: 'assign', label: 'Assign' },
   { key: 'messages', label: 'Messages' },
@@ -37,15 +43,45 @@ const TABS: { key: NonNullable<SubTab>; label: string }[] = [
   { key: 'drills', label: 'Drills' },
 ];
 
+function fmtCount(n: number): string {
+  if (n <= 0) return '';
+  if (n >= 100) return '99+';
+  return String(n);
+}
+
 export default function WorkScreen() {
   const route = useRoute<Route>();
   const initial = route.params?.initialSubTab ?? 'swings';
-  const [tab, setTab] = useState<NonNullable<SubTab>>(initial);
+  const [tab, setTab] = useState<TabKey>(initial);
 
   // If the tab is re-focused with a new initialSubTab param, honour it.
   useEffect(() => {
     if (route.params?.initialSubTab) setTab(route.params.initialSubTab);
   }, [route.params?.initialSubTab]);
+
+  // Sub-tab count badges. We fan out the same hooks the bodies already
+  // use so React Query dedupes and the badges stay live in sync.
+  const { kids } = useFamily();
+  const kid = kids[0] ?? null;
+  const { data: swings } = useSwingsForKid(kid?.id);
+  const { data: assignments } = useAssignments(kid?.id);
+  const { data: coachMsgs } = useCoachMessagesForKid(kid?.id);
+  const { data: drills } = useTrainingVideos('all');
+
+  const counts = useMemo<Record<TabKey, string>>(() => {
+    const swingsTotal = swings?.length ?? 0;
+    const pendingAssign = (assignments ?? []).filter((a) => a.status === 'pending').length;
+    const newMsgs = (coachMsgs ?? []).filter((m) => !m.viewedAt).length;
+    const reviewed = (assignments ?? []).filter((a) => a.status === 'reviewed').length;
+    const drillsTotal = drills?.length ?? 0;
+    return {
+      swings: fmtCount(swingsTotal),
+      assign: fmtCount(pendingAssign),
+      messages: fmtCount(newMsgs),
+      hw: fmtCount(reviewed),
+      drills: fmtCount(drillsTotal),
+    };
+  }, [swings, assignments, coachMsgs, drills]);
 
   const Body = useMemo(() => {
     switch (tab) {
@@ -76,6 +112,7 @@ export default function WorkScreen() {
       >
         {TABS.map((t) => {
           const active = tab === t.key;
+          const count = counts[t.key];
           return (
             <Pressable
               key={t.key}
@@ -83,8 +120,14 @@ export default function WorkScreen() {
               style={[styles.pill, active && styles.pillActive]}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
+              accessibilityLabel={count ? `${t.label}, ${count}` : t.label}
             >
               <Text style={[styles.pillText, active && styles.pillTextActive]}>{t.label}</Text>
+              {count ? (
+                <View style={[styles.badge, active && styles.badgeActive]}>
+                  <Text style={[styles.badgeText, active && styles.badgeTextActive]}>{count}</Text>
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
@@ -120,6 +163,9 @@ const styles = StyleSheet.create({
     gap: spacing.base,
   },
   pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     paddingHorizontal: spacing['2xl'],
     paddingVertical: spacing.lg,
     borderRadius: radius.full,
@@ -128,6 +174,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.darker,
   },
   pillActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  badge: {
+    minWidth: 20,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    backgroundColor: colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeActive: { backgroundColor: colors.dark },
+  badgeText: {
+    color: colors.dark,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xs,
+  },
+  badgeTextActive: { color: colors.gold },
   pillText: {
     color: colors.textLight,
     fontFamily: fontFamilies.oswaldBold,
