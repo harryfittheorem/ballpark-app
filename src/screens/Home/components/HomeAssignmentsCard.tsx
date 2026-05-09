@@ -1,15 +1,3 @@
-/**
- * HomeAssignmentsCard — single summary card surfacing pending drill
- * assignments on the parent Home tab.
- *
- * Spec (v0.6 task §Done looks like): show count of pending drills and
- * the soonest due date; tapping opens the Work tab. We deliberately do
- * NOT list individual drills here — the Work tab is the list surface.
- *
- * Renders nothing when there are zero pending drills, so a caught-up
- * parent's Home stays uncluttered.
- */
-
 import { ChevronRight, Dumbbell } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -21,13 +9,13 @@ type Props = {
   onPress: () => void;
 };
 
-function formatDue(dateStr: string): string {
+function formatDue(dateStr: string | null): string {
+  if (!dateStr) return 'No due date';
   const d = new Date(`${dateStr}T00:00:00`);
   if (Number.isNaN(d.getTime())) return '';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const diffMs = d.getTime() - today.getTime();
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round((d.getTime() - today.getTime()) / 86400000);
   if (diffDays < 0) return 'Overdue';
   if (diffDays === 0) return 'Due today';
   if (diffDays === 1) return 'Due tomorrow';
@@ -39,54 +27,78 @@ export default function HomeAssignmentsCard({ assignments, onPress }: Props) {
   const pending = assignments.filter((a) => a.status === 'pending');
   if (pending.length === 0) return null;
 
-  // Soonest due date among pending drills (nulls sort last).
-  const withDue = pending.filter((a): a is AssignmentWithRefs & { due_date: string } => !!a.due_date);
-  withDue.sort((a, b) => a.due_date.localeCompare(b.due_date));
-  const soonest = withDue[0]?.due_date ?? null;
-
-  const summary = soonest
-    ? formatDue(soonest)
-    : 'No due date set';
+  const sorted = [...pending].sort((a, b) => {
+    if (!a.due_date && !b.due_date) return 0;
+    if (!a.due_date) return 1;
+    if (!b.due_date) return -1;
+    return a.due_date.localeCompare(b.due_date);
+  });
+  const top = sorted.slice(0, 2);
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.wrap, pressed && styles.pressed]}
-      accessibilityRole="button"
-      accessibilityLabel={`${pending.length} drill${pending.length === 1 ? '' : 's'} due, ${summary}`}
-    >
-      <View style={styles.iconWrap}>
-        <Dumbbell size={20} color={colors.gold} />
+    <View style={styles.wrap}>
+      <View style={styles.header}>
+        <View style={styles.iconWrap}>
+          <Dumbbell size={18} color={colors.gold} />
+        </View>
+        <Text style={styles.eyebrow}>ASSIGNMENTS</Text>
+        <View style={{ flex: 1 }} />
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel="See all assignments"
+          style={styles.seeAllPress}
+        >
+          <Text style={styles.seeAll}>SEE ALL</Text>
+          <ChevronRight size={14} color={colors.gold} />
+        </Pressable>
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.eyebrow}>Drills due</Text>
-        <Text style={styles.title}>
-          {pending.length} drill{pending.length === 1 ? '' : 's'} to do
-        </Text>
-        <Text style={styles.meta}>{summary}</Text>
-      </View>
-      <ChevronRight size={20} color={colors.textMuted} />
-    </Pressable>
+
+      {top.map((a) => (
+        <Pressable
+          key={a.id}
+          onPress={onPress}
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          accessibilityRole="button"
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowTitle} numberOfLines={1}>
+              {a.title}
+            </Text>
+            <Text style={styles.rowMeta} numberOfLines={1}>
+              {formatDue(a.due_date)}
+            </Text>
+          </View>
+          <View style={styles.pointsPill}>
+            <Text style={styles.pointsPillText}>+{a.point_reward ?? 25} PTS</Text>
+          </View>
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
     backgroundColor: colors.darker,
     borderColor: colors.borderGold,
     borderWidth: 1,
     borderRadius: radius['2xl'],
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.base,
   },
-  pressed: { opacity: 0.85 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+    paddingHorizontal: spacing.base,
+    paddingTop: spacing.xs,
+  },
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: colors.darkest,
     borderWidth: 1,
     borderColor: colors.borderGold,
@@ -95,21 +107,50 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.sm,
+    color: colors.gold,
+    letterSpacing: tracking.wider,
+  },
+  seeAllPress: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  seeAll: {
+    fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.xs,
     color: colors.gold,
-    textTransform: 'uppercase',
     letterSpacing: tracking.wider,
-    marginBottom: 2,
   },
-  title: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.lg,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.darkest,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  rowPressed: { opacity: 0.85 },
+  rowTitle: {
+    fontFamily: fontFamilies.interSemiBold,
+    fontSize: fontSizes.base,
     color: colors.textOnDark,
   },
-  meta: {
+  rowMeta: {
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.sm,
     color: colors.textLight,
     marginTop: 2,
+  },
+  pointsPill: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    backgroundColor: colors.gold,
+  },
+  pointsPillText: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xs,
+    color: colors.dark,
+    letterSpacing: tracking.wide,
   },
 });

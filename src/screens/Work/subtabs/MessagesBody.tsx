@@ -1,6 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 import { Camera, MessageCircle, PlayCircle, Send } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,6 +15,7 @@ import {
   View,
 } from 'react-native';
 
+import { createMuxUpload } from '@/api/mux';
 import type { ThreadMessage } from '@/api/parentMessages';
 import { useToast } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
@@ -27,6 +29,7 @@ import {
 import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
+import { uploadVideoToMux } from '@/utils/uploadVideo';
 
 type Nav = WorkStackScreenProps<'WorkHome'>['navigation'];
 
@@ -75,6 +78,9 @@ export default function MessagesBody() {
   );
 
   const [draft, setDraft] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const idemKeyRef = useRef<string | null>(null);
 
   const activeCoach = useMemo(
     () => coaches?.find((c) => c.userId === coachUserId) ?? null,
@@ -86,8 +92,64 @@ export default function MessagesBody() {
     return n || 'Your coach';
   }, [activeCoach]);
 
-  const onOpenVideoComposer = () =>
-    navigation.navigate('SendVideoToCoach', coachUserId ? { coachUserId } : undefined);
+  const onPickAndSendVideo = useCallback(async () => {
+    if (uploading) return;
+    if (!kid || !family || !coachUserId) {
+      showToast("Couldn't send — missing recipient.");
+      return;
+    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      showToast('Photo library permission is required to send a video.');
+      return;
+    }
+    const picked = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsEditing: false,
+      quality: 1,
+    });
+    if (picked.canceled || !picked.assets?.[0]) return;
+    const asset = picked.assets[0];
+    setUploading(true);
+    setUploadPct(0);
+    try {
+      if (!idemKeyRef.current) {
+        idemKeyRef.current = `pmsg-${kid.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      }
+      const { upload_url, video_id } = await createMuxUpload(
+        idemKeyRef.current,
+        'parent_to_coach',
+      );
+      const { promise } = uploadVideoToMux({
+        uploadUrl: upload_url,
+        fileUri: asset.uri,
+        contentType: asset.mimeType ?? 'video/mp4',
+        onProgress: (f) => setUploadPct(Math.round(f * 100)),
+      });
+      await promise;
+      await new Promise<void>((resolve, reject) => {
+        sendMutation.mutate(
+          {
+            videoId: video_id,
+            recipientFamilyId: family.id,
+            recipientKidId: kid.id,
+            recipientCoachUserId: coachUserId,
+            label: null,
+            senderDisplay: null,
+            messageText: null,
+          },
+          { onSuccess: () => resolve(), onError: (e) => reject(e) },
+        );
+      });
+      idemKeyRef.current = null;
+      showToast('Video sent — your coach will see it once it finishes processing.');
+    } catch (err) {
+      showToast(errorMessage(err));
+    } finally {
+      setUploading(false);
+      setUploadPct(0);
+    }
+  }, [uploading, kid, family, coachUserId, sendMutation, showToast]);
 
   const onPlayCoachVideo = (messageId: string) =>
     navigation.navigate('Home', { screen: 'VideoPlayback', params: { messageId } });
@@ -200,10 +262,21 @@ export default function MessagesBody() {
         )}
       </View>
 
+      {uploading ? (
+        <View style={styles.uploadBar}>
+          <ActivityIndicator color={colors.gold} />
+          <Text style={styles.uploadText}>Uploading video… {uploadPct}%</Text>
+        </View>
+      ) : null}
       <View style={styles.composer}>
         <Pressable
-          onPress={onOpenVideoComposer}
-          style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
+          onPress={onPickAndSendVideo}
+          disabled={uploading}
+          style={({ pressed }) => [
+            styles.iconBtn,
+            uploading && { opacity: 0.4 },
+            pressed && { opacity: 0.85 },
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Send a video"
         >
@@ -434,6 +507,21 @@ const styles = StyleSheet.create({
     color: colors.textOnDark,
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.md,
+  },
+  uploadBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    paddingHorizontal: spacing['2xl'],
+    paddingVertical: spacing.base,
+    backgroundColor: colors.darker,
+    borderTopWidth: 1,
+    borderColor: colors.border,
+  },
+  uploadText: {
+    color: colors.textOnDark,
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
   },
   sendBtn: {
     width: 40,

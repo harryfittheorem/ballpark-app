@@ -15,15 +15,15 @@ export default function HwBody() {
   const navigation = useNavigation<Nav>();
   const { kids } = useFamily();
   const kid = kids[0] ?? null;
-  const { data: assignments } = useAssignments(kid?.id);
+  const { data: assignments } = useAssignments(kid?.id, ['submitted', 'reviewed']);
   const list = assignments ?? [];
 
   if (list.length === 0) {
     return (
       <EmptyState
         icon={<ZapOff size={26} color={colors.gold} />}
-        title="No drills yet"
-        body="When your coach assigns a drill it lands here with the video, your submission, and the feedback."
+        title="No homework yet"
+        body="When you submit a drill it lands here for review, with your coach's stars + feedback once they grade it."
       />
     );
   }
