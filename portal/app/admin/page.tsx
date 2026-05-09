@@ -1,4 +1,19 @@
+import Link from "next/link";
+
 import { Card } from "@/components/ui/Card";
+
+const TILES = [
+  {
+    href: "/admin/redemptions",
+    title: "Redemptions",
+    body: "Mark front-desk reward redemptions as fulfilled.",
+  },
+  {
+    href: "/admin/training-videos",
+    title: "Training videos",
+    body: "Curate the Train tab catalog.",
+  },
+];
 
 export default function AdminPage() {
   return (
@@ -12,14 +27,18 @@ export default function AdminPage() {
         </p>
       </div>
 
-      <Card accent padding="lg" className="border-dashed text-center">
-        <p className="text-sm text-cream-light">
-          Admin features coming in v0.8.
-        </p>
-        <p className="mt-2 text-xs text-text-light">
-          The auth gate around this page is the proof the role check works.
-        </p>
-      </Card>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {TILES.map((tile) => (
+          <Link key={tile.href} href={tile.href} className="block">
+            <Card padding="lg" accent className="h-full transition hover:border-gold">
+              <h2 className="font-display text-xl uppercase tracking-wide text-gold">
+                {tile.title}
+              </h2>
+              <p className="mt-2 text-sm text-text-light">{tile.body}</p>
+            </Card>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

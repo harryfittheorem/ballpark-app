@@ -4,7 +4,7 @@ import BookScreen from '@/screens/Book/BookScreen';
 import BookingDetailScreen from '@/screens/Me/BookingDetailScreen';
 import BookingsListScreen from '@/screens/Me/BookingsListScreen';
 import ConnectHitTraxScreen from '@/screens/Me/ConnectHitTraxScreen';
-import MeScreen from '@/screens/Me/MeScreen';
+import ProfileScreen from '@/screens/Me/ProfileScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
@@ -25,7 +25,7 @@ export default function MeStackNavigator() {
         contentStyle: { backgroundColor: colors.darkest },
       }}
     >
-      <Stack.Screen name="MeHome" component={MeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="MeHome" component={ProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="Book"
         component={BookScreen}

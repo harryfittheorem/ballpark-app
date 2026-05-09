@@ -7,6 +7,7 @@
 import { CheckCircle2, Coins, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
@@ -75,7 +76,15 @@ export default function RewardRedeemScreen({ route, navigation }: Props) {
             <CheckCircle2 size={56} color={colors.gold} />
           </View>
           <Text style={styles.successTitle}>You did it!</Text>
-          <Text style={styles.successSubtitle}>Show this code at the front desk to claim:</Text>
+          <Text style={styles.successSubtitle}>Show this at the front desk to claim:</Text>
+          <View style={styles.qrFrame}>
+            <QRCode
+              value={code}
+              size={180}
+              color={colors.dark}
+              backgroundColor={colors.cream}
+            />
+          </View>
           <Text style={styles.codeBlock}>{code}</Text>
           <Text style={styles.successProduct}>{product.name}</Text>
           {newBalance !== null ? (
@@ -283,17 +292,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing['3xl'],
   },
+  qrFrame: {
+    backgroundColor: colors.cream,
+    padding: spacing['2xl'],
+    borderRadius: radius['2xl'],
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    marginBottom: spacing['2xl'],
+  },
   codeBlock: {
     fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes['4xl'],
+    fontSize: fontSizes['3xl'],
     color: colors.gold,
     letterSpacing: 6,
     backgroundColor: colors.darker,
     borderColor: colors.borderGold,
     borderWidth: 1,
     borderRadius: radius['2xl'],
-    paddingVertical: spacing['3xl'],
-    paddingHorizontal: spacing['4xl'],
+    paddingVertical: spacing['2xl'],
+    paddingHorizontal: spacing['3xl'],
     marginBottom: spacing['2xl'],
   },
   successProduct: {
