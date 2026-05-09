@@ -9,13 +9,23 @@ import SessionTypeCard from './SessionTypeCard';
 type Props = {
   selectedSessionTypeId: string | null;
   onSelect: (id: string) => void;
+  /**
+   * Task #135 — when set, hide session types whose `type_category`
+   * doesn't match. `'all'` (or undefined) renders everything.
+   */
+  categoryFilter?: 'all' | 'private' | 'group' | 'cage';
 };
 
 export default function SessionTypeSection({
   selectedSessionTypeId,
   onSelect,
+  categoryFilter = 'all',
 }: Props) {
-  const { data, isPending, isError, refetch, isRefetching } = useSessionTypes();
+  const { data: raw, isPending, isError, refetch, isRefetching } = useSessionTypes();
+  const data =
+    categoryFilter === 'all' || !raw
+      ? raw
+      : raw.filter((s) => s.type_category === categoryFilter);
 
   return (
     <SectionCard title="Session Type" subtitle="Choose what you want to book.">

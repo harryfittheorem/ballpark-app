@@ -183,7 +183,22 @@ export default function HomeScreen() {
                 />
               </View>
             ) : null}
-            <View style={styles.section}>{renderCoachVideo()}</View>
+            {/* Task #135 — pending drills moves above PR / coach video so the
+                most action-y card sits at the top of the scroll. "See all"
+                deep-links into Work → Assign sub-tab. */}
+            {assignments && assignments.some((a) => a.status === 'pending') ? (
+              <View style={styles.section}>
+                <HomeAssignmentsCard
+                  assignments={assignments}
+                  onPress={() =>
+                    navigation.navigate('Work', {
+                      screen: 'WorkHome',
+                      params: { initialSubTab: 'assign' },
+                    })
+                  }
+                />
+              </View>
+            ) : null}
             <View style={styles.section}>
               <LatestPersonalBestCard
                 pr={latestPr ?? null}
@@ -194,20 +209,17 @@ export default function HomeScreen() {
                           screen: 'SwingDetail',
                           params: { swingId: latestPr.swing_id as string },
                         })
-                    : undefined
+                    : // No swing-link yet → "See all" still makes sense:
+                      // jump into the Swings sub-tab to browse everything.
+                      () =>
+                        navigation.navigate('Work', {
+                          screen: 'WorkHome',
+                          params: { initialSubTab: 'swings' },
+                        })
                 }
               />
             </View>
-            {assignments && assignments.some((a) => a.status === 'pending') ? (
-              <View style={styles.section}>
-                <HomeAssignmentsCard
-                  assignments={assignments}
-                  onPress={() =>
-                    navigation.navigate('Work', { screen: 'WorkHome' })
-                  }
-                />
-              </View>
-            ) : null}
+            <View style={styles.section}>{renderCoachVideo()}</View>
             <View style={styles.section}>
               {/* Tap is intentionally a no-op for v0.3 — navigation to a */}
               {/* booking detail / list screen lands in v0.4. */}
