@@ -1,17 +1,17 @@
 /**
- * SwingThumbnail — single 3:4 tile rendered inside a 3-column grid on
- * Videos → Swings + Favorites and a 4-column grid on Session Detail.
+ * SwingThumbnail — single 3:4 tile rendered inside the Videos grids and
+ * the Session Detail screen.
  *
- * No real per-swing video clip exists yet (HitTrax is metric-only — the
- * Mux-clip-per-swing pipeline is a future task). To keep the visual
- * layout honest now and forward-compatible later, we render a dark
- * placeholder card with the headline metric (exit velo) overlaid plus a
- * gold "PR" pip when `is_personal_best`. When per-swing Mux clips ship,
- * we just swap the placeholder background for an `<Image source={{ uri:
- * muxPosterUrl(...) }} />` without touching the grid layout.
+ * Anatomy (per task #119 spec):
+ *   - dark background (per-swing Mux clip ships in a future task; until
+ *     then we render a centered Play icon over a gradient backdrop).
+ *   - PR variant: gold gradient backdrop + "PR" pip top-left.
+ *   - Heart pip top-right when favorited.
+ *   - Bottom metric strip: Exit velo / Launch / Distance.
  */
 
-import { Heart, Star } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Heart, Play, Star } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Swing } from '@/api/swings';
@@ -23,21 +23,45 @@ type Props = {
   onPress: () => void;
 };
 
-function formatVelo(v: number | null): string {
+function fmt1(v: number | null | undefined): string {
   if (v == null) return '—';
-  return `${Number(v).toFixed(1)}`;
+  return Number(v).toFixed(1);
+}
+function fmt0(v: number | null | undefined): string {
+  if (v == null) return '—';
+  return String(Math.round(Number(v)));
 }
 
 export default function SwingThumbnail({ swing, favorited, onPress }: Props) {
-  const velo = formatVelo(swing.exit_velocity_mph);
+  const isPr = !!swing.is_personal_best;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.card,
+        isPr && styles.cardPr,
+        pressed && styles.pressed,
+      ]}
     >
-      <View style={styles.bg} />
-      {swing.is_personal_best ? (
+      <LinearGradient
+        colors={
+          isPr
+            ? ['rgba(241, 229, 173, 0.35)', 'rgba(184, 162, 104, 0.55)']
+            : [colors.dark, colors.darker]
+        }
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.playWrap} pointerEvents="none">
+        <View style={[styles.playCircle, isPr && styles.playCirclePr]}>
+          <Play
+            size={20}
+            color={isPr ? colors.dark : colors.gold}
+            fill={isPr ? colors.dark : colors.gold}
+          />
+        </View>
+      </View>
+      {isPr ? (
         <View style={styles.prPip}>
           <Star size={10} color={colors.dark} fill={colors.dark} />
           <Text style={styles.prText}>PR</Text>
@@ -48,11 +72,21 @@ export default function SwingThumbnail({ swing, favorited, onPress }: Props) {
           <Heart size={12} color={colors.gold} fill={colors.gold} />
         </View>
       ) : null}
-      <View style={styles.metricBlock}>
-        <Text style={styles.veloValue}>{velo}</Text>
-        <Text style={styles.veloUnit}>MPH</Text>
+      <View style={styles.metricStrip}>
+        <Metric label="EV" value={fmt1(swing.exit_velocity_mph)} pr={isPr} />
+        <Metric label="LA" value={fmt0(swing.launch_angle_deg)} pr={isPr} />
+        <Metric label="DIST" value={fmt0(swing.distance_ft)} pr={isPr} />
       </View>
     </Pressable>
+  );
+}
+
+function Metric({ label, value, pr }: { label: string; value: string; pr: boolean }) {
+  return (
+    <View style={styles.metricCell}>
+      <Text style={[styles.metricVal, pr && styles.metricValPr]}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -65,10 +99,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     justifyContent: 'flex-end',
-    padding: spacing.lg,
   },
+  cardPr: { borderColor: colors.gold },
   pressed: { opacity: 0.85 },
-  bg: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.darker },
+  playWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(15, 14, 14, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playCirclePr: { backgroundColor: 'rgba(241, 229, 173, 0.95)' },
   prPip: {
     position: 'absolute',
     top: spacing.base,
@@ -92,18 +139,26 @@ const styles = StyleSheet.create({
     top: spacing.base,
     right: spacing.base,
   },
-  metricBlock: {
-    alignItems: 'flex-start',
+  metricStrip: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.base,
+    backgroundColor: 'rgba(15, 14, 14, 0.55)',
   },
-  veloValue: {
-    color: colors.gold,
+  metricCell: { alignItems: 'center', flex: 1 },
+  metricVal: {
+    color: colors.textOnDark,
     fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes['2xl'],
+    fontSize: fontSizes.lg,
   },
-  veloUnit: {
+  metricValPr: { color: colors.gold },
+  metricLabel: {
     color: colors.textLight,
     fontFamily: fontFamilies.interMedium,
     fontSize: fontSizes.xs,
     letterSpacing: tracking.wide,
+    marginTop: spacing.xxs,
   },
 });

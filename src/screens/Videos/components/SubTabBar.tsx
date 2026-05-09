@@ -1,8 +1,6 @@
 /**
- * SubTabBar for the Videos screen — visually identical to the Earn
- * SubTabBar (gold pill on dark cradle). Kept local to Videos so the two
- * screens can diverge later (Earn might gain a 5th tab; Videos only has 4)
- * without coupling.
+ * SubTabBar for the Videos screen. Four tabs per spec:
+ * SWINGS · HOMEWORK · MESSAGES · FAVORITES.
  */
 
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -13,9 +11,9 @@ export type VideosSubTabKey = 'swings' | 'homework' | 'messages' | 'favorites';
 
 const TABS: { key: VideosSubTabKey; label: string }[] = [
   { key: 'swings', label: 'Swings' },
-  { key: 'homework', label: 'Drills' },
-  { key: 'messages', label: 'Coach' },
-  { key: 'favorites', label: 'Favs' },
+  { key: 'homework', label: 'Homework' },
+  { key: 'messages', label: 'Messages' },
+  { key: 'favorites', label: 'Favorites' },
 ];
 
 export default function SubTabBar({
@@ -65,7 +63,7 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: colors.gold },
   pillText: {
     fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.sm,
     color: colors.textLight,
     textTransform: 'uppercase',
     letterSpacing: tracking.wide,

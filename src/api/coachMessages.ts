@@ -288,6 +288,69 @@ export async function getLatestCoachMessageForKid(
 }
 
 /**
+ * List every coach_message addressed to the given kid, newest first. Used
+ * by the parent Videos → Messages sub-tab to render the full coach-video
+ * rail (latest at the top + history below). RLS already restricts the
+ * row set to the parent's own family. Coach-name lookup is batched into
+ * a single second round-trip for the union of distinct sender ids so the
+ * payload stays O(1) round-trips even for chatty coaches.
+ */
+export async function listCoachMessagesForKid(
+  kidId: string,
+  opts: { limit?: number } = {},
+): Promise<LatestCoachMessage[]> {
+  const limit = opts.limit ?? 100;
+  const { data: rows, error } = await supabase
+    .from('coach_messages')
+    .select(
+      'id, created_at, viewed_at, message_text, sender_user_id, video:videos(status, mux_playback_id, duration_seconds)',
+    )
+    .eq('recipient_kid_id', kidId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  if (!rows || rows.length === 0) return [];
+
+  const senderIds = Array.from(
+    new Set(rows.map((r) => r.sender_user_id).filter((x): x is string => !!x)),
+  );
+  const coachByUserId = new Map<string, { firstName: string; lastName: string }>();
+  if (senderIds.length > 0) {
+    const { data: coaches, error: cErr } = await supabase
+      .from('coaches')
+      .select('user_id, first_name, last_name')
+      .in('user_id', senderIds);
+    if (cErr) throw cErr;
+    (coaches ?? []).forEach((c) => {
+      if (!c.user_id) return;
+      coachByUserId.set(c.user_id, { firstName: c.first_name, lastName: c.last_name });
+    });
+  }
+
+  return rows.map((r) => {
+    const videoRaw = r.video as
+      | { status: Tables<'videos'>['status']; mux_playback_id: string | null; duration_seconds: number | null }
+      | { status: Tables<'videos'>['status']; mux_playback_id: string | null; duration_seconds: number | null }[]
+      | null;
+    const v = Array.isArray(videoRaw) ? videoRaw[0] ?? null : videoRaw;
+    return {
+      id: r.id,
+      createdAt: r.created_at,
+      viewedAt: r.viewed_at,
+      messageText: r.message_text,
+      video: v
+        ? {
+            status: v.status,
+            muxPlaybackId: v.mux_playback_id,
+            durationSeconds: v.duration_seconds,
+          }
+        : null,
+      coach: r.sender_user_id ? coachByUserId.get(r.sender_user_id) ?? null : null,
+    };
+  });
+}
+
+/**
  * Single coach_message row joined with the attached video — the projection
  * the parent's playback screen needs (Step 4.13). RLS already restricts
  * SELECT to messages addressed to the caller's family, so no extra filter

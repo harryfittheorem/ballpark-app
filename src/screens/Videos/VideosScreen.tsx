@@ -1,17 +1,18 @@
 /**
  * VideosScreen — task #119.
  *
- * Four sub-tabs: Swings (BY SESSION / ALL toggle), Drills (homework
- * playback queue), Coach (latest coach video messages), Favorites (the
- * heart-toggled subset of swings).
+ * Four sub-tabs: SWINGS (BY SESSION / ALL toggle), HOMEWORK (every drill
+ * assignment with full submission metadata), MESSAGES (full coach-video
+ * rail backed by the same `coach_messages` rows the Home card uses),
+ * FAVORITES (the heart-toggled subset of swings).
  *
- * The Drills + Coach tabs reuse data already fetched elsewhere in the
- * app (assignments, sentCoachMessages, latestCoachMessage) so we do NOT
- * duplicate fetch logic here — TanStack Query dedupes by key.
+ * The Drills + Coach data is fetched here directly so the rail behaves
+ * like the Home card (CoachVideoCard) — TanStack Query dedupes by key
+ * with the Home queries.
  */
 
 import { useNavigation } from '@react-navigation/native';
-import { Dumbbell, Heart, Mail, ZapOff } from 'lucide-react-native';
+import { Heart, Mail, ZapOff } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,17 +25,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import type { Swing } from '@/api/swings';
+import type { Session } from '@/api/sessions';
+import type { AssignmentWithRefs } from '@/api/assignments';
+import type { LatestCoachMessage } from '@/api/coachMessages';
 import { useAssignments } from '@/hooks/useAssignments';
+import { useCoachMessagesForKid } from '@/hooks/useCoachMessages';
 import { useFamily } from '@/hooks/useFamily';
-import { useLatestCoachMessage } from '@/hooks/useLatestCoachMessage';
 import {
   useFavoriteSwingIds,
   useSessionsForKid,
   useSwingsForKid,
 } from '@/hooks/useSwings';
 import type { VideosStackScreenProps } from '@/navigation/types';
+import AssignmentRow from '@/screens/Work/components/AssignmentRow';
+import CoachVideoCard from '@/screens/Home/components/CoachVideoCard';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
+import { formatRelativeTime } from '@/utils/time';
 
 import EmptyState from './components/EmptyState';
 import SessionGroupCard from './components/SessionGroupCard';
@@ -45,6 +53,11 @@ import SwingThumbnail from './components/SwingThumbnail';
 type Nav = VideosStackScreenProps<'VideosHome'>['navigation'];
 
 type SwingViewMode = 'session' | 'all';
+
+const POSTER_WIDTH = 480;
+function muxPosterUrl(playbackId: string) {
+  return `https://image.mux.com/${playbackId}/thumbnail.jpg?width=${POSTER_WIDTH}`;
+}
 
 export default function VideosScreen() {
   const navigation = useNavigation<Nav>();
@@ -58,15 +71,10 @@ export default function VideosScreen() {
   const { data: sessions, isPending: sessionsPending } = useSessionsForKid(kid?.id);
   const { data: favorites } = useFavoriteSwingIds();
   const { data: assignments } = useAssignments(kid?.id);
-  const { data: latestMessage } = useLatestCoachMessage(kid?.id);
+  const { data: coachMessages } = useCoachMessagesForKid(kid?.id);
 
-  // Group swings by session_id for the BY SESSION view. Swings whose
-  // `session_id` is null (rare — happens when the polling worker imported
-  // a swing before the session row was reconciled) are bucketed into a
-  // synthetic "Loose swings" group at the top so they're never lost.
   const swingsBySession = useMemo(() => {
-    type SwingRow = NonNullable<typeof swings>[number];
-    const map = new Map<string | null, SwingRow[]>();
+    const map = new Map<string | null, Swing[]>();
     (swings ?? []).forEach((s) => {
       const k = s.session_id;
       const arr = map.get(k) ?? [];
@@ -106,14 +114,10 @@ export default function VideosScreen() {
     );
   }
 
+  // Spec stats: TOTAL / PRs / SESSIONS.
   const totalSwings = swings?.length ?? 0;
   const prCount = (swings ?? []).filter((s) => s.is_personal_best).length;
-  const topVelo = (swings ?? []).reduce<number | null>((acc, s) => {
-    const v = s.exit_velocity_mph ?? null;
-    if (v == null) return acc;
-    if (acc == null || v > acc) return v;
-    return acc;
-  }, null);
+  const sessionCount = sessions?.length ?? 0;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -121,9 +125,9 @@ export default function VideosScreen() {
       <View style={styles.statsWrap}>
         <StatsBar
           stats={[
-            { label: 'Swings', value: String(totalSwings) },
+            { label: 'Total', value: String(totalSwings) },
             { label: 'PRs', value: String(prCount) },
-            { label: 'Top mph', value: topVelo == null ? '—' : topVelo.toFixed(1) },
+            { label: 'Sessions', value: String(sessionCount) },
           ]}
         />
       </View>
@@ -155,13 +159,7 @@ export default function VideosScreen() {
 
       {tab === 'messages' ? (
         <MessagesTab
-          latestId={latestMessage?.id ?? null}
-          coachName={
-            latestMessage?.coach
-              ? `${latestMessage.coach.firstName} ${latestMessage.coach.lastName}`.trim()
-              : null
-          }
-          createdAt={latestMessage?.createdAt ?? null}
+          messages={coachMessages ?? []}
           onPress={(messageId) =>
             navigation.navigate('Home', { screen: 'VideoPlayback', params: { messageId } })
           }
@@ -183,7 +181,7 @@ function Header() {
   return (
     <View style={styles.header}>
       <Text style={styles.title}>Videos</Text>
-      <Text style={styles.subtitle}>Swings, drills, and coach messages</Text>
+      <Text style={styles.subtitle}>Swings, homework, and messages</Text>
     </View>
   );
 }
@@ -191,39 +189,31 @@ function Header() {
 // ---------------------------------------------------------------------------
 // Swings tab
 // ---------------------------------------------------------------------------
-function SwingsTab(props: {
+type SwingsTabProps = {
   mode: SwingViewMode;
   onModeChange: (m: SwingViewMode) => void;
   isError: boolean;
   errorMsg: string | null;
-  allSwings: ReturnType<typeof useSwingsForKid>['data'] extends infer T
-    ? T extends Array<infer U>
-      ? U[]
-      : never
-    : never;
-  sessions: ReturnType<typeof useSessionsForKid>['data'] extends infer T
-    ? T extends Array<infer U>
-      ? U[]
-      : never
-    : never;
-  swingsBySession: Map<string | null, typeof props.allSwings>;
+  allSwings: Swing[];
+  sessions: Session[];
+  swingsBySession: Map<string | null, Swing[]>;
   favorites: Set<string>;
   onPressSwing: (swingId: string) => void;
   onPressSession: (sessionId: string) => void;
-}) {
-  const {
-    mode,
-    onModeChange,
-    isError,
-    errorMsg,
-    allSwings,
-    sessions,
-    swingsBySession,
-    favorites,
-    onPressSwing,
-    onPressSession,
-  } = props;
+};
 
+function SwingsTab({
+  mode,
+  onModeChange,
+  isError,
+  errorMsg,
+  allSwings,
+  sessions,
+  swingsBySession,
+  favorites,
+  onPressSwing,
+  onPressSession,
+}: SwingsTabProps) {
   if (isError) {
     return (
       <View style={styles.centered}>
@@ -250,9 +240,7 @@ function SwingsTab(props: {
         numColumns={3}
         columnWrapperStyle={styles.gridRow}
         contentContainerStyle={styles.gridContent}
-        ListHeaderComponent={
-          <ModeToggle mode={mode} onChange={onModeChange} />
-        }
+        ListHeaderComponent={<ModeToggle mode={mode} onChange={onModeChange} />}
         renderItem={({ item }) => (
           <View style={styles.gridCell}>
             <SwingThumbnail
@@ -266,23 +254,49 @@ function SwingsTab(props: {
     );
   }
 
-  // BY SESSION view. Map known session rows to their swings; if a session
-  // has no swings (rare race) we still render its header so the count
-  // matches the session list cardinality.
+  // BY SESSION view. We render one card per session; loose swings (those
+  // whose `session_id` is null because the polling worker imported them
+  // before the session row reconciled) are bucketed at the top so they're
+  // never lost from the rail.
+  const looseSwings = swingsBySession.get(null) ?? [];
+  const looseRows: { kind: 'loose'; swings: Swing[] }[] =
+    looseSwings.length > 0 ? [{ kind: 'loose', swings: looseSwings }] : [];
+  const sessionRows = sessions.map((s) => ({ kind: 'session' as const, session: s }));
+  type Row = (typeof looseRows)[number] | (typeof sessionRows)[number];
+  const rows: Row[] = [...looseRows, ...sessionRows];
+
   return (
-    <FlatList
-      data={sessions}
-      keyExtractor={(s) => s.id}
+    <FlatList<Row>
+      data={rows}
+      keyExtractor={(r) => (r.kind === 'loose' ? 'loose' : r.session.id)}
       contentContainerStyle={styles.listContent}
       ListHeaderComponent={<ModeToggle mode={mode} onChange={onModeChange} />}
       renderItem={({ item }) => {
-        const swings = swingsBySession.get(item.id) ?? [];
+        if (item.kind === 'loose') {
+          return (
+            <View style={styles.looseCard}>
+              <Text style={styles.looseTitle}>RECENT SWINGS · NEW SESSION SYNCING</Text>
+              <View style={styles.previewRow}>
+                {item.swings.slice(0, 3).map((s) => (
+                  <View key={s.id} style={styles.previewCell}>
+                    <SwingThumbnail
+                      swing={s}
+                      favorited={favorites.has(s.id)}
+                      onPress={() => onPressSwing(s.id)}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        }
+        const swings = swingsBySession.get(item.session.id) ?? [];
         return (
           <SessionGroupCard
-            session={item}
+            session={item.session}
             previewSwings={swings}
             favorites={favorites}
-            onPressSession={() => onPressSession(item.id)}
+            onPressSession={() => onPressSession(item.session.id)}
             onPressSwing={onPressSwing}
           />
         );
@@ -330,61 +344,55 @@ function ModeToggle({
 }
 
 // ---------------------------------------------------------------------------
-// Homework / Drills tab
+// Homework tab — submission-centric. Reuses the Work tab's AssignmentRow
+// so status badges + star ratings + due/feedback metadata stay consistent.
 // ---------------------------------------------------------------------------
 function HomeworkTab({
   assignments,
   onPress,
 }: {
-  assignments: { id: string; title: string; status: string; drill_video: { mux_playback_id: string | null } | null }[];
+  assignments: AssignmentWithRefs[];
   onPress: (assignmentId: string) => void;
 }) {
-  // Surface drills that have a Mux drill video — the Videos tab is a
-  // playback surface, so drills with no video belong on Work, not here.
-  const withVideo = assignments.filter((a) => a.drill_video?.mux_playback_id);
-  if (withVideo.length === 0) {
+  if (assignments.length === 0) {
     return (
       <EmptyState
-        icon={<Dumbbell size={26} color={colors.gold} />}
-        title="No drill videos yet"
-        body="Drills your coach assigns with a video will appear here for replay."
+        icon={<ZapOff size={26} color={colors.gold} />}
+        title="No drills yet"
+        body="When your coach assigns a drill, it'll show up here with the video, your submission, and the feedback."
       />
     );
   }
   return (
     <ScrollView contentContainerStyle={styles.listContent}>
-      {withVideo.map((a) => (
-        <Pressable
-          key={a.id}
-          onPress={() => onPress(a.id)}
-          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-        >
-          <Dumbbell size={18} color={colors.gold} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle} numberOfLines={1}>{a.title}</Text>
-            <Text style={styles.rowSubtitle}>{a.status.toUpperCase()}</Text>
-          </View>
-        </Pressable>
+      {assignments.map((a) => (
+        <View key={a.id} style={styles.assignmentWrap}>
+          <AssignmentRow assignment={a} onPress={() => onPress(a.id)} />
+          {a.status === 'reviewed' && a.feedback ? (
+            <View style={styles.feedbackQuote}>
+              <Text style={styles.feedbackText} numberOfLines={2}>
+                &ldquo;{a.feedback}&rdquo;
+              </Text>
+            </View>
+          ) : null}
+        </View>
       ))}
     </ScrollView>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Messages tab
+// Messages tab — coach-video rail. Reuses CoachVideoCard so it visually
+// matches the Home card.
 // ---------------------------------------------------------------------------
 function MessagesTab({
-  latestId,
-  coachName,
-  createdAt,
+  messages,
   onPress,
 }: {
-  latestId: string | null;
-  coachName: string | null;
-  createdAt: string | null;
+  messages: LatestCoachMessage[];
   onPress: (messageId: string) => void;
 }) {
-  if (!latestId) {
+  if (messages.length === 0) {
     return (
       <EmptyState
         icon={<Mail size={26} color={colors.gold} />}
@@ -395,20 +403,26 @@ function MessagesTab({
   }
   return (
     <ScrollView contentContainerStyle={styles.listContent}>
-      <Pressable
-        onPress={() => onPress(latestId)}
-        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-      >
-        <Mail size={18} color={colors.gold} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.rowTitle} numberOfLines={1}>
-            {coachName ?? 'Your coach'}
-          </Text>
-          <Text style={styles.rowSubtitle}>
-            {createdAt ? new Date(createdAt).toLocaleDateString() : ''}
-          </Text>
-        </View>
-      </Pressable>
+      {messages.map((m) => {
+        const v = m.video;
+        const ready = v && v.status === 'ready' && v.muxPlaybackId;
+        const coachName = m.coach
+          ? `${m.coach.firstName} ${m.coach.lastName}`.trim()
+          : 'Your coach';
+        return (
+          <View key={m.id} style={{ marginBottom: spacing['2xl'] }}>
+            <CoachVideoCard
+              variant={ready ? 'ready' : 'processing'}
+              coachName={coachName}
+              thumbnail={ready ? muxPosterUrl(v!.muxPlaybackId as string) : undefined}
+              durationSeconds={v?.durationSeconds ?? undefined}
+              subtitle={formatRelativeTime(m.createdAt)}
+              unread={!m.viewedAt}
+              onPress={ready ? () => onPress(m.id) : undefined}
+            />
+          </View>
+        );
+      })}
     </ScrollView>
   );
 }
@@ -421,11 +435,7 @@ function FavoritesTab({
   favorites,
   onPressSwing,
 }: {
-  swings: ReturnType<typeof useSwingsForKid>['data'] extends infer T
-    ? T extends Array<infer U>
-      ? U[]
-      : never
-    : never;
+  swings: Swing[];
   favorites: Set<string>;
   onPressSwing: (swingId: string) => void;
 }) {
@@ -522,28 +532,36 @@ const styles = StyleSheet.create({
     letterSpacing: tracking.wide,
   },
   toggleTextActive: { color: colors.dark },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
+  looseCard: {
     backgroundColor: colors.darker,
-    borderRadius: radius['2xl'],
+    borderRadius: radius['3xl'],
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing['2xl'],
+    marginBottom: spacing['2xl'],
+  },
+  looseTitle: {
+    color: colors.gold,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.sm,
+    letterSpacing: tracking.wide,
     marginBottom: spacing.lg,
   },
-  pressed: { opacity: 0.85 },
-  rowTitle: {
-    color: colors.textOnDark,
-    fontFamily: fontFamilies.interSemiBold,
-    fontSize: fontSizes.lg,
+  previewRow: { flexDirection: 'row', gap: spacing.lg },
+  previewCell: { flex: 1 },
+  assignmentWrap: { marginBottom: spacing.lg },
+  feedbackQuote: {
+    marginTop: spacing.xs,
+    marginLeft: spacing['3xl'],
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.base,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.gold,
   },
-  rowSubtitle: {
+  feedbackText: {
     color: colors.textLight,
-    fontFamily: fontFamilies.interMedium,
-    fontSize: fontSizes.xs,
-    letterSpacing: tracking.wide,
-    marginTop: spacing.xxs,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    fontStyle: 'italic',
   },
 });

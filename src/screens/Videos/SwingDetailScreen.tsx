@@ -5,18 +5,24 @@
  *   - 16:9 placeholder for the swing clip (per-swing Mux clips ship in
  *     a future task — until then we render a dark "no clip yet" panel).
  *   - PR-aware metric grid (exit velo / launch / distance / pitch speed).
- *   - Action row: Heart toggle (optimistic via useToggleFavorite),
- *     Share (Alert stub — Share Card 9:16 generator is a separate task),
- *     Send to coach (Alert stub — composer ships in another task).
- *   - PR badges card when this swing IS a PR.
- *
- * Share + Send are intentionally stubbed (Alert.alert) so the layout +
- * navigation contract are stable when the real flows graduate. The
- * action row is wired to real handlers only for "Favorite" today.
+ *   - SHARE + SEND TO COACH 50/50 action row (Alert.alert stubs — the
+ *     9:16 share-card generator + coach-composer ship in a follow-up).
+ *   - Favorite is a heart icon on the screen header (not in the action
+ *     row, per spec — the row is reserved for share/send).
+ *   - When this swing IS a PR: a coach-note quote card + a dedicated
+ *     points-earned sparkles card.
  */
 
 import { useRoute } from '@react-navigation/native';
-import { Award, Heart, Send, Share2, Star } from 'lucide-react-native';
+import {
+  Award,
+  Heart,
+  MessageCircle,
+  Send,
+  Share2,
+  Sparkles,
+  Star,
+} from 'lucide-react-native';
 import {
   ActivityIndicator,
   Alert,
@@ -56,6 +62,8 @@ const METRIC_UNITS: Record<string, string> = {
   pitch_speed_mph: 'MPH',
 };
 
+const PR_POINTS = 15;
+
 function fmt(v: number | null | undefined, digits = 1): string {
   if (v == null) return '—';
   return Number(v).toFixed(digits);
@@ -94,8 +102,6 @@ export default function SwingDetailScreen() {
   }
 
   const favorited = favorites?.has(swing.id) ?? false;
-  // A PR row points at this swing exactly when this swing IS that metric's
-  // current best. We render gold pill badges per matching metric.
   const prMatches = (prs ?? []).filter((p) => p.swing_id === swing.id);
 
   const handleFavorite = () => {
@@ -121,23 +127,37 @@ export default function SwingDetailScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Header swing={swing} />
-        <PlaceholderPlayer />
-        <MetricGrid swing={swing} prs={prMatches.map((p) => p.metric)} />
-        <ActionRow
+        <Header
+          swing={swing}
           favorited={favorited}
           favSaving={toggleFav.isPending}
           onFavorite={handleFavorite}
-          onShare={handleShare}
-          onSend={handleSend}
         />
-        {prMatches.length > 0 ? <PRsCard prMetrics={prMatches.map((p) => p.metric)} /> : null}
+        <PlaceholderPlayer />
+        <MetricGrid swing={swing} prs={prMatches.map((p) => p.metric)} />
+        <ActionRow onShare={handleShare} onSend={handleSend} />
+        {prMatches.length > 0 ? (
+          <>
+            <PRPointsCard count={prMatches.length} />
+            <CoachNoteCard prMetrics={prMatches.map((p) => p.metric)} />
+          </>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Header({ swing }: { swing: Swing }) {
+function Header({
+  swing,
+  favorited,
+  favSaving,
+  onFavorite,
+}: {
+  swing: Swing;
+  favorited: boolean;
+  favSaving: boolean;
+  onFavorite: () => void;
+}) {
   const d = new Date(swing.occurred_at);
   const label = Number.isNaN(d.getTime())
     ? 'Swing'
@@ -149,17 +169,32 @@ function Header({ swing }: { swing: Swing }) {
         minute: '2-digit',
       });
   return (
-    <View style={styles.headerWrap}>
-      <Text style={styles.headerTitle}>{label.toUpperCase()}</Text>
-      {swing.result ? <Text style={styles.headerSubtitle}>{swing.result.toUpperCase()}</Text> : null}
+    <View style={styles.headerRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.headerTitle}>{label.toUpperCase()}</Text>
+        {swing.result ? (
+          <Text style={styles.headerSubtitle}>{swing.result.toUpperCase()}</Text>
+        ) : null}
+      </View>
+      <Pressable
+        onPress={onFavorite}
+        disabled={favSaving}
+        accessibilityRole="button"
+        accessibilityLabel={favorited ? 'Remove from favorites' : 'Add to favorites'}
+        hitSlop={12}
+        style={({ pressed }) => [styles.favBtn, pressed && styles.favBtnPressed]}
+      >
+        <Heart
+          size={22}
+          color={favorited ? colors.gold : colors.textLight}
+          fill={favorited ? colors.gold : 'transparent'}
+        />
+      </Pressable>
     </View>
   );
 }
 
 function PlaceholderPlayer() {
-  // No per-swing Mux clip yet (HitTrax is metric-only). The 16:9 placeholder
-  // pins layout so the screen is forward-compatible with a real <Video />
-  // when the per-swing clip pipeline ships.
   return (
     <View style={styles.player}>
       <Text style={styles.playerLabel}>SWING CLIP COMING SOON</Text>
@@ -202,41 +237,18 @@ function MetricGrid({ swing, prs }: { swing: Swing; prs: string[] }) {
   );
 }
 
-function ActionRow({
-  favorited,
-  favSaving,
-  onFavorite,
-  onShare,
-  onSend,
-}: {
-  favorited: boolean;
-  favSaving: boolean;
-  onFavorite: () => void;
-  onShare: () => void;
-  onSend: () => void;
-}) {
+function ActionRow({ onShare, onSend }: { onShare: () => void; onSend: () => void }) {
   return (
     <View style={styles.actionRow}>
       <ActionButton
-        icon={
-          <Heart
-            size={18}
-            color={favorited ? colors.gold : colors.textLight}
-            fill={favorited ? colors.gold : 'transparent'}
-          />
-        }
-        label={favorited ? 'Saved' : 'Favorite'}
-        onPress={onFavorite}
-        disabled={favSaving}
-      />
-      <ActionButton
-        icon={<Share2 size={18} color={colors.textLight} />}
+        icon={<Share2 size={18} color={colors.dark} />}
         label="Share"
         onPress={onShare}
+        primary
       />
       <ActionButton
-        icon={<Send size={18} color={colors.textLight} />}
-        label="Send"
+        icon={<Send size={18} color={colors.gold} />}
+        label="Send to coach"
         onPress={onSend}
       />
     </View>
@@ -247,40 +259,65 @@ function ActionButton({
   icon,
   label,
   onPress,
-  disabled,
+  primary,
 }: {
   icon: React.ReactNode;
   label: string;
   onPress: () => void;
-  disabled?: boolean;
+  primary?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
       style={({ pressed }) => [
         styles.actionBtn,
+        primary ? styles.actionBtnPrimary : styles.actionBtnSecondary,
         pressed && styles.actionBtnPressed,
-        disabled && styles.actionBtnDisabled,
       ]}
     >
       {icon}
-      <Text style={styles.actionLabel}>{label.toUpperCase()}</Text>
+      <Text
+        style={[
+          styles.actionLabel,
+          primary ? styles.actionLabelPrimary : styles.actionLabelSecondary,
+        ]}
+      >
+        {label.toUpperCase()}
+      </Text>
     </Pressable>
   );
 }
 
-function PRsCard({ prMetrics }: { prMetrics: string[] }) {
+function PRPointsCard({ count }: { count: number }) {
   return (
-    <View style={styles.prsCard}>
-      <View style={styles.prsHeader}>
-        <Award size={18} color={colors.gold} />
-        <Text style={styles.prsTitle}>PERSONAL BEST</Text>
+    <View style={styles.prPointsCard}>
+      <Sparkles size={26} color={colors.gold} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.prPointsTitle}>+{count * PR_POINTS} POINTS</Text>
+        <Text style={styles.prPointsBody}>
+          {count === 1
+            ? 'New personal best — points credited to your account.'
+            : `${count} new personal bests — points credited to your account.`}
+        </Text>
       </View>
-      <Text style={styles.prsBody}>
-        This swing set a new PR in {prMetrics.map((m) => METRIC_LABELS[m] ?? m).join(', ')}.
-        +15 points credited automatically.
-      </Text>
+    </View>
+  );
+}
+
+function CoachNoteCard({ prMetrics }: { prMetrics: string[] }) {
+  const list = prMetrics.map((m) => METRIC_LABELS[m] ?? m).join(', ');
+  return (
+    <View style={styles.coachCard}>
+      <View style={styles.coachHeader}>
+        <Award size={16} color={colors.gold} />
+        <Text style={styles.coachTitle}>PERSONAL BEST</Text>
+      </View>
+      <View style={styles.quoteRow}>
+        <MessageCircle size={16} color={colors.gold} />
+        <Text style={styles.quoteText}>
+          &ldquo;Big swing — that&rsquo;s a new PR in {list}. Keep that swing path going.&rdquo;
+        </Text>
+      </View>
     </View>
   );
 }
@@ -296,7 +333,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing['3xl'],
     textAlign: 'center',
   },
-  headerWrap: { marginBottom: spacing['2xl'] },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing['2xl'],
+    gap: spacing.lg,
+  },
   headerTitle: {
     color: colors.gold,
     fontFamily: fontFamilies.oswaldBold,
@@ -310,6 +352,17 @@ const styles = StyleSheet.create({
     letterSpacing: tracking.wide,
     marginTop: spacing.xxs,
   },
+  favBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.darker,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  favBtnPressed: { opacity: 0.7 },
   player: {
     aspectRatio: 16 / 9,
     backgroundColor: colors.darker,
@@ -394,7 +447,7 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    gap: spacing.base,
+    gap: spacing.lg,
     marginBottom: spacing['2xl'],
   },
   actionBtn: {
@@ -403,39 +456,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.base,
-    backgroundColor: colors.darker,
     borderRadius: radius['2xl'],
-    borderWidth: 1,
-    borderColor: colors.border,
     paddingVertical: spacing['2xl'],
+    borderWidth: 1,
   },
+  actionBtnPrimary: { backgroundColor: colors.gold, borderColor: colors.gold },
+  actionBtnSecondary: { backgroundColor: colors.darker, borderColor: colors.border },
   actionBtnPressed: { opacity: 0.7 },
-  actionBtnDisabled: { opacity: 0.5 },
   actionLabel: {
-    color: colors.textOnDark,
     fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.sm,
+    fontSize: fontSizes.md,
     letterSpacing: tracking.wide,
   },
-  prsCard: {
-    backgroundColor: 'rgba(241, 229, 173, 0.08)',
+  actionLabelPrimary: { color: colors.dark },
+  actionLabelSecondary: { color: colors.gold },
+  prPointsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    backgroundColor: 'rgba(241, 229, 173, 0.12)',
     borderRadius: radius['2xl'],
     borderWidth: 1,
     borderColor: colors.gold,
     padding: spacing['2xl'],
+    marginBottom: spacing.lg,
   },
-  prsHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.base },
-  prsTitle: {
+  prPointsTitle: {
+    color: colors.gold,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['2xl'],
+    letterSpacing: tracking.wide,
+  },
+  prPointsBody: {
+    color: colors.textOnDark,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    marginTop: spacing.xxs,
+    lineHeight: 18,
+  },
+  coachCard: {
+    backgroundColor: colors.darker,
+    borderRadius: radius['2xl'],
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing['2xl'],
+  },
+  coachHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.base },
+  coachTitle: {
     color: colors.gold,
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.lg,
     letterSpacing: tracking.wide,
   },
-  prsBody: {
+  quoteRow: {
+    flexDirection: 'row',
+    gap: spacing.base,
+    marginTop: spacing.lg,
+    paddingLeft: spacing.base,
+  },
+  quoteText: {
+    flex: 1,
     color: colors.textOnDark,
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.md,
-    marginTop: spacing.base,
+    fontStyle: 'italic',
     lineHeight: 20,
   },
 });
