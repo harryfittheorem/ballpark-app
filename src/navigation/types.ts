@@ -71,6 +71,12 @@ export type VideosStackParamList = {
   VideosHome: undefined;
   SessionDetail: { sessionId: string };
   SwingDetail: { swingId: string };
+  // v0.7 task #120
+  ShareCard: { swingId: string };
+  SendVideoToCoach: { coachUserId?: string } | undefined;
+  SendVideoSuccess: { coachUserId: string; kidId: string };
+  MessagesInbox: undefined;
+  MessageThread: { kidId: string; coachUserId: string };
 };
 
 export type VideosStackScreenProps<T extends keyof VideosStackParamList> = CompositeScreenProps<

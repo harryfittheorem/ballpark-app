@@ -60,7 +60,7 @@ export class MuxFunctionError extends Error {
  * user-initiated attempt so we don't create duplicate `videos` rows; only
  * generate a new key when the coach picks a different video.
  */
-export type MuxUploadPurpose = 'coach_message' | 'drill';
+export type MuxUploadPurpose = 'coach_message' | 'drill' | 'parent_to_coach';
 
 export async function createMuxUpload(
   idempotencyKey: string,

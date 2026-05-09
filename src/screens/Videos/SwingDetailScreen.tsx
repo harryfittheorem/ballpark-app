@@ -13,7 +13,7 @@
  *     points-earned sparkles card.
  */
 
-import { useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import {
   Award,
   Heart,
@@ -47,6 +47,7 @@ import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/th
 import { errorMessage } from '@/utils/error';
 
 type Route = VideosStackScreenProps<'SwingDetail'>['route'];
+type Nav = VideosStackScreenProps<'SwingDetail'>['navigation'];
 
 const METRIC_LABELS: Record<string, string> = {
   exit_velocity_mph: 'Exit velo',
@@ -71,6 +72,7 @@ function fmt(v: number | null | undefined, digits = 1): string {
 
 export default function SwingDetailScreen() {
   const route = useRoute<Route>();
+  const navigation = useNavigation<Nav>();
   const { swingId } = route.params;
   const { kids } = useFamily();
   const kid = kids[0] ?? null;
@@ -111,17 +113,11 @@ export default function SwingDetailScreen() {
   };
 
   const handleShare = () => {
-    Alert.alert(
-      'Share card coming soon',
-      'A 9:16 share image with metrics + PR badges ships in the next release.',
-    );
+    navigation.navigate('ShareCard', { swingId: swing.id });
   };
 
   const handleSend = () => {
-    Alert.alert(
-      'Send to coach coming soon',
-      'A short note + this swing card will be sendable to your coach in the next release.',
-    );
+    navigation.navigate('SendVideoToCoach', undefined);
   };
 
   return (

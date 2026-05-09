@@ -83,7 +83,12 @@ async function fanOutCoachVideoNotifications(videoId: string): Promise<void> {
     .select("id, purpose")
     .eq("id", videoId)
     .maybeSingle();
-  if (vErr || !video || video.purpose !== "coach_message") return;
+  if (vErr || !video) return;
+  if (video.purpose === "parent_to_coach") {
+    await fanOutParentToCoachNotifications(videoId);
+    return;
+  }
+  if (video.purpose !== "coach_message") return;
 
   // Look up the message + recipient parent for push targeting + push title.
   const { data: msg } = await adminClient
@@ -153,6 +158,56 @@ async function fanOutCoachVideoNotifications(videoId: string): Promise<void> {
       }
     }),
   ]);
+}
+
+// Parent->coach push fan-out (v0.7 task #120). Mirrors the coach->parent
+// branch above but: (a) targets the coach addressed via
+// coach_messages.recipient_coach_user_id, and (b) skips email — coach
+// inbox is in-app only. Best-effort: any failure is logged but never
+// turns the 200 to Mux into a retry.
+async function fanOutParentToCoachNotifications(videoId: string): Promise<void> {
+  const { data: msg } = await adminClient
+    .from("coach_messages")
+    .select("recipient_coach_user_id, recipient_kid_id, sender_display")
+    .eq("video_id", videoId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!msg || !msg.recipient_coach_user_id) return;
+
+  const { data: kidRes } = await adminClient
+    .from("kids")
+    .select("first_name")
+    .eq("id", msg.recipient_kid_id)
+    .maybeSingle();
+  const kidFirst = kidRes?.first_name ?? "an athlete";
+  const fromName =
+    typeof msg.sender_display === "string" && msg.sender_display.trim()
+      ? msg.sender_display.trim()
+      : "A parent";
+
+  const authHeader = { Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` };
+  const fnBase = `${SUPABASE_URL}/functions/v1`;
+
+  const r = await fetch(`${fnBase}/send-push-notification`, {
+    method: "POST",
+    headers: { ...authHeader, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_ids: [msg.recipient_coach_user_id],
+      title: `New video about ${kidFirst}`,
+      body: `${fromName} sent you a clip.`,
+      data: { kind: "parent_to_coach", video_id: videoId },
+    }),
+  }).catch((e) => {
+    console.error(`mux-webhook parent_to_coach push fetch_err=${e}`);
+    return null as Response | null;
+  });
+  if (r && !r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.error(
+      `mux-webhook parent_to_coach push status=${r.status} body=${txt.slice(0, 200)}`,
+    );
+  }
 }
 
 const TOLERANCE_SECONDS = 300; // 5 min replay window — Stripe convention.

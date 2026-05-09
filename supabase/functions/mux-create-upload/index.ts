@@ -130,13 +130,10 @@ serve(async (req) => {
   if (!tenantId) {
     return jsonError(401, "unauthorized", "Token missing tenant_id claim");
   }
-  if (appRole !== "coach") {
-    return jsonError(403, "forbidden", "Coach role required");
-  }
 
   // ---- 3b. Read optional purpose from request body ------------------------
   // Body is optional; tolerate missing / malformed JSON the same way as
-  // before (treat as empty object). Anything other than the two known
+  // before (treat as empty object). Anything other than the three known
   // purposes is rejected so the DB CHECK constraint never gets a chance
   // to surface as a 500.
   let bodyJson: { purpose?: unknown } = {};
@@ -146,14 +143,27 @@ serve(async (req) => {
   } catch {
     bodyJson = {};
   }
-  const purpose: "coach_message" | "drill" =
-    bodyJson.purpose === "drill" ? "drill" : "coach_message";
+  const allowedPurposes = ["coach_message", "drill", "parent_to_coach"] as const;
+  type Purpose = typeof allowedPurposes[number];
   if (
     bodyJson.purpose !== undefined &&
-    bodyJson.purpose !== "coach_message" &&
-    bodyJson.purpose !== "drill"
+    !allowedPurposes.includes(bodyJson.purpose as Purpose)
   ) {
     return jsonError(400, "bad_request", "Invalid purpose");
+  }
+  const purpose: Purpose = (bodyJson.purpose as Purpose | undefined) ?? "coach_message";
+
+  // Role check: coach owns coach_message + drill; parent owns parent_to_coach.
+  // The DB also enforces this via RLS on the videos INSERT policies, so this
+  // guard is defence-in-depth + a clearer 403 message.
+  if (purpose === "parent_to_coach") {
+    if (appRole !== "parent") {
+      return jsonError(403, "forbidden", "Parent role required for parent_to_coach uploads");
+    }
+  } else {
+    if (appRole !== "coach") {
+      return jsonError(403, "forbidden", "Coach role required");
+    }
   }
 
   // ---- 4. Call Mux Direct Upload API --------------------------------------
