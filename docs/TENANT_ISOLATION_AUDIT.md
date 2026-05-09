@@ -219,3 +219,9 @@ node scripts/audit-tenant-isolation.mjs 'AuditFixtures2026!'
 ```
 
 All three scripts are idempotent. The audit itself never writes (other than the cross-tenant kids INSERT probe which RLS rejects before any row materialises), and both seeders use deterministic UUIDs with `Prefer: resolution=ignore-duplicates`, so re-runs are no-ops.
+
+---
+
+## 8. Defence-in-depth: kids policies
+
+The `kids_insert_own_family` and `kids_update_own_family` RLS policies pin `families.tenant_id = JWT tenant_id` inside the `families` sub-select. `public.kids` has no direct `tenant_id` column, so the pin must live in the join — without it, a forged kid row joined against a legitimate family in another tenant would slip through.
