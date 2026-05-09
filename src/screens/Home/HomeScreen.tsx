@@ -182,9 +182,16 @@ export default function HomeScreen() {
                 />
               </View>
             ) : null}
-            {/* Task #135 — pending drills moves above PR / coach video so the
-                most action-y card sits at the top of the scroll. "See all"
-                deep-links into Work → Assign sub-tab. */}
+            {/* v0.4 IA: NEW FROM COACH → UP NEXT → ASSIGNMENTS → LATEST PR. */}
+            <View style={styles.section}>{renderCoachVideo()}</View>
+            <View style={styles.section}>
+              <UpcomingSessionCard
+                date={upcoming?.scheduledStart}
+                durationMinutes={upcoming?.durationMinutes}
+                coachName={upcoming?.coachName}
+                location={upcoming?.locationName}
+              />
+            </View>
             {assignments && assignments.some((a) => a.status === 'pending') ? (
               <View style={styles.section}>
                 <HomeAssignmentsCard
@@ -198,18 +205,6 @@ export default function HomeScreen() {
                 />
               </View>
             ) : null}
-            {/* Task #135 — v0.4 spec order: NEW FROM COACH, then UP NEXT,
-                then ASSIGNMENTS (already hoisted above), then LATEST PR.
-                QuickActionsRow removed — actions live inline on each card. */}
-            <View style={styles.section}>{renderCoachVideo()}</View>
-            <View style={styles.section}>
-              <UpcomingSessionCard
-                date={upcoming?.scheduledStart}
-                durationMinutes={upcoming?.durationMinutes}
-                coachName={upcoming?.coachName}
-                location={upcoming?.locationName}
-              />
-            </View>
             <View style={styles.section}>
               <LatestPersonalBestCard
                 pr={latestPr ?? null}

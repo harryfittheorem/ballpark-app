@@ -35,9 +35,14 @@ import DateSection from './components/DateSection';
 import SessionTypeSection from './components/SessionTypeSection';
 import SummarySection from './components/SummarySection';
 import TimeSection from './components/TimeSection';
+import { useCoachAvailability } from './hooks/useCoachAvailability';
+import { useCoaches } from './hooks/useCoaches';
+import { useDayBookings } from './hooks/useDayBookings';
+import { usePrimaryLocation } from './hooks/usePrimaryLocation';
 import { useSessionTypes } from './hooks/useSessionTypes';
 import { styles as flowStyles } from './styles';
-import type { Slot } from './utils/slots';
+import { formatSlotTime, generateDaySlots, type Slot } from './utils/slots';
+import type { SessionType } from '@/api/bookings';
 
 type Category = 'all' | 'private' | 'group' | 'cage';
 
@@ -285,6 +290,26 @@ export default function BookScreen() {
               onPress={() => onPickDay(tomorrowYmd)}
             />
           </View>
+          <OpenSlotsList
+            label="TODAY"
+            date={todayYmd}
+            sessionType={selectedSessionType}
+            category={category}
+            onPickSlot={(slot) => {
+              handleSelectDate(todayYmd);
+              handleSelectSlot(slot, [slot.coach_id]);
+            }}
+          />
+          <OpenSlotsList
+            label="TOMORROW"
+            date={tomorrowYmd}
+            sessionType={selectedSessionType}
+            category={category}
+            onPickSlot={(slot) => {
+              handleSelectDate(tomorrowYmd);
+              handleSelectSlot(slot, [slot.coach_id]);
+            }}
+          />
         </View>
 
         {/* Existing wizard ------------------------------------------------- */}
@@ -329,6 +354,98 @@ export default function BookScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function OpenSlotsList({
+  label,
+  date,
+  sessionType,
+  category,
+  onPickSlot,
+}: {
+  label: string;
+  date: string;
+  sessionType: SessionType | null;
+  category: Category;
+  onPickSlot: (slot: Slot) => void;
+}) {
+  const availability = useCoachAvailability();
+  const location = usePrimaryLocation();
+  const coaches = useCoaches();
+  const bookings = useDayBookings(date, location.data?.timezone ?? null);
+
+  const tz = location.data?.timezone ?? null;
+  const duration = sessionType?.duration_minutes ?? null;
+
+  if (!sessionType || duration == null) {
+    return (
+      <View style={shellStyles.openSlotsHint}>
+        <Text style={shellStyles.openSlotsHintText}>
+          Pick a session type above to see {label.toLowerCase()}&apos;s open slots.
+        </Text>
+      </View>
+    );
+  }
+
+  if (
+    availability.isPending ||
+    bookings.isPending ||
+    !availability.data ||
+    !bookings.data
+  ) {
+    return null;
+  }
+
+  const slots = generateDaySlots({
+    date,
+    durationMinutes: duration,
+    timezone: tz,
+    availability: availability.data,
+    bookings: bookings.data,
+  }).slice(0, 3);
+
+  if (slots.length === 0) {
+    return (
+      <View style={shellStyles.openSlotsHint}>
+        <Text style={shellStyles.openSlotsHintText}>
+          No open slots {label.toLowerCase()}.
+        </Text>
+      </View>
+    );
+  }
+
+  const coachNameOf = (id: string) => {
+    const c = coaches.data?.find((x) => x.id === id);
+    return c ? `${c.first_name} ${c.last_name}`.trim() : 'Coach';
+  };
+  const typeLabel = category === 'all' ? 'PRIVATE' : category.toUpperCase();
+
+  return (
+    <View style={{ marginTop: spacing.lg }}>
+      <Text style={shellStyles.openSlotsDayLabel}>{label}</Text>
+      {slots.map((slot) => (
+        <Pressable
+          key={`${slot.coach_id}|${slot.start}`}
+          onPress={() => onPickSlot(slot)}
+          style={({ pressed }) => [
+            shellStyles.openSlotRow,
+            pressed && { opacity: 0.85 },
+          ]}
+          accessibilityRole="button"
+        >
+          <Text style={shellStyles.openSlotTime}>{formatSlotTime(slot.start, tz)}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={shellStyles.openSlotCoach}>{coachNameOf(slot.coach_id)}</Text>
+            <Text style={shellStyles.openSlotMeta}>{sessionType.name}</Text>
+          </View>
+          <View style={shellStyles.openSlotChip}>
+            <Text style={shellStyles.openSlotChipText}>{typeLabel}</Text>
+          </View>
+          <ChevronRight size={14} color={colors.textLight} />
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
@@ -466,4 +583,66 @@ const shellStyles = StyleSheet.create({
     fontSize: fontSizes.sm,
   },
   dayChipSubActive: { color: colors.dark },
+  openSlotsHint: {
+    marginTop: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.dark,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  openSlotsHintText: {
+    color: colors.textLight,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+  },
+  openSlotsDayLabel: {
+    color: colors.textLight,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xs,
+    letterSpacing: tracking.wider,
+    marginBottom: spacing.base,
+    marginTop: spacing.base,
+  },
+  openSlotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.base,
+    borderRadius: radius.lg,
+    backgroundColor: colors.dark,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.xs,
+  },
+  openSlotTime: {
+    color: colors.gold,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.md,
+    width: 70,
+  },
+  openSlotCoach: {
+    color: colors.textOnDark,
+    fontFamily: fontFamilies.interSemiBold,
+    fontSize: fontSizes.sm,
+  },
+  openSlotMeta: {
+    color: colors.textLight,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.xs,
+    marginTop: 2,
+  },
+  openSlotChip: {
+    paddingHorizontal: spacing.base,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    backgroundColor: 'rgba(241,229,173,0.15)',
+  },
+  openSlotChipText: {
+    color: colors.gold,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xs,
+    letterSpacing: tracking.wide,
+  },
 });
