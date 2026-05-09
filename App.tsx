@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -23,7 +23,7 @@ export default function App() {
     );
   }
 
-  return (
+  const inner = (
     <GestureHandlerRootView style={styles.flex}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
@@ -37,6 +37,18 @@ export default function App() {
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webShell}>
+        <View style={styles.phoneFrame}>
+          {inner}
+        </View>
+      </View>
+    );
+  }
+
+  return inner;
 }
 
 const styles = StyleSheet.create({
@@ -46,5 +58,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.darkest,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  webShell: {
+    flex: 1,
+    backgroundColor: colors.darker,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  phoneFrame: {
+    width: 390,
+    maxWidth: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    backgroundColor: colors.darkest,
   },
 });
