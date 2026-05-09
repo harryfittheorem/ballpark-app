@@ -72,6 +72,10 @@ export async function createTrainingVideo(formData: FormData) {
       .maybeSingle();
     if (vrow?.mux_playback_id) {
       muxPlaybackId = vrow.mux_playback_id;
+    } else {
+      redirect(
+        "/admin/training-videos/new?error=video_not_ready_or_inaccessible",
+      );
     }
   }
   if (!muxPlaybackId) {
@@ -133,6 +137,10 @@ export async function updateTrainingVideo(formData: FormData) {
       .maybeSingle();
     if (vrow?.mux_playback_id) {
       muxPlaybackId = vrow.mux_playback_id;
+    } else {
+      redirect(
+        `/admin/training-videos/${id}/edit?error=video_not_ready_or_inaccessible`,
+      );
     }
   }
   if (!muxPlaybackId) {

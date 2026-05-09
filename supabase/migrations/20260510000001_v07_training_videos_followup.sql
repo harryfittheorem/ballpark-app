@@ -20,6 +20,23 @@ COMMENT ON COLUMN public.videos.purpose IS
   'What this video was uploaded for. coach_message | drill | parent_to_coach | training. Set by mux-create-upload from the client''s purpose param; training is admin-only (v0.7 task #121).';
 
 
+-- 1a. Admin SELECT on public.videos for training uploads ---------------------
+-- mux-create-upload INSERTs the videos row with the service role (bypasses
+-- RLS) but the portal admin then needs to SELECT mux_playback_id once the
+-- mux-webhook fills it in (poll loop in TrainingVideoUploadField). Without
+-- this policy admins read 0 rows under RLS and the auto-fill never resolves.
+-- Scoped to the admin's tenant AND purpose='training' for least privilege.
+DROP POLICY IF EXISTS videos_select_admin_training ON public.videos;
+CREATE POLICY videos_select_admin_training ON public.videos
+  FOR SELECT
+  TO authenticated
+  USING (
+    (auth.jwt() ->> 'app_role') = 'admin'
+    AND tenant_id = ((auth.jwt() ->> 'tenant_id')::uuid)
+    AND purpose = 'training'
+  );
+
+
 -- 2. record_training_view: server-side per-session dedupe --------------------
 -- A "session" for analytics is "this kid hasn't viewed this video in the
 -- last 30 minutes". Repeated calls within the window are no-ops — the
