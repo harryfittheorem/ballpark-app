@@ -908,6 +908,172 @@ export type Database = {
         }
         Relationships: []
       }
+      sessions: {
+        Row: {
+          avg_exit_velocity_mph: number | null
+          best_exit_velocity_mph: number | null
+          capture_session_id: string | null
+          capture_source: string
+          created_at: string
+          ended_at: string | null
+          facility_id: string | null
+          id: string
+          kid_id: string
+          max_distance_ft: number | null
+          notes: string | null
+          started_at: string
+          swing_count: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          avg_exit_velocity_mph?: number | null
+          best_exit_velocity_mph?: number | null
+          capture_session_id?: string | null
+          capture_source: string
+          created_at?: string
+          ended_at?: string | null
+          facility_id?: string | null
+          id?: string
+          kid_id: string
+          max_distance_ft?: number | null
+          notes?: string | null
+          started_at: string
+          swing_count?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          avg_exit_velocity_mph?: number | null
+          best_exit_velocity_mph?: number | null
+          capture_session_id?: string | null
+          capture_source?: string
+          created_at?: string
+          ended_at?: string | null
+          facility_id?: string | null
+          id?: string
+          kid_id?: string
+          max_distance_ft?: number | null
+          notes?: string | null
+          started_at?: string
+          swing_count?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      swings: {
+        Row: {
+          capture_event_id: string
+          capture_source: string
+          contact_quality: string | null
+          created_at: string
+          distance_ft: number | null
+          exit_velocity_mph: number | null
+          id: string
+          is_personal_best: boolean
+          kid_id: string
+          launch_angle_deg: number | null
+          occurred_at: string
+          pitch_speed_mph: number | null
+          raw: Json | null
+          result: string | null
+          session_id: string | null
+          spray_angle_deg: number | null
+          tenant_id: string
+        }
+        Insert: {
+          capture_event_id: string
+          capture_source: string
+          contact_quality?: string | null
+          created_at?: string
+          distance_ft?: number | null
+          exit_velocity_mph?: number | null
+          id?: string
+          is_personal_best?: boolean
+          kid_id: string
+          launch_angle_deg?: number | null
+          occurred_at: string
+          pitch_speed_mph?: number | null
+          raw?: Json | null
+          result?: string | null
+          session_id?: string | null
+          spray_angle_deg?: number | null
+          tenant_id: string
+        }
+        Update: {
+          capture_event_id?: string
+          capture_source?: string
+          contact_quality?: string | null
+          created_at?: string
+          distance_ft?: number | null
+          exit_velocity_mph?: number | null
+          id?: string
+          is_personal_best?: boolean
+          kid_id?: string
+          launch_angle_deg?: number | null
+          occurred_at?: string
+          pitch_speed_mph?: number | null
+          raw?: Json | null
+          result?: string | null
+          session_id?: string | null
+          spray_angle_deg?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swings_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      personal_bests: {
+        Row: {
+          achieved_at: string
+          created_at: string
+          id: string
+          kid_id: string
+          metric: string
+          swing_id: string | null
+          tenant_id: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          achieved_at: string
+          created_at?: string
+          id?: string
+          kid_id: string
+          metric: string
+          swing_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          achieved_at?: string
+          created_at?: string
+          id?: string
+          kid_id?: string
+          metric?: string
+          swing_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_bests_swing_id_fkey"
+            columns: ["swing_id"]
+            isOneToOne: false
+            referencedRelation: "swings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kid_capture_links: {
         Row: {
           association_status: string
