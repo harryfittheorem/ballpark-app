@@ -29,9 +29,7 @@ import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Pressable,
-  Platform,
   ScrollView,
   Text,
   View,
@@ -98,20 +96,17 @@ export default function ShareCardScreen() {
     [],
   );
 
+  // All four primary buttons go through the OS share sheet so the
+  // generated PNG is ALWAYS attached. The four labels are user hints
+  // about the intended destination — the share sheet itself surfaces
+  // Instagram, TikTok, Messages, etc. as targets when the corresponding
+  // apps are installed. We deliberately do NOT short-circuit with a deep
+  // link (e.g. `instagram-stories://`), because those deep links open
+  // the destination app WITHOUT the image, defeating the share action.
   const onInstagram = useCallback(async () => {
     setBusy('instagram');
     try {
       const uri = await capture();
-      const igUrl = 'instagram-stories://share';
-      const canOpen = Platform.OS === 'ios' && (await Linking.canOpenURL(igUrl));
-      if (canOpen) {
-        try {
-          await Linking.openURL(igUrl);
-          return;
-        } catch {
-          // fall through to share sheet
-        }
-      }
       await shareViaSheet(uri, 'Share to Instagram');
     } catch (err) {
       Alert.alert('Could not share', errorMessage(err));
@@ -124,16 +119,6 @@ export default function ShareCardScreen() {
     setBusy('tiktok');
     try {
       const uri = await capture();
-      const ttUrl = 'snssdk1233://';
-      const canOpen = await Linking.canOpenURL(ttUrl).catch(() => false);
-      if (canOpen) {
-        try {
-          await Linking.openURL(ttUrl);
-          return;
-        } catch {
-          // fall through
-        }
-      }
       await shareViaSheet(uri, 'Share to TikTok');
     } catch (err) {
       Alert.alert('Could not share', errorMessage(err));
@@ -146,8 +131,6 @@ export default function ShareCardScreen() {
     setBusy('message');
     try {
       const uri = await capture();
-      // Plain SMS: deep link can't attach images. Use the share sheet so
-      // the user lands in their chosen messaging app with the image.
       await shareViaSheet(uri, 'Send via Messages');
     } catch (err) {
       Alert.alert('Could not share', errorMessage(err));

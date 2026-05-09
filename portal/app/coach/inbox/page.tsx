@@ -7,6 +7,9 @@ type Row = {
   video_id: string | null;
   viewed_at: string | null;
   created_at: string;
+  sender_user_id: string;
+  sender_display: string | null;
+  recipient_coach_user_id: string | null;
   recipient_kid: { first_name: string } | { first_name: string }[] | null;
 };
 
@@ -42,12 +45,19 @@ export default async function CoachInboxPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Inbox shows BOTH sides of the conversation:
+  //   * messages this coach SENT (sender_user_id = me)
+  //   * messages a parent sent that are ADDRESSED to this coach
+  //     (recipient_coach_user_id = me) — the parent->coach
+  //     direction added by migration 20260509000000.
+  // RLS additionally enforces tenant_id; this filter is just for
+  // narrowing the result set to the active coach.
   const { data, error } = await supabase
     .from("coach_messages")
     .select(
-      "id, message_text, video_id, viewed_at, created_at, recipient_kid:recipient_kid_id(first_name)",
+      "id, message_text, video_id, viewed_at, created_at, sender_user_id, sender_display, recipient_coach_user_id, recipient_kid:recipient_kid_id(first_name)",
     )
-    .eq("sender_user_id", user!.id)
+    .or(`sender_user_id.eq.${user!.id},recipient_coach_user_id.eq.${user!.id}`)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -69,15 +79,15 @@ export default async function CoachInboxPage() {
           Inbox
         </h1>
         <p className="mt-1 text-sm text-text-light">
-          Messages you have sent to families.
+          Messages between you and your families.
         </p>
       </div>
 
       {rows.length === 0 ? (
         <Card padding="lg" className="border-dashed text-center">
           <p className="text-sm text-text-light">
-            You haven&apos;t sent any messages yet. Use the Ballpark mobile
-            app to record a video for a family — it will show up here.
+            No messages yet. Use the Ballpark mobile app to record a video
+            for a family — it will show up here.
           </p>
         </Card>
       ) : (
@@ -88,6 +98,11 @@ export default async function CoachInboxPage() {
               const preview = isVideo
                 ? "Video message"
                 : (row.message_text ?? "").trim() || "(empty message)";
+              const isInbound = row.sender_user_id !== user!.id;
+              const directionLabel = isInbound ? "From" : "To";
+              const personName = isInbound
+                ? row.sender_display?.trim() || "Family"
+                : kidName(row);
               return (
                 <li
                   key={row.id}
@@ -95,8 +110,18 @@ export default async function CoachInboxPage() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                          isInbound
+                            ? "border border-gold bg-gold/10 text-gold"
+                            : "border border-border-gold bg-darkest text-text-light"
+                        }`}
+                      >
+                        {isInbound ? "Received" : "Sent"}
+                      </span>
                       <span className="text-sm font-semibold text-cream-light">
-                        To {kidName(row)}
+                        {directionLabel} {personName}
+                        {isInbound ? ` · about ${kidName(row)}` : ""}
                       </span>
                       {isVideo ? (
                         <span className="inline-flex items-center rounded-full border border-border-gold bg-darkest px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gold">
@@ -112,7 +137,18 @@ export default async function CoachInboxPage() {
                     <span className="text-xs text-text-light">
                       {relativeTime(row.created_at)}
                     </span>
-                    {row.viewed_at ? (
+                    {isInbound ? (
+                      row.viewed_at ? (
+                        <span className="text-[11px] text-text-light/70">
+                          Read
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gold">
+                          <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+                          New
+                        </span>
+                      )
+                    ) : row.viewed_at ? (
                       <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-success">
                         <span className="h-1.5 w-1.5 rounded-full bg-success" />
                         Viewed

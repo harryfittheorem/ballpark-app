@@ -196,9 +196,14 @@ CREATE POLICY videos_insert_own_parent_to_coach ON public.videos
   );
 
 -- 8. videos: coach SELECT on parent_to_coach addressed to them via thread ----
--- A coach must see the Mux poster + playback id of a parent_to_coach video
--- referenced by any coach_messages row in their tenant. Anchored on the
--- message join, mirroring videos_select_recipient_parent.
+-- A coach must see the Mux poster + playback id of a parent_to_coach video,
+-- but ONLY when they are a participant on the message that links to it —
+-- either the coach SENT the message (sender_user_id) or the coach is the
+-- addressed recipient (recipient_coach_user_id). Without this join scope
+-- any coach in the same tenant could read playback ids for parent uploads
+-- addressed to a different coach in the same facility, leaking media
+-- across coaches. Anchored on the message join, mirroring
+-- videos_select_recipient_parent.
 DROP POLICY IF EXISTS videos_select_coach_thread ON public.videos;
 CREATE POLICY videos_select_coach_thread ON public.videos
   FOR SELECT TO authenticated
@@ -209,5 +214,9 @@ CREATE POLICY videos_select_coach_thread ON public.videos
       SELECT 1 FROM public.coach_messages cm
        WHERE cm.video_id = videos.id
          AND cm.tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
+         AND (
+           cm.sender_user_id = auth.uid()
+           OR cm.recipient_coach_user_id = auth.uid()
+         )
     )
   );
