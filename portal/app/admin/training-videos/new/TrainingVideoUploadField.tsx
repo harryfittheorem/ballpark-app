@@ -35,11 +35,13 @@ function fmtBytes(n: number): string {
 
 export function TrainingVideoUploadField({
   onBusyChange,
+  defaultPlaybackId = "",
 }: {
   onBusyChange?: (busy: boolean) => void;
+  defaultPlaybackId?: string;
 }) {
   const [status, setStatus] = useState<UploadStatus>({ kind: "idle" });
-  const [playbackId, setPlaybackId] = useState<string>("");
+  const [playbackId, setPlaybackId] = useState<string>(defaultPlaybackId);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

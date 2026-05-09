@@ -103,6 +103,68 @@ export async function createTrainingVideo(formData: FormData) {
   redirect("/admin/training-videos");
 }
 
+export async function updateTrainingVideo(formData: FormData) {
+  const { supabase } = await requireAdmin();
+
+  const id = ((formData.get("id") as string | null) ?? "").trim();
+  if (!id) redirect("/admin/training-videos?error=missing_id");
+
+  const title = (formData.get("title") as string | null)?.trim() ?? "";
+  const description = ((formData.get("description") as string | null) ?? "").trim();
+  const category = formData.get("category");
+  const level = formData.get("level") ?? "beginner";
+  const coachName = ((formData.get("coach_name") as string | null) ?? "").trim();
+  const durationRaw = (formData.get("duration_sec") as string | null) ?? "";
+
+  let muxPlaybackId = ((formData.get("mux_playback_id") as string | null) ?? "").trim();
+  const videoId = ((formData.get("video_id") as string | null) ?? "").trim();
+
+  if (!title) redirect(`/admin/training-videos/${id}/edit?error=title_required`);
+  if (!isCategory(category)) {
+    redirect(`/admin/training-videos/${id}/edit?error=category_required`);
+  }
+  const lvl: Level = isLevel(level) ? level : "beginner";
+
+  if (!muxPlaybackId && videoId) {
+    const { data: vrow } = await supabase
+      .from("videos")
+      .select("mux_playback_id")
+      .eq("id", videoId)
+      .maybeSingle();
+    if (vrow?.mux_playback_id) {
+      muxPlaybackId = vrow.mux_playback_id;
+    }
+  }
+  if (!muxPlaybackId) {
+    redirect(`/admin/training-videos/${id}/edit?error=playback_id_missing`);
+  }
+
+  const durationSec = durationRaw ? Math.max(0, Math.floor(Number(durationRaw))) : null;
+
+  const { error } = await supabase
+    .from("training_videos")
+    .update({
+      mux_playback_id: muxPlaybackId,
+      title,
+      description: description || null,
+      category,
+      level: lvl,
+      coach_name: coachName || null,
+      duration_sec: Number.isFinite(durationSec ?? NaN) ? durationSec : null,
+    })
+    .eq("id", id);
+
+  if (error) {
+    redirect(
+      `/admin/training-videos/${id}/edit?error=${encodeURIComponent(error.message)}`,
+    );
+  }
+
+  revalidatePath("/admin/training-videos");
+  revalidatePath(`/admin/training-videos/${id}/edit`);
+  redirect("/admin/training-videos");
+}
+
 export async function togglePublishTrainingVideo(formData: FormData) {
   const { supabase } = await requireAdmin();
   const id = (formData.get("id") as string | null) ?? "";

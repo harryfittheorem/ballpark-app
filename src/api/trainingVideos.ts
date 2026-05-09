@@ -4,19 +4,22 @@
  * `training_videos` is HQ-curated and tenant-scoped. RLS lets every
  * authenticated user in the tenant SELECT published rows; only admins can
  * insert/update/delete. Per-kid view logging goes through the
- * `record_training_view` SECURITY DEFINER RPC so the client cannot
- * fabricate inflated view counts.
+ * `record_training_view` SECURITY DEFINER RPC which dedupes server-side
+ * (≤ 1 view_count bump per kid+video per 30 minutes) so the client cannot
+ * inflate counts even by retrying.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
-// `training_videos` + `record_training_view` were added in migration
-// 20260510000000 and are not in the regenerated `Database` types yet
-// (same caveat as the v0.7 task #120 columns documented in replit.md).
-// We cast to a permissive client just for this file until the next
-// `supabase gen types` regen runs in scripts/post-merge.sh.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const sb = supabase as any;
+// `training_videos` and `record_training_view` were added in migrations
+// 20260510000000 / 20260510000001 and are not in the regenerated `Database`
+// types yet (same caveat as v0.7 task #120 noted in replit.md). Casting
+// to the un-typed `SupabaseClient` (rather than `any`) preserves method
+// signatures and return-type inference for everything except the table
+// name string literal — `scripts/post-merge.sh` regens the typed client
+// after the migration runs in CI.
+const sb = supabase as unknown as SupabaseClient;
 
 export type TrainingVideoCategory = 'hitting' | 'mental' | 'situational' | 'fielding';
 export type TrainingVideoLevel = 'beginner' | 'intermediate' | 'advanced';
@@ -97,7 +100,7 @@ export async function listTrainingVideos(
   if (opts.category) q = q.eq('category', opts.category);
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []).map((r: Row) => toCamel(r));
+  return ((data ?? []) as unknown as Row[]).map(toCamel);
 }
 
 /** Single fetch for the player screen. */
@@ -108,14 +111,14 @@ export async function getTrainingVideo(id: string): Promise<TrainingVideo | null
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
-  return data ? toCamel(data as Row) : null;
+  return data ? toCamel(data as unknown as Row) : null;
 }
 
 /**
- * Fire-and-forget view logger. Throttling lives in the player screen
- * (a useRef gate so a burst of playback-status ticks only hits the RPC
- * once). RLS + ownership checks live inside the SECURITY DEFINER
- * function so we never pass `tenant_id` from the client.
+ * Fire-and-forget view logger. The SECURITY DEFINER RPC dedupes
+ * server-side (≤ 1 increment per kid+video per 30 minutes). The
+ * client's useRef gate in TrainingVideoPlayerScreen is defence in
+ * depth, not the source of correctness.
  */
 export async function recordTrainingView(videoId: string, kidId: string): Promise<void> {
   const { error } = await sb.rpc('record_training_view', {
