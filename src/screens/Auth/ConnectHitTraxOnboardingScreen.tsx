@@ -86,6 +86,11 @@ export default function ConnectHitTraxOnboardingScreen() {
         return;
       }
       setSubmittedOk(true);
+      // Spec: "submit lands parent on Home". Auto-navigate immediately —
+      // the Home screen already renders the pending HitTrax banner driven
+      // by useHitTraxLink, so the parent sees the same "check your email"
+      // affordance there with no second tap required.
+      goHome();
     } catch (err) {
       // hittrax-associate is atomic: a thrown error here means HitTrax
       // refused (or was unreachable) and NO row was written. The parent
