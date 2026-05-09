@@ -27,7 +27,6 @@ import HeroCard from './components/HeroCard';
 import HomeAssignmentsCard from './components/HomeAssignmentsCard';
 import HomeHeader from './components/HomeHeader';
 import LatestPersonalBestCard from './components/LatestPersonalBestCard';
-import QuickActionsRow from './components/QuickActionsRow';
 import StatTilesRow from './components/StatTilesRow';
 import UpcomingSessionCard from './components/UpcomingSessionCard';
 import { styles } from './styles';
@@ -199,6 +198,18 @@ export default function HomeScreen() {
                 />
               </View>
             ) : null}
+            {/* Task #135 — v0.4 spec order: NEW FROM COACH, then UP NEXT,
+                then ASSIGNMENTS (already hoisted above), then LATEST PR.
+                QuickActionsRow removed — actions live inline on each card. */}
+            <View style={styles.section}>{renderCoachVideo()}</View>
+            <View style={styles.section}>
+              <UpcomingSessionCard
+                date={upcoming?.scheduledStart}
+                durationMinutes={upcoming?.durationMinutes}
+                coachName={upcoming?.coachName}
+                location={upcoming?.locationName}
+              />
+            </View>
             <View style={styles.section}>
               <LatestPersonalBestCard
                 pr={latestPr ?? null}
@@ -209,29 +220,13 @@ export default function HomeScreen() {
                           screen: 'SwingDetail',
                           params: { swingId: latestPr.swing_id as string },
                         })
-                    : // No swing-link yet → "See all" still makes sense:
-                      // jump into the Swings sub-tab to browse everything.
-                      () =>
+                    : () =>
                         navigation.navigate('Work', {
                           screen: 'WorkHome',
                           params: { initialSubTab: 'swings' },
                         })
                 }
               />
-            </View>
-            <View style={styles.section}>{renderCoachVideo()}</View>
-            <View style={styles.section}>
-              {/* Tap is intentionally a no-op for v0.3 — navigation to a */}
-              {/* booking detail / list screen lands in v0.4. */}
-              <UpcomingSessionCard
-                date={upcoming?.scheduledStart}
-                durationMinutes={upcoming?.durationMinutes}
-                coachName={upcoming?.coachName}
-                location={upcoming?.locationName}
-              />
-            </View>
-            <View style={styles.section}>
-              <QuickActionsRow />
             </View>
           </>
         ) : showEmpty ? (

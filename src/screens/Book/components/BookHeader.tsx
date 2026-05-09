@@ -5,9 +5,8 @@ import { colors, fontFamilies, fontSizes, spacing, tracking } from '@/theme';
 export default function BookHeader() {
   return (
     <View style={styles.container}>
-      <Text style={styles.eyebrow}>SCHEDULE</Text>
-      <Text style={styles.title}>Book a Session</Text>
-      <Text style={styles.subtitle}>Pick a session type, date, time, and coach.</Text>
+      <Text style={styles.eyebrow}>RESERVE YOUR SPOT</Text>
+      <Text style={styles.title}>BOOK</Text>
     </View>
   );
 }
