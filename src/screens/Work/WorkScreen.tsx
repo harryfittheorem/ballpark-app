@@ -93,12 +93,13 @@ export default function WorkScreen() {
         <Text style={styles.title}>Work</Text>
         <Text style={styles.subtitle}>Train, review, and message your coach</Text>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabBar}
-      >
-        {TABS.map((t) => {
+      <View style={styles.tabBarWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabBar}
+        >
+          {TABS.map((t) => {
           const active = tab === t.key;
           const count = counts[t.key];
           return (
@@ -118,8 +119,9 @@ export default function WorkScreen() {
               ) : null}
             </Pressable>
           );
-        })}
-      </ScrollView>
+          })}
+        </ScrollView>
+      </View>
       <View style={{ flex: 1 }}>
         <Body />
       </View>
@@ -145,17 +147,19 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     marginTop: spacing.xs,
   },
+  tabBarWrapper: { flexShrink: 0 },
   tabBar: {
     paddingHorizontal: spacing['3xl'],
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.base,
     gap: spacing.base,
+    alignItems: 'flex-start',
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     paddingHorizontal: spacing['2xl'],
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.base,
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.border,

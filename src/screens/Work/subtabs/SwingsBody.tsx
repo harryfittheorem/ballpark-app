@@ -82,6 +82,10 @@ export default function SwingsBody() {
     );
   }
 
+  const totalSwings = (swings ?? []).length;
+  const totalPRs = (swings ?? []).filter((s) => s.is_personal_best).length;
+  const totalSessions = (sessions ?? []).length;
+
   if (mode === 'all') {
     return (
       <FlatList
@@ -90,7 +94,12 @@ export default function SwingsBody() {
         numColumns={3}
         columnWrapperStyle={styles.gridRow}
         contentContainerStyle={styles.gridContent}
-        ListHeaderComponent={<ModeToggle mode={mode} onChange={setMode} />}
+        ListHeaderComponent={
+          <>
+            <StatsBar swings={totalSwings} prs={totalPRs} sessions={totalSessions} />
+            <ModeToggle mode={mode} onChange={setMode} />
+          </>
+        }
         renderItem={({ item }) => (
           <View style={styles.gridCell}>
             <SwingThumbnail
@@ -116,7 +125,12 @@ export default function SwingsBody() {
       data={rows}
       keyExtractor={(r) => (r.kind === 'loose' ? 'loose' : r.session.id)}
       contentContainerStyle={styles.listContent}
-      ListHeaderComponent={<ModeToggle mode={mode} onChange={setMode} />}
+      ListHeaderComponent={
+        <>
+          <StatsBar swings={totalSwings} prs={totalPRs} sessions={totalSessions} />
+          <ModeToggle mode={mode} onChange={setMode} />
+        </>
+      }
       renderItem={({ item }) => {
         if (item.kind === 'loose') {
           return (
@@ -157,6 +171,32 @@ export default function SwingsBody() {
         />
       }
     />
+  );
+}
+
+function StatsBar({
+  swings,
+  prs,
+  sessions,
+}: {
+  swings: number;
+  prs: number;
+  sessions: number;
+}) {
+  const stats = [
+    { label: 'TOTAL SWINGS', value: swings },
+    { label: 'PRs', value: prs },
+    { label: 'SESSIONS', value: sessions },
+  ];
+  return (
+    <View style={styles.statsCard}>
+      {stats.map((s, i) => (
+        <View key={s.label} style={[styles.statCol, i < stats.length - 1 && styles.statColBorder]}>
+          <Text style={styles.statLabel}>{s.label}</Text>
+          <Text style={styles.statValue}>{s.value}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -214,6 +254,37 @@ const styles = StyleSheet.create({
     letterSpacing: tracking.wide,
   },
   toggleTextActive: { color: colors.dark },
+  statsCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.darker,
+    borderRadius: radius['3xl'],
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing['2xl'],
+    overflow: 'hidden',
+  },
+  statCol: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing['2xl'],
+    paddingHorizontal: spacing.base,
+  },
+  statColBorder: {
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
+  },
+  statLabel: {
+    color: colors.textLight,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xs,
+    letterSpacing: tracking.wide,
+    marginBottom: spacing.xs,
+  },
+  statValue: {
+    color: colors.gold,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['2xl'],
+  },
   looseCard: {
     backgroundColor: colors.darker,
     borderRadius: radius['3xl'],
