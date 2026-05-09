@@ -1,3 +1,4 @@
+import { Hash, User, Users } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -9,11 +10,14 @@ import {
   tracking,
 } from '@/theme';
 
+type TypeCategory = 'private' | 'group' | 'cage' | string;
+
 type Props = {
   name: string;
   durationMinutes: number;
   basePriceCents: number;
   selected: boolean;
+  typeCategory?: TypeCategory;
   onPress: () => void;
 };
 
@@ -27,11 +31,22 @@ function formatDuration(mins: number): string {
 
 function formatPrice(cents: number): string {
   if (cents === 0) return 'Free';
-  // USD only for v0.3 — no Intl needed.
   const dollars = cents / 100;
-  // Whole-dollar prices render without trailing `.00` to match the rest of
-  // the booking UI ("$45" not "$45.00"); fractional cents keep two decimals.
   return cents % 100 === 0 ? `$${dollars}` : `$${dollars.toFixed(2)}`;
+}
+
+function CategoryIcon({
+  typeCategory,
+  selected,
+}: {
+  typeCategory: TypeCategory;
+  selected: boolean;
+}) {
+  const color = selected ? colors.gold : colors.textLight;
+  const size = 28;
+  if (typeCategory === 'group') return <Users size={size} color={color} />;
+  if (typeCategory === 'cage') return <Hash size={size} color={color} />;
+  return <User size={size} color={color} />;
 }
 
 export default function SessionTypeCard({
@@ -39,6 +54,7 @@ export default function SessionTypeCard({
   durationMinutes,
   basePriceCents,
   selected,
+  typeCategory = 'private',
   onPress,
 }: Props) {
   return (
@@ -53,27 +69,33 @@ export default function SessionTypeCard({
       accessibilityState={{ selected }}
       accessibilityLabel={`${name}, ${formatDuration(durationMinutes)}, ${formatPrice(basePriceCents)}`}
     >
-      <View style={styles.row}>
-        <Text style={[styles.name, selected && styles.nameSelected]} numberOfLines={2}>
-          {name}
-        </Text>
-        <Text style={[styles.price, selected && styles.priceSelected]}>
-          {formatPrice(basePriceCents)}
-        </Text>
+      <View style={styles.iconWrap}>
+        <CategoryIcon typeCategory={typeCategory} selected={selected} />
       </View>
-      <Text style={styles.duration}>{formatDuration(durationMinutes)}</Text>
+      <Text style={[styles.name, selected && styles.nameSelected]} numberOfLines={2}>
+        {name}
+      </Text>
+      <Text style={[styles.duration, selected && styles.durationSelected]}>
+        {formatDuration(durationMinutes)}
+      </Text>
+      <Text style={[styles.price, selected && styles.priceSelected]}>
+        {formatPrice(basePriceCents)}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1,
+    alignItems: 'center',
     borderRadius: radius['2xl'],
     backgroundColor: colors.dark,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: spacing['2xl'],
-    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing['2xl'],
+    gap: spacing.xs,
   },
   cardSelected: {
     borderColor: colors.gold,
@@ -82,34 +104,37 @@ const styles = StyleSheet.create({
   cardPressed: {
     borderColor: colors.borderGold,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: spacing['2xl'],
+  iconWrap: {
+    marginBottom: spacing.base,
   },
   name: {
-    flex: 1,
-    fontFamily: fontFamilies.interSemiBold,
-    fontSize: fontSizes.lg,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.base,
     color: colors.textOnDark,
+    letterSpacing: tracking.wide,
+    textAlign: 'center',
+    textTransform: 'uppercase',
   },
   nameSelected: {
-    color: colors.gold,
-  },
-  price: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.lg,
-    color: colors.textOnDark,
-    letterSpacing: tracking.tight,
-  },
-  priceSelected: {
     color: colors.gold,
   },
   duration: {
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.base,
     color: colors.textLight,
-    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  durationSelected: {
+    color: colors.textOnDark,
+  },
+  price: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.md,
+    color: colors.textOnDark,
+    letterSpacing: tracking.tight,
+    textAlign: 'center',
+  },
+  priceSelected: {
+    color: colors.gold,
   },
 });

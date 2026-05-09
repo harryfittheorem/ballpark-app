@@ -1,8 +1,9 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
-import { Calendar, ChevronRight, Clock } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { Calendar } from 'lucide-react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { ScrollView as ScrollViewType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/ui';
@@ -13,32 +14,58 @@ import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/th
 import BookHeader from './components/BookHeader';
 import CoachSection from './components/CoachSection';
 import DateSection from './components/DateSection';
+import MultiDaySlotList from './components/MultiDaySlotList';
 import SessionTypeSection from './components/SessionTypeSection';
 import SummarySection from './components/SummarySection';
 import TimeSection from './components/TimeSection';
-import { useCoachAvailability } from './hooks/useCoachAvailability';
-import { useCoaches } from './hooks/useCoaches';
-import { useDayBookings } from './hooks/useDayBookings';
-import { usePrimaryLocation } from './hooks/usePrimaryLocation';
 import { useSessionTypes } from './hooks/useSessionTypes';
 import { styles as flowStyles } from './styles';
-import { formatSlotTime, generateDaySlots, type Slot } from './utils/slots';
+import type { Slot } from './utils/slots';
 import type { SessionType } from '@/api/bookings';
 
 type Category = 'all' | 'private' | 'group' | 'cage';
 
 const CATEGORIES: { key: Category; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'private', label: 'Private Lessons' },
-  { key: 'group', label: 'Group Classes' },
-  { key: 'cage', label: 'Cage Rentals' },
+  { key: 'all', label: 'ALL' },
+  { key: 'private', label: 'PRIVATE LESSONS' },
+  { key: 'group', label: 'GROUP CLASSES' },
+  { key: 'cage', label: 'CAGE RENTALS' },
 ];
 
-function ymd(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
+function statusLabel(status: string): string {
+  if (status === 'confirmed') return 'CONFIRMED';
+  if (status === 'pending') return 'PENDING';
+  return status.toUpperCase();
+}
+
+function statusColors(status: string): { bg: string; text: string } {
+  if (status === 'confirmed') return { bg: 'rgba(168,198,127,0.18)', text: colors.success };
+  if (status === 'pending') return { bg: 'rgba(232,167,71,0.18)', text: colors.warning };
+  return { bg: 'rgba(155,149,144,0.18)', text: colors.textLight };
+}
+
+function dateBadgeLabel(start: Date, today: Date, tomorrow: Date): { top: string; bottom: string } {
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  let top: string;
+  if (isSameDay(start, today)) {
+    top = 'TOD';
+  } else if (isSameDay(start, tomorrow)) {
+    top = 'TMR';
+  } else {
+    top = start.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase().slice(0, 3);
+  }
+
+  const bottom = start.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  return { top, bottom };
 }
 
 export default function BookScreen() {
@@ -46,10 +73,11 @@ export default function BookScreen() {
   const navigation = useNavigation<MainTabScreenProps<'Book'>['navigation']>();
   const { showToast } = useToast();
 
-  // Sub-tab filter for "What can I book?".
+  const scrollRef = useRef<ScrollViewType>(null);
+  const wizardY = useRef<number>(0);
+
   const [category, setCategory] = useState<Category>('all');
 
-  // ---- Wizard state (lifted from the v0.3 BookScreen) ----------------------
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -58,10 +86,13 @@ export default function BookScreen() {
   const [eligibleCoachIds, setEligibleCoachIds] = useState<string[]>([]);
 
   const { data: sessionTypes } = useSessionTypes();
-  const selectedSessionType =
+  const selectedSessionType: SessionType | null =
     sessionTypes?.find((s) => s.id === selectedSessionTypeId) ?? null;
 
   const { data: bookings } = useFamilyBookings();
+  const today = new Date();
+  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+
   const upcoming = useMemo(() => {
     if (!bookings) return [];
     const now = Date.now();
@@ -74,7 +105,6 @@ export default function BookScreen() {
       .slice(0, 3);
   }, [bookings]);
 
-  // Re-selecting the session type clears date + downstream sections.
   const handleSelectSessionType = useCallback((id: string) => {
     setSelectedSessionTypeId(id);
     setSelectedDate(null);
@@ -140,25 +170,28 @@ export default function BookScreen() {
     [navigation, resetSelection, showToast],
   );
 
-  // Today / Tomorrow quick-pick — pre-seeds the wizard's date so the
-  // parent can immediately scroll into TimeSection.
-  const today = new Date();
-  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-  const todayYmd = ymd(today);
-  const tomorrowYmd = ymd(tomorrow);
-
-  const onPickDay = (d: string) => {
-    if (!selectedSessionTypeId) {
-      showToast('Pick a session type first to see open slots.');
-      return;
-    }
-    handleSelectDate(d);
-  };
+  const handleMultiDaySlotPick = useCallback(
+    (date: string, slot: Slot) => {
+      if (!selectedSessionTypeId) {
+        showToast('Pick a session type first to see open slots.');
+        return;
+      }
+      handleSelectDate(date);
+      handleSelectSlot(slot, [slot.coach_id]);
+      // Scroll the wizard into view so the parent can confirm without hunting
+      // for it. A small delay lets React flush the state update first.
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ y: wizardY.current, animated: true });
+      }, 80);
+    },
+    [selectedSessionTypeId, handleSelectDate, handleSelectSlot, showToast],
+  );
 
   return (
     <SafeAreaView style={flowStyles.safe} edges={['top']}>
       <BookHeader />
       <ScrollView
+        ref={scrollRef}
         style={flowStyles.scroll}
         contentContainerStyle={[
           flowStyles.scrollContent,
@@ -166,7 +199,7 @@ export default function BookScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Sub-tab pills ---------------------------------------------------- */}
+        {/* Filter pills ---------------------------------------------------- */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -182,17 +215,15 @@ export default function BookScreen() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
               >
-                <Text
-                  style={[shellStyles.pillText, active && shellStyles.pillTextActive]}
-                >
-                  {c.label.toUpperCase()}
+                <Text style={[shellStyles.pillText, active && shellStyles.pillTextActive]}>
+                  {c.label}
                 </Text>
               </Pressable>
             );
           })}
         </ScrollView>
 
-        {/* Your upcoming --------------------------------------------------- */}
+        {/* YOUR UPCOMING --------------------------------------------------- */}
         <View style={flowStyles.section}>
           <Text style={shellStyles.sectionLabel}>YOUR UPCOMING</Text>
           {upcoming.length === 0 ? (
@@ -205,20 +236,15 @@ export default function BookScreen() {
           ) : (
             upcoming.map((b) => {
               const start = new Date(b.scheduled_start);
-              const when = start.toLocaleString(undefined, {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-              });
-              const sub = [
+              const badge = dateBadgeLabel(start, today, tomorrow);
+              const sc = statusColors(b.status ?? 'pending');
+              const middle = [
                 b.session_type?.name ?? 'Session',
                 b.coach ? `with ${b.coach.first_name}` : null,
-                b.location?.name ?? null,
               ]
                 .filter(Boolean)
                 .join(' · ');
+              const locationSub = b.location?.name ?? null;
               return (
                 <Pressable
                   key={b.id}
@@ -233,18 +259,37 @@ export default function BookScreen() {
                     pressed && { opacity: 0.85 },
                   ]}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={shellStyles.upcomingWhen}>{when.toUpperCase()}</Text>
-                    <Text style={shellStyles.upcomingSub}>{sub}</Text>
+                  {/* Coloured date badge */}
+                  <View style={shellStyles.dateBadge}>
+                    <Text style={shellStyles.dateBadgeTop}>{badge.top}</Text>
+                    <Text style={shellStyles.dateBadgeBottom}>{badge.bottom}</Text>
                   </View>
-                  <ChevronRight size={18} color={colors.textLight} />
+
+                  {/* Middle: session name + location */}
+                  <View style={shellStyles.upcomingMiddle}>
+                    <Text style={shellStyles.upcomingTitle} numberOfLines={1}>
+                      {middle}
+                    </Text>
+                    {locationSub ? (
+                      <Text style={shellStyles.upcomingSub} numberOfLines={1}>
+                        {locationSub}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* Status pill */}
+                  <View style={[shellStyles.statusPill, { backgroundColor: sc.bg }]}>
+                    <Text style={[shellStyles.statusPillText, { color: sc.text }]}>
+                      {statusLabel(b.status ?? 'pending')}
+                    </Text>
+                  </View>
                 </Pressable>
               );
             })
           )}
         </View>
 
-        {/* "What can I book?" ---------------------------------------------- */}
+        {/* WHAT CAN I BOOK? ----------------------------------------------- */}
         <View style={flowStyles.section}>
           <Text style={shellStyles.sectionLabel}>WHAT CAN I BOOK?</Text>
           <SessionTypeSection
@@ -254,217 +299,64 @@ export default function BookScreen() {
           />
         </View>
 
-        {/* Today / Tomorrow open slots ------------------------------------- */}
+        {/* Multi-day available slots --------------------------------------- */}
         <View style={flowStyles.section}>
-          <Text style={shellStyles.sectionLabel}>TODAY / TOMORROW</Text>
-          <View style={shellStyles.dayChipRow}>
-            <DayChip
-              label="TODAY"
-              date={todayYmd}
-              active={selectedDate === todayYmd}
-              onPress={() => onPickDay(todayYmd)}
-            />
-            <DayChip
-              label="TOMORROW"
-              date={tomorrowYmd}
-              active={selectedDate === tomorrowYmd}
-              onPress={() => onPickDay(tomorrowYmd)}
-            />
-          </View>
-          <OpenSlotsList
-            label="TODAY"
-            date={todayYmd}
+          <Text style={shellStyles.sectionLabel}>AVAILABLE SLOTS</Text>
+          <MultiDaySlotList
             sessionType={selectedSessionType}
             category={category}
-            onPickSlot={(slot) => {
-              handleSelectDate(todayYmd);
-              handleSelectSlot(slot, [slot.coach_id]);
-            }}
-          />
-          <OpenSlotsList
-            label="TOMORROW"
-            date={tomorrowYmd}
-            sessionType={selectedSessionType}
-            category={category}
-            onPickSlot={(slot) => {
-              handleSelectDate(tomorrowYmd);
-              handleSelectSlot(slot, [slot.coach_id]);
-            }}
+            onPickSlot={handleMultiDaySlotPick}
           />
         </View>
 
-        {/* Existing wizard ------------------------------------------------- */}
-        <View style={flowStyles.section}>
-          <DateSection
-            locked={dateLocked}
-            durationMinutes={selectedSessionType?.duration_minutes ?? null}
-            selectedDate={selectedDate}
-            onSelectDate={handleSelectDate}
-          />
-        </View>
-        <View style={flowStyles.section}>
-          <TimeSection
-            locked={timeLocked}
-            lockedHint={timeLockedHint}
-            date={selectedDate}
-            durationMinutes={selectedSessionType?.duration_minutes ?? null}
-            selectedSlotKey={selectedSlotKey}
-            onSelectSlot={handleSelectSlot}
-          />
-        </View>
-        <View style={flowStyles.section}>
-          <CoachSection
-            locked={coachLocked}
-            lockedHint={coachLockedHint}
-            autoSelectedCoachId={coachAutoSelected ? selectedCoachId : null}
-            eligibleCoachIds={eligibleCoachIds}
-            selectedCoachId={selectedCoachId}
-            onSelectCoach={handleSelectCoach}
-          />
-        </View>
-        <View style={flowStyles.section}>
-          <SummarySection
-            locked={summaryLocked}
-            lockedHint={summaryLockedHint}
-            sessionType={selectedSessionType}
-            date={selectedDate}
-            slot={selectedSlot}
-            selectedCoachId={selectedCoachId}
-            onBooked={handleBooked}
-          />
+        {/* Wizard ---------------------------------------------------------- */}
+        <View
+          onLayout={(e) => {
+            wizardY.current = e.nativeEvent.layout.y;
+          }}
+        >
+          <View style={flowStyles.section}>
+            <DateSection
+              locked={dateLocked}
+              durationMinutes={selectedSessionType?.duration_minutes ?? null}
+              selectedDate={selectedDate}
+              onSelectDate={handleSelectDate}
+            />
+          </View>
+          <View style={flowStyles.section}>
+            <TimeSection
+              locked={timeLocked}
+              lockedHint={timeLockedHint}
+              date={selectedDate}
+              durationMinutes={selectedSessionType?.duration_minutes ?? null}
+              selectedSlotKey={selectedSlotKey}
+              onSelectSlot={handleSelectSlot}
+            />
+          </View>
+          <View style={flowStyles.section}>
+            <CoachSection
+              locked={coachLocked}
+              lockedHint={coachLockedHint}
+              autoSelectedCoachId={coachAutoSelected ? selectedCoachId : null}
+              eligibleCoachIds={eligibleCoachIds}
+              selectedCoachId={selectedCoachId}
+              onSelectCoach={handleSelectCoach}
+            />
+          </View>
+          <View style={flowStyles.section}>
+            <SummarySection
+              locked={summaryLocked}
+              lockedHint={summaryLockedHint}
+              sessionType={selectedSessionType}
+              date={selectedDate}
+              slot={selectedSlot}
+              selectedCoachId={selectedCoachId}
+              onBooked={handleBooked}
+            />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function OpenSlotsList({
-  label,
-  date,
-  sessionType,
-  category,
-  onPickSlot,
-}: {
-  label: string;
-  date: string;
-  sessionType: SessionType | null;
-  category: Category;
-  onPickSlot: (slot: Slot) => void;
-}) {
-  const availability = useCoachAvailability();
-  const location = usePrimaryLocation();
-  const coaches = useCoaches();
-  const bookings = useDayBookings(date, location.data?.timezone ?? null);
-
-  const tz = location.data?.timezone ?? null;
-  const duration = sessionType?.duration_minutes ?? null;
-
-  if (!sessionType || duration == null) {
-    return (
-      <View style={shellStyles.openSlotsHint}>
-        <Text style={shellStyles.openSlotsHintText}>
-          Pick a session type above to see {label.toLowerCase()}&apos;s open slots.
-        </Text>
-      </View>
-    );
-  }
-
-  if (
-    availability.isPending ||
-    bookings.isPending ||
-    !availability.data ||
-    !bookings.data
-  ) {
-    return null;
-  }
-
-  const slots = generateDaySlots({
-    date,
-    durationMinutes: duration,
-    timezone: tz,
-    availability: availability.data,
-    bookings: bookings.data,
-  }).slice(0, 3);
-
-  if (slots.length === 0) {
-    return (
-      <View style={shellStyles.openSlotsHint}>
-        <Text style={shellStyles.openSlotsHintText}>
-          No open slots {label.toLowerCase()}.
-        </Text>
-      </View>
-    );
-  }
-
-  const coachNameOf = (id: string) => {
-    const c = coaches.data?.find((x) => x.id === id);
-    return c ? `${c.first_name} ${c.last_name}`.trim() : 'Coach';
-  };
-  const typeLabel = category === 'all' ? 'PRIVATE' : category.toUpperCase();
-
-  return (
-    <View style={{ marginTop: spacing.lg }}>
-      <Text style={shellStyles.openSlotsDayLabel}>{label}</Text>
-      {slots.map((slot) => (
-        <Pressable
-          key={`${slot.coach_id}|${slot.start}`}
-          onPress={() => onPickSlot(slot)}
-          style={({ pressed }) => [
-            shellStyles.openSlotRow,
-            pressed && { opacity: 0.85 },
-          ]}
-          accessibilityRole="button"
-        >
-          <Text style={shellStyles.openSlotTime}>{formatSlotTime(slot.start, tz)}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={shellStyles.openSlotCoach}>{coachNameOf(slot.coach_id)}</Text>
-            <Text style={shellStyles.openSlotMeta}>{sessionType.name}</Text>
-          </View>
-          <View style={shellStyles.openSlotChip}>
-            <Text style={shellStyles.openSlotChipText}>{typeLabel}</Text>
-          </View>
-          <ChevronRight size={14} color={colors.textLight} />
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-function DayChip({
-  label,
-  date,
-  active,
-  onPress,
-}: {
-  label: string;
-  date: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  // Pretty short date on the chip — e.g. "MAY 9".
-  const d = new Date(`${date}T00:00:00`);
-  const sub = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        shellStyles.dayChip,
-        active && shellStyles.dayChipActive,
-        pressed && { opacity: 0.9 },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={`${label}, ${sub}`}
-    >
-      <Clock size={16} color={active ? colors.dark : colors.gold} />
-      <View>
-        <Text style={[shellStyles.dayChipText, active && shellStyles.dayChipTextActive]}>
-          {label}
-        </Text>
-        <Text style={[shellStyles.dayChipSub, active && shellStyles.dayChipSubActive]}>
-          {sub.toUpperCase()}
-        </Text>
-      </View>
-    </Pressable>
   );
 }
 
@@ -523,105 +415,50 @@ const shellStyles = StyleSheet.create({
     borderColor: colors.borderGold,
     marginBottom: spacing.lg,
   },
-  upcomingWhen: {
-    color: colors.gold,
+  dateBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.xl,
+    backgroundColor: colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  dateBadgeTop: {
+    color: colors.dark,
     fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.base,
     letterSpacing: tracking.wide,
+    lineHeight: 14,
+  },
+  dateBadgeBottom: {
+    color: colors.dark,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.xs,
+    lineHeight: 12,
+    marginTop: 2,
+  },
+  upcomingMiddle: {
+    flex: 1,
+  },
+  upcomingTitle: {
+    color: colors.textOnDark,
+    fontFamily: fontFamilies.interSemiBold,
+    fontSize: fontSizes.md,
   },
   upcomingSub: {
     color: colors.textLight,
     fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.base,
     marginTop: 2,
   },
-  dayChipRow: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-  },
-  dayChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    padding: spacing['2xl'],
-    borderRadius: radius['2xl'],
-    borderWidth: 1,
-    borderColor: colors.borderGold,
-    backgroundColor: colors.dark,
-  },
-  dayChipActive: { backgroundColor: colors.gold, borderColor: colors.gold },
-  dayChipText: {
-    color: colors.gold,
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.md,
-    letterSpacing: tracking.wide,
-  },
-  dayChipTextActive: { color: colors.dark },
-  dayChipSub: {
-    color: colors.textLight,
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.sm,
-  },
-  dayChipSubActive: { color: colors.dark },
-  openSlotsHint: {
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    backgroundColor: colors.dark,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  openSlotsHintText: {
-    color: colors.textLight,
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.sm,
-  },
-  openSlotsDayLabel: {
-    color: colors.textLight,
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.xs,
-    letterSpacing: tracking.wider,
-    marginBottom: spacing.base,
-    marginTop: spacing.base,
-  },
-  openSlotRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.base,
-    borderRadius: radius.lg,
-    backgroundColor: colors.dark,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.xs,
-  },
-  openSlotTime: {
-    color: colors.gold,
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.md,
-    width: 70,
-  },
-  openSlotCoach: {
-    color: colors.textOnDark,
-    fontFamily: fontFamilies.interSemiBold,
-    fontSize: fontSizes.sm,
-  },
-  openSlotMeta: {
-    color: colors.textLight,
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.xs,
-    marginTop: 2,
-  },
-  openSlotChip: {
+  statusPill: {
     paddingHorizontal: spacing.base,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    backgroundColor: 'rgba(241,229,173,0.15)',
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.full,
+    flexShrink: 0,
   },
-  openSlotChipText: {
-    color: colors.gold,
+  statusPillText: {
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.xs,
     letterSpacing: tracking.wide,

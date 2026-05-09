@@ -48,13 +48,14 @@ export default function SessionTypeSection({
           <Text style={styles.emptyText}>No sessions available.</Text>
         </View>
       ) : (
-        <View style={styles.list}>
+        <View style={styles.grid}>
           {data.map((s) => (
             <SessionTypeCard
               key={s.id}
               name={s.name}
               durationMinutes={s.duration_minutes}
               basePriceCents={s.base_price_cents}
+              typeCategory={s.type_category ?? 'private'}
               selected={selectedSessionTypeId === s.id}
               onPress={() => onSelect(s.id)}
             />
@@ -66,7 +67,8 @@ export default function SessionTypeSection({
 }
 
 const styles = StyleSheet.create({
-  list: {
+  grid: {
+    flexDirection: 'row',
     gap: spacing.lg,
   },
   state: {
