@@ -58,7 +58,9 @@ export default function WorkScreen() {
     const swingsTotal = swings?.length ?? 0;
     const pendingAssign = (assignments ?? []).filter((a) => a.status === 'pending').length;
     const newMsgs = (coachMsgs ?? []).filter((m) => !m.viewedAt).length;
-    const reviewed = (assignments ?? []).filter((a) => a.status === 'reviewed').length;
+    const reviewed = (assignments ?? []).filter(
+      (a) => a.status === 'submitted' || a.status === 'reviewed',
+    ).length;
     const drillsTotal = drills?.length ?? 0;
     return {
       swings: fmtCount(swingsTotal),

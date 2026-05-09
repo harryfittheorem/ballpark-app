@@ -1,32 +1,24 @@
 import { Bell } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
 type Props = {
   kidFirstName: string;
-  unreadCount?: number;
-  onPressBell?: () => void;
 };
 
-export default function HomeHeader({ kidFirstName, unreadCount = 0, onPressBell }: Props) {
+export default function HomeHeader({ kidFirstName }: Props) {
   return (
     <View style={styles.container}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.eyebrow}>HEY, CHAMP</Text>
+        <Text style={styles.eyebrow}>WELCOME BACK</Text>
         <Text style={styles.greeting} numberOfLines={1}>
           {kidFirstName.toUpperCase()}
         </Text>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Notifications"
-        onPress={onPressBell}
-        style={styles.bell}
-      >
+      <View style={styles.bell} accessible={false} importantForAccessibility="no">
         <Bell size={20} color={colors.gold} strokeWidth={2.5} />
-        {unreadCount > 0 ? <View style={styles.badge} /> : null}
-      </Pressable>
+      </View>
     </View>
   );
 }
@@ -62,14 +54,5 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  badge: {
-    position: 'absolute',
-    top: 8,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.gold,
   },
 });
