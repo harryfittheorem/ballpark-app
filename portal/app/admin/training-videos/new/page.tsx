@@ -15,9 +15,9 @@ export default async function NewTrainingVideoPage({
           New training video
         </h1>
         <p className="mt-1 text-sm text-text-light">
-          Upload a clip via Mux or paste an existing Mux playback id. Save
-          as a draft (default) or check Publish to expose it to the tenant
-          immediately.
+          Upload a clip via Mux or paste an existing Mux playback id.
+          Publish is on by default — uncheck it to save as a draft you
+          can publish later from the catalog list.
         </p>
       </div>
 
