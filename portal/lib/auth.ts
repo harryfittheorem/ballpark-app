@@ -1,6 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 
-export type AppRole = "coach" | "admin" | "parent";
+export type AppRole = "coach" | "admin" | "owner" | "parent";
 
 /**
  * Decode the payload of a JWT without verifying its signature. Supabase
@@ -38,6 +38,7 @@ export function readAppRole(session: Session | null): AppRole {
   const claim = payload?.app_role;
   if (claim === "coach") return "coach";
   if (claim === "admin") return "admin";
+  if (claim === "owner") return "owner";
   return "parent";
 }
 
