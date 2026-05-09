@@ -241,15 +241,15 @@ function ActionRow({ onShare, onSend }: { onShare: () => void; onSend: () => voi
   return (
     <View style={styles.actionRow}>
       <ActionButton
-        icon={<Share2 size={18} color={colors.dark} />}
+        icon={<Share2 size={18} color={colors.gold} />}
         label="Share"
         onPress={onShare}
-        primary
       />
       <ActionButton
-        icon={<Send size={18} color={colors.gold} />}
+        icon={<Send size={18} color={colors.dark} />}
         label="Send to coach"
         onPress={onSend}
+        primary
       />
     </View>
   );
