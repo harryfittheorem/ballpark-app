@@ -15,6 +15,7 @@
   "dependencies": {
     "@expo-google-fonts/inter": "^0.2.3",
     "@expo-google-fonts/oswald": "^0.2.3",
+    "@expo/metro-runtime": "~6.1.2",
     "@hookform/resolvers": "^3.9.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.0.0",
@@ -41,6 +42,7 @@
     "expo-status-bar": "~3.0.9",
     "lucide-react-native": "^0.469.0",
     "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-hook-form": "^7.53.2",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
@@ -51,6 +53,7 @@
     "react-native-svg": "15.12.1",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-view-shot": "4.0.3",
+    "react-native-web": "^0.21.0",
     "react-native-worklets": "^0.8.3",
     "zod": "^3.23.8",
     "zustand": "^5.0.1"

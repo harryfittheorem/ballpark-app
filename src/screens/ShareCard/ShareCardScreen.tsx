@@ -24,11 +24,12 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
-import { Copy, Download, Instagram, MessageSquare, MoreHorizontal, Music2, X } from 'lucide-react-native';
+import { Copy, Download, Instagram, MessageSquare, MoreHorizontal, Music2, Smartphone, X } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -69,6 +70,7 @@ export default function ShareCardScreen() {
   >(null);
 
   const capture = useCallback(async (): Promise<string> => {
+    if (Platform.OS === 'web') throw new Error('Capture not supported on web.');
     if (!captureContainerRef.current) {
       throw new Error('Card not ready yet — try again.');
     }
@@ -281,74 +283,94 @@ export default function ShareCardScreen() {
           <Text style={styles.previewCaption}>1080 x 1920 — ready for stories.</Text>
         </View>
 
-        {/* Primary destinations — IG / TikTok / Message / More. Each tries
-            the platform's deep link first and falls back to the OS share
-            sheet so the destination is always reachable. */}
-        <View style={styles.primaryGrid}>
-          <PrimaryAction
-            icon={<Instagram size={22} color={colors.gold} />}
-            label="Instagram"
-            onPress={onInstagram}
-            busy={busy === 'instagram'}
-            disabled={busy !== null}
-          />
-          <PrimaryAction
-            icon={<Music2 size={22} color={colors.gold} />}
-            label="TikTok"
-            onPress={onTikTok}
-            busy={busy === 'tiktok'}
-            disabled={busy !== null}
-          />
-          <PrimaryAction
-            icon={<MessageSquare size={22} color={colors.gold} />}
-            label="Message"
-            onPress={onMessage}
-            busy={busy === 'message'}
-            disabled={busy !== null}
-          />
-          <PrimaryAction
-            icon={<MoreHorizontal size={22} color={colors.gold} />}
-            label="More"
-            onPress={onMore}
-            busy={busy === 'more'}
-            disabled={busy !== null}
-          />
-        </View>
+        {Platform.OS === 'web' ? (
+          <View style={{ alignItems: 'center', marginTop: 24, paddingHorizontal: 24 }}>
+            <Smartphone size={28} color={colors.textMuted} />
+            <Text
+              style={{
+                marginTop: 12,
+                fontFamily: fontFamilies.interMedium,
+                fontSize: 14,
+                color: colors.textMuted,
+                textAlign: 'center',
+                lineHeight: 20,
+              }}
+            >
+              Sharing and saving are available in the{'\n'}Ballpark app on your phone.
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* Primary destinations — IG / TikTok / Message / More. Each tries
+                the platform's deep link first and falls back to the OS share
+                sheet so the destination is always reachable. */}
+            <View style={styles.primaryGrid}>
+              <PrimaryAction
+                icon={<Instagram size={22} color={colors.gold} />}
+                label="Instagram"
+                onPress={onInstagram}
+                busy={busy === 'instagram'}
+                disabled={busy !== null}
+              />
+              <PrimaryAction
+                icon={<Music2 size={22} color={colors.gold} />}
+                label="TikTok"
+                onPress={onTikTok}
+                busy={busy === 'tiktok'}
+                disabled={busy !== null}
+              />
+              <PrimaryAction
+                icon={<MessageSquare size={22} color={colors.gold} />}
+                label="Message"
+                onPress={onMessage}
+                busy={busy === 'message'}
+                disabled={busy !== null}
+              />
+              <PrimaryAction
+                icon={<MoreHorizontal size={22} color={colors.gold} />}
+                label="More"
+                onPress={onMore}
+                busy={busy === 'more'}
+                disabled={busy !== null}
+              />
+            </View>
 
-        <View style={styles.actions}>
-          <ActionRow
-            icon={<Download size={18} color={colors.gold} />}
-            label="Save to Photos"
-            onPress={onSave}
-            busy={busy === 'save'}
-            disabled={busy !== null}
-          />
-          <ActionRow
-            icon={<Copy size={18} color={colors.gold} />}
-            label="Copy image"
-            onPress={onCopy}
-            busy={busy === 'copy'}
-            disabled={busy !== null}
-          />
-        </View>
+            <View style={styles.actions}>
+              <ActionRow
+                icon={<Download size={18} color={colors.gold} />}
+                label="Save to Photos"
+                onPress={onSave}
+                busy={busy === 'save'}
+                disabled={busy !== null}
+              />
+              <ActionRow
+                icon={<Copy size={18} color={colors.gold} />}
+                label="Copy image"
+                onPress={onCopy}
+                busy={busy === 'copy'}
+                disabled={busy !== null}
+              />
+            </View>
+          </>
+        )}
       </ScrollView>
 
-      {/* Off-screen full-resolution capture target. Absolutely positioned
-          off the visible canvas so RN still measures/paints it but no human
-          eye ever sees the 1080-wide version on the phone. */}
-      <View
-        ref={captureContainerRef}
-        collapsable={false}
-        style={{
-          position: 'absolute',
-          left: -99999,
-          top: 0,
-          width: FULL_WIDTH,
-          height: FULL_HEIGHT,
-        }}
-      >
-        <ShareCardArtwork {...cardProps} />
-      </View>
+      {/* Off-screen full-resolution capture target — native only. */}
+      {Platform.OS !== 'web' && (
+        <View
+          ref={captureContainerRef}
+          collapsable={false}
+          style={{
+            position: 'absolute',
+            left: -99999,
+            top: 0,
+            width: FULL_WIDTH,
+            height: FULL_HEIGHT,
+          }}
+        >
+          <ShareCardArtwork {...cardProps} />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
