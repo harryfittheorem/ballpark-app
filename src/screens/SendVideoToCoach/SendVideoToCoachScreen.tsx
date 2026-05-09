@@ -78,7 +78,30 @@ export default function SendVideoToCoachScreen() {
   const [label, setLabel] = useState<ComposerLabel | null>(null);
   const [coachId, setCoachId] = useState<string | null>(initialCoachId);
   const [caption, setCaption] = useState('');
-  const [senderDisplay, setSenderDisplay] = useState(family?.parent_first_name ?? '');
+  // Sent-from selector (Step 4). Options surface the parent's actual name
+  // (from the family row), generic Mom/Dad chips so multi-parent
+  // households don't have to type, and the kid's first name. The user can
+  // also type a custom value via the "Other" chip + text input. We default
+  // to the parent's first name when present so the common case is one tap.
+  const sentFromOptions = useMemo<string[]>(() => {
+    const opts: string[] = [];
+    const push = (v: string | null | undefined) => {
+      const trimmed = (v ?? '').trim();
+      if (!trimmed) return;
+      if (opts.some((o) => o.toLowerCase() === trimmed.toLowerCase())) return;
+      opts.push(trimmed);
+    };
+    push(family?.parent_first_name);
+    push('Mom');
+    push('Dad');
+    push(kid?.first_name);
+    return opts;
+  }, [family?.parent_first_name, kid?.first_name]);
+  const [senderDisplay, setSenderDisplay] = useState<string>(
+    family?.parent_first_name?.trim() || sentFromOptions[0] || '',
+  );
+  const [sentFromMode, setSentFromMode] = useState<'preset' | 'custom'>('preset');
+  const [customSender, setCustomSender] = useState<string>('');
   const [progress, setProgress] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const idemKeyRef = useRef<string | null>(null);
@@ -147,6 +170,8 @@ export default function SendVideoToCoachScreen() {
     setSubmitting(true);
     setProgress(0);
     try {
+      const resolvedSender =
+        (sentFromMode === 'custom' ? customSender : senderDisplay).trim() || null;
       const idemKey = idemKeyRef.current ?? uuidv4();
       idemKeyRef.current = idemKey;
       const { upload_url, video_id } = await createMuxUpload(idemKey, 'parent_to_coach');
@@ -165,7 +190,7 @@ export default function SendVideoToCoachScreen() {
         recipientKidId: kid.id,
         recipientCoachUserId: coachId,
         label,
-        senderDisplay: senderDisplay.trim() || null,
+        senderDisplay: resolvedSender,
         messageText: caption.trim() || null,
       });
 
@@ -184,7 +209,19 @@ export default function SendVideoToCoachScreen() {
       setSubmitting(false);
       setProgress(null);
     }
-  }, [asset, kid, family, coachId, label, senderDisplay, caption, sendMutation, navigation]);
+  }, [
+    asset,
+    kid,
+    family,
+    coachId,
+    label,
+    senderDisplay,
+    sentFromMode,
+    customSender,
+    caption,
+    sendMutation,
+    navigation,
+  ]);
 
   const stepTitle = useMemo(
     () => ({ 1: 'PICK A CLIP', 2: 'TAG IT', 3: 'CAPTION & COACH', 4: 'SENT FROM' }),
@@ -330,27 +367,97 @@ export default function SendVideoToCoachScreen() {
             <View style={{ gap: spacing['3xl'] }}>
               <Text style={styles.helperText}>
                 Tell your coach who's sending — handy when more than one parent uses the
-                same login.
+                same login. Tap a chip or pick "Other" to type a custom name.
               </Text>
               <View>
                 <Text style={styles.fieldLabel}>SENT FROM</Text>
-                <TextInput
-                  value={senderDisplay}
-                  onChangeText={setSenderDisplay}
-                  maxLength={40}
-                  placeholder="Mom, Dad, Coach Pete…"
-                  placeholderTextColor={colors.textLight}
-                  style={styles.textInput}
-                />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    gap: spacing.base,
+                    marginTop: spacing.base,
+                  }}
+                >
+                  {sentFromOptions.map((opt) => {
+                    const active =
+                      sentFromMode === 'preset' && senderDisplay === opt;
+                    return (
+                      <Pressable
+                        key={opt}
+                        onPress={() => {
+                          setSentFromMode('preset');
+                          setSenderDisplay(opt);
+                        }}
+                        style={({ pressed }) => [
+                          styles.chip,
+                          active && styles.chipActive,
+                          pressed && { opacity: 0.85 },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                      >
+                        <Text
+                          style={[
+                            styles.chipLabel,
+                            active && styles.chipLabelActive,
+                          ]}
+                        >
+                          {opt}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  <Pressable
+                    onPress={() => setSentFromMode('custom')}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      sentFromMode === 'custom' && styles.chipActive,
+                      pressed && { opacity: 0.85 },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: sentFromMode === 'custom' }}
+                  >
+                    <Text
+                      style={[
+                        styles.chipLabel,
+                        sentFromMode === 'custom' && styles.chipLabelActive,
+                      ]}
+                    >
+                      Other…
+                    </Text>
+                  </Pressable>
+                </View>
+                {sentFromMode === 'custom' ? (
+                  <TextInput
+                    value={customSender}
+                    onChangeText={setCustomSender}
+                    maxLength={40}
+                    placeholder="Type a name (e.g. Grandpa)"
+                    placeholderTextColor={colors.textLight}
+                    style={[styles.textInput, { marginTop: spacing.lg }]}
+                    autoFocus
+                  />
+                ) : null}
               </View>
               <Pressable
                 onPress={onSend}
-                disabled={submitting}
-                style={({ pressed }) => [
-                  styles.primaryBtn,
-                  pressed && { opacity: 0.85 },
-                  submitting && { opacity: 0.7 },
-                ]}
+                disabled={
+                  submitting ||
+                  (sentFromMode === 'custom' && !customSender.trim()) ||
+                  (sentFromMode === 'preset' && !senderDisplay.trim())
+                }
+                style={({ pressed }) => {
+                  const blocked =
+                    submitting ||
+                    (sentFromMode === 'custom' && !customSender.trim()) ||
+                    (sentFromMode === 'preset' && !senderDisplay.trim());
+                  return [
+                    styles.primaryBtn,
+                    pressed && !blocked && { opacity: 0.85 },
+                    blocked && { opacity: 0.6 },
+                  ];
+                }}
               >
                 {submitting ? (
                   <ActivityIndicator color={colors.dark} />

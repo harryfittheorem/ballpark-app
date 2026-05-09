@@ -2,15 +2,19 @@
  * Parent-side messaging API (v0.7 task #120).
  *
  * Mirrors src/api/coachMessages.ts but flips the direction: the parent is
- * the SENDER, a coach is the recipient context (not stored as a column —
- * coaches are reached implicitly because every coach in the tenant can SELECT
- * coach_messages rows in the tenant via coach_messages_select_coach_stub).
+ * the SENDER, the addressed coach is pinned in
+ * `coach_messages.recipient_coach_user_id` (added by migration
+ * 20260509000000). Coach access to those rows is granted by RLS policy
+ * `coach_messages_select_recipient_coach` — i.e. only the addressed coach
+ * (and the parent sender, via `coach_messages_select_parent_sender`) can
+ * read the row.
  *
  * Tables touched:
- *   coach_messages    insert with sender_user_id = parent.user_id, label,
+ *   coach_messages    insert with sender_user_id = parent.user_id,
+ *                     recipient_coach_user_id = picked coach, label,
  *                     sender_display, optional video_id (parent_to_coach).
- *   coaches           list tenant coaches so the composer / inbox can show a
- *                     "to: <coach>" affordance.
+ *   coaches           list tenant coaches so the composer / inbox can show
+ *                     a "to: <coach>" affordance.
  *
  * RLS is enforced server-side. The client passes tenant_id explicitly
  * because the policy WITH CHECK requires it on the row itself.

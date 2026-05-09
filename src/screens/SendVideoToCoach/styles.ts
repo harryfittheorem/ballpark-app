@@ -2,6 +2,13 @@ import { StyleSheet } from 'react-native';
 
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
+const chipStyles = {
+  paddingHorizontal: spacing['2xl'],
+  paddingVertical: spacing.lg,
+  borderRadius: radius['2xl'],
+  borderWidth: 1,
+};
+
 export const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.darkest },
   headerRow: {
@@ -115,5 +122,23 @@ export const styles = StyleSheet.create({
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.lg,
     letterSpacing: tracking.wider,
+  },
+  chip: {
+    ...chipStyles,
+    backgroundColor: colors.darker,
+    borderColor: colors.border,
+  },
+  chipActive: {
+    backgroundColor: colors.gold,
+    borderColor: colors.gold,
+  },
+  chipLabel: {
+    fontFamily: fontFamilies.interSemiBold,
+    fontSize: fontSizes.sm,
+    color: colors.textOnDark,
+    letterSpacing: tracking.wide,
+  },
+  chipLabelActive: {
+    color: colors.dark,
   },
 });

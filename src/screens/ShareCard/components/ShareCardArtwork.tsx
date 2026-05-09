@@ -82,11 +82,11 @@ export default function ShareCardArtwork({
           style={{
             fontFamily: fontFamilies.oswaldBold,
             color: colors.gold,
-            fontSize: 56,
+            fontSize: 52,
             letterSpacing: 6,
           }}
         >
-          BALLPARK
+          {facilityName.toUpperCase()}
         </Text>
         {isPr ? (
           <View
@@ -158,8 +158,11 @@ export default function ShareCardArtwork({
         </Text>
       </View>
 
-      {/* Hero metric — pick the most-impressive metric (PR > exit velo > distance) */}
-      <HeroMetric swing={swing} prMetrics={prMetrics} />
+      {/* Hero metric — ALWAYS exit velocity with MPH subtitle. Spec keeps
+          the share card layout consistent so the brand reads at a glance,
+          regardless of which metric earned the PR. The 2x2 metric grid
+          below highlights any other PR with a gold ribbon. */}
+      <HeroExitVelocity swing={swing} />
 
       {/* Lower 2x2 metric grid */}
       <View
@@ -228,7 +231,7 @@ export default function ShareCardArtwork({
         })}
       </View>
 
-      {/* Footer: facility wordmark + location + date */}
+      {/* Footer: location (if set) + date + ballpark.app wordmark */}
       <View
         style={{
           position: 'absolute',
@@ -241,16 +244,6 @@ export default function ShareCardArtwork({
         }}
       >
         <View>
-          <Text
-            style={{
-              fontFamily: fontFamilies.oswaldBold,
-              color: colors.gold,
-              fontSize: 36,
-              letterSpacing: 4,
-            }}
-          >
-            {facilityName.toUpperCase()}
-          </Text>
           {facilityLocation ? (
             <Text
               style={{
@@ -258,36 +251,33 @@ export default function ShareCardArtwork({
                 color: colors.textLight,
                 fontSize: 26,
                 letterSpacing: 2,
-                marginTop: 8,
               }}
             >
               {facilityLocation}
             </Text>
           ) : null}
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
           <Text
             style={{
               fontFamily: fontFamilies.interMedium,
               color: colors.textLight,
               fontSize: 26,
               letterSpacing: 2,
+              marginTop: facilityLocation ? 8 : 0,
             }}
           >
             {formatDate(achievedAt)}
           </Text>
-          <Text
-            style={{
-              fontFamily: fontFamilies.interMedium,
-              color: colors.gold,
-              fontSize: 26,
-              letterSpacing: 2,
-              marginTop: 8,
-            }}
-          >
-            ballpark.app
-          </Text>
         </View>
+        <Text
+          style={{
+            fontFamily: fontFamilies.interMedium,
+            color: colors.gold,
+            fontSize: 26,
+            letterSpacing: 2,
+          }}
+        >
+          ballpark.app
+        </Text>
       </View>
     </View>
   );
@@ -304,21 +294,8 @@ function formatDate(d: Date): string {
     .toUpperCase();
 }
 
-function HeroMetric({ swing, prMetrics }: { swing: Swing; prMetrics: string[] }) {
-  // Prefer a PR metric, then exit velocity, then distance.
-  const candidates: { key: keyof Swing & string; digits: number }[] = [
-    { key: 'exit_velocity_mph', digits: 1 },
-    { key: 'distance_ft', digits: 0 },
-    { key: 'pitch_speed_mph', digits: 1 },
-    { key: 'launch_angle_deg', digits: 0 },
-  ];
-  const prFirst = candidates.find(
-    (c) => prMetrics.includes(c.key) && swing[c.key] != null,
-  );
-  const fallback = candidates.find((c) => swing[c.key] != null);
-  const choice = prFirst ?? fallback;
-  if (!choice) return null;
-  const v = swing[choice.key] as number;
+function HeroExitVelocity({ swing }: { swing: Swing }) {
+  const v = swing.exit_velocity_mph;
   return (
     <View style={{ paddingHorizontal: 80, marginTop: 60 }}>
       <Text
@@ -329,7 +306,7 @@ function HeroMetric({ swing, prMetrics }: { swing: Swing; prMetrics: string[] })
           letterSpacing: 4,
         }}
       >
-        {METRIC_LABEL[choice.key]}
+        EXIT VELO
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 16 }}>
         <Text
@@ -340,7 +317,7 @@ function HeroMetric({ swing, prMetrics }: { swing: Swing; prMetrics: string[] })
             lineHeight: 240,
           }}
         >
-          {fmt(v, choice.digits)}
+          {fmt(v, 1)}
         </Text>
         <Text
           style={{
@@ -350,7 +327,7 @@ function HeroMetric({ swing, prMetrics }: { swing: Swing; prMetrics: string[] })
             marginLeft: 24,
           }}
         >
-          {METRIC_UNIT[choice.key]}
+          MPH
         </Text>
       </View>
     </View>
