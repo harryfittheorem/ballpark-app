@@ -10,12 +10,12 @@
 // in Profile.
 //
 // Auth: service-role bearer (same convention as send-push-notification).
-// Idempotency: the achievement-grant is ON CONFLICT DO NOTHING, and the
-// push itself is best-effort — re-running this function the same week
-// does NOT spam parents because we additionally gate the push on "this
-// kid was NOT in the top 10 a week ago" via points_ledger reconstruction.
-// (For the v1 cut we accept a duplicate push if the operator runs it
-// twice in a row — explicit dedupe table is task #122 follow-up.)
+// Idempotency: the achievement-grant is ON CONFLICT DO NOTHING. The push
+// itself is gated by `public.notification_log` keyed
+// (tenant_id, kid_id, event_type='leaderboard_top_10', period_key=ISO week)
+// — we INSERT the log row first; on UNIQUE collision we skip the push.
+// So re-invoking this function any number of times within the same ISO
+// week never sends a duplicate "Top 10" push to a parent.
 // =============================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -55,6 +55,10 @@ serve(async (req) => {
   }
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  // ISO week (e.g. "2026-W19") — stable inside a calendar week regardless
+  // of the exact moment within that week the cron fires.
+  const periodKey = isoWeekKey(new Date());
+  const EVENT_TYPE = "leaderboard_top_10";
   let pushed = 0;
 
   for (const tenant of tenants ?? []) {
@@ -103,6 +107,27 @@ serve(async (req) => {
       const parentUserId = families?.parent_user_id ?? null;
       if (!parentUserId) continue;
 
+      // Durable dedupe: try to insert a notification_log row. UNIQUE
+      // (tenant_id, kid_id, event_type, period_key) means re-runs in
+      // the same ISO week collide and we skip the push.
+      const { error: logErr } = await adminClient
+        .from("notification_log")
+        .insert({
+          tenant_id: tenant.id,
+          kid_id: kid.id,
+          user_id: parentUserId,
+          event_type: EVENT_TYPE,
+          period_key: periodKey,
+        });
+      if (logErr) {
+        // 23505 = unique_violation -> already pushed this week. Anything
+        // else is unexpected; log and skip so we don't risk a duplicate.
+        if ((logErr as { code?: string }).code !== "23505") {
+          console.error("notify-leaderboard-weekly log insert failed", logErr);
+        }
+        continue;
+      }
+
       const r = await fetch(`${SUPABASE_URL}/functions/v1/send-push-notification`, {
         method: "POST",
         headers: {
@@ -123,8 +148,18 @@ serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, pushed }), {
+  return new Response(JSON.stringify({ ok: true, pushed, period_key: periodKey }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
 });
+
+// ISO week of date as "YYYY-Www" (matches Postgres to_char(d,'IYYY-"W"IW')).
+function isoWeekKey(d: Date): string {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${t.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}

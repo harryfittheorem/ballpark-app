@@ -535,6 +535,40 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.kid_achievements TO service_role;
 
 
 -- -----------------------------------------------------------------------------
+-- 7c. notification_log — durable per-period dedupe for fan-out jobs
+--
+-- Keyed by (tenant_id, kid_id, event_type, period_key). The
+-- notify-leaderboard-weekly function inserts a row before sending; the
+-- UNIQUE constraint guarantees the push only fires once per ISO week
+-- per (kid, event), no matter how many times the cron / operator
+-- re-invokes the function. Other best-effort jobs can adopt the same
+-- table by picking their own `period_key` convention (daily, hourly,
+-- one-shot UUID, etc).
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.notification_log (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  kid_id      uuid NULL REFERENCES public.kids(id) ON DELETE CASCADE,
+  user_id     uuid NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  event_type  text NOT NULL,
+  period_key  text NOT NULL,
+  sent_at     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_notification_log_kid_event_period
+  ON public.notification_log (tenant_id, kid_id, event_type, period_key)
+  WHERE kid_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_notification_log_user_event_period
+  ON public.notification_log (tenant_id, user_id, event_type, period_key)
+  WHERE user_id IS NOT NULL AND kid_id IS NULL;
+
+ALTER TABLE public.notification_log ENABLE ROW LEVEL SECURITY;
+-- No client policies — service-role only.
+GRANT SELECT, INSERT ON public.notification_log TO service_role;
+
+
+-- -----------------------------------------------------------------------------
 -- 7b. get_kid_weekly_rank_delta(p_kid_id) RPC
 --
 -- Returns how many ranks a kid has climbed (+) or dropped (-) over the

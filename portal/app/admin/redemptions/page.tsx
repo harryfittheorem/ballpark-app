@@ -6,10 +6,10 @@
  * the form or the per-row "Mark fulfilled" button calls the
  * `mark_redemption_fulfilled(p_code)` RPC.
  *
- * Camera scan is intentionally manual entry only for v1 — adding a
- * webcam barcode scanner needs a JS QR library + getUserMedia plumbing
- * that's out of scope for this task. The mobile QR code is for visual
- * front-desk verification; the staff types the 8-char code below it.
+ * Two scan paths: a `<QRScanner />` client component that uses
+ * `html5-qrcode` + `getUserMedia` to read the parent's QR straight off
+ * the customer's phone screen and auto-submits the manual form; and the
+ * manual 8-char input for browsers without camera permission.
  */
 
 import { redirect } from "next/navigation";
@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/Card";
 import { readAppRole, readTenantId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
+import { QRScanner } from "./QRScanner";
 import { fulfillByCode, fulfillById } from "./actions";
 
 type PendingRow = {
@@ -105,25 +106,32 @@ export default async function RedemptionsPage({
 
       <Card accent padding="lg">
         <h2 className="font-display text-xl uppercase tracking-wide text-gold">
-          Manual code entry
+          Scan or enter code
         </h2>
-        <form action={fulfillByCode} className="mt-4 flex flex-wrap gap-3">
-          <input
-            name="code"
-            required
-            autoFocus
-            placeholder="ABCD1234"
-            maxLength={8}
-            className="flex-1 min-w-[200px] rounded-md border border-border-gold bg-darkest px-4 py-3 font-mono text-lg uppercase tracking-[0.4em] text-gold outline-none focus:border-gold"
-            autoComplete="off"
-          />
-          <button
-            type="submit"
-            className="rounded-md bg-gold px-6 py-3 font-display text-lg uppercase tracking-wide text-dark transition hover:opacity-90"
+        <div className="mt-4 space-y-4">
+          <QRScanner formId="redemption-fulfill-form" />
+          <form
+            id="redemption-fulfill-form"
+            action={fulfillByCode}
+            className="flex flex-wrap gap-3"
           >
-            Fulfill
-          </button>
-        </form>
+            <input
+              name="code"
+              required
+              autoFocus
+              placeholder="ABCD1234"
+              maxLength={8}
+              className="flex-1 min-w-[200px] rounded-md border border-border-gold bg-darkest px-4 py-3 font-mono text-lg uppercase tracking-[0.4em] text-gold outline-none focus:border-gold"
+              autoComplete="off"
+            />
+            <button
+              type="submit"
+              className="rounded-md bg-gold px-6 py-3 font-display text-lg uppercase tracking-wide text-dark transition hover:opacity-90"
+            >
+              Fulfill
+            </button>
+          </form>
+        </div>
       </Card>
 
       <section>

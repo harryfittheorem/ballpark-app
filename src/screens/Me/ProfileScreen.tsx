@@ -56,7 +56,7 @@ import {
 } from '@/hooks/useAchievements';
 import { useFamily } from '@/hooks/useFamily';
 import { useHitTraxLink } from '@/hooks/useHitTraxLink';
-import { usePersonalBestsForKid } from '@/hooks/useSwings';
+import { usePersonalBestsForKid, useSwingsForKid } from '@/hooks/useSwings';
 import type { MeStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
@@ -82,17 +82,27 @@ const ICONS: Record<string, LucideIcon> = {
   Activity,
 };
 
+// Contact rate isn't a `personal_bests` row — it's derived from swings
+// (count of contact swings ÷ total swings). We synthesise it as a
+// special tile and pull the value from the swings query rather than the
+// PRs map.
+type PbMetric =
+  | 'exit_velocity_mph'
+  | 'launch_angle_deg'
+  | 'distance_ft'
+  | 'contact_rate';
+
 const PB_TILES: Array<{
-  metric: 'exit_velocity_mph' | 'launch_angle_deg' | 'distance_ft' | 'pitch_speed_mph';
+  metric: PbMetric;
   label: string;
   unit: string;
   icon: LucideIcon;
   digits: number;
 }> = [
-  { metric: 'exit_velocity_mph', label: 'EXIT VELO',   unit: 'MPH', icon: Gauge,      digits: 1 },
-  { metric: 'launch_angle_deg',  label: 'LAUNCH ANGLE', unit: '°',  icon: TrendingUp, digits: 0 },
-  { metric: 'distance_ft',       label: 'DISTANCE',    unit: 'FT',  icon: Ruler,      digits: 0 },
-  { metric: 'pitch_speed_mph',   label: 'PITCH SPEED', unit: 'MPH', icon: Activity,   digits: 1 },
+  { metric: 'exit_velocity_mph', label: 'EXIT VELO',    unit: 'MPH', icon: Gauge,      digits: 1 },
+  { metric: 'launch_angle_deg',  label: 'LAUNCH ANGLE', unit: '°',   icon: TrendingUp, digits: 0 },
+  { metric: 'distance_ft',       label: 'DISTANCE',     unit: 'FT',  icon: Ruler,      digits: 0 },
+  { metric: 'contact_rate',      label: 'CONTACT RATE', unit: '%',   icon: Target,     digits: 0 },
 ];
 
 function fmtPb(v: number, digits: number): string {
@@ -116,6 +126,18 @@ export default function ProfileScreen({ navigation }: Props) {
           : 'Not connected';
 
   const { data: prs } = usePersonalBestsForKid(kid?.id);
+  const { data: swings } = useSwingsForKid(kid?.id);
+
+  // Contact rate: % of swings with measurable exit velocity > 0. NULL
+  // exit velocity means HitTrax didn't register contact (whiff or miss).
+  const contactRate = useMemo<number | null>(() => {
+    if (!swings || swings.length === 0) return null;
+    const total = swings.length;
+    const contact = swings.filter(
+      (s) => typeof s.exit_velocity_mph === 'number' && s.exit_velocity_mph > 0,
+    ).length;
+    return Math.round((contact / total) * 100);
+  }, [swings]);
   const { data: catalog } = useAchievementsCatalog();
   const { data: earned } = useEarnedAchievements(kid?.id);
 
@@ -204,7 +226,10 @@ export default function ProfileScreen({ navigation }: Props) {
         <Text style={styles.sectionLabel}>PERSONAL BESTS</Text>
         <View style={styles.pbGrid}>
           {PB_TILES.map((tile) => {
-            const v = prsByMetric.get(tile.metric);
+            const v =
+              tile.metric === 'contact_rate'
+                ? contactRate ?? undefined
+                : prsByMetric.get(tile.metric);
             const Icon = tile.icon;
             return (
               <View key={tile.metric} style={styles.pbTile}>
