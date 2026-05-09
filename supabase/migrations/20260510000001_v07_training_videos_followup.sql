@@ -38,6 +38,9 @@ CREATE POLICY videos_select_admin_training ON public.videos
 
 
 -- 2. record_training_view: server-side per-session dedupe --------------------
+-- Drop the prior signature first; CREATE OR REPLACE cannot change return type.
+DROP FUNCTION IF EXISTS public.record_training_view(uuid, uuid);
+
 -- A "session" for analytics is "this kid hasn't viewed this video in the
 -- last 30 minutes". Repeated calls within the window are no-ops — the
 -- view row is NOT inserted and view_count is NOT bumped. This guarantees
