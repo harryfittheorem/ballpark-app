@@ -1,14 +1,22 @@
+/**
+ * Rewards tab stack — task #119.
+ *
+ * Replaces the old EarnStackNavigator. The Rewards screen wraps the
+ * existing Rewards / Store / Earn-rules tab components behind a
+ * SubTabBar; Ranks has been promoted to its own bottom tab.
+ */
+
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import EarnScreen from '@/screens/Earn/EarnScreen';
+import RewardsScreen from '@/screens/Rewards/RewardsScreen';
 import RewardRedeemScreen from '@/screens/Earn/RewardRedeemScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
-import type { EarnStackParamList } from './types';
+import type { RewardsStackParamList } from './types';
 
-const Stack = createNativeStackNavigator<EarnStackParamList>();
+const Stack = createNativeStackNavigator<RewardsStackParamList>();
 
-export default function EarnStackNavigator() {
+export default function RewardsStackNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
@@ -21,7 +29,7 @@ export default function EarnStackNavigator() {
         contentStyle: { backgroundColor: colors.darkest },
       }}
     >
-      <Stack.Screen name="EarnHome" component={EarnScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="RewardsHome" component={RewardsScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="RewardRedeem"
         component={RewardRedeemScreen}

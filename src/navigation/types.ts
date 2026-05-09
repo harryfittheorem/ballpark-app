@@ -22,11 +22,26 @@ export type WorkStackScreenProps<T extends keyof WorkStackParamList> = Composite
   BottomTabScreenProps<MainTabParamList>
 >;
 
+/**
+ * v0.7 task #119: bottom nav grew from 5 to 7 tabs.
+ *   Home · Videos · Work · Train · Rewards · Ranks · Me
+ *
+ * Book moved out of the bottom nav into:
+ *   - a Quick Action on Home  (navigates Me → Book)
+ *   - the Me sub-screen        (MeStack 'Book' route)
+ *
+ * Earn split into two top-level tabs (Rewards + Ranks). The old Store and
+ * Earn-rules sub-tabs are merged inside the Rewards tab as in-screen
+ * sub-tabs (see RewardsTabNavigator's local SubTabBar) so we don't lose
+ * surface area, but the headline Earn surface is split per spec.
+ */
 export type MainTabParamList = {
-  Home: undefined;
+  Home: NavigatorScreenParams<HomeStackParamList>;
+  Videos: NavigatorScreenParams<VideosStackParamList>;
   Work: NavigatorScreenParams<WorkStackParamList>;
-  Book: undefined;
-  Earn: undefined;
+  Train: undefined;
+  Rewards: NavigatorScreenParams<RewardsStackParamList>;
+  Ranks: undefined;
   Me: NavigatorScreenParams<MeStackParamList> | undefined;
 };
 
@@ -42,6 +57,24 @@ export type HomeStackParamList = {
 
 export type HomeStackScreenProps<T extends keyof HomeStackParamList> = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, T>,
+  BottomTabScreenProps<MainTabParamList>
+>;
+
+/**
+ * Videos tab stack — list root + session detail + swing detail.
+ * SwingDetail / SessionDetail are pushed within the Videos tab so the
+ * back affordance stays inside the tab. The full-screen VideoPlayback
+ * modal continues to live on the Home stack (it's the destination for
+ * coach messages, which originate from Home + Videos → Coach sub-tab).
+ */
+export type VideosStackParamList = {
+  VideosHome: undefined;
+  SessionDetail: { sessionId: string };
+  SwingDetail: { swingId: string };
+};
+
+export type VideosStackScreenProps<T extends keyof VideosStackParamList> = CompositeScreenProps<
+  NativeStackScreenProps<VideosStackParamList, T>,
   BottomTabScreenProps<MainTabParamList>
 >;
 
@@ -78,25 +111,37 @@ export type CoachTabScreenProps<T extends keyof CoachTabParamList> = BottomTabSc
   T
 >;
 
+/**
+ * v0.7 task #119: Book moved from the bottom nav to a Me sub-screen.
+ * Parents reach it via Home → Quick Action ("Book Session") or via the
+ * Me tab. The MeStack now hosts every "manage my account" surface
+ * (Bookings, Orders, HitTrax, Book).
+ */
 export type MeStackParamList = {
   MeHome: undefined;
+  Book: undefined;
   BookingsList: undefined;
   BookingDetail: { bookingId: string };
   Orders: undefined;
   ConnectHitTrax: undefined;
 };
 
-export type MeStackScreenProps<T extends keyof MeStackParamList> = NativeStackScreenProps<
-  MeStackParamList,
-  T
+export type MeStackScreenProps<T extends keyof MeStackParamList> = CompositeScreenProps<
+  NativeStackScreenProps<MeStackParamList, T>,
+  BottomTabScreenProps<MainTabParamList>
 >;
 
-export type EarnStackParamList = {
-  EarnHome: undefined;
+/**
+ * Rewards tab stack. The Earn screen previously bundled Rewards + Store +
+ * Ranks + Earn-rules behind a SubTabBar; with the v0.7 split, Ranks moves
+ * out to its own bottom tab and Rewards/Store/Earn-rules collapse onto a
+ * single screen with an in-screen sub-tab switcher. The stack only needs
+ * the redeem modal in addition to the Rewards root.
+ */
+export type RewardsStackParamList = {
+  RewardsHome: undefined;
   RewardRedeem: { productId: string; kidId: string };
 };
 
-export type EarnStackScreenProps<T extends keyof EarnStackParamList> = NativeStackScreenProps<
-  EarnStackParamList,
-  T
->;
+export type RewardsStackScreenProps<T extends keyof RewardsStackParamList> =
+  NativeStackScreenProps<RewardsStackParamList, T>;

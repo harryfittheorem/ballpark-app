@@ -13,6 +13,7 @@ import {
   latestCoachMessageKey,
   useLatestCoachMessage,
 } from '@/hooks/useLatestCoachMessage';
+import { personalBestsKeys, useLatestPersonalBest } from '@/hooks/useSwings';
 import { upcomingSessionKey, useUpcomingSession } from '@/hooks/useUpcomingSession';
 import type { HomeStackScreenProps } from '@/navigation/types';
 import { colors, spacing } from '@/theme';
@@ -25,6 +26,7 @@ import EmptyHomeCard from './components/EmptyHomeCard';
 import HeroCard from './components/HeroCard';
 import HomeAssignmentsCard from './components/HomeAssignmentsCard';
 import HomeHeader from './components/HomeHeader';
+import LatestPersonalBestCard from './components/LatestPersonalBestCard';
 import QuickActionsRow from './components/QuickActionsRow';
 import StatTilesRow from './components/StatTilesRow';
 import UpcomingSessionCard from './components/UpcomingSessionCard';
@@ -66,6 +68,9 @@ export default function HomeScreen() {
   // "connect" CTA when there's no link yet, a "re-connect" CTA when the
   // last attempt was declined/removed, and a "pending" pill in between.
   const { data: hittraxLink } = useHitTraxLink(kid?.id);
+  // v0.7 task #119 — real "Latest personal best" card. Renders an honest
+  // empty state until the kid sets their first PR (see LatestPersonalBestCard).
+  const { data: latestPr } = useLatestPersonalBest(kid?.id);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -85,6 +90,9 @@ export default function HomeScreen() {
         // ['assignments', kid.id, ...] prefix).
         kid
           ? qc.invalidateQueries({ queryKey: ['assignments', kid.id] })
+          : Promise.resolve(),
+        kid
+          ? qc.invalidateQueries({ queryKey: personalBestsKeys.latestByKid(kid.id) })
           : Promise.resolve(),
       ]);
     } finally {
@@ -176,6 +184,20 @@ export default function HomeScreen() {
               </View>
             ) : null}
             <View style={styles.section}>{renderCoachVideo()}</View>
+            <View style={styles.section}>
+              <LatestPersonalBestCard
+                pr={latestPr ?? null}
+                onPress={
+                  latestPr?.swing_id
+                    ? () =>
+                        navigation.navigate('Videos', {
+                          screen: 'SwingDetail',
+                          params: { swingId: latestPr.swing_id as string },
+                        })
+                    : undefined
+                }
+              />
+            </View>
             {assignments && assignments.some((a) => a.status === 'pending') ? (
               <View style={styles.section}>
                 <HomeAssignmentsCard

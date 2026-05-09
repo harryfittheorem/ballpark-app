@@ -13,11 +13,11 @@ import { Button } from '@/components/ui/Button';
 import { useFamily } from '@/hooks/useFamily';
 import { useProducts } from '@/hooks/useProducts';
 import { useRedeemReward } from '@/hooks/useRedeemReward';
-import type { EarnStackScreenProps } from '@/navigation/types';
+import type { RewardsStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
-type Props = EarnStackScreenProps<'RewardRedeem'>;
+type Props = RewardsStackScreenProps<'RewardRedeem'>;
 
 export default function RewardRedeemScreen({ route, navigation }: Props) {
   const { productId, kidId } = route.params;

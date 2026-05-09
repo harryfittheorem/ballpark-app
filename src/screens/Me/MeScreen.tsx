@@ -99,6 +99,15 @@ export default function MeScreen({ navigation }: Props) {
         ) : null}
 
         <TouchableOpacity
+          onPress={() => navigation.navigate('Book')}
+          style={styles.navRow}
+          testID="me-row-book"
+        >
+          <Text style={styles.navRowText}>Book a session</Text>
+          <ChevronRight color={colors.gold} size={20} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
           onPress={() => navigation.navigate('BookingsList')}
           style={styles.navRow}
         >

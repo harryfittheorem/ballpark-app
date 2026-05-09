@@ -1,18 +1,37 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Calendar, Dumbbell, Home, Trophy, User } from 'lucide-react-native';
+import {
+  Coins,
+  Dumbbell,
+  Home,
+  PlayCircle,
+  Sparkles,
+  Trophy,
+  User,
+} from 'lucide-react-native';
 
 import { useCoachMessageBadge } from '@/hooks/useNewCoachMessage';
-import BookScreen from '@/screens/Book/BookScreen';
+import RanksScreen from '@/screens/Ranks/RanksScreen';
+import TrainScreen from '@/screens/Train/TrainScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
-import EarnStackNavigator from './EarnStackNavigator';
 import HomeStackNavigator from './HomeStackNavigator';
 import MeStackNavigator from './MeStackNavigator';
+import RewardsStackNavigator from './RewardsStackNavigator';
+import VideosStackNavigator from './VideosStackNavigator';
 import WorkStackNavigator from './WorkStackNavigator';
 import type { MainTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+/**
+ * v0.7 task #119: 5 → 7 tabs.
+ *   Home · Videos · Work · Train · Rewards · Ranks · Me
+ *
+ * Book is no longer a tab — it lives at Me → Book and as a Quick Action
+ * on Home. Earn split into Rewards (pill switcher inside) + Ranks (own
+ * tab). Tab labels are kept short so 7 tabs fit comfortably on the
+ * narrowest supported viewport (iPhone SE 1st gen, 320pt wide).
+ */
 export default function MainTabNavigator() {
   const hasNewCoachMessage = useCoachMessageBadge();
   return (
@@ -46,18 +65,28 @@ export default function MainTabNavigator() {
         }}
       />
       <Tab.Screen
+        name="Videos"
+        component={VideosStackNavigator}
+        options={{ tabBarIcon: ({ color, size }) => <PlayCircle color={color} size={size} /> }}
+      />
+      <Tab.Screen
         name="Work"
         component={WorkStackNavigator}
         options={{ tabBarIcon: ({ color, size }) => <Dumbbell color={color} size={size} /> }}
       />
       <Tab.Screen
-        name="Book"
-        component={BookScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Calendar color={color} size={size} /> }}
+        name="Train"
+        component={TrainScreen}
+        options={{ tabBarIcon: ({ color, size }) => <Sparkles color={color} size={size} /> }}
       />
       <Tab.Screen
-        name="Earn"
-        component={EarnStackNavigator}
+        name="Rewards"
+        component={RewardsStackNavigator}
+        options={{ tabBarIcon: ({ color, size }) => <Coins color={color} size={size} /> }}
+      />
+      <Tab.Screen
+        name="Ranks"
+        component={RanksScreen}
         options={{ tabBarIcon: ({ color, size }) => <Trophy color={color} size={size} /> }}
       />
       <Tab.Screen

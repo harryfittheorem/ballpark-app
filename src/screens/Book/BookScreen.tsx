@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useToast } from '@/components/ui';
 import { spacing } from '@/theme';
 
-import type { MainTabScreenProps } from '@/navigation/types';
+import type { MeStackScreenProps } from '@/navigation/types';
 
 import BookHeader from './components/BookHeader';
 import CoachSection from './components/CoachSection';
@@ -21,8 +21,12 @@ import type { Slot } from './utils/slots';
 
 export default function BookScreen() {
   const tabBarHeight = useBottomTabBarHeight();
+  // v0.7 task #119: BookScreen now lives inside MeStack (route 'Book'),
+  // not as its own bottom tab. After a successful booking we still want
+  // to land the parent on Home, which is reachable via the parent
+  // BottomTabNavigator on this composite screen-prop.
   const navigation =
-    useNavigation<MainTabScreenProps<'Book'>['navigation']>();
+    useNavigation<MeStackScreenProps<'Book'>['navigation']>();
   const { showToast } = useToast();
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -108,7 +112,7 @@ export default function BookScreen() {
   const handleBooked = useCallback(
     (formattedWhen: string) => {
       resetSelection();
-      navigation.navigate('Home');
+      navigation.navigate('Home', { screen: 'HomeMain' });
       showToast(`Session booked for ${formattedWhen}`);
     },
     [navigation, resetSelection, showToast],

@@ -1074,6 +1074,33 @@ export type Database = {
           },
         ]
       }
+      kid_swing_favorites: {
+        Row: {
+          created_at: string
+          id: string
+          kid_id: string
+          parent_user_id: string
+          swing_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kid_id: string
+          parent_user_id: string
+          swing_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kid_id?: string
+          parent_user_id?: string
+          swing_id?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       kid_capture_links: {
         Row: {
           association_status: string
@@ -1228,6 +1255,10 @@ export type Database = {
       register_device_token: {
         Args: { p_expo_push_token: string; p_platform: string }
         Returns: undefined
+      }
+      toggle_swing_favorite: {
+        Args: { p_swing_id: string }
+        Returns: boolean
       }
       review_assignment: {
         Args: { p_assignment_id: string; p_feedback: string; p_rating: number }

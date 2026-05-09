@@ -77,7 +77,17 @@ Path aliases (`@/*` → `src/*`) are configured in `tsconfig.json` and `babel.co
 
 ## Status
 
--   v0.1 Foundation, v0.2 Home, v0.3 Booking, v0.4 Messages, v0.5 Earn, **v0.6 Work** all shipped. Next: v0.7 per ROADMAP.
+-   v0.1 Foundation, v0.2 Home, v0.3 Booking, v0.4 Messages, v0.5 Earn, v0.6 Work all shipped. **v0.7 task #119 (Videos tab + 7-tab nav refactor)** in progress.
+
+## v0.7 task #119 — 7-tab nav + Videos surface (in progress 2026-05-09)
+
+-   Bottom nav grew from 5 → 7 tabs: Home · Videos · Work · Train · Rewards · Ranks · Me. Book moved out of the bottom nav: it's now a Quick Action on Home (`navigation.navigate('Me', { screen: 'Book' })`) and a row on the Me sub-stack. Earn split — Rewards (in-screen pill switcher: Rewards / Store / Rules) is its own tab, Ranks is its own tab. The old `EarnStackNavigator.tsx` + `EarnScreen.tsx` were deleted; `RewardsStackNavigator.tsx` + `src/screens/Rewards/RewardsScreen.tsx` + `src/screens/Ranks/RanksScreen.tsx` replace them. The Earn sub-tab components (`RewardsTab`, `StoreTab`, `EarnRulesTab`, `RanksTab`) are reused verbatim — leaderboard / redemption logic stays in one place.
+-   Videos tab is a new Stack (`VideosStackNavigator.tsx`) with three routes: `VideosHome` (4 in-screen sub-tabs — Swings / Drills / Coach / Favs), `SessionDetail`, `SwingDetail`. Coach sub-tab navigates to the existing full-screen player on the Home stack (`navigation.navigate('Home', { screen: 'VideoPlayback', params: { messageId } })`) so we don't duplicate the Mux player. Drills sub-tab filters assignments to those with a `drill_video.mux_playback_id` and routes to Work → AssignmentDetail.
+-   `kid_swing_favorites` (migration `20260508080000`) — `UNIQUE(kid_id, swing_id)`, RLS scoped to the parent's family + tenant, plus `toggle_swing_favorite(p_swing_id uuid)` SECURITY DEFINER RPC that derives `kid_id` + `tenant_id` from the swing row to avoid trusting client params. `useToggleFavorite` is optimistic (toggles the cached `Set<string>` immediately, rolls back on error).
+-   SwingDetail intentionally renders a 16:9 placeholder for the per-swing clip — HitTrax is metric-only and per-swing Mux clips ship in a future task. The PR-aware metric grid pulls `personal_bests` and gold-ribbons any metric where `personal_bests.swing_id = thisSwing.id`. Share + Send-to-coach are `Alert.alert` stubs (composer + 9:16 share-card generator are separate tasks); only Favorite is wired to a real mutation.
+-   Home gained a real `LatestPersonalBestCard` (queries `personal_bests` ordered by `achieved_at` desc, limit 1; falls back to an honest empty state). Tap routes to `Videos → SwingDetail` when `swing_id` is non-null. The PR query key is `personalBestsKeys.latestByKid(kidId)` and is invalidated alongside the other Home queries on pull-to-refresh.
+-   Train tab is a "coming soon" shell — programmed workouts ship later. Kept brand-consistent so the 7-tab layout never has a broken slot.
+-   `BookScreen` was retyped from `MainTabScreenProps<'Book'>` to `MeStackScreenProps<'Book'>` and the post-booking redirect changed from `navigate('Home')` to `navigate('Home', { screen: 'HomeMain' })` to land on the Home stack root, not just the tab.
 
 ## Cross-tenant RLS audit (task #86, 2026-05-08)
 
