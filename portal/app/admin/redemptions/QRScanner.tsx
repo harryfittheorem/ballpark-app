@@ -110,7 +110,7 @@ export function QRScanner({ formId }: { formId: string }) {
     <div className="w-full rounded-md border border-border-gold bg-darkest p-4">
       <div className="flex items-center justify-between">
         <p className="font-display text-sm uppercase tracking-wide text-gold">
-          Point the camera at the customer's QR code
+          Point the camera at the customer&apos;s QR code
         </p>
         <button
           type="button"

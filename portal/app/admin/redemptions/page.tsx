@@ -86,8 +86,8 @@ export default async function RedemptionsPage({
           Redemptions
         </h1>
         <p className="mt-1 text-sm text-text-light">
-          Type the 8-character code shown on the parent's phone, or click
-          "Mark fulfilled" on the matching pending row.
+          Type the 8-character code shown on the parent&apos;s phone, or click
+          &quot;Mark fulfilled&quot; on the matching pending row.
         </p>
       </div>
 
