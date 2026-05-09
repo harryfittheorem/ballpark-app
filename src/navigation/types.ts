@@ -12,14 +12,6 @@ export type AuthStackScreenProps<T extends keyof AuthStackParamList> = NativeSta
   T
 >;
 
-/**
- * Task #135: consolidated 5-tab nav (the customer-finalized v0.4 design).
- *   Home · Work · Book · Earn · Me
- *
- * Work absorbs the v0.7 Videos + Train + Messages + Send-to-coach surfaces
- * as in-screen sub-tabs. Earn re-merges Rewards + Store + Ranks + Rules.
- * Book is a top-level tab again. Profile/achievements/settings live on Me.
- */
 export type MainTabParamList = {
   Home: NavigatorScreenParams<HomeStackParamList>;
   Work: NavigatorScreenParams<WorkStackParamList>;
@@ -115,7 +107,7 @@ export type CoachTabScreenProps<T extends keyof CoachTabParamList> = BottomTabSc
 
 /**
  * Me tab — Profile root + account-management sub-screens. Book is no
- * longer here; it's a top-level tab again per task #135.
+ * longer here; it's a top-level tab.
  */
 export type MeStackParamList = {
   MeHome: undefined;

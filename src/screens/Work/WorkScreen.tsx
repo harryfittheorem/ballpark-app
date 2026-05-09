@@ -1,17 +1,3 @@
-/**
- * WorkScreen — task #135.
- *
- * The consolidated Work tab. Five in-screen sub-tabs:
- *   Swings   — HitTrax sessions / swings (was Videos → Swings)
- *   Assign   — drill assignments queue (the original v0.6 Work tab)
- *   Messages — coach video rail + per-coach inbox
- *   HW       — homework / drill submission view
- *   Drills   — self-serve training video library (was Train tab)
- *
- * Sub-tab routing is intentionally in-screen — the WorkStack only
- * registers push destinations (AssignmentDetail, SwingDetail, etc).
- */
-
 import { useRoute } from '@react-navigation/native';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';

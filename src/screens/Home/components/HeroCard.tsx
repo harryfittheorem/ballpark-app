@@ -1,36 +1,28 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Flame } from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import {
-  colors,
-  fontFamilies,
-  fontSizes,
-  radius,
-  spacing,
-  tracking,
-} from '@/theme';
+import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
 type Props = {
-  kidName: string;
-  ageGroup: string;
-  jerseyNumber?: number | null;
   pointsBalance: number;
-  currentStreakDays: number;
+  nextRewardName: string | null;
+  nextRewardCost: number | null;
+  onPress?: () => void;
 };
 
 export default function HeroCard({
-  kidName,
-  ageGroup,
-  jerseyNumber,
   pointsBalance,
-  currentStreakDays,
+  nextRewardName,
+  nextRewardCost,
+  onPress,
 }: Props) {
-  const subtitle =
-    jerseyNumber != null ? `${ageGroup} · #${jerseyNumber}` : ageGroup;
+  const cost = nextRewardCost ?? 0;
+  const pointsAway = cost > 0 ? Math.max(cost - pointsBalance, 0) : 0;
+  const progressPct =
+    cost > 0 ? Math.min(Math.max(pointsBalance / cost, 0), 1) : 0;
 
   return (
-    <View style={styles.shadow}>
+    <Pressable onPress={onPress} accessibilityRole="button" style={styles.shadow}>
       <LinearGradient
         colors={[colors.gold, colors.goldBright]}
         start={{ x: 0, y: 0 }}
@@ -41,23 +33,31 @@ export default function HeroCard({
         <View style={styles.innerBorder} pointerEvents="none" />
 
         <View style={styles.content}>
-          <Text style={styles.name} numberOfLines={1}>
-            {kidName.toUpperCase()}
-          </Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-
-          <View style={styles.pointsBlock}>
+          <Text style={styles.eyebrow}>YOUR POINTS</Text>
+          <View style={styles.row}>
             <Text style={styles.pointsValue}>{pointsBalance}</Text>
-            <Text style={styles.pointsLabel}>POINTS</Text>
+            {nextRewardCost != null ? (
+              <Text style={styles.pointsTotal}> / {nextRewardCost}</Text>
+            ) : null}
           </View>
-
-          <View style={styles.streakRow}>
-            <Flame size={16} color={colors.dark} fill={colors.goldDeep} />
-            <Text style={styles.streakText}>{currentStreakDays} DAY STREAK</Text>
+          {nextRewardName ? (
+            <Text style={styles.nextLabel} numberOfLines={1}>
+              NEXT REWARD: {nextRewardName.toUpperCase()}
+            </Text>
+          ) : (
+            <Text style={styles.nextLabel}>KEEP EARNING</Text>
+          )}
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progressPct * 100}%` }]} />
           </View>
+          {nextRewardCost != null ? (
+            <Text style={styles.awayLabel}>
+              {pointsAway === 0 ? 'READY TO REDEEM' : `${pointsAway} PTS AWAY`}
+            </Text>
+          ) : null}
         </View>
       </LinearGradient>
-    </View>
+    </Pressable>
   );
 }
 
@@ -87,32 +87,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dark,
     opacity: 0.08,
   },
-  content: {
-    position: 'relative',
-    zIndex: 1,
-  },
   innerBorder: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: radius['5xl'],
     borderWidth: 1,
     borderColor: colors.borderGold,
   },
-  name: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes['3xl'],
-    color: colors.dark,
-    letterSpacing: -tracking.tight,
-  },
-  subtitle: {
-    fontFamily: fontFamilies.interSemiBold,
-    fontSize: fontSizes.base,
+  content: { position: 'relative', zIndex: 1 },
+  eyebrow: {
+    fontFamily: fontFamilies.interExtraBold,
+    fontSize: fontSizes.sm,
     color: colors.dark,
     opacity: 0.7,
-    marginTop: spacing.xs,
+    letterSpacing: tracking.wider,
   },
-  pointsBlock: {
-    marginTop: spacing['3xl'],
-  },
+  row: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing.base },
   pointsValue: {
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes['6xl'],
@@ -120,24 +109,39 @@ const styles = StyleSheet.create({
     letterSpacing: -tracking.wide,
     lineHeight: fontSizes['6xl'],
   },
-  pointsLabel: {
+  pointsTotal: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['2xl'],
+    color: colors.dark,
+    opacity: 0.55,
+    paddingBottom: 6,
+  },
+  nextLabel: {
     fontFamily: fontFamilies.interExtraBold,
     fontSize: fontSizes.sm,
     color: colors.dark,
+    opacity: 0.75,
+    letterSpacing: tracking.wide,
+    marginTop: spacing.lg,
+  },
+  progressTrack: {
+    marginTop: spacing.base,
+    height: 8,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.dark,
+    borderRadius: radius.full,
+  },
+  awayLabel: {
+    fontFamily: fontFamilies.interExtraBold,
+    fontSize: fontSizes.xs,
+    color: colors.dark,
     opacity: 0.7,
     letterSpacing: tracking.wider,
-    marginTop: spacing.xs,
-  },
-  streakRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.base,
-    marginTop: spacing['2xl'],
-  },
-  streakText: {
-    fontFamily: fontFamilies.interExtraBold,
-    fontSize: fontSizes.base,
-    color: colors.dark,
-    letterSpacing: tracking.wide,
+    marginTop: spacing.base,
   },
 });

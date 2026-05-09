@@ -1,11 +1,3 @@
-/**
- * EarnStackNavigator — task #135.
- *
- * Hosts the consolidated Earn tab. EarnHome contains an in-screen pill
- * switcher (Rewards / Store / Ranks / Rules); RewardRedeem is the only
- * push destination.
- */
-
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import EarnScreen from '@/screens/Earn/EarnScreen';

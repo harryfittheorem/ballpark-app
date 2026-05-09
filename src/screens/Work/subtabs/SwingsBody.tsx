@@ -1,10 +1,3 @@
-/**
- * Swings sub-tab body for the Work tab — task #135.
- *
- * Lifted from the v0.7 VideosScreen swings panel. Renders BY-SESSION /
- * ALL toggle, session group cards, and a 3-col swing grid.
- */
-
 import { useNavigation } from '@react-navigation/native';
 import { ZapOff } from 'lucide-react-native';
 import { useMemo, useState } from 'react';

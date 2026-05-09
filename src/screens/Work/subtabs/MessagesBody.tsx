@@ -1,24 +1,3 @@
-/**
- * Messages sub-tab body for the Work tab — task #135 (round 3).
- *
- * Customer-finalized v0.4 design calls for a unified in-tab 1:1 thread
- * with embedded video bubbles + a composer, absorbing the v0.7 inbox
- * launcher / dedicated thread route / send-to-coach screen flow.
- *
- * Behaviour:
- *  - Single tenant coach (Infinite Hitting today): auto-selected, thread
- *    renders immediately.
- *  - Multiple coaches: a chip row at top lets the parent switch between
- *    threads. The selected coach is held in local state; defaults to the
- *    first inbox row that has any history, else the first tenant coach.
- *  - Composer at the bottom sends a text-only parent->coach message via
- *    the existing `useSendParentMessage` mutation.
- *  - Video composer is still reachable via the camera button — pushes to
- *    `SendVideoToCoach` which already handles the Mux upload pipeline.
- *  - Coach-recorded video bubbles tap into the existing full-screen
- *    Mux player (`Home -> VideoPlayback`) so we don't duplicate chrome.
- */
-
 import { useNavigation } from '@react-navigation/native';
 import { Camera, MessageCircle, PlayCircle, Send } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';

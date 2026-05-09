@@ -1,22 +1,3 @@
-/**
- * BookScreen — task #135 (round 3).
- *
- * Customer-finalized v0.4 design: a top-level Book tab that wraps the
- * existing v0.3 booking wizard inside a 4-sub-tab shell:
- *
- *   ALL · PRIVATE LESSONS · GROUP CLASSES · CAGE RENTALS
- *
- * Plus three required surfaces around the wizard:
- *   - "Your upcoming" — next 1–3 bookings the family already has.
- *   - "What can I book?" — the existing SessionTypeSection, now filtered
- *     by the active sub-tab's `type_category`.
- *   - "Today / Tomorrow open slots" — quick-pick chips that pre-seed the
- *     wizard's date so the parent can jump straight into picking a time.
- *
- * The existing booking-flow components are reused verbatim — only the
- * shell + the SessionTypeSection category filter are new.
- */
-
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { Calendar, ChevronRight, Clock } from 'lucide-react-native';

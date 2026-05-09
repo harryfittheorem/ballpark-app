@@ -1,11 +1,3 @@
-/**
- * WorkStackNavigator — task #135.
- *
- * Hosts the unified Work tab. WorkHome is a single screen with five
- * in-screen sub-tabs (Swings / Assign / Messages / HW / Drills); the
- * remaining routes are push destinations the sub-tabs navigate into.
- */
-
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import AssignmentDetailScreen from '@/screens/Work/AssignmentDetailScreen';

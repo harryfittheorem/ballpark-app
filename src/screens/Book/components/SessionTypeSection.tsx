@@ -9,10 +9,6 @@ import SessionTypeCard from './SessionTypeCard';
 type Props = {
   selectedSessionTypeId: string | null;
   onSelect: (id: string) => void;
-  /**
-   * Task #135 — when set, hide session types whose `type_category`
-   * doesn't match. `'all'` (or undefined) renders everything.
-   */
   categoryFilter?: 'all' | 'private' | 'group' | 'cage';
 };
 

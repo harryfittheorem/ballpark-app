@@ -1,18 +1,3 @@
-/**
- * ProfileScreen — v0.7 task #122.
- *
- * Replaces the old MeScreen as the Me tab landing surface. Layout:
- *   - Avatar tile (gold, kid's initial), name, subtitle line
- *   - PERSONAL BESTS 2x2 grid (gold numbers; empty -> em-dash)
- *   - ACHIEVEMENTS X/Y, 4-column badge grid (earned in gold, locked dim)
- *   - Settings list: Bookings, Orders, HitTrax, Book a session, Sign out,
- *     Delete account
- *
- * Existing sub-screens (Bookings, Orders, HitTrax, Book) reachable via the
- * settings list. Sign-out + delete-account flows preserved verbatim from
- * the old MeScreen so we don't regress account-lifecycle behaviour.
- */
-
 import {
   Award,
   BookOpen,

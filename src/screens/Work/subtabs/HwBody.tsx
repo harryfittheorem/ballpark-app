@@ -1,10 +1,3 @@
-/**
- * HW (homework) sub-tab body for the Work tab — task #135.
- *
- * Submission-centric drill list. Reuses AssignmentRow + shows the
- * coach's feedback line under reviewed rows.
- */
-
 import { useNavigation } from '@react-navigation/native';
 import { ZapOff } from 'lucide-react-native';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';

@@ -1,5 +1,5 @@
 /**
- * EarnScreen — task #135.
+ * EarnScreen.
  *
  * Re-merges the v0.4 Earn tab: Rewards / Store / Ranks / Rules behind a
  * pill-style sub-tab switcher. Sub-tab body components are unchanged from

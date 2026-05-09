@@ -1,14 +1,15 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAssignments } from '@/hooks/useAssignments';
 import { useAuth } from '@/hooks/useAuth';
 import { useFamily } from '@/hooks/useFamily';
-import { useHitTraxLink } from '@/hooks/useHitTraxLink';
+import { useLeaderboard } from '@/hooks/useLeaderboard';
+import { useProducts } from '@/hooks/useProducts';
 import {
   latestCoachMessageKey,
   useLatestCoachMessage,
@@ -21,7 +22,6 @@ import { formatRelativeTime } from '@/utils/time';
 
 import CoachMessageToast from './components/CoachMessageToast';
 import CoachVideoCard from './components/CoachVideoCard';
-import ConnectHitTraxBanner from './components/ConnectHitTraxBanner';
 import EmptyHomeCard from './components/EmptyHomeCard';
 import HeroCard from './components/HeroCard';
 import HomeAssignmentsCard from './components/HomeAssignmentsCard';
@@ -48,28 +48,35 @@ export default function HomeScreen() {
 
   const { kids, loading: familyLoading } = useFamily();
   const kid = kids[0];
-  // Gate the empty-state render on the first family fetch settling so
-  // existing parents don't see a flash of the "Add your kid" CTA while
-  // the kids list loads. Once we have a cached kid (re-mount after a
-  // tab switch, etc.) `familyLoading` is false and we render normally.
   const showEmpty = !kid && !familyLoading;
   const { session: upcoming } = useUpcomingSession(kid?.id);
-  // Focus-gated so the 60s polling interval (Step 4.14) doesn't run while
-  // the parent is on a non-Home tab. Cached data still renders the
-  // CoachVideoCard when defocused so there's no flash on tab switch.
   const isFocused = useIsFocused();
   const { data: latestMessage, isPending: latestMessagePending } =
     useLatestCoachMessage(kid?.id, { enabled: isFocused });
-  // Home only renders the "due now / next" summary, so narrow to pending
-  // server-side instead of fetching the kid's full assignment history.
   const { data: assignments } = useAssignments(kid?.id, ['pending']);
-  // HitTrax onboarding banner — hidden when link is active, surfaces a
-  // "connect" CTA when there's no link yet, a "re-connect" CTA when the
-  // last attempt was declined/removed, and a "pending" pill in between.
-  const { data: hittraxLink } = useHitTraxLink(kid?.id);
-  // v0.7 task #119 — real "Latest personal best" card. Renders an honest
-  // empty state until the kid sets their first PR (see LatestPersonalBestCard).
   const { data: latestPr } = useLatestPersonalBest(kid?.id);
+  const { data: products } = useProducts();
+  const { data: leaderboard } = useLeaderboard();
+
+  const nextReward = useMemo(() => {
+    if (!products || !kid) return null;
+    const balance = kid.points_balance ?? 0;
+    const affordable = products
+      .filter((p) => p.points_cost != null && p.points_cost > balance)
+      .sort((a, b) => (a.points_cost ?? 0) - (b.points_cost ?? 0));
+    return affordable[0] ?? null;
+  }, [products, kid]);
+
+  const rank = useMemo(() => {
+    if (!leaderboard || !kid) return null;
+    const row = leaderboard.find((r) => r.kidId === kid.id);
+    return row?.rank ?? null;
+  }, [leaderboard, kid]);
+
+  const exitVeloMph =
+    latestPr && latestPr.metric === 'exit_velocity_mph'
+      ? Number(latestPr.value)
+      : null;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -84,29 +91,21 @@ export default function HomeScreen() {
         kid
           ? qc.invalidateQueries({ queryKey: latestCoachMessageKey(kid.id) })
           : Promise.resolve(),
-        // Invalidate every assignments cache slot for this kid (Home's
-        // ['pending'] slice and Work's full list both live under the
-        // ['assignments', kid.id, ...] prefix).
         kid
           ? qc.invalidateQueries({ queryKey: ['assignments', kid.id] })
           : Promise.resolve(),
         kid
           ? qc.invalidateQueries({ queryKey: personalBestsKeys.latestByKid(kid.id) })
           : Promise.resolve(),
+        qc.invalidateQueries({ queryKey: ['products'] }),
+        qc.invalidateQueries({ queryKey: ['leaderboard'] }),
       ]);
     } finally {
       setRefreshing(false);
     }
   }, [qc, user, kid]);
 
-  // Pick the right CoachVideoCard variant based on what the latest message
-  // query returned. We render the card unconditionally (with an empty-state
-  // variant) so the section keeps its slot in the layout even when there
-  // are no messages yet — no jarring shift the moment the first one arrives.
   const renderCoachVideo = () => {
-    // While the query is in flight, show the "processing" placeholder
-    // (non-interactive, same chrome) so we don't briefly flash the empty
-    // state to a parent who actually has videos.
     if (latestMessagePending) {
       return <CoachVideoCard variant="processing" />;
     }
@@ -137,7 +136,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <HomeHeader locationName="Dallas N." />
+      <HomeHeader kidFirstName={kid?.first_name ?? 'CHAMP'} />
       <CoachMessageToast />
       <ScrollView
         style={styles.scroll}
@@ -159,30 +158,19 @@ export default function HomeScreen() {
           <>
             <View style={styles.section}>
               <HeroCard
-                kidName={`${kid.first_name} ${kid.last_name}`.trim()}
-                ageGroup={kid.age_group ?? ''}
-                jerseyNumber={kid.jersey_number}
                 pointsBalance={kid.points_balance}
-                currentStreakDays={kid.current_streak_days}
+                nextRewardName={nextReward?.name ?? null}
+                nextRewardCost={nextReward?.points_cost ?? null}
+                onPress={() => navigation.navigate('Earn', { screen: 'EarnHome' })}
               />
             </View>
             <View style={styles.section}>
               <StatTilesRow
-                pointsBalance={kid.points_balance}
                 currentStreakDays={kid.current_streak_days}
+                rank={rank}
+                exitVeloMph={exitVeloMph}
               />
             </View>
-            {hittraxLink?.association_status !== 'active' ? (
-              <View style={styles.section}>
-                <ConnectHitTraxBanner
-                  link={hittraxLink}
-                  onPress={() =>
-                    navigation.navigate('Me', { screen: 'ConnectHitTrax' })
-                  }
-                />
-              </View>
-            ) : null}
-            {/* v0.4 IA: NEW FROM COACH → UP NEXT → ASSIGNMENTS → LATEST PR. */}
             <View style={styles.section}>{renderCoachVideo()}</View>
             <View style={styles.section}>
               <UpcomingSessionCard
@@ -229,9 +217,6 @@ export default function HomeScreen() {
             <EmptyHomeCard onAddKid={() => navigation.navigate('AddKid')} />
           </View>
         ) : (
-          // First family fetch in flight — render a quiet spinner so we
-          // don't flash the "Add your kid" CTA at parents who already
-          // have a kid.
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={colors.gold} />
           </View>

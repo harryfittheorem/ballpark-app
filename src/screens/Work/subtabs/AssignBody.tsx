@@ -1,9 +1,3 @@
-/**
- * Assign sub-tab body for the Work tab — task #135.
- *
- * The original v0.6 WorkScreen content (sectioned drill list).
- */
-
 import { useNavigation } from '@react-navigation/native';
 import { Dumbbell } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';

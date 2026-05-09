@@ -1,10 +1,3 @@
-/**
- * Drills sub-tab body for the Work tab — task #135.
- *
- * Self-serve training video library lifted from the v0.7 TrainScreen.
- * Filter chips + featured hero + continue-watching + grid.
- */
-
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Play } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';

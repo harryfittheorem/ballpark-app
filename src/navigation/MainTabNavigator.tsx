@@ -13,14 +13,6 @@ import type { MainTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-/**
- * Task #135 — consolidated 5-tab nav (customer-finalized v0.4 design):
- *   Home · Work · Book · Earn · Me
- *
- * Work absorbs Videos + Train + Messages + Send-to-coach as in-screen
- * sub-tabs. Earn re-merges Rewards + Store + Ranks + Rules. Book is back
- * as a top-level tab. Me is slimmed (profile + settings).
- */
 export default function MainTabNavigator() {
   const hasNewCoachMessage = useCoachMessageBadge();
   return (
@@ -54,7 +46,7 @@ export default function MainTabNavigator() {
         component={WorkStackNavigator}
         options={{
           tabBarIcon: ({ color, size }) => <Briefcase color={color} size={size} />,
-          // Task #135: Messages now lives under Work, so the "new coach
+          // Messages lives under Work, so the "new coach
           // message" badge follows it from the old Home tab.
           tabBarBadge: hasNewCoachMessage ? '' : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.gold },
