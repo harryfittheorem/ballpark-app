@@ -12,7 +12,9 @@
  */
 
 import 'react-native-url-polyfill/auto';
-import { createClient, type SupportedStorage } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient, type SupportedStorage } from '@supabase/supabase-js';
+
+import type { DatabaseExt } from '@/types/databaseExt';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
@@ -68,3 +70,12 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     flowType: 'pkce',
   },
 });
+
+/**
+ * Typed view of the same client that knows about the columns added by
+ * migration `20260509000000_v07_parent_to_coach_messages.sql`. Used by
+ * `src/api/parentMessages.ts` so we never reach for `as any`. Drop this
+ * extension and re-export `supabase` directly once `src/types/database.ts`
+ * is regenerated.
+ */
+export const supabaseExt = supabase as unknown as SupabaseClient<DatabaseExt>;

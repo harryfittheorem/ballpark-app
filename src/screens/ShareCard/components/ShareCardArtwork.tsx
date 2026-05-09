@@ -35,10 +35,18 @@ export default function ShareCardArtwork({
   kidName,
   swing,
   prMetrics,
+  ageGroup,
+  facilityName,
+  facilityLocation,
+  achievedAt,
 }: {
   kidName: string;
   swing: Swing;
   prMetrics: string[];
+  ageGroup: string | null;
+  facilityName: string;
+  facilityLocation: string | null;
+  achievedAt: Date;
 }) {
   const metrics: { key: keyof Swing & string }[] = [
     { key: 'exit_velocity_mph' },
@@ -107,30 +115,46 @@ export default function ShareCardArtwork({
         ) : null}
       </View>
 
-      {/* Big athlete name */}
-      <View style={{ paddingHorizontal: 80, marginTop: 220 }}>
-        <Text
-          style={{
-            fontFamily: fontFamilies.interSemiBold,
-            color: colors.textLight,
-            fontSize: 38,
-            letterSpacing: 4,
-            textTransform: 'uppercase',
-          }}
-        >
-          {kidName}
-        </Text>
+      {/* Big athlete name + age group + headline */}
+      <View style={{ paddingHorizontal: 80, marginTop: 200 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap' }}>
+          <Text
+            style={{
+              fontFamily: fontFamilies.interSemiBold,
+              color: colors.textLight,
+              fontSize: 38,
+              letterSpacing: 4,
+              textTransform: 'uppercase',
+            }}
+          >
+            {kidName}
+          </Text>
+          {ageGroup ? (
+            <Text
+              style={{
+                fontFamily: fontFamilies.interMedium,
+                color: colors.gold,
+                fontSize: 30,
+                letterSpacing: 4,
+                marginLeft: 24,
+                textTransform: 'uppercase',
+              }}
+            >
+              · {ageGroup}
+            </Text>
+          ) : null}
+        </View>
         <Text
           style={{
             fontFamily: fontFamilies.oswaldBold,
             color: colors.gold,
-            fontSize: 144,
+            fontSize: isPr ? 128 : 144,
             letterSpacing: 4,
             marginTop: 12,
-            lineHeight: 160,
+            lineHeight: isPr ? 144 : 160,
           }}
         >
-          {isPr ? 'PERSONAL BEST' : 'BIG SWING'}
+          {isPr ? 'NEW PERSONAL BEST' : 'BIG SWING'}
         </Text>
       </View>
 
@@ -204,7 +228,7 @@ export default function ShareCardArtwork({
         })}
       </View>
 
-      {/* Footer watermark */}
+      {/* Footer: facility wordmark + location + date */}
       <View
         style={{
           position: 'absolute',
@@ -212,33 +236,72 @@ export default function ShareCardArtwork({
           left: 80,
           right: 80,
           flexDirection: 'row',
-          alignItems: 'center',
+          alignItems: 'flex-end',
           justifyContent: 'space-between',
         }}
       >
-        <Text
-          style={{
-            fontFamily: fontFamilies.interMedium,
-            color: colors.textLight,
-            fontSize: 28,
-            letterSpacing: 2,
-          }}
-        >
-          INFINITE HITTING
-        </Text>
-        <Text
-          style={{
-            fontFamily: fontFamilies.interMedium,
-            color: colors.gold,
-            fontSize: 28,
-            letterSpacing: 2,
-          }}
-        >
-          ballpark.app
-        </Text>
+        <View>
+          <Text
+            style={{
+              fontFamily: fontFamilies.oswaldBold,
+              color: colors.gold,
+              fontSize: 36,
+              letterSpacing: 4,
+            }}
+          >
+            {facilityName.toUpperCase()}
+          </Text>
+          {facilityLocation ? (
+            <Text
+              style={{
+                fontFamily: fontFamilies.interMedium,
+                color: colors.textLight,
+                fontSize: 26,
+                letterSpacing: 2,
+                marginTop: 8,
+              }}
+            >
+              {facilityLocation}
+            </Text>
+          ) : null}
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text
+            style={{
+              fontFamily: fontFamilies.interMedium,
+              color: colors.textLight,
+              fontSize: 26,
+              letterSpacing: 2,
+            }}
+          >
+            {formatDate(achievedAt)}
+          </Text>
+          <Text
+            style={{
+              fontFamily: fontFamilies.interMedium,
+              color: colors.gold,
+              fontSize: 26,
+              letterSpacing: 2,
+              marginTop: 8,
+            }}
+          >
+            ballpark.app
+          </Text>
+        </View>
       </View>
     </View>
   );
+}
+
+function formatDate(d: Date): string {
+  const valid = !Number.isNaN(d.getTime()) ? d : new Date();
+  return valid
+    .toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    .toUpperCase();
 }
 
 function HeroMetric({ swing, prMetrics }: { swing: Swing; prMetrics: string[] }) {

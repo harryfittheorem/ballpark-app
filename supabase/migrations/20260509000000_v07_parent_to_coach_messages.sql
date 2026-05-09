@@ -129,6 +129,23 @@ CREATE POLICY coach_messages_select_parent_sender ON public.coach_messages
   );
 
 
+-- 4b. Coach SELECT on parent->coach rows addressed to THEM -------------------
+-- The pre-existing `coach_messages_select_own_coach` policy only covers rows
+-- the coach SENT (`sender_user_id = auth.uid()`). Without this addition a
+-- coach would not be able to read parent->coach messages routed to them.
+-- Scoped to `recipient_coach_user_id = auth.uid()` so other coaches in the
+-- same tenant cannot read messages addressed to a different coach (privacy
+-- separation between coaches in the same facility).
+DROP POLICY IF EXISTS coach_messages_select_recipient_coach ON public.coach_messages;
+CREATE POLICY coach_messages_select_recipient_coach ON public.coach_messages
+  FOR SELECT TO authenticated
+  USING (
+    tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
+    AND (auth.jwt() ->> 'app_role') = 'coach'
+    AND recipient_coach_user_id = auth.uid()
+  );
+
+
 -- 5. Coach UPDATE viewed_at on parent->coach rows ----------------------------
 -- Existing coach_messages_update_recipient_parent covers parent marking
 -- coach->parent viewed. We add the inverse so the coach can mark a

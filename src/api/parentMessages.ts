@@ -16,29 +16,19 @@
  * because the policy WITH CHECK requires it on the row itself.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseExt } from '@/lib/supabase';
 import type { Tables } from '@/types/database';
+import type { DatabaseExt } from '@/types/databaseExt';
 
-// The generated database types in src/types/database.ts predate the
-// 20260509000000 migration that added `label` + `sender_display` to
-// public.coach_messages. Until the types are regenerated, keep a small
-// local typing for the new columns so we don't have to sprinkle `as any`
-// through this file. The DB CHECK constraint is the source of truth.
-type CoachMessageRowExt = Tables<'coach_messages'> & {
-  label: string | null;
-  sender_display: string | null;
-};
-type CoachMessageInsertExt = {
-  tenant_id: string;
-  sender_user_id: string;
-  video_id: string | null;
-  recipient_family_id: string;
-  recipient_kid_id: string;
-  recipient_coach_user_id: string;
-  message_text: string | null;
-  label: string | null;
-  sender_display: string | null;
-};
+// `supabaseExt` is the same connection / session as `supabase` but typed
+// against `DatabaseExt`, which augments the generated types with the
+// columns added by 20260509000000 (`label`, `sender_display`,
+// `recipient_coach_user_id`). When the types are regenerated, swap
+// `supabaseExt` -> `supabase` and delete `src/types/databaseExt.ts`.
+type CoachMessageRowExt =
+  DatabaseExt['public']['Tables']['coach_messages']['Row'];
+type CoachMessageInsertExt =
+  DatabaseExt['public']['Tables']['coach_messages']['Insert'];
 
 export type ComposerLabel =
   | 'game_footage'
@@ -133,14 +123,13 @@ export async function sendParentMessage(
     label: input.label,
     sender_display: input.senderDisplay,
   };
-  const { data, error } = await supabase
+  const { data, error } = await supabaseExt
     .from('coach_messages')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .insert(insertRow as unknown as any)
+    .insert(insertRow)
     .select('*')
     .single();
   if (error) throw error;
-  return data as unknown as SentParentMessage;
+  return data;
 }
 
 /**
@@ -231,7 +220,7 @@ export async function listMessageThread(opts: {
   selfUserId: string;
 }): Promise<ThreadMessage[]> {
   const { kidId, coachUserId, selfUserId } = opts;
-  const { data, error } = await supabase
+  const { data, error } = await supabaseExt
     .from('coach_messages')
     .select(
       'id, created_at, sender_user_id, recipient_family_id, recipient_kid_id, recipient_coach_user_id, message_text, label, sender_display, viewed_at, video:videos(id, status, mux_playback_id, duration_seconds, purpose)',
@@ -268,7 +257,7 @@ export async function listParentInbox(opts: {
 }): Promise<InboxRow[]> {
   const { kidId, selfUserId } = opts;
 
-  const { data: msgs, error } = await supabase
+  const { data: msgs, error } = await supabaseExt
     .from('coach_messages')
     .select(
       'id, created_at, sender_user_id, recipient_coach_user_id, message_text, viewed_at, video_id',
@@ -297,7 +286,7 @@ export async function listParentInbox(opts: {
     video_id: string | null;
   };
   const folder = new Map<string, InboxRow>();
-  for (const m of (msgs ?? []) as unknown as RawMsg[]) {
+  for (const m of (msgs ?? []) as RawMsg[]) {
     const isSelf = m.sender_user_id === selfUserId;
     const coachId = isSelf ? m.recipient_coach_user_id : m.sender_user_id;
     if (!coachId) continue;

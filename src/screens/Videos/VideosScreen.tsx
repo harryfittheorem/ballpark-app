@@ -12,7 +12,7 @@
  */
 
 import { useNavigation } from '@react-navigation/native';
-import { Heart, Mail, ZapOff } from 'lucide-react-native';
+import { Heart, Inbox, Mail, Send, ZapOff } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -163,6 +163,8 @@ export default function VideosScreen() {
           onPress={(messageId) =>
             navigation.navigate('Home', { screen: 'VideoPlayback', params: { messageId } })
           }
+          onSendToCoach={() => navigation.navigate('SendVideoToCoach', {})}
+          onOpenInbox={() => navigation.navigate('MessagesInbox')}
         />
       ) : null}
 
@@ -388,21 +390,93 @@ function HomeworkTab({
 function MessagesTab({
   messages,
   onPress,
+  onSendToCoach,
+  onOpenInbox,
 }: {
   messages: LatestCoachMessage[];
   onPress: (messageId: string) => void;
+  onSendToCoach: () => void;
+  onOpenInbox: () => void;
 }) {
+  const cta = (
+    <View style={{ gap: spacing.lg, marginBottom: spacing['2xl'] }}>
+      <Pressable
+        onPress={onSendToCoach}
+        style={({ pressed }) => [
+          {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: spacing.base,
+            backgroundColor: colors.gold,
+            paddingVertical: spacing['3xl'],
+            borderRadius: radius['2xl'],
+          },
+          pressed && { opacity: 0.85 },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="Send a video to coach"
+      >
+        <Send size={18} color={colors.dark} />
+        <Text
+          style={{
+            color: colors.dark,
+            fontFamily: fontFamilies.oswaldBold,
+            fontSize: fontSizes.lg,
+            letterSpacing: tracking.wider,
+          }}
+        >
+          SEND A VIDEO TO COACH
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={onOpenInbox}
+        style={({ pressed }) => [
+          {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: spacing.base,
+            paddingVertical: spacing['2xl'],
+            borderRadius: radius['2xl'],
+            borderWidth: 1,
+            borderColor: colors.borderGold,
+          },
+          pressed && { opacity: 0.85 },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="Open coach inbox"
+      >
+        <Inbox size={16} color={colors.gold} />
+        <Text
+          style={{
+            color: colors.gold,
+            fontFamily: fontFamilies.oswaldBold,
+            fontSize: fontSizes.md,
+            letterSpacing: tracking.wide,
+          }}
+        >
+          OPEN COACH INBOX
+        </Text>
+      </Pressable>
+    </View>
+  );
+
   if (messages.length === 0) {
     return (
-      <EmptyState
-        icon={<Mail size={26} color={colors.gold} />}
-        title="No coach messages yet"
-        body="When a coach sends a video, it lands here and on Home."
-      />
+      <ScrollView contentContainerStyle={styles.listContent}>
+        {cta}
+        <EmptyState
+          icon={<Mail size={26} color={colors.gold} />}
+          title="No coach messages yet"
+          body="When a coach sends a video, it lands here and on Home."
+        />
+      </ScrollView>
     );
   }
   return (
     <ScrollView contentContainerStyle={styles.listContent}>
+      {cta}
       {messages.map((m) => {
         const v = m.video;
         const ready = v && v.status === 'ready' && v.muxPlaybackId;

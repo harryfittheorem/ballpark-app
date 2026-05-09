@@ -24,12 +24,14 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
-import { Copy, Download, Share2, X } from 'lucide-react-native';
+import { Copy, Download, Instagram, MessageSquare, MoreHorizontal, Music2, X } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
+  Platform,
   ScrollView,
   Text,
   View,
@@ -64,7 +66,9 @@ export default function ShareCardScreen() {
   const { data: prs } = usePersonalBestsForKid(kid?.id);
 
   const captureContainerRef = useRef<View>(null);
-  const [busy, setBusy] = useState<null | 'share' | 'save' | 'copy'>(null);
+  const [busy, setBusy] = useState<
+    null | 'instagram' | 'tiktok' | 'message' | 'more' | 'save' | 'copy'
+  >(null);
 
   const capture = useCallback(async (): Promise<string> => {
     if (!captureContainerRef.current) {
@@ -79,22 +83,90 @@ export default function ShareCardScreen() {
     });
   }, []);
 
-  const onShare = useCallback(async () => {
-    setBusy('share');
-    try {
-      const uri = await capture();
+  // Best-effort: try a native deep link to the destination app first; if
+  // the device has no handler (or expo-sharing fails), fall back to the OS
+  // share sheet so the user always lands on a working flow.
+  const shareViaSheet = useCallback(
+    async (uri: string, dialogTitle: string) => {
       const available = await Sharing.isAvailableAsync();
       if (!available) {
         Alert.alert('Sharing unavailable', 'This device does not expose a share sheet.');
         return;
       }
-      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share PR' });
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle });
+    },
+    [],
+  );
+
+  const onInstagram = useCallback(async () => {
+    setBusy('instagram');
+    try {
+      const uri = await capture();
+      const igUrl = 'instagram-stories://share';
+      const canOpen = Platform.OS === 'ios' && (await Linking.canOpenURL(igUrl));
+      if (canOpen) {
+        try {
+          await Linking.openURL(igUrl);
+          return;
+        } catch {
+          // fall through to share sheet
+        }
+      }
+      await shareViaSheet(uri, 'Share to Instagram');
     } catch (err) {
       Alert.alert('Could not share', errorMessage(err));
     } finally {
       setBusy(null);
     }
-  }, [capture]);
+  }, [capture, shareViaSheet]);
+
+  const onTikTok = useCallback(async () => {
+    setBusy('tiktok');
+    try {
+      const uri = await capture();
+      const ttUrl = 'snssdk1233://';
+      const canOpen = await Linking.canOpenURL(ttUrl).catch(() => false);
+      if (canOpen) {
+        try {
+          await Linking.openURL(ttUrl);
+          return;
+        } catch {
+          // fall through
+        }
+      }
+      await shareViaSheet(uri, 'Share to TikTok');
+    } catch (err) {
+      Alert.alert('Could not share', errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  }, [capture, shareViaSheet]);
+
+  const onMessage = useCallback(async () => {
+    setBusy('message');
+    try {
+      const uri = await capture();
+      // Plain SMS: deep link can't attach images. Use the share sheet so
+      // the user lands in their chosen messaging app with the image.
+      await shareViaSheet(uri, 'Send via Messages');
+    } catch (err) {
+      Alert.alert('Could not share', errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  }, [capture, shareViaSheet]);
+
+  const onMore = useCallback(async () => {
+    setBusy('more');
+    try {
+      const uri = await capture();
+      await shareViaSheet(uri, 'Share PR');
+    } catch (err) {
+      Alert.alert('Could not share', errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  }, [capture, shareViaSheet]);
 
   const onSave = useCallback(async () => {
     setBusy('save');
@@ -169,6 +241,21 @@ export default function ShareCardScreen() {
   const prMatches = (prs ?? []).filter((p) => p.swing_id === swing.id);
   const kidName = kid ? `${kid.first_name}` : 'Athlete';
   const previewScale = PREVIEW_WIDTH / FULL_WIDTH;
+  const ageGroup = (kid?.age_group ?? null) as string | null;
+  // v0.7 ships with a single tenant (Infinite Hitting). Once the tenant
+  // row is fetched per-user we'll thread it through here.
+  const facilityName = 'Infinite Hitting';
+  const facilityLocation: string | null = null;
+  const achievedAt = new Date(swing.created_at);
+  const cardProps = {
+    kidName,
+    swing,
+    prMetrics: prMatches.map((p) => p.metric),
+    ageGroup,
+    facilityName,
+    facilityLocation,
+    achievedAt,
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -205,25 +292,47 @@ export default function ShareCardScreen() {
                 ],
               }}
             >
-              <ShareCardArtwork
-                kidName={kidName}
-                swing={swing}
-                prMetrics={prMatches.map((p) => p.metric)}
-              />
+              <ShareCardArtwork {...cardProps} />
             </View>
           </View>
           <Text style={styles.previewCaption}>1080 x 1920 — ready for stories.</Text>
         </View>
 
-        <View style={styles.actions}>
-          <ActionRow
-            icon={<Share2 size={18} color={colors.dark} />}
-            label="Share"
-            onPress={onShare}
-            primary
-            busy={busy === 'share'}
+        {/* Primary destinations — IG / TikTok / Message / More. Each tries
+            the platform's deep link first and falls back to the OS share
+            sheet so the destination is always reachable. */}
+        <View style={styles.primaryGrid}>
+          <PrimaryAction
+            icon={<Instagram size={22} color={colors.gold} />}
+            label="Instagram"
+            onPress={onInstagram}
+            busy={busy === 'instagram'}
             disabled={busy !== null}
           />
+          <PrimaryAction
+            icon={<Music2 size={22} color={colors.gold} />}
+            label="TikTok"
+            onPress={onTikTok}
+            busy={busy === 'tiktok'}
+            disabled={busy !== null}
+          />
+          <PrimaryAction
+            icon={<MessageSquare size={22} color={colors.gold} />}
+            label="Message"
+            onPress={onMessage}
+            busy={busy === 'message'}
+            disabled={busy !== null}
+          />
+          <PrimaryAction
+            icon={<MoreHorizontal size={22} color={colors.gold} />}
+            label="More"
+            onPress={onMore}
+            busy={busy === 'more'}
+            disabled={busy !== null}
+          />
+        </View>
+
+        <View style={styles.actions}>
           <ActionRow
             icon={<Download size={18} color={colors.gold} />}
             label="Save to Photos"
@@ -255,13 +364,50 @@ export default function ShareCardScreen() {
           height: FULL_HEIGHT,
         }}
       >
-        <ShareCardArtwork
-          kidName={kidName}
-          swing={swing}
-          prMetrics={prMatches.map((p) => p.metric)}
-        />
+        <ShareCardArtwork {...cardProps} />
       </View>
     </SafeAreaView>
+  );
+}
+
+function PrimaryAction({
+  icon,
+  label,
+  onPress,
+  busy,
+  disabled,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+  busy: boolean;
+  disabled: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.primaryTile,
+        pressed && !disabled && styles.actionRowPressed,
+        disabled && { opacity: 0.6 },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      {busy ? <ActivityIndicator color={colors.gold} /> : icon}
+      <Text
+        style={{
+          fontFamily: fontFamilies.oswaldBold,
+          fontSize: 12,
+          letterSpacing: 1,
+          color: colors.gold,
+          marginTop: 8,
+        }}
+      >
+        {label.toUpperCase()}
+      </Text>
+    </Pressable>
   );
 }
 

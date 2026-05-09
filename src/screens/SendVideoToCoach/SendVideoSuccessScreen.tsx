@@ -1,5 +1,6 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Check, MessageCircle } from 'lucide-react-native';
+import { useEffect, useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,10 +10,25 @@ import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/th
 type Nav = VideosStackScreenProps<'SendVideoSuccess'>['navigation'];
 type Route = VideosStackScreenProps<'SendVideoSuccess'>['route'];
 
+const AUTO_REDIRECT_MS = 2000;
+
 export default function SendVideoSuccessScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { coachUserId, kidId } = route.params;
+  const redirected = useRef(false);
+
+  // Auto-redirect into the thread after ~2s. The user can still tap
+  // "DONE" before the timer fires; we cancel on unmount and on manual
+  // navigation.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (redirected.current) return;
+      redirected.current = true;
+      navigation.replace('MessageThread', { kidId, coachUserId });
+    }, AUTO_REDIRECT_MS);
+    return () => clearTimeout(t);
+  }, [navigation, kidId, coachUserId]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.darkest }}>
@@ -45,7 +61,7 @@ export default function SendVideoSuccessScreen() {
             letterSpacing: tracking.wider,
           }}
         >
-          SENT
+          SENT!
         </Text>
         <Text
           style={{
@@ -57,13 +73,14 @@ export default function SendVideoSuccessScreen() {
           }}
         >
           Your coach gets a push notification and an inbox card. The clip
-          finishes processing in a minute or two.
+          finishes processing in a minute or two. Opening your thread…
         </Text>
         <View style={{ width: '100%', gap: spacing['2xl'] }}>
           <Pressable
-            onPress={() =>
-              navigation.replace('MessageThread', { kidId, coachUserId })
-            }
+            onPress={() => {
+              redirected.current = true;
+              navigation.replace('MessageThread', { kidId, coachUserId });
+            }}
             style={({ pressed }) => [
               {
                 flexDirection: 'row',
@@ -90,7 +107,10 @@ export default function SendVideoSuccessScreen() {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => navigation.popToTop()}
+            onPress={() => {
+              redirected.current = true;
+              navigation.popToTop();
+            }}
             style={({ pressed }) => [
               {
                 paddingVertical: spacing['3xl'],

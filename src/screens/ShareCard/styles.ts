@@ -37,6 +37,23 @@ export const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     marginTop: spacing['2xl'],
   },
+  primaryGrid: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.lg,
+    marginBottom: spacing['3xl'],
+  },
+  primaryTile: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing['3xl'],
+    borderRadius: radius['2xl'],
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.darker,
+  },
   actions: { width: '100%', gap: spacing['2xl'] },
   actionRow: {
     flexDirection: 'row',

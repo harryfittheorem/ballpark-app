@@ -216,25 +216,52 @@ function Bubble({
   const borderColor = isSelf ? colors.gold : colors.borderGold;
 
   const created = new Date(message.createdAt);
-  const time = Number.isNaN(created.getTime())
-    ? ''
-    : created.toLocaleString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const time = Number.isNaN(created.getTime()) ? '' : formatSentRelative(created);
 
   return (
     <View style={{ alignItems: align, maxWidth: '88%', alignSelf: align }}>
-      {message.senderDisplay && isSelf ? (
-        <Text
+      {/* Side badge (COACH for inbound, YOU for self) — keeps direction
+          unambiguous even when both bubbles are gold-on-dark in dark mode. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 4,
+          marginHorizontal: 6,
+          gap: 8,
+        }}
+      >
+        <View
           style={{
-            fontFamily: fontFamilies.interMedium,
-            fontSize: fontSizes.sm,
-            color: colors.textLight,
-            marginBottom: 4,
-            marginRight: 6,
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: 4,
+            backgroundColor: isSelf ? colors.gold : colors.goldDeep,
           }}
         >
-          From {message.senderDisplay}
-        </Text>
-      ) : null}
+          <Text
+            style={{
+              fontFamily: fontFamilies.oswaldBold,
+              fontSize: 10,
+              letterSpacing: tracking.wider,
+              color: isSelf ? colors.dark : colors.darkest,
+            }}
+          >
+            {isSelf ? 'YOU' : 'COACH'}
+          </Text>
+        </View>
+        {message.senderDisplay && isSelf ? (
+          <Text
+            style={{
+              fontFamily: fontFamilies.interMedium,
+              fontSize: fontSizes.sm,
+              color: colors.textLight,
+            }}
+          >
+            From {message.senderDisplay}
+          </Text>
+        ) : null}
+      </View>
       <View
         style={{
           backgroundColor: bg,
@@ -283,10 +310,30 @@ function Bubble({
           marginHorizontal: 6,
         }}
       >
-        {time}
+        Sent {time}
       </Text>
     </View>
   );
+}
+
+function formatSentRelative(d: Date): string {
+  const now = Date.now();
+  const diffMs = now - d.getTime();
+  const oneDay = 24 * 60 * 60 * 1000;
+  const time = d.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  if (diffMs < oneDay && new Date(now).getDate() === d.getDate()) {
+    return `today at ${time}`;
+  }
+  if (diffMs < 2 * oneDay) {
+    return `yesterday at ${time}`;
+  }
+  if (diffMs < 7 * oneDay) {
+    return d.toLocaleDateString(undefined, { weekday: 'long' }) + ` at ${time}`;
+  }
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ` at ${time}`;
 }
 
 function VideoBubbleBody({
