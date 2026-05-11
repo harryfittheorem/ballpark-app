@@ -850,6 +850,79 @@ export type Database = {
           },
         ]
       }
+      memberships: {
+        Row: {
+          amount_cents: number
+          billing_anchor_day: number | null
+          cancelled_at: string | null
+          created_at: string
+          family_id: string
+          id: string
+          kid_id: string
+          plan_name: string
+          plan_type: string
+          started_at: string
+          status: string
+          stripe_subscription_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          billing_anchor_day?: number | null
+          cancelled_at?: string | null
+          created_at?: string
+          family_id: string
+          id?: string
+          kid_id: string
+          plan_name: string
+          plan_type: string
+          started_at?: string
+          status?: string
+          stripe_subscription_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          billing_anchor_day?: number | null
+          cancelled_at?: string | null
+          created_at?: string
+          family_id?: string
+          id?: string
+          kid_id?: string
+          plan_name?: string
+          plan_type?: string
+          started_at?: string
+          status?: string
+          stripe_subscription_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memberships_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_log: {
         Row: {
           event_type: string
@@ -971,6 +1044,67 @@ export type Database = {
           },
           {
             foreignKeyName: "orders_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_events: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          error_code: string | null
+          family_id: string
+          id: string
+          membership_id: string | null
+          payment_method: string
+          status: string
+          stripe_payment_intent_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          error_code?: string | null
+          family_id: string
+          id?: string
+          membership_id?: string | null
+          payment_method: string
+          status: string
+          stripe_payment_intent_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          error_code?: string | null
+          family_id?: string
+          id?: string
+          membership_id?: string | null
+          payment_method?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_events_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_events_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_events_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
