@@ -40,7 +40,9 @@ export default async function LoginPage({
             </span>
           </div>
           <p className="text-sm text-text-light">
-            Sign in to access the coach + admin tools.
+            This portal is for coaches and admins.{" "}
+            <br />
+            Parents please use the mobile app.
           </p>
         </div>
 
