@@ -38,10 +38,9 @@ function nextChargeLabel(anchorDay: number | null, status: string): string {
   const now = new Date();
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   let month = now.getMonth();
-  let year = now.getFullYear();
   if (now.getDate() >= anchorDay) {
     month += 1;
-    if (month > 11) { month = 0; year += 1; }
+    if (month > 11) { month = 0; }
   }
   return `${months[month]} ${anchorDay}`;
 }

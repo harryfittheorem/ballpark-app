@@ -20,7 +20,7 @@ type Props = {
   tenantName: string;
 };
 
-export function DashboardContent({ kpis, members, revenueMonthly, packages, locationName, tenantName }: Props) {
+export function DashboardContent({ kpis, members, revenueMonthly, packages, tenantName }: Props) {
   const router = useRouter();
 
   const atRisk = members.filter(m => m.status === 'active' && (m.churnRisk === 'high' || m.churnRisk === 'medium'));

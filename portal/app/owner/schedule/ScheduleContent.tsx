@@ -127,7 +127,7 @@ export function ScheduleContent({ data }: Props) {
           <OCard>
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 14, fontWeight: 700, fontFamily: fonts.display, letterSpacing: 0.5, color: brand.text, textTransform: 'uppercase' }}>Peak Hour Analysis</div>
-              <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 2 }}>Today's hourly booking distribution</div>
+              <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 2 }}>Today&apos;s hourly booking distribution</div>
             </div>
             <BarChart data={hourBarData} height={180} />
             {totalToday === 0 && (
