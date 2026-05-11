@@ -57,7 +57,7 @@ export function DashboardContent({ kpis, members, revenueMonthly, packages, loca
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
           <KPICard label="MRR" value={`$${totalMrr.toLocaleString()}`} icon={DollarSign} color="gold" />
           <KPICard label="Active Members" value={kpis.activeMembers} icon={Users} />
-          <KPICard label="Retention Rate" value={`${kpis.autoPayRate}%`} icon={TrendingUp} color="success" />
+          <KPICard label="Retention Rate" value={`${kpis.retentionRate}%`} icon={TrendingUp} color={kpis.retentionRate >= 85 ? 'success' : 'warning'} />
           <KPICard label="At Risk" value={atRisk.length} icon={AlertTriangle} color="warning" />
           <KPICard label="Failed Payments" value={kpis.failedPaymentsCount} icon={AlertCircle} color="danger" />
         </div>

@@ -25,7 +25,7 @@ function relativeTime(ts: string | null): string {
 
 function churnRisk(daysSinceLastSession: number): 'low' | 'medium' | 'high' {
   if (daysSinceLastSession > 21) return 'high';
-  if (daysSinceLastSession > 10) return 'medium';
+  if (daysSinceLastSession > 14) return 'medium';
   return 'low';
 }
 
@@ -118,11 +118,13 @@ export type MembershipPackage = {
 export type OwnerKPIs = {
   mrr: number;
   activeMembers: number;
+  totalMembers: number;
   failedPaymentsCount: number;
   atRiskCount: number;
   collectedMtd: number;
   autoPayRate: number;
   pastDue: number;
+  retentionRate: number;
 };
 
 export type PointsProduct = {
@@ -167,6 +169,13 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
   const active = memberships.filter(m => m.status === 'active');
   const mrr = active.reduce((s, m) => s + (m.amount_cents ?? 0), 0) / 100;
   const activeMembers = new Set(active.map(m => m.kid_id)).size;
+  const totalMembers = new Set(memberships.map(m => m.kid_id)).size;
+
+  // Retention rate: active memberships / all non-cancelled memberships
+  const nonCancelled = memberships.filter(m => m.status !== 'cancelled');
+  const retentionRate = nonCancelled.length > 0
+    ? Math.round((active.length / nonCancelled.length) * 1000) / 10
+    : 100;
 
   const events = eventsRes.data ?? [];
   const now = new Date();
@@ -184,11 +193,13 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
   return {
     mrr,
     activeMembers,
+    totalMembers,
     failedPaymentsCount: failedRes.data?.length ?? 0,
     atRiskCount: 0,
     collectedMtd,
     autoPayRate,
     pastDue: failedMtd,
+    retentionRate,
   };
 }
 
@@ -705,6 +716,89 @@ export async function getRetentionData(supabase: SupabaseClient, tenantId: strin
   ];
 
   return { retentionRate, avgLifetimeMonths, cohortRetention, churnReasons };
+}
+
+// ─── Schedule ───────────────────────────────────────────────────────────────
+
+export type ScheduleBooking = {
+  id: string;
+  kidName: string;
+  coachName: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  cage: string | null;
+  sessionType: string;
+  status: string;
+  hourLabel: string;
+};
+
+export type OwnerScheduleData = {
+  bookings: ScheduleBooking[];
+  totalToday: number;
+  occupancyPct: number;
+  peakHour: string | null;
+  openSlots: number;
+};
+
+export async function getOwnerScheduleData(
+  supabase: SupabaseClient,
+  tenantId: string,
+  date: Date = new Date(),
+): Promise<OwnerScheduleData> {
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(date);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const { data: raw } = await supabase
+    .from('bookings')
+    .select(`
+      id, scheduled_start, scheduled_end, cage_number, session_type, status,
+      kids(first_name, last_name),
+      coaches(first_name, last_name)
+    `)
+    .eq('tenant_id', tenantId)
+    .gte('scheduled_start', dayStart.toISOString())
+    .lte('scheduled_start', dayEnd.toISOString())
+    .order('scheduled_start');
+
+  const bookings: ScheduleBooking[] = (raw ?? []).map(b => {
+    const kid = b.kids as unknown as { first_name: string; last_name: string | null } | null;
+    const coach = b.coaches as unknown as { first_name: string; last_name: string | null } | null;
+    const start = new Date(b.scheduled_start);
+    const hr = start.getHours();
+    const ampm = hr >= 12 ? 'PM' : 'AM';
+    const hr12 = hr > 12 ? hr - 12 : hr === 0 ? 12 : hr;
+    return {
+      id: b.id,
+      kidName: kid ? [kid.first_name, kid.last_name].filter(Boolean).join(' ') : 'Unknown',
+      coachName: coach ? [coach.first_name, coach.last_name].filter(Boolean).join(' ') : '—',
+      scheduledStart: b.scheduled_start,
+      scheduledEnd: b.scheduled_end ?? b.scheduled_start,
+      cage: b.cage_number ? `Cage ${b.cage_number}` : null,
+      sessionType: b.session_type ?? 'Private',
+      status: b.status,
+      hourLabel: `${hr12} ${ampm}`,
+    };
+  });
+
+  const TOTAL_SLOTS = 8 * 12; // 8 cages × 12 hours
+  const hourCounts: Record<string, number> = {};
+  for (const b of bookings) {
+    hourCounts[b.hourLabel] = (hourCounts[b.hourLabel] ?? 0) + 1;
+  }
+  const peakHour = Object.keys(hourCounts).length > 0
+    ? Object.entries(hourCounts).sort(([, a], [, b]) => b - a)[0][0]
+    : null;
+  const occupancyPct = Math.round((bookings.length / TOTAL_SLOTS) * 1000) / 10;
+
+  return {
+    bookings,
+    totalToday: bookings.length,
+    occupancyPct,
+    peakHour,
+    openSlots: TOTAL_SLOTS - bookings.length,
+  };
 }
 
 // ─── Tenant / Location Name ──────────────────────────────────────────────────
