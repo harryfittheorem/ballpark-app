@@ -195,60 +195,73 @@ END $$;
 -- ────────────────────────────────────────────────────────────
 -- SEED DATA — Infinite Hitting tenant (00000000-0000-0000-0000-000000000001)
 --
--- Real families/kids pulled from the live DB:
+-- NOTE: These rows reference families/kids provisioned on the live
+-- Infinite Hitting Supabase project. On a clean/fresh environment
+-- these FK parents won't exist, so the entire seed block is
+-- skipped safely via the DO guard below.
+--
+-- Real families/kids on the live DB:
 --   Family ac9f0847 → Kid Harry Singh   (ad08b4ce, 12U)
 --   Family 98309a11 → Kid Yug Singh     (54c7643f, 11U)
 --   Family 8e209137 → Kid Yug Singh     (cb390ca5, 12U)
 --   Family c84bcb7b → Kid Harry         (d98cf2ef, 13U)
 -- ────────────────────────────────────────────────────────────
-INSERT INTO public.memberships (id, tenant_id, family_id, kid_id, plan_name, plan_type, status, amount_cents, billing_anchor_day, started_at)
-VALUES
-  ('00000000-0000-0000-0000-000000001001',
-   '00000000-0000-0000-0000-000000000001',
-   'ac9f0847-8a91-4e77-8428-c9ccf45f859c',
-   'ad08b4ce-3536-4add-8604-a9f29c3cd290',
-   'Unlimited Monthly', 'eft', 'active', 29900, 5,
-   '2025-01-05 00:00:00+00'),
+DO $$ BEGIN
+  -- Only seed if the Infinite Hitting tenant and at least one referenced
+  -- family exist (i.e. this is the live project, not a blank env).
+  IF EXISTS (
+    SELECT 1 FROM public.tenants
+    WHERE id = '00000000-0000-0000-0000-000000000001'
+  ) AND EXISTS (
+    SELECT 1 FROM public.families
+    WHERE id = 'ac9f0847-8a91-4e77-8428-c9ccf45f859c'
+  ) THEN
+    INSERT INTO public.memberships
+      (id, tenant_id, family_id, kid_id, plan_name, plan_type, status, amount_cents, billing_anchor_day, started_at)
+    VALUES
+      ('00000000-0000-0000-0000-000000001001',
+       '00000000-0000-0000-0000-000000000001',
+       'ac9f0847-8a91-4e77-8428-c9ccf45f859c',
+       'ad08b4ce-3536-4add-8604-a9f29c3cd290',
+       'Unlimited Monthly', 'eft', 'active', 29900, 5,
+       '2025-01-05 00:00:00+00'),
+      ('00000000-0000-0000-0000-000000001002',
+       '00000000-0000-0000-0000-000000000001',
+       '98309a11-d9fe-4cc3-9834-af79ac778ca3',
+       '54c7643f-b56a-4816-9144-b8f36bbe37e4',
+       'Elite 2x/Week', 'eft', 'active', 24900, 12,
+       '2025-02-12 00:00:00+00'),
+      ('00000000-0000-0000-0000-000000001003',
+       '00000000-0000-0000-0000-000000000001',
+       '8e209137-0f0e-4b6a-9c9c-7e5e3cebb1c1',
+       'cb390ca5-8543-47e9-acec-d964031fa472',
+       '8-Pack Private Lessons', 'otc', 'active', 48000, NULL,
+       '2025-03-01 00:00:00+00'),
+      ('00000000-0000-0000-0000-000000001004',
+       '00000000-0000-0000-0000-000000000001',
+       'c84bcb7b-0498-412c-b213-fec1bb0aba54',
+       'd98cf2ef-6351-4284-97c5-b5c09f38b3fb',
+       'Elite 1x/Week', 'eft', 'active', 17900, 18,
+       '2025-03-18 00:00:00+00')
+    ON CONFLICT (id) DO NOTHING;
 
-  ('00000000-0000-0000-0000-000000001002',
-   '00000000-0000-0000-0000-000000000001',
-   '98309a11-d9fe-4cc3-9834-af79ac778ca3',
-   '54c7643f-b56a-4816-9144-b8f36bbe37e4',
-   'Elite 2x/Week', 'eft', 'active', 24900, 12,
-   '2025-02-12 00:00:00+00'),
-
-  ('00000000-0000-0000-0000-000000001003',
-   '00000000-0000-0000-0000-000000000001',
-   '8e209137-0f0e-4b6a-9c9c-7e5e3cebb1c1',
-   'cb390ca5-8543-47e9-acec-d964031fa472',
-   '8-Pack Private Lessons', 'otc', 'active', 48000, NULL,
-   '2025-03-01 00:00:00+00'),
-
-  ('00000000-0000-0000-0000-000000001004',
-   '00000000-0000-0000-0000-000000000001',
-   'c84bcb7b-0498-412c-b213-fec1bb0aba54',
-   'd98cf2ef-6351-4284-97c5-b5c09f38b3fb',
-   'Elite 1x/Week', 'eft', 'active', 17900, 18,
-   '2025-03-18 00:00:00+00')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO public.payment_events
-  (tenant_id, family_id, membership_id, amount_cents, status, payment_method, created_at)
-VALUES
-  -- Membership 1001: Unlimited Monthly $299/mo EFT – Jan–May paid
-  ('00000000-0000-0000-0000-000000000001','ac9f0847-8a91-4e77-8428-c9ccf45f859c','00000000-0000-0000-0000-000000001001',29900,'paid','eft','2025-02-05'),
-  ('00000000-0000-0000-0000-000000000001','ac9f0847-8a91-4e77-8428-c9ccf45f859c','00000000-0000-0000-0000-000000001001',29900,'paid','eft','2025-03-05'),
-  ('00000000-0000-0000-0000-000000000001','ac9f0847-8a91-4e77-8428-c9ccf45f859c','00000000-0000-0000-0000-000000001001',29900,'paid','eft','2025-04-05'),
-  ('00000000-0000-0000-0000-000000000001','ac9f0847-8a91-4e77-8428-c9ccf45f859c','00000000-0000-0000-0000-000000001001',29900,'paid','eft','2025-05-05'),
-
-  -- Membership 1002: Elite 2x/Week $249/mo EFT – Feb–Apr paid, May failed
-  ('00000000-0000-0000-0000-000000000001','98309a11-d9fe-4cc3-9834-af79ac778ca3','00000000-0000-0000-0000-000000001002',24900,'paid','eft','2025-03-12'),
-  ('00000000-0000-0000-0000-000000000001','98309a11-d9fe-4cc3-9834-af79ac778ca3','00000000-0000-0000-0000-000000001002',24900,'paid','eft','2025-04-12'),
-  ('00000000-0000-0000-0000-000000000001','98309a11-d9fe-4cc3-9834-af79ac778ca3','00000000-0000-0000-0000-000000001002',24900,'failed','eft','2025-05-12'),
-
-  -- Membership 1003: 8-Pack OTC $480 upfront cash
-  ('00000000-0000-0000-0000-000000000001','8e209137-0f0e-4b6a-9c9c-7e5e3cebb1c1','00000000-0000-0000-0000-000000001003',48000,'paid','cash','2025-03-01'),
-
-  -- Membership 1004: Elite 1x/Week $179/mo EFT – Apr–May paid
-  ('00000000-0000-0000-0000-000000000001','c84bcb7b-0498-412c-b213-fec1bb0aba54','00000000-0000-0000-0000-000000001004',17900,'paid','eft','2025-04-18'),
-  ('00000000-0000-0000-0000-000000000001','c84bcb7b-0498-412c-b213-fec1bb0aba54','00000000-0000-0000-0000-000000001004',17900,'paid','eft','2025-05-18');
+    INSERT INTO public.payment_events
+      (tenant_id, family_id, membership_id, amount_cents, status, payment_method, created_at)
+    VALUES
+      -- Membership 1001: Unlimited Monthly $299/mo EFT – Jan–May paid
+      ('00000000-0000-0000-0000-000000000001','ac9f0847-8a91-4e77-8428-c9ccf45f859c','00000000-0000-0000-0000-000000001001',29900,'paid','eft','2025-02-05'),
+      ('00000000-0000-0000-0000-000000000001','ac9f0847-8a91-4e77-8428-c9ccf45f859c','00000000-0000-0000-0000-000000001001',29900,'paid','eft','2025-03-05'),
+      ('00000000-0000-0000-0000-000000000001','ac9f0847-8a91-4e77-8428-c9ccf45f859c','00000000-0000-0000-0000-000000001001',29900,'paid','eft','2025-04-05'),
+      ('00000000-0000-0000-0000-000000000001','ac9f0847-8a91-4e77-8428-c9ccf45f859c','00000000-0000-0000-0000-000000001001',29900,'paid','eft','2025-05-05'),
+      -- Membership 1002: Elite 2x/Week $249/mo EFT – Feb–Apr paid, May failed
+      ('00000000-0000-0000-0000-000000000001','98309a11-d9fe-4cc3-9834-af79ac778ca3','00000000-0000-0000-0000-000000001002',24900,'paid','eft','2025-03-12'),
+      ('00000000-0000-0000-0000-000000000001','98309a11-d9fe-4cc3-9834-af79ac778ca3','00000000-0000-0000-0000-000000001002',24900,'paid','eft','2025-04-12'),
+      ('00000000-0000-0000-0000-000000000001','98309a11-d9fe-4cc3-9834-af79ac778ca3','00000000-0000-0000-0000-000000001002',24900,'failed','eft','2025-05-12'),
+      -- Membership 1003: 8-Pack OTC $480 upfront cash
+      ('00000000-0000-0000-0000-000000000001','8e209137-0f0e-4b6a-9c9c-7e5e3cebb1c1','00000000-0000-0000-0000-000000001003',48000,'paid','cash','2025-03-01'),
+      -- Membership 1004: Elite 1x/Week $179/mo EFT – Apr–May paid
+      ('00000000-0000-0000-0000-000000000001','c84bcb7b-0498-412c-b213-fec1bb0aba54','00000000-0000-0000-0000-000000001004',17900,'paid','eft','2025-04-18'),
+      ('00000000-0000-0000-0000-000000000001','c84bcb7b-0498-412c-b213-fec1bb0aba54','00000000-0000-0000-0000-000000001004',17900,'paid','eft','2025-05-18')
+    ON CONFLICT DO NOTHING;
+  END IF;
+END $$;
