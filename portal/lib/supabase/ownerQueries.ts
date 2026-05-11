@@ -807,6 +807,228 @@ export async function getOwnerScheduleData(
   };
 }
 
+// ─── Member Detail ───────────────────────────────────────────────────────────
+
+export type BookingStatus = 'completed' | 'cancelled' | 'confirmed' | 'pending' | 'no_show';
+export type PaymentStatus = 'paid' | 'failed' | 'refunded';
+
+export type TimelineEvent = {
+  id: string;
+  kind: 'booking' | 'payment';
+  dateIso: string;
+  dateLabel: string;
+  title: string;
+  subtitle: string;
+  status: BookingStatus | PaymentStatus;
+  amount?: number;
+};
+
+export type RecentPaymentEvent = {
+  id: string;
+  date: string;
+  amount: number;
+  status: 'paid' | 'failed' | 'refunded';
+  method: string;
+};
+
+export type MemberDetail = OwnerMember & {
+  bookingCount: number;
+  hittraxSessionCount: number;
+  pointsBalance: number;
+  timeline: TimelineEvent[];
+  recentPayments: RecentPaymentEvent[];
+};
+
+export async function getMemberDetail(
+  supabase: SupabaseClient,
+  tenantId: string,
+  membershipId: string,
+): Promise<MemberDetail | null> {
+  const { data: mem, error: memErr } = await supabase
+    .from('memberships')
+    .select(`
+      id,
+      plan_name,
+      plan_type,
+      status,
+      amount_cents,
+      billing_anchor_day,
+      started_at,
+      kid_id,
+      family_id,
+      kids!inner(id, first_name, last_name, age_group, points_balance),
+      families!inner(parent_first_name, parent_last_name)
+    `)
+    .eq('tenant_id', tenantId)
+    .eq('id', membershipId)
+    .single();
+
+  if (memErr || !mem) return null;
+
+  const kid = mem.kids as unknown as {
+    id: string;
+    first_name: string;
+    last_name: string | null;
+    age_group: string | null;
+    points_balance: number;
+  };
+  const fam = mem.families as unknown as {
+    parent_first_name: string;
+    parent_last_name: string | null;
+  };
+
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const dateLabel = (iso: string) => {
+    const d = new Date(iso);
+    return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  };
+
+  const [bookingCountRes, sessionsRes, recentBookingsRes, paymentsRes, lastBookingRes] = await Promise.all([
+    // Exact completed-booking count — no row limit so all completed bookings are counted
+    supabase
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('kid_id', kid.id)
+      .eq('status', 'completed'),
+    // HitTrax session count
+    supabase
+      .from('sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('kid_id', kid.id),
+    // Recent bookings for the timeline (last 5)
+    supabase
+      .from('bookings')
+      .select('id, scheduled_start, status, session_types(name), coaches(first_name, last_name)')
+      .eq('tenant_id', tenantId)
+      .eq('kid_id', kid.id)
+      .order('scheduled_start', { ascending: false })
+      .limit(5),
+    // Payment events — last 5 for timeline + last 3 for billing card
+    supabase
+      .from('payment_events')
+      .select('id, amount_cents, payment_method, status, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('membership_id', membershipId)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    // Last completed booking for churn-risk / engagement scoring
+    supabase
+      .from('bookings')
+      .select('scheduled_start')
+      .eq('tenant_id', tenantId)
+      .eq('kid_id', kid.id)
+      .eq('status', 'completed')
+      .order('scheduled_start', { ascending: false })
+      .limit(1),
+  ]);
+
+  const bookingCount = bookingCountRes.count ?? 0;
+  const hittraxSessionCount = sessionsRes.count ?? 0;
+
+  if (bookingCountRes.error) console.error('[getMemberDetail] bookingCount:', bookingCountRes.error.message);
+  if (sessionsRes.error) console.error('[getMemberDetail] sessions:', sessionsRes.error.message);
+  if (recentBookingsRes.error) console.error('[getMemberDetail] recentBookings:', recentBookingsRes.error.message);
+  if (paymentsRes.error) console.error('[getMemberDetail] payments:', paymentsRes.error.message);
+  if (lastBookingRes.error) console.error('[getMemberDetail] lastBooking:', lastBookingRes.error.message);
+
+  // Build unified timeline: merge recent bookings + payment events, sort descending
+  const knownBookingStatuses = new Set<BookingStatus>(['completed','cancelled','confirmed','pending','no_show']);
+  const knownPaymentStatuses = new Set<PaymentStatus>(['paid','failed','refunded']);
+
+  const bookingEvents: TimelineEvent[] = (recentBookingsRes.data ?? []).map(b => {
+    const coach = b.coaches as unknown as { first_name: string; last_name: string | null } | null;
+    const st = b.session_types as unknown as { name: string } | null;
+    const status: BookingStatus = knownBookingStatuses.has(b.status as BookingStatus)
+      ? (b.status as BookingStatus)
+      : 'pending';
+    return {
+      id: b.id,
+      kind: 'booking' as const,
+      dateIso: b.scheduled_start,
+      dateLabel: dateLabel(b.scheduled_start),
+      title: st?.name ?? 'Private Session',
+      subtitle: coach ? `Coach ${[coach.first_name, coach.last_name].filter(Boolean).join(' ')}` : 'Session',
+      status,
+    };
+  });
+
+  const paymentTimelineEvents: TimelineEvent[] = (paymentsRes.data ?? []).map(e => {
+    const status: PaymentStatus = knownPaymentStatuses.has(e.status as PaymentStatus)
+      ? (e.status as PaymentStatus)
+      : 'paid';
+    return {
+      id: e.id,
+      kind: 'payment' as const,
+      dateIso: e.created_at,
+      dateLabel: dateLabel(e.created_at),
+      title: status === 'paid' ? 'Payment received' : status === 'failed' ? 'Payment failed' : 'Payment refunded',
+      subtitle: `$${(e.amount_cents / 100).toFixed(2)} · ${(e.payment_method ?? 'eft').toUpperCase()}`,
+      status,
+      amount: e.amount_cents / 100,
+    };
+  });
+
+  const timeline: TimelineEvent[] = [...bookingEvents, ...paymentTimelineEvents]
+    .sort((a, b) => new Date(b.dateIso).getTime() - new Date(a.dateIso).getTime())
+    .slice(0, 8);
+
+  const recentPayments: RecentPaymentEvent[] = (paymentsRes.data ?? []).slice(0, 3).map(e => {
+    return {
+      id: e.id,
+      date: dateLabel(e.created_at),
+      amount: e.amount_cents / 100,
+      status: e.status as 'paid' | 'failed' | 'refunded',
+      method: (e.payment_method ?? 'eft').toUpperCase(),
+    };
+  });
+
+  const lastBookingTs = lastBookingRes.data?.[0]?.scheduled_start ?? null;
+  const days = daysSince(lastBookingTs);
+  const risk = churnRisk(days);
+  const planType = mem.plan_type as 'eft' | 'otc';
+  const memberStatus = mem.status === 'active' && risk === 'high' ? 'at-risk'
+    : (mem.status as 'active' | 'paused' | 'cancelled');
+
+  const lifetimeRes = await supabase
+    .from('payment_events')
+    .select('amount_cents')
+    .eq('tenant_id', tenantId)
+    .eq('membership_id', membershipId)
+    .eq('status', 'paid');
+  const lifetime = (lifetimeRes.data ?? []).reduce((s, e) => s + (e.amount_cents ?? 0), 0) / 100;
+
+  return {
+    id: mem.id,
+    kidId: kid.id,
+    name: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
+    age: kid.age_group ?? '—',
+    parent: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),
+    program: mem.plan_name,
+    planType,
+    status: memberStatus,
+    engagementScore: engagementScore(days),
+    churnRisk: risk,
+    lastSession: relativeTime(lastBookingTs),
+    nextCharge: nextChargeLabel(mem.billing_anchor_day, mem.status),
+    mrr: mem.amount_cents / 100,
+    lifetime,
+    joinedDate: formatJoinDate(mem.started_at),
+    riskReason: risk === 'high'
+      ? `No session in ${days} days. Outreach recommended within 48 hours.`
+      : risk === 'medium'
+      ? `No session in ${days} days. Send an engagement message.`
+      : undefined,
+    bookingCount,
+    hittraxSessionCount,
+    pointsBalance: kid.points_balance,
+    timeline,
+    recentPayments,
+  };
+}
+
 // ─── Tenant / Location Name ──────────────────────────────────────────────────
 
 export async function getTenantName(supabase: SupabaseClient, tenantId: string): Promise<string> {
