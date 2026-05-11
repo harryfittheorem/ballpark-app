@@ -750,10 +750,11 @@ export async function getOwnerScheduleData(
   const dayEnd = new Date(date);
   dayEnd.setHours(23, 59, 59, 999);
 
-  const { data: raw } = await supabase
+  const { data: raw, error: bookingError } = await supabase
     .from('bookings')
     .select(`
-      id, scheduled_start, scheduled_end, cage_number, session_type, status,
+      id, scheduled_start, scheduled_end, cage_number, status,
+      session_types(name),
       kids(first_name, last_name),
       coaches(first_name, last_name)
     `)
@@ -762,9 +763,14 @@ export async function getOwnerScheduleData(
     .lte('scheduled_start', dayEnd.toISOString())
     .order('scheduled_start');
 
+  if (bookingError) {
+    console.error('[getOwnerScheduleData] bookings query failed:', bookingError.message);
+  }
+
   const bookings: ScheduleBooking[] = (raw ?? []).map(b => {
     const kid = b.kids as unknown as { first_name: string; last_name: string | null } | null;
     const coach = b.coaches as unknown as { first_name: string; last_name: string | null } | null;
+    const st = b.session_types as unknown as { name: string } | null;
     const start = new Date(b.scheduled_start);
     const hr = start.getHours();
     const ampm = hr >= 12 ? 'PM' : 'AM';
@@ -776,7 +782,7 @@ export async function getOwnerScheduleData(
       scheduledStart: b.scheduled_start,
       scheduledEnd: b.scheduled_end ?? b.scheduled_start,
       cage: b.cage_number ? `Cage ${b.cage_number}` : null,
-      sessionType: b.session_type ?? 'Private',
+      sessionType: st?.name ?? 'Private',
       status: b.status,
       hourLabel: `${hr12} ${ampm}`,
     };

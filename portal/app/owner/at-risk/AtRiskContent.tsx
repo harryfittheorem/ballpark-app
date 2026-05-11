@@ -10,7 +10,7 @@ type Props = { members: OwnerMember[] };
 
 export function AtRiskContent({ members }: Props) {
   const router = useRouter();
-  const atRisk = members.filter(m => m.churnRisk === 'high' || m.churnRisk === 'medium');
+  const atRisk = members.filter(m => m.status === 'active' && (m.churnRisk === 'high' || m.churnRisk === 'medium'));
   const totalMrr = atRisk.reduce((s, m) => s + m.mrr, 0);
 
   return (

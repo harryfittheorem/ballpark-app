@@ -23,7 +23,7 @@ type Props = {
 export function DashboardContent({ kpis, members, revenueMonthly, packages, locationName, tenantName }: Props) {
   const router = useRouter();
 
-  const atRisk = members.filter(m => m.churnRisk === 'high' || m.churnRisk === 'medium');
+  const atRisk = members.filter(m => m.status === 'active' && (m.churnRisk === 'high' || m.churnRisk === 'medium'));
   const atRiskMrr = atRisk.reduce((s, m) => s + m.mrr, 0);
 
   const totalMrr = kpis.mrr;
