@@ -3,16 +3,16 @@
 import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { Search, Bell, ChevronDown } from 'lucide-react';
-import { demoData } from '@/lib/ownerDemoData';
 
 interface TopBarProps {
   role: 'owner' | 'franchisor';
   onRoleChange: (role: 'owner' | 'franchisor') => void;
+  userName?: string;
+  locationName?: string;
 }
 
-export function TopBar({ role, onRoleChange }: TopBarProps) {
+export function TopBar({ role, onRoleChange, userName = 'Owner', locationName = 'Your Location' }: TopBarProps) {
   const router = useRouter();
-  const user = role === 'franchisor' ? demoData.franchisor : demoData.owner;
 
   const handleRoleChange = (newRole: 'owner' | 'franchisor') => {
     onRoleChange(newRole);
@@ -62,11 +62,11 @@ export function TopBar({ role, onRoleChange }: TopBarProps) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', paddingLeft: 12, borderLeft: `1px solid ${brand.border}` }}>
         <div style={{ width: 32, height: 32, borderRadius: 16, background: brand.dark, color: brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, fontFamily: fonts.display }}>
-          {user.name.charAt(0)}
+          {userName.charAt(0)}
         </div>
         <div style={{ textAlign: 'left' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: brand.text }}>{user.name}</div>
-          <div style={{ fontSize: 10, color: brand.textMuted }}>{role === 'franchisor' ? 'All 17 Locations' : demoData.location.name}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: brand.text }}>{userName}</div>
+          <div style={{ fontSize: 10, color: brand.textMuted }}>{role === 'franchisor' ? 'All 17 Locations' : locationName}</div>
         </div>
         <ChevronDown size={14} color={brand.textMuted} />
       </div>

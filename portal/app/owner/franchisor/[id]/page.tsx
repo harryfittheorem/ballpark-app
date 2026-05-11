@@ -2,22 +2,41 @@
 
 import { use } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
-import { demoData } from '@/lib/ownerDemoData';
 import { KPICard, OButton, PageHeader, SectionHeader, OCard, BarChart } from '@/components/owner/ui';
 import { DollarSign, Users, TrendingUp, MessageCircle, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+
+const LOCATIONS = [
+  { id: 1, name: 'Phoenix', owner: 'Jessica Chen', members: 412, mrr: 118400, retention: 92.8, churnRisk: 'low', trend: 14.8 },
+  { id: 2, name: 'Austin C.', owner: 'Sarah Kim', members: 342, mrr: 95800, retention: 91.2, churnRisk: 'low', trend: 11.5 },
+  { id: 3, name: 'Atlanta', owner: 'Derek Thompson', members: 321, mrr: 88200, retention: 86.5, churnRisk: 'medium', trend: 3.4 },
+  { id: 4, name: 'Dallas N.', owner: 'Mike Patterson', members: 287, mrr: 80360, retention: 89.4, churnRisk: 'low', trend: 8.2 },
+  { id: 5, name: 'Houston W.', owner: 'Rob Martinez', members: 298, mrr: 78900, retention: 87.8, churnRisk: 'low', trend: 5.2 },
+  { id: 6, name: 'Tampa', owner: 'Melissa Grant', members: 289, mrr: 76500, retention: 88.9, churnRisk: 'low', trend: 7.1 },
+  { id: 7, name: 'Dallas S.', owner: 'Jennifer Ford', members: 267, mrr: 71800, retention: 88.1, churnRisk: 'low', trend: 6.7 },
+  { id: 8, name: 'Orlando', owner: 'Carlos Ruiz', members: 268, mrr: 71200, retention: 86.7, churnRisk: 'low', trend: 5.4 },
+  { id: 9, name: 'San Antonio', owner: 'Marcus Williams', members: 245, mrr: 64200, retention: 85.4, churnRisk: 'medium', trend: 2.1 },
+  { id: 10, name: 'Charlotte', owner: 'Brian Lee', members: 234, mrr: 62800, retention: 87.3, churnRisk: 'low', trend: 4.8 },
+  { id: 11, name: 'Las Vegas', owner: 'Tony Marino', members: 221, mrr: 58700, retention: 85.1, churnRisk: 'medium', trend: 1.9 },
+  { id: 12, name: 'Indianapolis', owner: 'Steve Colby', members: 204, mrr: 54200, retention: 86.2, churnRisk: 'low', trend: 4.5 },
+  { id: 13, name: 'Columbus', owner: 'Karen Baxter', members: 198, mrr: 51800, retention: 85.8, churnRisk: 'medium', trend: 3.2 },
+  { id: 14, name: 'Nashville', owner: 'Amanda Reese', members: 198, mrr: 51400, retention: 84.2, churnRisk: 'medium', trend: -1.2 },
+  { id: 15, name: 'Denver', owner: 'Rachel Kim', members: 187, mrr: 48900, retention: 82.5, churnRisk: 'high', trend: -2.8 },
+  { id: 16, name: 'St. Louis', owner: 'Greg Hanson', members: 179, mrr: 45800, retention: 83.7, churnRisk: 'medium', trend: 0.8 },
+  { id: 17, name: 'Kansas City', owner: 'Paul Simmons', members: 142, mrr: 36200, retention: 79.8, churnRisk: 'high', trend: -4.1 },
+];
 
 export default function LocationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const locationId = parseInt(id, 10);
-  const l = demoData.locations.find(loc => loc.id === locationId) ?? demoData.locations[0];
-  const rank = demoData.locations.findIndex(loc => loc.id === locationId) + 1;
+  const l = LOCATIONS.find(loc => loc.id === locationId) ?? LOCATIONS[0];
+  const rank = LOCATIONS.findIndex(loc => loc.id === locationId) + 1;
 
   return (
     <div>
       <PageHeader
         breadcrumb={`Network → ${l.name}`}
         title={l.name}
-        subtitle={`Owned by ${l.owner} · ${l.members} members · Ranked #${rank} of ${demoData.locations.length} in network`}
+        subtitle={`Owned by ${l.owner} · ${l.members} members · Ranked #${rank} of ${LOCATIONS.length} in network`}
         actions={
           <>
             <OButton variant="secondary" icon={MessageCircle}>Contact Owner</OButton>
@@ -55,7 +74,7 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
                   {[
                     { label: 'APP OPEN RATE', value: `${Math.round(l.retention * 0.96)}%`, meta: `+${(l.retention * 0.04).toFixed(0)}% vs network`, positive: l.retention > 85 },
                     { label: 'HOMEWORK DONE', value: `${Math.round(l.retention * 0.81)}%`, meta: '+8% vs network', positive: true },
-                    { label: 'AVG SESSIONS/MO', value: (5.6 + l.trend * 0.1).toFixed(1), meta: `+${(l.trend * 0.1).toFixed(1)} vs network`, positive: l.trend > 0 },
+                    { label: 'AVG SESSIONS/MO', value: (5.6 + l.trend * 0.1).toFixed(1), meta: `${l.trend >= 0 ? '+' : ''}${(l.trend * 0.1).toFixed(1)} vs network`, positive: l.trend > 0 },
                   ].map((s, i) => (
                     <div key={i}>
                       <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1 }}>{s.label}</div>
@@ -96,7 +115,7 @@ export default function LocationDetailPage({ params }: { params: Promise<{ id: s
               <OCard>
                 <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1 }}>IN NETWORK</div>
                 <div style={{ fontSize: 36, fontWeight: 700, fontFamily: fonts.display, marginTop: 4, color: rank <= 3 ? brand.goldDeep : brand.text }}>
-                  #{rank} <span style={{ fontSize: 14, color: brand.textMuted, fontWeight: 500 }}>of {demoData.locations.length}</span>
+                  #{rank} <span style={{ fontSize: 14, color: brand.textMuted, fontWeight: 500 }}>of {LOCATIONS.length}</span>
                 </div>
                 <div style={{ fontSize: 11, color: l.trend >= 0 ? brand.success : brand.danger, fontWeight: 700, marginTop: 4 }}>
                   {l.trend >= 0 ? '↑' : '↓'} {Math.abs(l.trend).toFixed(1)}% MoM trend
