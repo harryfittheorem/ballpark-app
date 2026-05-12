@@ -78,18 +78,18 @@ function Sparkline({ points }: { points: number[] }) {
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value, large }: { label: string; value: string; large?: boolean }) {
   return (
     <div>
       <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 13, fontWeight: 500, color: brand.text }}>{value}</div>
+      <div style={{ fontSize: large ? 15 : 13, fontWeight: large ? 700 : 500, color: brand.text }}>{value}</div>
     </div>
   );
 }
 
 export function MemberDetailContent({ member: m }: Props) {
   const demo = isDemo(m) ? m : null;
-  const mo = monthsAgo(m.joinedDate);
+  const mo = demo ? demo.memberForMonths : monthsAgo(m.joinedDate);
 
   return (
     <div>
@@ -220,7 +220,7 @@ export function MemberDetailContent({ member: m }: Props) {
             <SectionHeader title="Contact" />
             <OCard style={{ padding: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <InfoRow label="Parent" value={m.parent} />
+                <InfoRow label="Parent" value={m.parent} large />
                 <InfoRow label="Email" value={demo?.parentEmail ?? '—'} />
                 <InfoRow label="Phone" value={demo?.parentPhone ?? '—'} />
               </div>
