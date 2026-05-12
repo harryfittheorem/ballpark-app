@@ -12,6 +12,22 @@ npm run lint         # eslint
 
 `npm install` requires `--legacy-peer-deps`. Real testing is on a physical phone via Expo Go. Replit Deployments are not used; production ships through Expo EAS.
 
+**Portal demo data:**
+
+```bash
+node scripts/seed-portal-demo-data.mjs    # seed 4 coaches, 15 families/kids, 15 memberships,
+                                           # 12-month payment history, 20 today's bookings,
+                                           # 60 historical bookings, 5 products, points & orders.
+                                           # Idempotent — safe to re-run.
+
+node scripts/delete-portal-seed-data.mjs  # remove every seeded record by its deterministic UUID
+                                           # (5eed… namespace). Deletes in reverse FK order:
+                                           # orders → points_ledger → bookings → payment_events →
+                                           # memberships → kids → family/coach auth users (which
+                                           # cascade-delete the families/coaches rows) → products.
+                                           # Run before going to production.
+```
+
 **Environment Variables:**
 
 - `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_TENANT_SLUG=infinitehitting`
