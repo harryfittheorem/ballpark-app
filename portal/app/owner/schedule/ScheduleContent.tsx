@@ -63,7 +63,7 @@ export function ScheduleContent({ data }: Props) {
       <div style={{ padding: 24 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           <KPICard label="Today's Sessions" value={totalToday} deltaLabel="booked" icon={Calendar} color="gold" />
-          <KPICard label="Today's Occupancy" value={`${occupancyPct}%`} icon={Activity} color={occupancyPct > 50 ? 'success' : 'warning'} />
+          <KPICard label="Today's Occupancy" value={`${occupancyPct}%`} icon={Activity} color="success" />
           <KPICard label="Peak Hour" value={peakHour ?? '—'} deltaLabel={peakHour ? 'busiest slot' : 'no data yet'} icon={TrendingUp} color="warning" />
           <KPICard label="Open Slots" value={openSlots} deltaLabel="today" icon={Clock} />
         </div>

@@ -155,13 +155,13 @@ export function DashboardContent({ kpis, members, revenueMonthly, packages, tena
               </div>
             </div>
 
-            {packages.length > 0 && (
-              <div style={{ marginTop: 24 }}>
-                <SectionHeader
-                  title="Revenue by Package"
-                  action={<OButton variant="ghost" size="sm" onClick={() => router.push('/owner/revenue-reports')}>Full Report →</OButton>}
-                />
-                <OCard>
+            <div style={{ marginTop: 24 }}>
+              <SectionHeader
+                title="Revenue by Program"
+                action={<OButton variant="ghost" size="sm" onClick={() => router.push('/owner/revenue-reports')}>Full Report →</OButton>}
+              />
+              <OCard>
+                {packages.length > 0 ? (
                   <div style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <DonutChart
@@ -184,9 +184,11 @@ export function DashboardContent({ kpis, members, revenueMonthly, packages, tena
                       ))}
                     </div>
                   </div>
-                </OCard>
-              </div>
-            )}
+                ) : (
+                  <div style={{ padding: '24px 0', textAlign: 'center', color: brand.textMuted, fontSize: 13 }}>No package data yet</div>
+                )}
+              </OCard>
+            </div>
           </div>
 
           <div>
@@ -226,25 +228,64 @@ export function DashboardContent({ kpis, members, revenueMonthly, packages, tena
             <SectionHeader title="Today at a Glance" />
             <OCard>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {[
-                  { icon: Calendar, color: brand.goldDeep, label: 'Active Members', value: String(kpis.activeMembers), meta: 'across all plans', metaColor: brand.textMuted },
-                  { icon: CheckCircle2, color: brand.success, label: 'Collected (MTD)', value: `$${kpis.collectedMtd.toLocaleString()}`, meta: 'this month', metaColor: brand.success },
-                  { icon: Users, color: brand.info, label: 'Total Members', value: String(members.length), meta: 'all plans', metaColor: brand.textMuted },
-                  { icon: XCircle, color: brand.danger, label: 'Failed Payments', value: String(kpis.failedPaymentsCount), meta: 'last 30 days', metaColor: kpis.failedPaymentsCount > 0 ? brand.danger : brand.textMuted },
-                ].map((row, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 8, background: `${row.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <row.icon size={16} color={row.color} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12, color: brand.textMuted, fontWeight: 600 }}>{row.label}</div>
-                        <div style={{ fontSize: 18, fontWeight: 700, fontFamily: fonts.display }}>{row.value}</div>
-                      </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: `${brand.goldDeep}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Calendar size={16} color={brand.goldDeep} />
                     </div>
-                    <div style={{ fontSize: 10, color: row.metaColor, fontWeight: 700 }}>{row.meta}</div>
+                    <div>
+                      <div style={{ fontSize: 12, color: brand.textMuted, fontWeight: 600 }}>Sessions Today</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: fonts.display }}>{kpis.sessionsToday}</div>
+                    </div>
                   </div>
-                ))}
+                  <div style={{ padding: '3px 8px', borderRadius: 12, background: brand.successBg, color: brand.success, fontSize: 10, fontWeight: 700 }}>{kpis.utilizationPct}% util</div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: `${brand.success}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <CheckCircle2 size={16} color={brand.success} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: brand.textMuted, fontWeight: 600 }}>Paid Today</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: fonts.display }}>${kpis.paidToday.toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div style={{ padding: '3px 8px', borderRadius: 12, background: brand.successBg, color: brand.success, fontSize: 10, fontWeight: 700 }}>{kpis.paidTodayCount} txn{kpis.paidTodayCount !== 1 ? 's' : ''}</div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: `${brand.info}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Users size={16} color={brand.info} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: brand.textMuted, fontWeight: 600 }}>New Signups MTD</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: fonts.display }}>{kpis.newSignupsMtd}</div>
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700,
+                    background: kpis.newSignupsDelta >= 0 ? brand.successBg : brand.dangerBg,
+                    color: kpis.newSignupsDelta >= 0 ? brand.success : brand.danger,
+                  }}>{kpis.newSignupsDelta >= 0 ? '+' : ''}{kpis.newSignupsDelta} vs last mo</div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: `${brand.danger}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <XCircle size={16} color={brand.danger} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: brand.textMuted, fontWeight: 600 }}>Churned MTD</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: fonts.display }}>{kpis.churnedMtd}</div>
+                    </div>
+                  </div>
+                  {kpis.churnedMrrImpact > 0
+                    ? <div style={{ padding: '3px 8px', borderRadius: 12, background: brand.dangerBg, color: brand.danger, fontSize: 10, fontWeight: 700 }}>-${kpis.churnedMrrImpact.toLocaleString()} MRR</div>
+                    : <div style={{ padding: '3px 8px', borderRadius: 12, background: brand.successBg, color: brand.success, fontSize: 10, fontWeight: 700 }}>No churn</div>
+                  }
+                </div>
               </div>
             </OCard>
           </div>

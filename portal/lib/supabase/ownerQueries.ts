@@ -124,6 +124,14 @@ export type OwnerKPIs = {
   autoPayRate: number;
   pastDue: number;
   retentionRate: number;
+  sessionsToday: number;
+  utilizationPct: number;
+  paidToday: number;
+  paidTodayCount: number;
+  newSignupsMtd: number;
+  newSignupsDelta: number;
+  churnedMtd: number;
+  churnedMrrImpact: number;
 };
 
 export type PointsProduct = {
@@ -147,7 +155,13 @@ export type OwnerDashboardData = {
 // ─── KPIs ───────────────────────────────────────────────────────────────────
 
 export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): Promise<OwnerKPIs> {
-  const [membershipsRes, failedRes, eventsRes] = await Promise.all([
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(now); dayEnd.setHours(23, 59, 59, 999);
+
+  const [membershipsRes, failedRes, eventsRes, bookingsTodayRes, newSignupsRes, churnedMtdRes] = await Promise.all([
     supabase
       .from('memberships')
       .select('id, status, amount_cents, kid_id, billing_anchor_day')
@@ -162,6 +176,23 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
       .from('payment_events')
       .select('amount_cents, status, created_at')
       .eq('tenant_id', tenantId),
+    supabase
+      .from('bookings')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .gte('scheduled_start', dayStart.toISOString())
+      .lte('scheduled_start', dayEnd.toISOString()),
+    supabase
+      .from('memberships')
+      .select('id, started_at')
+      .eq('tenant_id', tenantId)
+      .gte('started_at', prevMonthStart.toISOString()),
+    supabase
+      .from('memberships')
+      .select('id, amount_cents')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'cancelled')
+      .gte('cancelled_at', monthStart.toISOString()),
   ]);
 
   const memberships = membershipsRes.data ?? [];
@@ -177,8 +208,6 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
     : 100;
 
   const events = eventsRes.data ?? [];
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const collectedMtd = events
     .filter(e => e.status === 'paid' && new Date(e.created_at) >= monthStart)
     .reduce((s, e) => s + (e.amount_cents ?? 0), 0) / 100;
@@ -188,6 +217,34 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
 
   const totalMtd = collectedMtd + failedMtd;
   const autoPayRate = totalMtd > 0 ? Math.round((collectedMtd / totalMtd) * 1000) / 10 : 100;
+
+  // Sessions today & utilization
+  const sessionsToday = bookingsTodayRes.data?.length ?? 0;
+  const TOTAL_SLOTS = 8 * 12;
+  const utilizationPct = Math.round((sessionsToday / TOTAL_SLOTS) * 1000) / 10;
+
+  // Paid today
+  const paidTodayEvents = events.filter(e => {
+    if (e.status !== 'paid') return false;
+    const ts = new Date(e.created_at);
+    return ts >= dayStart && ts <= dayEnd;
+  });
+  const paidToday = paidTodayEvents.reduce((s, e) => s + (e.amount_cents ?? 0), 0) / 100;
+  const paidTodayCount = paidTodayEvents.length;
+
+  // New signups MTD vs prev month
+  const recentSignups = newSignupsRes.data ?? [];
+  const newSignupsMtd = recentSignups.filter(m => new Date(m.started_at) >= monthStart).length;
+  const newSignupsPrevMonth = recentSignups.filter(m => {
+    const d = new Date(m.started_at);
+    return d >= prevMonthStart && d < monthStart;
+  }).length;
+  const newSignupsDelta = newSignupsMtd - newSignupsPrevMonth;
+
+  // Churned MTD: memberships whose cancelled_at falls within the current calendar month
+  const churnedRows = churnedMtdRes.data ?? [];
+  const churnedMtd = churnedRows.length;
+  const churnedMrrImpact = churnedRows.reduce((s, m) => s + (m.amount_cents ?? 0), 0) / 100;
 
   return {
     mrr,
@@ -199,6 +256,14 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
     autoPayRate,
     pastDue: failedMtd,
     retentionRate,
+    sessionsToday,
+    utilizationPct,
+    paidToday,
+    paidTodayCount,
+    newSignupsMtd,
+    newSignupsDelta,
+    churnedMtd,
+    churnedMrrImpact,
   };
 }
 
