@@ -125,7 +125,7 @@ export function MemberDetailContent({ member: m }: Props) {
             <SectionHeader title="Status" />
             <OCard>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                <Chip color={m.status === 'active' ? 'success' : m.status === 'at-risk' ? 'danger' : 'warning'}>{m.status}</Chip>
+                <Chip color={m.status === 'active' ? 'success' : m.status === 'paused' ? 'warning' : 'danger'}>{m.status}</Chip>
                 <Chip color={m.churnRisk === 'low' ? 'success' : m.churnRisk === 'medium' ? 'warning' : 'danger'}>Risk: {m.churnRisk}</Chip>
               </div>
               <div style={{ fontSize: 11, color: brand.textMuted, lineHeight: 1.6 }}>
