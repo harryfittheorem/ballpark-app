@@ -7,14 +7,35 @@ import type { TableColumn } from '@/components/owner/ui';
 import { Plus, Sparkles, Edit2 } from 'lucide-react';
 import type { PointsRewardsData, PointsProduct } from '@/lib/supabase/ownerQueries';
 
+// ── Hardcoded rules (always shown) ────────────────────────────────────────
+
 const POINTS_RULES = [
-  { id: 1, action: 'Complete a booked session', points: 10 },
-  { id: 2, action: 'Submit drill homework', points: 25 },
-  { id: 3, action: 'Coach reviews homework (bonus)', points: 10 },
-  { id: 4, action: 'Upload swing for coach feedback', points: 15 },
-  { id: 5, action: 'Login streak (daily)', points: 5 },
-  { id: 6, action: 'Unlock an achievement', points: 50 },
+  { id: 1, action: 'Complete a booked session',            points: 10 },
+  { id: 2, action: 'Submit drill homework',                points: 25 },
+  { id: 3, action: 'Coach reviews homework (bonus)',       points: 10 },
+  { id: 4, action: 'Upload swing for coach feedback',      points: 15 },
+  { id: 5, action: 'Login streak (daily)',                 points: 5  },
+  { id: 6, action: 'Unlock an achievement',               points: 50 },
 ];
+
+// ── Demo rewards catalog ───────────────────────────────────────────────────
+
+const DEMO_PRODUCTS: PointsProduct[] = [
+  { id: 'p1', name: 'Free Cage Hour',              category: 'Sessions',  cost: 500,  inventory: null, fulfilled: 24, pending: 3 },
+  { id: 'p2', name: 'Infinite Hitting Cap',        category: 'Apparel',   cost: 1200, inventory: 40,   fulfilled: 18, pending: 2 },
+  { id: 'p3', name: 'Free Private Lesson (30min)', category: 'Sessions',  cost: 800,  inventory: null, fulfilled: 11, pending: 1 },
+  { id: 'p4', name: 'Batting Gloves',              category: 'Equipment', cost: 1500, inventory: 20,   fulfilled: 7,  pending: 2 },
+  { id: 'p5', name: 'Water Bottle + Drawstring',   category: 'Apparel',   cost: 400,  inventory: 60,   fulfilled: 31, pending: 4 },
+];
+
+const DEMO_TOP_EARNERS = [
+  { name: 'Caleb N.',  points: 2840 },
+  { name: 'Aiden T.',  points: 2210 },
+  { name: 'Jake M.',   points: 1980 },
+  { name: 'Logan S.',  points: 1640 },
+];
+
+// ── Table columns ──────────────────────────────────────────────────────────
 
 const rewardColumns: TableColumn<PointsProduct & Record<string, unknown>>[] = [
   {
@@ -29,17 +50,23 @@ const rewardColumns: TableColumn<PointsProduct & Record<string, unknown>>[] = [
     ),
   },
   { label: 'Category', key: 'category', render: (r) => <Chip color="gold">{r.category as string}</Chip> },
-  { label: 'Cost', key: 'cost', align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, fontWeight: 700, color: brand.goldDeep }}>{r.cost as number} pts</span> },
+  { label: 'Cost',      key: 'cost',      align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, fontWeight: 700, color: brand.goldDeep }}>{r.cost as number} pts</span> },
   { label: 'Inventory', key: 'inventory', align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono }}>{r.inventory !== null ? String(r.inventory) : '∞'}</span> },
   { label: 'Fulfilled', key: 'fulfilled', align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, color: brand.success, fontWeight: 700 }}>{r.fulfilled as number}</span> },
-  { label: 'Pending', key: 'pending', align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, color: (r.pending as number) > 0 ? brand.warning : brand.textMuted, fontWeight: 700 }}>{r.pending as number}</span> },
+  { label: 'Pending',   key: 'pending',   align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, color: (r.pending as number) > 0 ? brand.warning : brand.textMuted, fontWeight: 700 }}>{r.pending as number}</span> },
 ];
 
 type Props = { data: PointsRewardsData };
 
+// ── Component ──────────────────────────────────────────────────────────────
+
 export function PointsRewardsContent({ data }: Props) {
   const [tab, setTab] = useState<'rules' | 'rewards'>('rules');
-  const { products, totalPointsIssued, topEarners } = data;
+
+  const hasLiveData       = data.totalPointsIssued > 0 || data.products.length > 0 || data.topEarners.length > 0;
+  const products          = hasLiveData ? data.products    : DEMO_PRODUCTS;
+  const totalPointsIssued = hasLiveData ? data.totalPointsIssued : 18_450;
+  const topEarners        = hasLiveData ? data.topEarners  : DEMO_TOP_EARNERS;
 
   return (
     <div>
@@ -54,8 +81,8 @@ export function PointsRewardsContent({ data }: Props) {
       <div style={{ padding: 24 }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
           {[
-            { id: 'rules' as const, label: 'Earning Rules', count: POINTS_RULES.length },
-            { id: 'rewards' as const, label: 'Rewards Catalog', count: products.length },
+            { id: 'rules'   as const, label: 'Earning Rules',    count: POINTS_RULES.length },
+            { id: 'rewards' as const, label: 'Rewards Catalog',  count: products.length },
           ].map(t => (
             <div
               key={t.id}
@@ -113,9 +140,11 @@ export function PointsRewardsContent({ data }: Props) {
                   <OCard>
                     {topEarners.map((e, i) => (
                       <div key={i} style={{ padding: '8px 0', borderBottom: i < topEarners.length - 1 ? `1px solid ${brand.border}` : 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 22, height: 22, borderRadius: 11, background: i === 0 ? brand.gold : brand.dark, color: i === 0 ? brand.dark : brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, fontFamily: fonts.display }}>{i + 1}</div>
+                        <div style={{ width: 22, height: 22, borderRadius: 11, background: i === 0 ? brand.gold : brand.dark, color: i === 0 ? brand.dark : brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, fontFamily: fonts.display }}>
+                          {i + 1}
+                        </div>
                         <div style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{e.name}</div>
-                        <div style={{ fontSize: 12, fontWeight: 700, fontFamily: fonts.mono }}>{e.points} pts</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, fontFamily: fonts.mono }}>{e.points.toLocaleString()} pts</div>
                       </div>
                     ))}
                   </OCard>
@@ -126,18 +155,10 @@ export function PointsRewardsContent({ data }: Props) {
         )}
 
         {tab === 'rewards' && (
-          products.length === 0 ? (
-            <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, padding: 40, textAlign: 'center' }}>
-              <Sparkles size={40} color={brand.goldDeep} style={{ margin: '0 auto 12px' }} />
-              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>No rewards yet</div>
-              <div style={{ fontSize: 12, color: brand.textMuted, marginTop: 4 }}>Add rewards in the mobile app admin panel to see them here.</div>
-            </div>
-          ) : (
-            <OTable
-              columns={rewardColumns as TableColumn<Record<string, unknown>>[]}
-              rows={products as unknown as Record<string, unknown>[]}
-            />
-          )
+          <OTable
+            columns={rewardColumns as TableColumn<Record<string, unknown>>[]}
+            rows={products as unknown as Record<string, unknown>[]}
+          />
         )}
       </div>
     </div>

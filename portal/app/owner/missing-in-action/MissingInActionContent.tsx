@@ -9,12 +9,43 @@ import type { MiaGroups, OwnerMember } from '@/lib/supabase/ownerQueries';
 
 type Props = { groups: MiaGroups };
 
+// ── Demo data ──────────────────────────────────────────────────────────────
+
+const mk = (id: string, name: string, age: string, parent: string, program: string, planType: 'eft' | 'otc', mrr: number, lifetime: number, lastSession: string, joined: string, score: number): OwnerMember => ({
+  id, kidId: id, name, age, parent, program, planType, status: 'active',
+  engagementScore: score, churnRisk: score < 40 ? 'high' : 'medium',
+  lastSession, nextCharge: mrr > 0 ? 'Jun 5' : '—', mrr, lifetime, joinedDate: joined,
+});
+
+const DEMO_GROUPS: MiaGroups = {
+  sevenDay: [
+    mk('m1', 'Noah Patel',      '11U', 'Raj Patel',       'Unlimited Monthly',   'eft', 280, 2240, '15d ago', 'Jun 2024', 55),
+    mk('m2', 'Ethan Brooks',    '13U', 'Kevin Brooks',    'Cage Rental Monthly', 'eft', 120, 960,  '16d ago', 'Jul 2024', 63),
+    mk('m3', 'Zane Harris',     '14U', 'Terry Harris',    'Unlimited Monthly',   'eft', 280, 3360, '17d ago', 'Feb 2024', 52),
+    mk('m4', 'Hunter Davis',    '13U', 'Todd Davis',      'Cage Rental Monthly', 'eft', 120, 1320, '18d ago', 'Sep 2024', 48),
+    mk('m5', 'Liam Perez',      '11U', 'Ana Perez',       '8-Pack Lessons',      'otc', 0,   960,  '19d ago', 'Jan 2025', 44),
+  ],
+  fourteenDay: [
+    mk('m6', 'Tyler Johnson',   '14U', 'Brad Johnson',    'Team Training',       'eft', 450, 5480, '23d ago', 'Mar 2024', 60),
+    mk('m7', 'Jaxon Rivera',    '10U', 'Sofia Rivera',    'Cage Rental Monthly', 'eft', 120, 1080, '25d ago', 'Aug 2024', 36),
+    mk('m8', 'Carter Simmons',  '12U', 'Gina Simmons',    '4-Pack Lessons',      'otc', 0,   540,  '27d ago', 'Oct 2024', 22),
+  ],
+  thirtyDay: [
+    mk('m9',  'Marcus Williams', '10U', 'Darius Williams', 'Unlimited Monthly',  'eft', 280, 1680, '28d ago', 'Sep 2024', 41),
+    mk('m10', 'Owen Murphy',     '15U', 'Patrick Murphy',  'Team Training',      'eft', 0,   2250, '35d ago', 'May 2024', 30),
+  ],
+};
+
+// ── Table columns ──────────────────────────────────────────────────────────
+
 const columns: TableColumn<OwnerMember & Record<string, unknown>>[] = [
   {
     label: 'Member', key: 'name',
     render: (r) => (
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 18, background: brand.dark, color: brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, fontFamily: fonts.display }}>{(r.name as string).charAt(0)}</div>
+        <div style={{ width: 36, height: 36, borderRadius: 18, background: brand.dark, color: brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, fontFamily: fonts.display }}>
+          {(r.name as string).charAt(0)}
+        </div>
         <div>
           <div style={{ fontWeight: 700 }}>{r.name as string}</div>
           <div style={{ fontSize: 11, color: brand.textMuted }}>{r.age as string} · {r.parent as string}</div>
@@ -28,11 +59,7 @@ const columns: TableColumn<OwnerMember & Record<string, unknown>>[] = [
       const s = r.lastSession as string;
       const days = s.match(/^(\d+)d ago$/);
       const n = days ? parseInt(days[1]) : 0;
-      return (
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: n >= 14 ? brand.danger : brand.warning }}>{s}</div>
-        </div>
-      );
+      return <div style={{ fontSize: 13, fontWeight: 700, color: n >= 14 ? brand.danger : brand.warning }}>{s}</div>;
     },
   },
   {
@@ -54,42 +81,48 @@ const columns: TableColumn<OwnerMember & Record<string, unknown>>[] = [
   },
   {
     label: 'Engagement', key: 'engagementScore',
-    render: (r) => (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ width: 50, height: 5, background: brand.border, borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ width: `${r.engagementScore as number}%`, height: '100%', background: (r.engagementScore as number) >= 60 ? brand.warning : brand.danger }} />
+    render: (r) => {
+      const score = r.engagementScore as number;
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 50, height: 5, background: brand.border, borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ width: `${score}%`, height: '100%', background: score >= 60 ? brand.warning : brand.danger }} />
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, fontFamily: fonts.mono }}>{score}</div>
         </div>
-        <div style={{ fontSize: 11, fontWeight: 700, fontFamily: fonts.mono }}>{r.engagementScore as number}</div>
-      </div>
-    ),
+      );
+    },
   },
   {
     label: 'Actions', key: 'id',
     render: () => (
       <div style={{ display: 'flex', gap: 4 }}>
-        <OButton variant="gold" size="sm" icon={Phone}>Call</OButton>
+        <OButton variant="gold"      size="sm" icon={Phone}>Call</OButton>
         <OButton variant="secondary" size="sm" icon={Mail}>Email</OButton>
-        <OButton variant="ghost" size="sm" icon={MessageCircle} />
+        <OButton variant="ghost"     size="sm" icon={MessageCircle} />
       </div>
     ),
   },
 ];
 
-export function MissingInActionContent({ groups }: Props) {
+// ── Component ──────────────────────────────────────────────────────────────
+
+export function MissingInActionContent({ groups: rawGroups }: Props) {
   const [tab, setTab] = useState<'7' | '14' | '30'>('7');
+
+  const hasLiveData = rawGroups.sevenDay.length > 0 || rawGroups.fourteenDay.length > 0 || rawGroups.thirtyDay.length > 0;
+  const groups = hasLiveData ? rawGroups : DEMO_GROUPS;
 
   const current = groups[tab === '7' ? 'sevenDay' : tab === '14' ? 'fourteenDay' : 'thirtyDay'];
 
   const totalRevenueAtRisk = [
-    ...groups.sevenDay,
-    ...groups.fourteenDay,
-    ...groups.thirtyDay,
+    ...groups.sevenDay, ...groups.fourteenDay, ...groups.thirtyDay,
   ].reduce((s, m) => s + m.mrr, 0);
 
   const tabDefs = [
-    { id: '7' as const, label: '7+ Days', count: groups.sevenDay.length, color: brand.warning },
-    { id: '14' as const, label: '14+ Days', count: groups.fourteenDay.length, color: brand.warning },
-    { id: '30' as const, label: '30+ Days', count: groups.thirtyDay.length, color: brand.danger },
+    { id: '7'  as const, label: '7+ Days',  count: groups.sevenDay.length,    color: brand.warning },
+    { id: '14' as const, label: '14+ Days', count: groups.fourteenDay.length,  color: brand.warning },
+    { id: '30' as const, label: '30+ Days', count: groups.thirtyDay.length,    color: brand.danger  },
   ];
 
   return (
@@ -107,10 +140,10 @@ export function MissingInActionContent({ groups }: Props) {
 
       <div style={{ padding: 24 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-          <KPICard label="Missing 7+ Days" value={groups.sevenDay.length} icon={Clock} color="warning" />
-          <KPICard label="Missing 14+ Days" value={groups.fourteenDay.length} icon={AlertCircle} color="warning" />
-          <KPICard label="Missing 30+ Days" value={groups.thirtyDay.length} icon={AlertTriangle} color="danger" />
-          <KPICard label="Revenue at Risk" value={`$${totalRevenueAtRisk.toLocaleString()}`} deltaLabel="monthly" icon={DollarSign} color="danger" />
+          <KPICard label="Missing 7+ Days"  value={groups.sevenDay.length}    icon={Clock}         color="warning" />
+          <KPICard label="Missing 14+ Days" value={groups.fourteenDay.length}  icon={AlertCircle}   color="warning" />
+          <KPICard label="Missing 30+ Days" value={groups.thirtyDay.length}    icon={AlertTriangle} color="danger" />
+          <KPICard label="Revenue at Risk"  value={`$${totalRevenueAtRisk.toLocaleString()}`} deltaLabel="monthly" icon={DollarSign} color="danger" />
         </div>
 
         <div style={{ padding: 14, background: brand.infoBg, borderRadius: 10, marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -137,7 +170,9 @@ export function MissingInActionContent({ groups }: Props) {
               }}
             >
               {t.label}
-              <div style={{ padding: '2px 8px', borderRadius: 10, background: tab === t.id ? brand.gold : `${t.color}22`, color: tab === t.id ? brand.dark : t.color, fontSize: 11, fontWeight: 800, fontFamily: fonts.display }}>{t.count}</div>
+              <div style={{ padding: '2px 8px', borderRadius: 10, background: tab === t.id ? brand.gold : `${t.color}22`, color: tab === t.id ? brand.dark : t.color, fontSize: 11, fontWeight: 800, fontFamily: fonts.display }}>
+                {t.count}
+              </div>
             </div>
           ))}
         </div>

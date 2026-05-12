@@ -8,10 +8,25 @@ import type { OwnerMember } from '@/lib/supabase/ownerQueries';
 
 type Props = { members: OwnerMember[] };
 
-export function AtRiskContent({ members }: Props) {
+// ── Demo data ──────────────────────────────────────────────────────────────
+
+const DEMO_AT_RISK: OwnerMember[] = [
+  { id: 'd1', kidId: 'k1', name: 'Marcus Williams', age: '10U', parent: 'Darius Williams',  program: 'Unlimited Monthly',   planType: 'eft', status: 'active', engagementScore: 41, churnRisk: 'high',   lastSession: '28d ago', nextCharge: 'Overdue', mrr: 280, lifetime: 1680, joinedDate: 'Sep 2024', riskReason: '28 days without a session plus one failed payment. Historical data shows 88% churn probability at this stage.' },
+  { id: 'd2', kidId: 'k2', name: 'Tyler Johnson',   age: '14U', parent: 'Brad Johnson',      program: 'Team Training',        planType: 'eft', status: 'active', engagementScore: 60, churnRisk: 'high',   lastSession: '23d ago', nextCharge: 'Jun 5',   mrr: 450, lifetime: 5480, joinedDate: 'Mar 2024', riskReason: '23 days since last session. Members in Team Training who miss 3+ consecutive weeks churn 72% of the time.' },
+  { id: 'd3', kidId: 'k3', name: 'Owen Murphy',     age: '15U', parent: 'Patrick Murphy',    program: 'Team Training',        planType: 'eft', status: 'active', engagementScore: 30, churnRisk: 'high',   lastSession: '35d ago', nextCharge: 'Jun 2',   mrr: 450, lifetime: 2250, joinedDate: 'May 2024', riskReason: '35 days inactive — critical window. Contact required today.' },
+  { id: 'd4', kidId: 'k4', name: 'Ethan Brooks',    age: '13U', parent: 'Kevin Brooks',      program: 'Cage Rental Monthly',  planType: 'eft', status: 'active', engagementScore: 63, churnRisk: 'medium', lastSession: '16d ago', nextCharge: 'Jun 3',   mrr: 120, lifetime: 960,  joinedDate: 'Jul 2024', riskReason: 'Attendance dropped significantly compared to prior months. Targeted messaging recommended.' },
+  { id: 'd5', kidId: 'k5', name: 'Noah Patel',      age: '11U', parent: 'Raj Patel',         program: 'Unlimited Monthly',   planType: 'eft', status: 'active', engagementScore: 55, churnRisk: 'medium', lastSession: '15d ago', nextCharge: 'Jun 8',   mrr: 280, lifetime: 2240, joinedDate: 'Jun 2024', riskReason: 'Missed last 3 scheduled sessions without notice. Progress highlights may help re-engage.' },
+];
+
+// ── Component ──────────────────────────────────────────────────────────────
+
+export function AtRiskContent({ members: rawMembers }: Props) {
   const router = useRouter();
-  const atRisk = members.filter(m => m.status === 'active' && (m.churnRisk === 'high' || m.churnRisk === 'medium'));
-  const totalMrr = atRisk.reduce((s, m) => s + m.mrr, 0);
+
+  const hasLiveData = rawMembers.length > 0;
+  const source      = hasLiveData ? rawMembers : DEMO_AT_RISK;
+  const atRisk      = source.filter(m => m.status === 'active' && (m.churnRisk === 'high' || m.churnRisk === 'medium'));
+  const totalMrr    = atRisk.reduce((s, m) => s + m.mrr, 0);
 
   return (
     <div>
@@ -64,16 +79,16 @@ export function AtRiskContent({ members }: Props) {
                       </div>
                       <div style={{ fontSize: 12, lineHeight: 1.5 }}>
                         {m.churnRisk === 'high'
-                          ? 'Personal call from coach within 48 hours. Offer free comeback session. History suggests 72% recovery rate when coach calls within 2 weeks.'
-                          : 'Targeted message with progress highlights. Members in similar state respond to specific achievement reminders.'}
+                          ? 'Personal call from coach within 48 hours. Offer a free comeback session. History shows 72% recovery rate when coach calls within 2 weeks of last session.'
+                          : 'Send targeted message with progress highlights. Members in this state respond to specific achievement reminders and personalised check-ins.'}
                       </div>
                     </div>
 
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <OButton variant="gold" size="sm" icon={Phone}>Call Parent</OButton>
+                      <OButton variant="gold"      size="sm" icon={Phone}>Call Parent</OButton>
                       <OButton variant="secondary" size="sm" icon={Mail}>Send Email</OButton>
                       <OButton variant="secondary" size="sm" icon={Gift}>Offer Free Session</OButton>
-                      <OButton variant="ghost" size="sm" onClick={() => router.push(`/owner/members/${m.id}`)}>View Profile →</OButton>
+                      <OButton variant="ghost"     size="sm" onClick={() => router.push(`/owner/members/${m.id}`)}>View Profile →</OButton>
                     </div>
                   </div>
                 </div>
