@@ -73,7 +73,7 @@
 html,
 body {
   background-color: var(--color-darkest);
-  color: var(--color-cream);
+  color: var(--color-text);
 }
 
 body {

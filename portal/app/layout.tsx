@@ -33,7 +33,7 @@ export default function RootLayout({
       className={`${inter.variable} ${oswald.variable}`}
     >
       <body
-        className="min-h-screen bg-darkest text-cream antialiased"
+        className="min-h-screen bg-darkest text-[#1a1a1a] antialiased"
         suppressHydrationWarning
       >
         {children}
