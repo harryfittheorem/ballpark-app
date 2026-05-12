@@ -60,7 +60,7 @@ export function RetentionContent({ data }: Props) {
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, alignItems: 'start' }}>
           <div>
             {cohortRetention.length > 0 ? (
               <>

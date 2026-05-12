@@ -34,7 +34,7 @@ const columns: TableColumn<OwnerMember & Record<string, unknown>>[] = [
   },
   {
     label: 'Status', key: 'status', sortable: true,
-    render: (r) => <Chip color={r.status === 'active' ? 'success' : r.status === 'at-risk' ? 'danger' : 'info'}>{r.status as string}</Chip>,
+    render: (r) => <Chip color={r.status === 'active' ? 'success' : r.status === 'paused' ? 'warning' : 'danger'}>{r.status as string}</Chip>,
   },
   {
     label: 'Engagement', key: 'engagementScore', sortable: true,

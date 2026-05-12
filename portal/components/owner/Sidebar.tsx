@@ -34,7 +34,7 @@ const ownerNav: NavSection[] = [
     label: 'Revenue',
     items: [
       { label: 'Billing', href: '/owner/billing', icon: CreditCard },
-      { label: 'Failed Payments', href: '/owner/failed-payments', icon: AlertCircle, badge: 3 },
+      { label: 'Failed Payments', href: '/owner/failed-payments', icon: AlertCircle },
       { label: 'Revenue Reports', href: '/owner/revenue-reports', icon: BarChart3 },
     ],
   },
@@ -42,8 +42,8 @@ const ownerNav: NavSection[] = [
     label: 'Retention',
     items: [
       { label: 'Retention', href: '/owner/retention', icon: TrendingUp },
-      { label: 'Missing in Action', href: '/owner/missing-in-action', icon: Clock, badge: 10 },
-      { label: 'At-Risk', href: '/owner/at-risk', icon: AlertTriangle, badge: 8 },
+      { label: 'Missing in Action', href: '/owner/missing-in-action', icon: Clock },
+      { label: 'At-Risk', href: '/owner/at-risk', icon: AlertTriangle },
       { label: 'Churn Analysis', href: '/owner/churn-analysis', icon: TrendingDown },
     ],
   },
