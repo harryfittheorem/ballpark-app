@@ -20,6 +20,7 @@ interface KPICardProps {
   unit?: string;
   delta?: number;
   deltaLabel?: string;
+  deltaInvert?: boolean;
   icon?: React.ElementType;
   color?: KPIColor;
 }
@@ -32,9 +33,11 @@ const kpiColors: Record<KPIColor, { bg: string; border: string; iconBg: string; 
   warning: { bg: brand.warningBg, border: brand.warning, iconBg: `${brand.warning}22`, iconColor: brand.warning },
 };
 
-export function KPICard({ label, value, unit, delta, deltaLabel, icon: Icon, color = 'default' }: KPICardProps) {
+export function KPICard({ label, value, unit, delta, deltaLabel, deltaInvert = false, icon: Icon, color = 'default' }: KPICardProps) {
   const c = kpiColors[color];
-  const isPositive = (delta ?? 0) >= 0;
+  const rawPositive = (delta ?? 0) >= 0;
+  const isGood = deltaInvert ? !rawPositive : rawPositive;
+  const isPositive = rawPositive;
   return (
     <div style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -50,7 +53,7 @@ export function KPICard({ label, value, unit, delta, deltaLabel, icon: Icon, col
         {unit && <div style={{ fontSize: 13, color: brand.textMuted, fontWeight: 600 }}>{unit}</div>}
       </div>
       {delta !== undefined && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: isPositive ? brand.success : brand.danger }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: isGood ? brand.success : brand.danger }}>
           {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
           {isPositive ? '+' : ''}{delta}%
           <span style={{ color: brand.textMuted, fontWeight: 500, marginLeft: 4 }}>{deltaLabel || 'vs last month'}</span>
