@@ -136,10 +136,10 @@ outputType = "console"
 name = "Expo web"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx expo start --web --port 5000 < /dev/null"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx expo start --web --port 5000 --offline < /dev/null"
+waitForPort = 5000
