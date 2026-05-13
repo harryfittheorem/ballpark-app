@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
+      // Expo manifest request (expo-platform header present)
       {
         source: "/",
         has: [{ type: "header", key: "expo-platform" }],
@@ -30,6 +31,27 @@ const nextConfig: NextConfig = {
         source: "/:path+",
         has: [{ type: "header", key: "expo-platform" }],
         destination: "http://localhost:8080/:path+",
+      },
+      // JS bundle downloads (platform=ios or platform=android query param)
+      {
+        source: "/:path*",
+        has: [{ type: "query", key: "platform", value: "ios" }],
+        destination: "http://localhost:8080/:path*",
+      },
+      {
+        source: "/:path*",
+        has: [{ type: "query", key: "platform", value: "android" }],
+        destination: "http://localhost:8080/:path*",
+      },
+      // React Native assets (fonts, images) — path-based, no special header needed
+      {
+        source: "/assets/:path*",
+        destination: "http://localhost:8080/assets/:path*",
+      },
+      // Source maps
+      {
+        source: "/symbolicate",
+        destination: "http://localhost:8080/symbolicate",
       },
     ];
   },
