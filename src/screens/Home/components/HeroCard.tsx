@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes['6xl'],
     color: colors.dark,
     letterSpacing: -tracking.wide,
-    lineHeight: fontSizes['6xl'],
+    lineHeight: fontSizes['6xl'] * 1.2,
   },
   pointsTotal: {
     fontFamily: fontFamilies.oswaldBold,
