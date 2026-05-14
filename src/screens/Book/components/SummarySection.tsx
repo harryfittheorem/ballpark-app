@@ -140,7 +140,7 @@ export default function SummarySection({
       ) : (
         <View style={styles.placeholder}>
           <Text style={styles.placeholderText}>
-            Your booking summary will appear here.
+            Tap any slot above — your summary appears here instantly.
           </Text>
         </View>
       )}

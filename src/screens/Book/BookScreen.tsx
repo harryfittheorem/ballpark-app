@@ -1,6 +1,6 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
-import { Calendar } from 'lucide-react-native';
+import { Calendar as CalendarIcon, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ScrollView as ScrollViewType } from 'react-native';
@@ -12,7 +12,6 @@ import type { MainTabScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
 import BookHeader from './components/BookHeader';
-import CoachSection from './components/CoachSection';
 import DateSection from './components/DateSection';
 import MultiDaySlotList from './components/MultiDaySlotList';
 import SessionTypeSection from './components/SessionTypeSection';
@@ -74,16 +73,15 @@ export default function BookScreen() {
   const { showToast } = useToast();
 
   const scrollRef = useRef<ScrollViewType>(null);
-  const wizardY = useRef<number>(0);
+  const summaryY = useRef<number>(0);
 
   const [category, setCategory] = useState<Category>('all');
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [selectedCoachId, setSelectedCoachId] = useState<string | null>(null);
-  const [coachAutoSelected, setCoachAutoSelected] = useState(false);
-  const [eligibleCoachIds, setEligibleCoachIds] = useState<string[]>([]);
 
   const { data: sessionTypes } = useSessionTypes();
   const selectedSessionType: SessionType | null =
@@ -110,55 +108,39 @@ export default function BookScreen() {
     setSelectedDate(null);
     setSelectedSlot(null);
     setSelectedCoachId(null);
-    setCoachAutoSelected(false);
-    setEligibleCoachIds([]);
   }, []);
 
   const handleSelectDate = useCallback((d: string) => {
     setSelectedDate(d);
     setSelectedSlot(null);
     setSelectedCoachId(null);
-    setCoachAutoSelected(false);
-    setEligibleCoachIds([]);
   }, []);
 
   const handleSelectSlot = useCallback((slot: Slot, eligible: string[]) => {
     setSelectedSlot(slot);
-    setEligibleCoachIds(eligible);
     if (eligible.length <= 1) {
       setSelectedCoachId(slot.coach_id);
-      setCoachAutoSelected(true);
     } else {
       setSelectedCoachId(null);
-      setCoachAutoSelected(false);
     }
   }, []);
-
-  const handleSelectCoach = useCallback((coachId: string) => {
-    setSelectedCoachId(coachId);
-    setCoachAutoSelected(false);
-  }, []);
-
-  const dateLocked = selectedSessionTypeId == null;
-  const timeLocked = dateLocked || selectedDate == null;
-  const coachLocked = timeLocked || selectedSlot == null;
-  const summaryLocked = coachLocked || selectedCoachId == null;
-
-  const timeLockedHint = dateLocked ? 'Pick a session type first.' : 'Pick a date first.';
-  const coachLockedHint = timeLocked ? timeLockedHint : 'Pick a time first.';
-  const summaryLockedHint = coachLocked ? coachLockedHint : 'Pick a coach first.';
 
   const selectedSlotKey = selectedSlot
     ? `${selectedSlot.coach_id}|${selectedSlot.start}`
     : null;
+
+  const scrollToSummary = useCallback(() => {
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: summaryY.current, animated: true });
+    }, 80);
+  }, []);
 
   const resetSelection = useCallback(() => {
     setSelectedSessionTypeId(null);
     setSelectedDate(null);
     setSelectedSlot(null);
     setSelectedCoachId(null);
-    setCoachAutoSelected(false);
-    setEligibleCoachIds([]);
+    setCalendarOpen(false);
   }, []);
 
   const handleBooked = useCallback(
@@ -178,14 +160,22 @@ export default function BookScreen() {
       }
       handleSelectDate(date);
       handleSelectSlot(slot, [slot.coach_id]);
-      // Scroll the wizard into view so the parent can confirm without hunting
-      // for it. A small delay lets React flush the state update first.
-      setTimeout(() => {
-        scrollRef.current?.scrollTo({ y: wizardY.current, animated: true });
-      }, 80);
+      scrollToSummary();
     },
-    [selectedSessionTypeId, handleSelectDate, handleSelectSlot, showToast],
+    [selectedSessionTypeId, handleSelectDate, handleSelectSlot, scrollToSummary, showToast],
   );
+
+  const handleCalendarSlotPick = useCallback(
+    (slot: Slot, eligible: string[]) => {
+      handleSelectSlot(slot, eligible);
+      setCalendarOpen(false);
+      scrollToSummary();
+    },
+    [handleSelectSlot, scrollToSummary],
+  );
+
+  const summaryLocked =
+    !selectedSessionTypeId || !selectedDate || !selectedSlot || !selectedCoachId;
 
   return (
     <SafeAreaView style={flowStyles.safe} edges={['top']}>
@@ -228,7 +218,7 @@ export default function BookScreen() {
           <Text style={shellStyles.sectionLabel}>YOUR UPCOMING</Text>
           {upcoming.length === 0 ? (
             <View style={shellStyles.emptyCard}>
-              <Calendar size={18} color={colors.gold} />
+              <CalendarIcon size={18} color={colors.gold} />
               <Text style={shellStyles.emptyText}>
                 No upcoming sessions. Pick one below.
               </Text>
@@ -259,13 +249,10 @@ export default function BookScreen() {
                     pressed && { opacity: 0.85 },
                   ]}
                 >
-                  {/* Coloured date badge */}
                   <View style={shellStyles.dateBadge}>
                     <Text style={shellStyles.dateBadgeTop}>{badge.top}</Text>
                     <Text style={shellStyles.dateBadgeBottom}>{badge.bottom}</Text>
                   </View>
-
-                  {/* Middle: session name + location */}
                   <View style={shellStyles.upcomingMiddle}>
                     <Text style={shellStyles.upcomingTitle} numberOfLines={1}>
                       {middle}
@@ -276,8 +263,6 @@ export default function BookScreen() {
                       </Text>
                     ) : null}
                   </View>
-
-                  {/* Status pill */}
                   <View style={[shellStyles.statusPill, { backgroundColor: sc.bg }]}>
                     <Text style={[shellStyles.statusPillText, { color: sc.text }]}>
                       {statusLabel(b.status ?? 'pending')}
@@ -289,9 +274,9 @@ export default function BookScreen() {
           )}
         </View>
 
-        {/* WHAT CAN I BOOK? ----------------------------------------------- */}
+        {/* WHAT ARE YOU BOOKING? ------------------------------------------ */}
         <View style={flowStyles.section}>
-          <Text style={shellStyles.sectionLabel}>WHAT CAN I BOOK?</Text>
+          <Text style={shellStyles.sectionLabel}>WHAT ARE YOU BOOKING?</Text>
           <SessionTypeSection
             selectedSessionTypeId={selectedSessionTypeId}
             onSelect={handleSelectSessionType}
@@ -299,7 +284,7 @@ export default function BookScreen() {
           />
         </View>
 
-        {/* Multi-day available slots --------------------------------------- */}
+        {/* AVAILABLE SLOTS ------------------------------------------------- */}
         <View style={flowStyles.section}>
           <Text style={shellStyles.sectionLabel}>AVAILABLE SLOTS</Text>
           <MultiDaySlotList
@@ -309,51 +294,71 @@ export default function BookScreen() {
           />
         </View>
 
-        {/* Wizard ---------------------------------------------------------- */}
+        {/* Browse other dates (collapsible calendar + time) --------------- */}
+        <View style={flowStyles.section}>
+          <Pressable
+            onPress={() => {
+              if (!selectedSessionTypeId) {
+                showToast('Pick a session type first.');
+                return;
+              }
+              setCalendarOpen((v) => !v);
+            }}
+            style={({ pressed }) => [
+              shellStyles.browseButton,
+              pressed && { opacity: 0.75 },
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: calendarOpen }}
+          >
+            <CalendarIcon size={16} color={colors.textLight} />
+            <Text style={shellStyles.browseText}>Browse other dates</Text>
+            {calendarOpen ? (
+              <ChevronUp size={16} color={colors.textLight} />
+            ) : (
+              <ChevronDown size={16} color={colors.textLight} />
+            )}
+          </Pressable>
+
+          {calendarOpen ? (
+            <View style={shellStyles.calendarExpanded}>
+              <DateSection
+                locked={false}
+                durationMinutes={selectedSessionType?.duration_minutes ?? null}
+                selectedDate={selectedDate}
+                onSelectDate={handleSelectDate}
+              />
+              {selectedDate ? (
+                <View style={shellStyles.timeSectionWrap}>
+                  <TimeSection
+                    locked={false}
+                    date={selectedDate}
+                    durationMinutes={selectedSessionType?.duration_minutes ?? null}
+                    selectedSlotKey={selectedSlotKey}
+                    onSelectSlot={handleCalendarSlotPick}
+                  />
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+
+        {/* SUMMARY --------------------------------------------------------- */}
         <View
+          style={flowStyles.section}
           onLayout={(e) => {
-            wizardY.current = e.nativeEvent.layout.y;
+            summaryY.current = e.nativeEvent.layout.y;
           }}
         >
-          <View style={flowStyles.section}>
-            <DateSection
-              locked={dateLocked}
-              durationMinutes={selectedSessionType?.duration_minutes ?? null}
-              selectedDate={selectedDate}
-              onSelectDate={handleSelectDate}
-            />
-          </View>
-          <View style={flowStyles.section}>
-            <TimeSection
-              locked={timeLocked}
-              lockedHint={timeLockedHint}
-              date={selectedDate}
-              durationMinutes={selectedSessionType?.duration_minutes ?? null}
-              selectedSlotKey={selectedSlotKey}
-              onSelectSlot={handleSelectSlot}
-            />
-          </View>
-          <View style={flowStyles.section}>
-            <CoachSection
-              locked={coachLocked}
-              lockedHint={coachLockedHint}
-              autoSelectedCoachId={coachAutoSelected ? selectedCoachId : null}
-              eligibleCoachIds={eligibleCoachIds}
-              selectedCoachId={selectedCoachId}
-              onSelectCoach={handleSelectCoach}
-            />
-          </View>
-          <View style={flowStyles.section}>
-            <SummarySection
-              locked={summaryLocked}
-              lockedHint={summaryLockedHint}
-              sessionType={selectedSessionType}
-              date={selectedDate}
-              slot={selectedSlot}
-              selectedCoachId={selectedCoachId}
-              onBooked={handleBooked}
-            />
-          </View>
+          <SummarySection
+            locked={summaryLocked}
+            lockedHint="Tap any slot above to see your booking summary."
+            sessionType={selectedSessionType}
+            date={selectedDate}
+            slot={selectedSlot}
+            selectedCoachId={selectedCoachId}
+            onBooked={handleBooked}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -462,5 +467,29 @@ const shellStyles = StyleSheet.create({
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.xs,
     letterSpacing: tracking.wide,
+  },
+  browseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing['2xl'],
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    backgroundColor: colors.darker,
+  },
+  browseText: {
+    flex: 1,
+    color: colors.textLight,
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.base,
+  },
+  calendarExpanded: {
+    marginTop: spacing.lg,
+  },
+  timeSectionWrap: {
+    marginTop: spacing['2xl'],
   },
 });
