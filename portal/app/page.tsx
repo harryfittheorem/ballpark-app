@@ -18,6 +18,7 @@ export default async function Root() {
   } = await supabase.auth.getSession();
   const role = readAppRole(session);
 
+  if (role === "super_admin") redirect("/hq");
   if (role === "coach") redirect("/coach/inbox");
   if (role === "admin") redirect("/admin");
   if (role === "owner") redirect("/owner");

@@ -5,9 +5,10 @@ type CookieWrite = { name: string; value: string; options: CookieOptions };
 
 /**
  * Refresh the Supabase session cookie on every request and gate
- * `/coach/*` and `/admin/*` behind authentication. Role-based routing
- * (coach vs admin vs parent) lives in the per-section layouts so we can
- * read the JWT claims server-side once a session exists.
+ * `/coach/*`, `/admin/*`, and `/hq/*` behind authentication. Role-based
+ * routing (coach vs admin vs owner vs super_admin) lives in the
+ * per-section layouts so we can read the JWT claims server-side once a
+ * session exists.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -41,7 +42,9 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const protectedPath =
-    path.startsWith("/coach") || path.startsWith("/admin");
+    path.startsWith("/coach") ||
+    path.startsWith("/admin") ||
+    path.startsWith("/hq");
 
   if (protectedPath && !user) {
     const url = request.nextUrl.clone();

@@ -22,6 +22,8 @@ import {
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
+const TENANT_SLUG = process.env.EXPO_PUBLIC_TENANT_SLUG ?? '';
+
 type Props = AuthStackScreenProps<'SignUp'>;
 
 export default function SignUpScreen({ navigation }: Props) {
@@ -44,15 +46,28 @@ export default function SignUpScreen({ navigation }: Props) {
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await signUpParent({
-        email: values.email,
-        password: values.password,
-        firstName: values.firstName,
-        lastName: values.lastName,
-        phone: values.phone,
-      });
-      // Auth state listener routes us into the app; AddKid is shown next
-      // because the family will have zero kids.
+      if (TENANT_SLUG) {
+        // Single-tenant build: sign up directly with baked-in slug.
+        await signUpParent({
+          email: values.email,
+          password: values.password,
+          firstName: values.firstName,
+          lastName: values.lastName,
+          phone: values.phone,
+        });
+        // Auth state listener routes us into the app.
+      } else {
+        // Multi-tenant: navigate to location picker first.
+        navigation.navigate('LocationPicker', {
+          signUpData: {
+            email: values.email,
+            password: values.password,
+            firstName: values.firstName,
+            lastName: values.lastName,
+            phone: values.phone,
+          },
+        });
+      }
     } catch (err) {
       Alert.alert('Sign-up failed', errorMessage(err));
     }
@@ -155,7 +170,7 @@ export default function SignUpScreen({ navigation }: Props) {
           />
 
           <Button
-            label="Sign up"
+            label={TENANT_SLUG ? 'Sign up' : 'Choose your location →'}
             onPress={onSubmit}
             loading={submitting}
             disabled={submitting}

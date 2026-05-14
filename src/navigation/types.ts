@@ -2,9 +2,20 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+export type SignUpFormData = {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+};
+
 export type AuthStackParamList = {
   SignIn: undefined;
   SignUp: undefined;
+  LocationPicker: {
+    signUpData: SignUpFormData;
+  };
 };
 
 export type AuthStackScreenProps<T extends keyof AuthStackParamList> = NativeStackScreenProps<

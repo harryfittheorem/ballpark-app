@@ -1,6 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 
-export type AppRole = "coach" | "admin" | "owner" | "parent";
+export type AppRole = "coach" | "admin" | "owner" | "parent" | "super_admin";
 
 /**
  * Decode the payload of a JWT without verifying its signature. Supabase
@@ -36,6 +36,7 @@ export function readAppRole(session: Session | null): AppRole {
   if (!session?.access_token) return "parent";
   const payload = decodeJwtPayload(session.access_token);
   const claim = payload?.app_role;
+  if (claim === "super_admin") return "super_admin";
   if (claim === "coach") return "coach";
   if (claim === "admin") return "admin";
   if (claim === "owner") return "owner";
@@ -44,9 +45,8 @@ export function readAppRole(session: Session | null): AppRole {
 
 /**
  * Read the `tenant_id` claim from the access token. Returns null when
- * there is no session or no claim. The Custom Access Token Hook on the
- * Supabase project injects `tenant_id` for every authenticated user, so
- * a null return for a signed-in user indicates a misconfigured hook.
+ * there is no session or no claim. Super admins intentionally have no
+ * tenant_id claim since they are not scoped to any single tenant.
  *
  * @supabase/ssr does not surface custom JWT claims directly, so we
  * decode the access token payload ourselves (signature already verified

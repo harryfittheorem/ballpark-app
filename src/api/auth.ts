@@ -4,13 +4,17 @@
  * Thin wrappers around supabase.auth that bake in the v0.1 tenant_slug
  * convention: every signup must carry tenant_slug in user_metadata so
  * `public.handle_new_user` can resolve the tenant and provision a family row.
+ *
+ * Multi-tenant builds (EXPO_PUBLIC_TENANT_SLUG unset) pass tenant_slug at
+ * call time via the LocationPickerScreen; single-tenant builds fall back to
+ * the baked-in env var.
  */
 
 import { queryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
 import { getEmailRedirectUrl } from '@/utils/authRedirect';
 
-const TENANT_SLUG = process.env.EXPO_PUBLIC_TENANT_SLUG ?? 'infinitehitting';
+const DEFAULT_TENANT_SLUG = process.env.EXPO_PUBLIC_TENANT_SLUG ?? '';
 
 export type SignUpInput = {
   email: string;
@@ -18,9 +22,16 @@ export type SignUpInput = {
   firstName: string;
   lastName: string;
   phone?: string;
+  /** Override the baked-in tenant slug. Used by LocationPickerScreen. */
+  tenantSlug?: string;
 };
 
 export async function signUpParent(input: SignUpInput) {
+  const tenantSlug = input.tenantSlug ?? DEFAULT_TENANT_SLUG;
+  if (!tenantSlug) {
+    throw new Error('signUpParent: tenantSlug is required (no EXPO_PUBLIC_TENANT_SLUG set and none provided)');
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email: input.email.trim(),
     password: input.password,
@@ -30,7 +41,7 @@ export async function signUpParent(input: SignUpInput) {
       // the resulting `?code=...` and exchanges it for a session.
       emailRedirectTo: getEmailRedirectUrl(),
       data: {
-        tenant_slug: TENANT_SLUG,
+        tenant_slug: tenantSlug,
         first_name: input.firstName.trim(),
         last_name: input.lastName.trim(),
         phone: input.phone?.trim() ?? null,

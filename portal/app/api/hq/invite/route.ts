@@ -1,0 +1,171 @@
+import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/serviceClient';
+import { readAppRole } from '@/lib/auth';
+
+export async function POST(req: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  const { data: { session } } = await supabase.auth.getSession();
+  if (readAppRole(session) !== 'super_admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const body = await req.json() as {
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: 'coach' | 'admin' | 'owner';
+    tenantSlug: string;
+    locationId?: string;
+  };
+
+  const { email, firstName, lastName, role, tenantSlug, locationId } = body;
+
+  if (!email || !firstName || !lastName || !role || !tenantSlug) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  }
+
+  const serviceClient = createServiceClient();
+
+  const { data: tenant, error: tenantError } = await serviceClient
+    .from('tenants')
+    .select('id, name')
+    .eq('slug', tenantSlug)
+    .single();
+
+  if (tenantError || !tenant) {
+    return NextResponse.json({ error: `Tenant slug "${tenantSlug}" not found` }, { status: 400 });
+  }
+
+  // Validate locationId belongs to this tenant if provided.
+  if (locationId) {
+    const { data: loc } = await serviceClient
+      .from('locations')
+      .select('id')
+      .eq('id', locationId)
+      .eq('tenant_id', tenant.id)
+      .single();
+    if (!loc) {
+      return NextResponse.json({ error: 'Location not found for this franchise' }, { status: 400 });
+    }
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+  const listRes = await fetch(
+    `${supabaseUrl}/auth/v1/admin/users?filter=${encodeURIComponent(email)}`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } },
+  );
+  const listBody = await listRes.json() as { users?: Array<{ email: string; id: string }> };
+  const existing = (listBody.users ?? []).find((u) => u.email === email);
+  if (existing) {
+    return NextResponse.json({ error: `A user with email ${email} already exists.` }, { status: 409 });
+  }
+
+  const userMeta = {
+    app_role: role,
+    tenant_slug: tenantSlug,
+    first_name: firstName,
+    last_name: lastName,
+  };
+
+  const resendKey = process.env.RESEND_API_KEY;
+  const resendFrom = process.env.RESEND_FROM_EMAIL ?? 'noreply@infinitehitting.com';
+
+  let createdUserId: string | null = null;
+
+  if (resendKey) {
+    // Generate a magic link and deliver it ourselves via Resend.
+    // generate_link with type=invite creates the user immediately.
+    const linkRes = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({ type: 'invite', email, data: userMeta }),
+    });
+    const linkBody = await linkRes.json() as {
+      action_link?: string; id?: string; error?: string; msg?: string;
+    };
+
+    if (!linkRes.ok || !linkBody.action_link) {
+      const errMsg = linkBody.error ?? linkBody.msg ?? 'Failed to generate invite link';
+      return NextResponse.json({ error: errMsg }, { status: 500 });
+    }
+
+    createdUserId = linkBody.id ?? null;
+
+    const roleLabel = role === 'coach' ? 'Coach' : role === 'admin' ? 'Admin' : 'Owner';
+    const sendRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${resendKey}`,
+      },
+      body: JSON.stringify({
+        from: resendFrom,
+        to: email,
+        subject: `You've been invited to Ballpark — ${tenant.name}`,
+        html: `
+          <p>Hi ${firstName},</p>
+          <p>You've been invited to join <strong>${tenant.name}</strong> on Ballpark as a <strong>${roleLabel}</strong>.</p>
+          <p>Click the link below to set your password and activate your account:</p>
+          <p><a href="${linkBody.action_link}" style="background:#F1E5AD;color:#2D2B2A;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;">Accept Invitation</a></p>
+          <p>This link expires in 24 hours.</p>
+          <p>— The Ballpark Team</p>
+        `,
+      }),
+    });
+
+    if (!sendRes.ok) {
+      const sendErr = await sendRes.json().catch(() => ({})) as { message?: string };
+      return NextResponse.json(
+        { error: `Email delivery failed: ${sendErr.message ?? sendRes.statusText}` },
+        { status: 502 },
+      );
+    }
+  } else {
+    // No Resend configured — use Supabase's built-in invite email (sends automatically).
+    const inviteRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({
+        email,
+        email_confirm: false,
+        invite: true,
+        user_metadata: userMeta,
+      }),
+    });
+
+    if (!inviteRes.ok) {
+      const inviteErr = await inviteRes.json().catch(() => ({})) as { msg?: string; message?: string; id?: string };
+      return NextResponse.json(
+        { error: inviteErr.msg ?? inviteErr.message ?? 'Failed to create invite' },
+        { status: 502 },
+      );
+    }
+
+    const inviteBody = await inviteRes.json().catch(() => ({})) as { id?: string };
+    createdUserId = inviteBody.id ?? null;
+  }
+
+  // If a location was specified and role is coach, wire up primary_location_id.
+  // The handle_new_user trigger fires synchronously, so the coaches row exists.
+  if (locationId && role === 'coach' && createdUserId) {
+    await serviceClient
+      .from('coaches')
+      .update({ primary_location_id: locationId })
+      .eq('user_id', createdUserId);
+  }
+
+  return NextResponse.json({ success: true, email, tenantName: tenant.name });
+}

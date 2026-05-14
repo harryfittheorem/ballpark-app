@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import SignInScreen from '@/screens/Auth/SignInScreen';
 import SignUpScreen from '@/screens/Auth/SignUpScreen';
+import LocationPickerScreen from '@/screens/Auth/LocationPickerScreen';
 
 import type { AuthStackParamList } from './types';
 
@@ -15,6 +16,7 @@ export default function AuthNavigator() {
     >
       <Stack.Screen name="SignUp" component={SignUpScreen} />
       <Stack.Screen name="SignIn" component={SignInScreen} />
+      <Stack.Screen name="LocationPicker" component={LocationPickerScreen} />
     </Stack.Navigator>
   );
 }
