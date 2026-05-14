@@ -116,7 +116,7 @@ serve(async (req) => {
     const timeoutHandle = setTimeout(() => controller.abort(), HITTRAX_TIMEOUT_MS);
     let res: Response;
     try {
-      res = await fetch(url, { method: "POST", signal: controller.signal });
+      res = await fetch(url, { method: "POST", body: "", signal: controller.signal });
     } catch (err) {
       clearTimeout(timeoutHandle);
       if ((err as Error)?.name === "AbortError") return jsonError(504, "hittrax_timeout", "HitTrax timed out");
