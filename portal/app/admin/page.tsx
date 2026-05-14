@@ -13,6 +13,11 @@ const TILES = [
     title: "Training videos",
     body: "Curate the Train tab catalog.",
   },
+  {
+    href: "/admin/settings",
+    title: "Tenant settings",
+    body: "Configure per-location settings such as the HitTrax Facility ID.",
+  },
 ];
 
 export default function AdminPage() {

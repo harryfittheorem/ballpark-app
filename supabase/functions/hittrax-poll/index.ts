@@ -173,7 +173,7 @@ async function fanOutSwingPrPush(
   }
 }
 
-async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutcome> {
+async function pollOneLink(cfg: HitTraxConfig, link: LinkRow, facilityId: string | null): Promise<PollOutcome> {
   const outcome: PollOutcome = { link_id: link.id, ok: false, swings_inserted: 0, prs_detected: 0 };
 
   if (!link.third_party_user_password) {
@@ -206,6 +206,7 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow): Promise<PollOutco
     ContentType: HITTRAX_CONTENT_TYPE,
     StartDate: formatHitTraxDate(startDate),
     EndDate: formatHitTraxDate(endDate),
+    ...(facilityId ? { FacilityID: facilityId } : {}),
   });
 
   const controller = new AbortController();
@@ -497,9 +498,28 @@ serve(async (req) => {
     return jsonError(500, "db_error", "Failed to fetch active links");
   }
 
+  // Look up hittrax_facility_id once per distinct tenant in a single query.
+  const tenantIds = [...new Set((links ?? []).map((l) => l.tenant_id))];
+  const facilityIdByTenant = new Map<string, string | null>();
+  if (tenantIds.length > 0) {
+    const { data: tenantRows, error: tenantsErr } = await adminClient
+      .from("tenants")
+      .select("id, hittrax_facility_id")
+      .in("id", tenantIds);
+    if (tenantsErr) {
+      // Non-fatal: polling proceeds without FacilityID param (graceful
+      // degradation), but we log so operators can catch misconfiguration.
+      console.error("hittrax-poll tenant facility_id lookup failed", tenantsErr);
+    }
+    for (const row of tenantRows ?? []) {
+      facilityIdByTenant.set(row.id, row.hittrax_facility_id ?? null);
+    }
+  }
+
   const outcomes: PollOutcome[] = [];
   for (const link of links ?? []) {
-    const o = await pollOneLink(cfg, link as LinkRow);
+    const facilityId = facilityIdByTenant.get(link.tenant_id) ?? null;
+    const o = await pollOneLink(cfg, link as LinkRow, facilityId);
     outcomes.push(o);
   }
 
