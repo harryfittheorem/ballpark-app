@@ -28,27 +28,36 @@ function todayAt(h24: number): string {
   return d.toISOString();
 }
 
+// Converts a UTC ISO timestamp to a local-time hour label like "4 PM"
+function localHourLabel(isoString: string): string {
+  const d = new Date(isoString);
+  const h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hr12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  return `${hr12} ${ampm}`;
+}
+
 const DEMO_BOOKINGS: ScheduleBooking[] = [
-  { id: 'b01', kidName: 'Jake M.',    coachName: 'Mike Rodriguez', scheduledStart: todayAt(9),  scheduledEnd: todayAt(10), cage: 'Cage 1', sessionType: 'Private',     status: 'confirmed', hourLabel: '9 AM' },
-  { id: 'b02', kidName: 'Ryan C.',    coachName: 'Sarah Kim',      scheduledStart: todayAt(9),  scheduledEnd: todayAt(10), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed', hourLabel: '9 AM' },
-  { id: 'b03', kidName: 'Aiden T.',   coachName: 'Mike Rodriguez', scheduledStart: todayAt(9),  scheduledEnd: todayAt(10), cage: 'Cage 3', sessionType: 'Private',     status: 'confirmed', hourLabel: '9 AM' },
-  { id: 'b04', kidName: 'Caleb N.',   coachName: 'Dave Thompson',  scheduledStart: todayAt(10), scheduledEnd: todayAt(11), cage: 'Cage 1', sessionType: 'Group',       status: 'confirmed', hourLabel: '10 AM' },
-  { id: 'b05', kidName: 'Noah P.',    coachName: 'Sarah Kim',      scheduledStart: todayAt(10), scheduledEnd: todayAt(11), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed', hourLabel: '10 AM' },
-  { id: 'b06', kidName: 'Liam P.',    coachName: 'Dave Thompson',  scheduledStart: todayAt(11), scheduledEnd: todayAt(12), cage: 'Cage 1', sessionType: 'Cage Rental', status: 'confirmed', hourLabel: '11 AM' },
-  { id: 'b07', kidName: 'Logan S.',   coachName: 'Mike Rodriguez', scheduledStart: todayAt(11), scheduledEnd: todayAt(12), cage: 'Cage 3', sessionType: 'Private',     status: 'confirmed', hourLabel: '11 AM' },
-  { id: 'b08', kidName: 'Hunter D.',  coachName: 'Sarah Kim',      scheduledStart: todayAt(12), scheduledEnd: todayAt(13), cage: 'Cage 2', sessionType: 'Cage Rental', status: 'confirmed', hourLabel: '12 PM' },
-  { id: 'b09', kidName: 'Jaxon R.',   coachName: 'Dave Thompson',  scheduledStart: todayAt(13), scheduledEnd: todayAt(14), cage: 'Cage 4', sessionType: 'Group',       status: 'confirmed', hourLabel: '1 PM' },
-  { id: 'b10', kidName: 'Zane H.',    coachName: 'Mike Rodriguez', scheduledStart: todayAt(14), scheduledEnd: todayAt(15), cage: 'Cage 1', sessionType: 'Private',     status: 'confirmed', hourLabel: '2 PM' },
-  { id: 'b11', kidName: 'Ethan B.',   coachName: 'Sarah Kim',      scheduledStart: todayAt(14), scheduledEnd: todayAt(15), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed', hourLabel: '2 PM' },
-  { id: 'b12', kidName: 'Carter S.',  coachName: 'Dave Thompson',  scheduledStart: todayAt(14), scheduledEnd: todayAt(15), cage: 'Cage 3', sessionType: 'Cage Rental', status: 'confirmed', hourLabel: '2 PM' },
-  { id: 'b13', kidName: 'Marcus W.',  coachName: 'Mike Rodriguez', scheduledStart: todayAt(15), scheduledEnd: todayAt(16), cage: 'Cage 1', sessionType: 'Private',     status: 'pending',   hourLabel: '3 PM' },
-  { id: 'b14', kidName: 'Owen M.',    coachName: 'Sarah Kim',      scheduledStart: todayAt(15), scheduledEnd: todayAt(16), cage: 'Cage 2', sessionType: 'Group',       status: 'confirmed', hourLabel: '3 PM' },
-  { id: 'b15', kidName: 'Tyler J.',   coachName: 'Dave Thompson',  scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 1', sessionType: 'Private',     status: 'confirmed', hourLabel: '4 PM' },
-  { id: 'b16', kidName: 'Jake M.',    coachName: 'Mike Rodriguez', scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 2', sessionType: 'Group',       status: 'confirmed', hourLabel: '4 PM' },
-  { id: 'b17', kidName: 'Aiden T.',   coachName: 'Sarah Kim',      scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 3', sessionType: 'Private',     status: 'confirmed', hourLabel: '4 PM' },
-  { id: 'b18', kidName: 'Ryan C.',    coachName: 'Dave Thompson',  scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 4', sessionType: 'Cage Rental', status: 'confirmed', hourLabel: '4 PM' },
-  { id: 'b19', kidName: 'Caleb N.',   coachName: 'Mike Rodriguez', scheduledStart: todayAt(17), scheduledEnd: todayAt(18), cage: 'Cage 1', sessionType: 'Group',       status: 'confirmed', hourLabel: '5 PM' },
-  { id: 'b20', kidName: 'Noah P.',    coachName: 'Sarah Kim',      scheduledStart: todayAt(17), scheduledEnd: todayAt(18), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed', hourLabel: '5 PM' },
+  { id: 'b01', kidName: 'Jake M.',    coachName: 'Mike Rodriguez', scheduledStart: todayAt(9),  scheduledEnd: todayAt(10), cage: 'Cage 1', sessionType: 'Private',     status: 'confirmed' },
+  { id: 'b02', kidName: 'Ryan C.',    coachName: 'Sarah Kim',      scheduledStart: todayAt(9),  scheduledEnd: todayAt(10), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed' },
+  { id: 'b03', kidName: 'Aiden T.',   coachName: 'Mike Rodriguez', scheduledStart: todayAt(9),  scheduledEnd: todayAt(10), cage: 'Cage 3', sessionType: 'Private',     status: 'confirmed' },
+  { id: 'b04', kidName: 'Caleb N.',   coachName: 'Dave Thompson',  scheduledStart: todayAt(10), scheduledEnd: todayAt(11), cage: 'Cage 1', sessionType: 'Group',       status: 'confirmed' },
+  { id: 'b05', kidName: 'Noah P.',    coachName: 'Sarah Kim',      scheduledStart: todayAt(10), scheduledEnd: todayAt(11), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed' },
+  { id: 'b06', kidName: 'Liam P.',    coachName: 'Dave Thompson',  scheduledStart: todayAt(11), scheduledEnd: todayAt(12), cage: 'Cage 1', sessionType: 'Cage Rental', status: 'confirmed' },
+  { id: 'b07', kidName: 'Logan S.',   coachName: 'Mike Rodriguez', scheduledStart: todayAt(11), scheduledEnd: todayAt(12), cage: 'Cage 3', sessionType: 'Private',     status: 'confirmed' },
+  { id: 'b08', kidName: 'Hunter D.',  coachName: 'Sarah Kim',      scheduledStart: todayAt(12), scheduledEnd: todayAt(13), cage: 'Cage 2', sessionType: 'Cage Rental', status: 'confirmed' },
+  { id: 'b09', kidName: 'Jaxon R.',   coachName: 'Dave Thompson',  scheduledStart: todayAt(13), scheduledEnd: todayAt(14), cage: 'Cage 4', sessionType: 'Group',       status: 'confirmed' },
+  { id: 'b10', kidName: 'Zane H.',    coachName: 'Mike Rodriguez', scheduledStart: todayAt(14), scheduledEnd: todayAt(15), cage: 'Cage 1', sessionType: 'Private',     status: 'confirmed' },
+  { id: 'b11', kidName: 'Ethan B.',   coachName: 'Sarah Kim',      scheduledStart: todayAt(14), scheduledEnd: todayAt(15), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed' },
+  { id: 'b12', kidName: 'Carter S.',  coachName: 'Dave Thompson',  scheduledStart: todayAt(14), scheduledEnd: todayAt(15), cage: 'Cage 3', sessionType: 'Cage Rental', status: 'confirmed' },
+  { id: 'b13', kidName: 'Marcus W.',  coachName: 'Mike Rodriguez', scheduledStart: todayAt(15), scheduledEnd: todayAt(16), cage: 'Cage 1', sessionType: 'Private',     status: 'pending'   },
+  { id: 'b14', kidName: 'Owen M.',    coachName: 'Sarah Kim',      scheduledStart: todayAt(15), scheduledEnd: todayAt(16), cage: 'Cage 2', sessionType: 'Group',       status: 'confirmed' },
+  { id: 'b15', kidName: 'Tyler J.',   coachName: 'Dave Thompson',  scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 1', sessionType: 'Private',     status: 'confirmed' },
+  { id: 'b16', kidName: 'Jake M.',    coachName: 'Mike Rodriguez', scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 2', sessionType: 'Group',       status: 'confirmed' },
+  { id: 'b17', kidName: 'Aiden T.',   coachName: 'Sarah Kim',      scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 3', sessionType: 'Private',     status: 'confirmed' },
+  { id: 'b18', kidName: 'Ryan C.',    coachName: 'Dave Thompson',  scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 4', sessionType: 'Cage Rental', status: 'confirmed' },
+  { id: 'b19', kidName: 'Caleb N.',   coachName: 'Mike Rodriguez', scheduledStart: todayAt(17), scheduledEnd: todayAt(18), cage: 'Cage 1', sessionType: 'Group',       status: 'confirmed' },
+  { id: 'b20', kidName: 'Noah P.',    coachName: 'Sarah Kim',      scheduledStart: todayAt(17), scheduledEnd: todayAt(18), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed' },
 ];
 
 type Props = { data: OwnerScheduleData };
@@ -67,10 +76,7 @@ function cageLabel(cage: string | null): string {
 
 function bookingsForSlot(bookings: ScheduleBooking[], cage: string, hour: string): ScheduleBooking[] {
   return bookings.filter(b => {
-    const h = new Date(b.scheduledStart).getHours();
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const hr12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
-    const label = `${hr12} ${ampm}`;
+    const label = localHourLabel(b.scheduledStart);
     if (cage === 'Unassigned') return label === hour && b.cage === null;
     return label === hour && b.cage === cage;
   });
@@ -101,8 +107,18 @@ export function ScheduleContent({ data }: Props) {
 
   const totalToday   = hasLiveData ? data.totalToday   : DEMO_BOOKINGS.length;
   const occupancyPct = hasLiveData ? data.occupancyPct : 78;
-  const peakHour     = hasLiveData ? data.peakHour     : '4 PM';
   const openSlots    = hasLiveData ? data.openSlots    : CAGES.length * HOURS.length - totalToday;
+
+  // peakHour and hourBarData are computed client-side so getHours() uses the
+  // browser's local timezone — not the server's UTC.
+  const hourCounts: Record<string, number> = {};
+  for (const b of bookings) {
+    const lbl = localHourLabel(b.scheduledStart);
+    hourCounts[lbl] = (hourCounts[lbl] ?? 0) + 1;
+  }
+  const peakHour = Object.keys(hourCounts).length > 0
+    ? Object.entries(hourCounts).sort(([, a], [, b]) => b - a)[0][0]
+    : hasLiveData ? null : '4 PM';
 
   const sessionTypeMap: Record<string, number> = {};
   for (const b of bookings) {
@@ -112,7 +128,7 @@ export function ScheduleContent({ data }: Props) {
 
   const hourBarData = HOURS.map(h => ({
     label:     h,
-    value:     bookings.filter(b => b.hourLabel === h).length,
+    value:     hourCounts[h] ?? 0,
     highlight: h === peakHour,
   }));
 

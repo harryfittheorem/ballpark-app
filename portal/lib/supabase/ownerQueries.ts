@@ -840,14 +840,12 @@ export type ScheduleBooking = {
   cage: string | null;
   sessionType: string;
   status: string;
-  hourLabel: string;
 };
 
 export type OwnerScheduleData = {
   bookings: ScheduleBooking[];
   totalToday: number;
   occupancyPct: number;
-  peakHour: string | null;
   openSlots: number;
 };
 
@@ -882,10 +880,6 @@ export async function getOwnerScheduleData(
     const kid = b.kids as unknown as { first_name: string; last_name: string | null } | null;
     const coach = b.coaches as unknown as { first_name: string; last_name: string | null } | null;
     const st = b.session_types as unknown as { name: string } | null;
-    const start = new Date(b.scheduled_start);
-    const hr = start.getHours();
-    const ampm = hr >= 12 ? 'PM' : 'AM';
-    const hr12 = hr > 12 ? hr - 12 : hr === 0 ? 12 : hr;
     return {
       id: b.id,
       kidName: kid ? [kid.first_name, kid.last_name].filter(Boolean).join(' ') : 'Unknown',
@@ -895,25 +889,16 @@ export async function getOwnerScheduleData(
       cage: b.cage_number ? `Cage ${b.cage_number}` : null,
       sessionType: st?.name ?? 'Private',
       status: b.status,
-      hourLabel: `${hr12} ${ampm}`,
     };
   });
 
   const TOTAL_SLOTS = 8 * 14; // 8 cages × 14 hours (9 AM–10 PM)
-  const hourCounts: Record<string, number> = {};
-  for (const b of bookings) {
-    hourCounts[b.hourLabel] = (hourCounts[b.hourLabel] ?? 0) + 1;
-  }
-  const peakHour = Object.keys(hourCounts).length > 0
-    ? Object.entries(hourCounts).sort(([, a], [, b]) => b - a)[0][0]
-    : null;
   const occupancyPct = Math.round((bookings.length / TOTAL_SLOTS) * 1000) / 10;
 
   return {
     bookings,
     totalToday: bookings.length,
     occupancyPct,
-    peakHour,
     openSlots: TOTAL_SLOTS - bookings.length,
   };
 }
