@@ -1,5 +1,4 @@
-import { ChevronRight } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
@@ -11,11 +10,8 @@ import { formatSlotTime, generateDaySlots, type Slot, type AvailabilityForSlots 
 import type { SessionType } from '@/api/bookings';
 import type { Coach } from '@/api/bookings';
 
-type Category = 'all' | 'private' | 'group' | 'cage';
-
 type Props = {
   sessionType: SessionType | null;
-  category: Category;
   onPickSlot: (date: string, slot: Slot) => void;
 };
 
@@ -26,46 +22,34 @@ function ymd(d: Date): string {
   return `${y}-${m}-${dd}`;
 }
 
-function getDayLabel(date: string, index: number): string {
+function getShortDayLabel(date: string, index: number): string {
   if (index === 0) return 'TODAY';
-  if (index === 1) return 'TOMORROW';
+  if (index === 1) return 'TMR';
   const d = new Date(`${date}T00:00:00`);
-  return d.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+  return d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
 }
 
-function getFullDate(date: string): string {
+function getMonthDay(date: string): string {
   const d = new Date(`${date}T00:00:00`);
-  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function getTypeBadge(category: Category, sessionType: SessionType | null): string {
-  if (category !== 'all') return category.toUpperCase();
-  const cat = sessionType?.type_category ?? 'private';
-  if (cat === 'group') return 'GROUP';
-  if (cat === 'cage') return 'CAGE';
-  return 'PRIVATE';
-}
-
-function DayGroup({
+function DayColumn({
   date,
   dayLabel,
-  fullDate,
+  monthDay,
   sessionType,
-  category,
   availability,
   coaches,
-  locationName,
   timezone,
   onPickSlot,
 }: {
   date: string;
   dayLabel: string;
-  fullDate: string;
+  monthDay: string;
   sessionType: SessionType;
-  category: Category;
   availability: AvailabilityForSlots[] | undefined;
   coaches: Coach[] | undefined;
-  locationName: string | null;
   timezone: string | null;
   onPickSlot: (slot: Slot) => void;
 }) {
@@ -83,67 +67,53 @@ function DayGroup({
         })
       : [];
 
-  const coachNameOf = (id: string) => {
+  const coachFirstName = (id: string) => {
     const c = coaches?.find((x) => x.id === id);
-    return c ? `${c.first_name} ${c.last_name}`.trim() : 'Coach';
+    return c?.first_name ?? 'Coach';
   };
 
-  const typeBadge = getTypeBadge(category, sessionType);
-  const openCount = slots.length;
-
   return (
-    <View style={styles.dayGroup}>
-      <View style={styles.dayHeader}>
-        <View style={styles.dayHeaderLeft}>
-          <Text style={styles.dayName}>{dayLabel}</Text>
-          <Text style={styles.dayDate}>{fullDate}</Text>
-        </View>
-        {isPending ? (
-          <ActivityIndicator size="small" color={colors.gold} />
-        ) : (
-          <View style={styles.openCountBadge}>
-            <Text style={styles.openCountText}>{openCount} OPEN</Text>
-          </View>
-        )}
+    <View style={styles.column}>
+      <View style={styles.colHeader}>
+        <Text style={styles.colDayLabel}>{dayLabel}</Text>
+        <Text style={styles.colMonthDay}>{monthDay}</Text>
       </View>
+      <View style={styles.colDivider} />
 
-      {!isPending && slots.length === 0 ? (
-        <View style={styles.noSlots}>
-          <Text style={styles.noSlotsText}>No open slots {dayLabel.toLowerCase()}.</Text>
+      {isPending ? (
+        <View style={styles.colState}>
+          <ActivityIndicator size="small" color={colors.gold} />
+        </View>
+      ) : slots.length === 0 ? (
+        <View style={styles.colState}>
+          <Text style={styles.colNoneText}>None open</Text>
         </View>
       ) : (
-        slots.map((slot) => (
-          <Pressable
-            key={`${slot.coach_id}|${slot.start}`}
-            onPress={() => onPickSlot(slot)}
-            style={({ pressed }) => [styles.slotRow, pressed && { opacity: 0.8 }]}
-            accessibilityRole="button"
-          >
-            <Text style={styles.slotTime}>{formatSlotTime(slot.start, timezone)}</Text>
-            <View style={styles.slotMiddle}>
-              <Text style={styles.slotCoach}>{coachNameOf(slot.coach_id)}</Text>
-              {locationName ? (
-                <Text style={styles.slotMeta}>{locationName}</Text>
-              ) : null}
-            </View>
-            <View style={styles.typeBadge}>
-              <Text style={styles.typeBadgeText}>{typeBadge}</Text>
-            </View>
-            <ChevronRight size={14} color={colors.textLight} />
-          </Pressable>
-        ))
+        <View style={styles.chips}>
+          {slots.map((slot) => (
+            <Pressable
+              key={`${slot.coach_id}|${slot.start}`}
+              onPress={() => onPickSlot(slot)}
+              style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
+              accessibilityRole="button"
+              accessibilityLabel={`${formatSlotTime(slot.start, timezone)} with ${coachFirstName(slot.coach_id)}`}
+            >
+              <Text style={styles.chipTime}>{formatSlotTime(slot.start, timezone)}</Text>
+              <Text style={styles.chipCoach}>{coachFirstName(slot.coach_id)}</Text>
+            </Pressable>
+          ))}
+        </View>
       )}
     </View>
   );
 }
 
-export default function MultiDaySlotList({ sessionType, category, onPickSlot }: Props) {
+export default function MultiDaySlotList({ sessionType, onPickSlot }: Props) {
   const availability = useCoachAvailability();
   const location = usePrimaryLocation();
   const coaches = useCoaches();
 
   const timezone = location.data?.timezone ?? null;
-  const locationName = location.data?.name ?? null;
 
   const today = new Date();
   const days = Array.from({ length: 4 }, (_, i) => {
@@ -162,25 +132,29 @@ export default function MultiDaySlotList({ sessionType, category, onPickSlot }: 
   }
 
   return (
-    <View>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.row}
+    >
       {days.map((date, i) => (
-        <DayGroup
+        <DayColumn
           key={date}
           date={date}
-          dayLabel={getDayLabel(date, i)}
-          fullDate={getFullDate(date)}
+          dayLabel={getShortDayLabel(date, i)}
+          monthDay={getMonthDay(date)}
           sessionType={sessionType}
-          category={category}
           availability={availability.data}
           coaches={coaches.data}
-          locationName={locationName}
           timezone={timezone}
           onPickSlot={(slot) => onPickSlot(date, slot)}
         />
       ))}
-    </View>
+    </ScrollView>
   );
 }
+
+const COLUMN_WIDTH = 116;
 
 const styles = StyleSheet.create({
   noTypeHint: {
@@ -196,99 +170,83 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.base,
     textAlign: 'center',
   },
-  dayGroup: {
-    marginBottom: spacing['2xl'],
+  row: {
+    gap: spacing.base,
+    paddingRight: spacing.lg,
   },
-  dayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    marginBottom: spacing.base,
-  },
-  dayHeaderLeft: {
-    flex: 1,
-  },
-  dayName: {
-    color: colors.textOnDark,
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.lg,
-    letterSpacing: tracking.wider,
-  },
-  dayDate: {
-    color: colors.textLight,
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.base,
-    marginTop: 2,
-  },
-  openCountBadge: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(241,229,173,0.12)',
-    borderWidth: 1,
-    borderColor: colors.borderGold,
-  },
-  openCountText: {
-    color: colors.gold,
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.xs,
-    letterSpacing: tracking.wide,
-  },
-  noSlots: {
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.base,
-  },
-  noSlotsText: {
-    color: colors.textLight,
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.base,
-  },
-  slotRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: radius.xl,
+  column: {
+    width: COLUMN_WIDTH,
+    borderRadius: radius['2xl'],
     backgroundColor: colors.dark,
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: spacing.base,
+    overflow: 'hidden',
   },
-  slotTime: {
+  colHeader: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.base,
+  },
+  colDayLabel: {
     color: colors.gold,
     fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes['2xl'],
-    width: 76,
-    lineHeight: 26,
+    fontSize: fontSizes.sm,
+    letterSpacing: tracking.wider,
   },
-  slotMiddle: {
-    flex: 1,
-  },
-  slotCoach: {
-    color: colors.textOnDark,
-    fontFamily: fontFamilies.interSemiBold,
-    fontSize: fontSizes.md,
-  },
-  slotMeta: {
+  colMonthDay: {
     color: colors.textLight,
     fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.base,
-    marginTop: 2,
+    fontSize: fontSizes.xs,
+    marginTop: 1,
   },
-  typeBadge: {
+  colDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.base,
+  },
+  colState: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  colNoneText: {
+    color: colors.textMuted,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.xs,
+    textAlign: 'center',
+  },
+  chips: {
     paddingHorizontal: spacing.base,
-    paddingVertical: spacing.xxs,
-    borderRadius: radius.sm,
-    backgroundColor: 'rgba(241,229,173,0.15)',
+    paddingBottom: spacing.lg,
+    gap: spacing.base,
   },
-  typeBadgeText: {
+  chip: {
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: 'rgba(241, 229, 173, 0.06)',
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.base,
+    alignItems: 'center',
+  },
+  chipPressed: {
+    backgroundColor: 'rgba(241, 229, 173, 0.18)',
+  },
+  chipTime: {
     color: colors.gold,
     fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.md,
+    letterSpacing: tracking.tight,
+    textAlign: 'center',
+  },
+  chipCoach: {
+    color: colors.textLight,
+    fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.xs,
-    letterSpacing: tracking.wide,
+    textAlign: 'center',
+    marginTop: 2,
   },
 });

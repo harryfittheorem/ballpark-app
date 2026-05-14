@@ -1,8 +1,8 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
-import { Calendar as CalendarIcon, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Calendar as CalendarIcon, X } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ScrollView as ScrollViewType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -289,12 +289,11 @@ export default function BookScreen() {
           <Text style={shellStyles.sectionLabel}>AVAILABLE SLOTS</Text>
           <MultiDaySlotList
             sessionType={selectedSessionType}
-            category={category}
             onPickSlot={handleMultiDaySlotPick}
           />
         </View>
 
-        {/* Browse other dates (collapsible calendar + time) --------------- */}
+        {/* Browse other dates button --------------------------------------- */}
         <View style={flowStyles.section}>
           <Pressable
             onPress={() => {
@@ -302,45 +301,17 @@ export default function BookScreen() {
                 showToast('Pick a session type first.');
                 return;
               }
-              setCalendarOpen((v) => !v);
+              setCalendarOpen(true);
             }}
             style={({ pressed }) => [
               shellStyles.browseButton,
               pressed && { opacity: 0.75 },
             ]}
             accessibilityRole="button"
-            accessibilityState={{ expanded: calendarOpen }}
           >
             <CalendarIcon size={16} color={colors.textLight} />
             <Text style={shellStyles.browseText}>Browse other dates</Text>
-            {calendarOpen ? (
-              <ChevronUp size={16} color={colors.textLight} />
-            ) : (
-              <ChevronDown size={16} color={colors.textLight} />
-            )}
           </Pressable>
-
-          {calendarOpen ? (
-            <View style={shellStyles.calendarExpanded}>
-              <DateSection
-                locked={false}
-                durationMinutes={selectedSessionType?.duration_minutes ?? null}
-                selectedDate={selectedDate}
-                onSelectDate={handleSelectDate}
-              />
-              {selectedDate ? (
-                <View style={shellStyles.timeSectionWrap}>
-                  <TimeSection
-                    locked={false}
-                    date={selectedDate}
-                    durationMinutes={selectedSessionType?.duration_minutes ?? null}
-                    selectedSlotKey={selectedSlotKey}
-                    onSelectSlot={handleCalendarSlotPick}
-                  />
-                </View>
-              ) : null}
-            </View>
-          ) : null}
         </View>
 
         {/* SUMMARY --------------------------------------------------------- */}
@@ -361,6 +332,68 @@ export default function BookScreen() {
           />
         </View>
       </ScrollView>
+
+      {/* Browse other dates — bottom-sheet modal -------------------------- */}
+      <Modal
+        visible={calendarOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCalendarOpen(false)}
+      >
+        <View style={shellStyles.modalOverlay}>
+          {/* Backdrop — tap to dismiss */}
+          <Pressable
+            style={shellStyles.modalBackdrop}
+            onPress={() => setCalendarOpen(false)}
+          />
+
+          {/* Sheet */}
+          <View style={shellStyles.modalSheet}>
+            {/* Drag handle */}
+            <View style={shellStyles.modalHandle} />
+
+            {/* Header */}
+            <View style={shellStyles.modalHeader}>
+              <Text style={shellStyles.modalTitle}>BROWSE DATES</Text>
+              <Pressable
+                onPress={() => setCalendarOpen(false)}
+                style={shellStyles.modalCloseBtn}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <X size={20} color={colors.textLight} />
+              </Pressable>
+            </View>
+
+            {/* Scrollable content: calendar + time slots */}
+            <ScrollView
+              style={shellStyles.modalScroll}
+              contentContainerStyle={shellStyles.modalScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <DateSection
+                locked={false}
+                durationMinutes={selectedSessionType?.duration_minutes ?? null}
+                selectedDate={selectedDate}
+                onSelectDate={handleSelectDate}
+              />
+              {selectedDate ? (
+                <View style={shellStyles.modalTimeSectionWrap}>
+                  <TimeSection
+                    locked={false}
+                    date={selectedDate}
+                    durationMinutes={selectedSessionType?.duration_minutes ?? null}
+                    selectedSlotKey={selectedSlotKey}
+                    onSelectSlot={handleCalendarSlotPick}
+                  />
+                </View>
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -486,10 +519,63 @@ const shellStyles = StyleSheet.create({
     fontFamily: fontFamilies.interMedium,
     fontSize: fontSizes.base,
   },
-  calendarExpanded: {
-    marginTop: spacing.lg,
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
-  timeSectionWrap: {
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  },
+  modalSheet: {
+    maxHeight: '82%',
+    backgroundColor: colors.darkest,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: colors.borderGold,
+    overflow: 'hidden',
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginTop: spacing.lg,
+    marginBottom: spacing.base,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing['3xl'],
+    paddingBottom: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    flex: 1,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.md,
+    color: colors.gold,
+    letterSpacing: tracking.wider,
+  },
+  modalCloseBtn: {
+    padding: spacing.xs,
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    paddingHorizontal: spacing['3xl'],
+    paddingTop: spacing['2xl'],
+    paddingBottom: spacing['4xl'],
+  },
+  modalTimeSectionWrap: {
     marginTop: spacing['2xl'],
   },
 });
