@@ -530,7 +530,7 @@ const shellStyles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
   modalSheet: {
-    maxHeight: '82%',
+    height: '80%',
     backgroundColor: colors.darkest,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

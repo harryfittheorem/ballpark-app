@@ -173,6 +173,7 @@ const styles = StyleSheet.create({
   row: {
     gap: spacing.base,
     paddingRight: spacing.lg,
+    alignItems: 'stretch',
   },
   column: {
     width: COLUMN_WIDTH,
@@ -211,6 +212,7 @@ const styles = StyleSheet.create({
     minHeight: 52,
     alignItems: 'center',
     justifyContent: 'center',
+    flex: 1,
   },
   colNoneText: {
     color: colors.textMuted,
