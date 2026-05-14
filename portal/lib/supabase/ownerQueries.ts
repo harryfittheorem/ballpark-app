@@ -220,7 +220,7 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
 
   // Sessions today & utilization
   const sessionsToday = bookingsTodayRes.data?.length ?? 0;
-  const TOTAL_SLOTS = 8 * 12;
+  const TOTAL_SLOTS = 8 * 14; // 8 cages × 14 hours (9 AM–10 PM)
   const utilizationPct = Math.round((sessionsToday / TOTAL_SLOTS) * 1000) / 10;
 
   // Paid today
@@ -852,7 +852,7 @@ export async function getOwnerScheduleData(
     };
   });
 
-  const TOTAL_SLOTS = 8 * 12; // 8 cages × 12 hours
+  const TOTAL_SLOTS = 8 * 14; // 8 cages × 14 hours (9 AM–10 PM)
   const hourCounts: Record<string, number> = {};
   for (const b of bookings) {
     hourCounts[b.hourLabel] = (hourCounts[b.hourLabel] ?? 0) + 1;

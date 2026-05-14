@@ -5,8 +5,8 @@ import { KPICard, OButton, PageHeader, OCard, BarChart, DonutChart } from '@/com
 import { Calendar, Activity, TrendingUp, Clock, Filter, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { OwnerScheduleData, ScheduleBooking } from '@/lib/supabase/ownerQueries';
 
-const HOURS = ['9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM', '7 PM', '8 PM'];
-const CAGES = ['Cage 1', 'Cage 2', 'Cage 3', 'Cage 4', 'Cage 5', 'Cage 6', 'Cage 7', 'Cage 8'];
+const HOURS = ['9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM', '7 PM', '8 PM', '9 PM', '10 PM'];
+const CAGES = ['Cage 1', 'Cage 2', 'Cage 3', 'Cage 4', 'Cage 5', 'Cage 6', 'Cage 7', 'Cage 8', 'Unassigned'];
 
 const now = new Date();
 const DAY_NAMES   = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -61,7 +61,8 @@ function bookingsForSlot(bookings: ScheduleBooking[], cage: string, hour: string
     const ampm = h >= 12 ? 'PM' : 'AM';
     const hr12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
     const label = `${hr12} ${ampm}`;
-    return label === hour && (b.cage === cage || b.cage === null);
+    if (cage === 'Unassigned') return label === hour && b.cage === null;
+    return label === hour && b.cage === cage;
   });
 }
 
@@ -131,17 +132,17 @@ export function ScheduleContent({ data }: Props) {
           <div style={{ overflow: 'auto' }}>
             <div style={{ minWidth: 900, padding: 16 }}>
               {/* Cage headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(8, 1fr)', gap: 4, marginBottom: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(8, 1fr) minmax(80px, 0.8fr)', gap: 4, marginBottom: 8 }}>
                 <div />
                 {CAGES.map(c => (
-                  <div key={c} style={{ fontSize: 10, fontWeight: 700, color: brand.textMuted, textAlign: 'center', letterSpacing: 0.5, padding: '6px 0', background: brand.surfaceAlt, borderRadius: 4 }}>
+                  <div key={c} style={{ fontSize: 10, fontWeight: 700, color: c === 'Unassigned' ? brand.warning : brand.textMuted, textAlign: 'center', letterSpacing: 0.5, padding: '6px 0', background: brand.surfaceAlt, borderRadius: 4, fontStyle: c === 'Unassigned' ? 'italic' : 'normal' }}>
                     {c.toUpperCase()}
                   </div>
                 ))}
               </div>
               {/* Hour rows */}
               {HOURS.map((hr, hi) => (
-                <div key={hi} style={{ display: 'grid', gridTemplateColumns: '60px repeat(8, 1fr)', gap: 4, marginBottom: 4, minHeight: 48 }}>
+                <div key={hi} style={{ display: 'grid', gridTemplateColumns: '60px repeat(8, 1fr) minmax(80px, 0.8fr)', gap: 4, marginBottom: 4, minHeight: 48 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: brand.textMuted, padding: '14px 0', textAlign: 'right', paddingRight: 8 }}>{hr}</div>
                   {CAGES.map((cage, ci) => {
                     const slot = bookingsForSlot(bookings, cage, hr);
