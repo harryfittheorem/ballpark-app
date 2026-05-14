@@ -24,7 +24,7 @@ function ymd(d: Date): string {
 
 function getShortDayLabel(date: string, index: number): string {
   if (index === 0) return 'TODAY';
-  if (index === 1) return 'TMR';
+  if (index === 1) return 'TOMORROW';
   const d = new Date(`${date}T00:00:00`);
   return d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
 }
