@@ -1688,6 +1688,10 @@ export type Database = {
         Args: { p_tenant_id: string; p_video_id: string }
         Returns: boolean
       }
+      _video_is_parent_upload: {
+        Args: { p_tenant_id: string; p_user_id: string; p_video_id: string }
+        Returns: boolean
+      }
       cancel_assignment_for_coach: {
         Args: { p_assignment_id: string }
         Returns: string
