@@ -61,7 +61,7 @@ export type OwnerMember = {
   parent: string;
   program: string;
   planType: 'eft' | 'otc';
-  status: 'active' | 'at-risk' | 'paused' | 'cancelled';
+  status: 'active' | 'at-risk' | 'paused' | 'cancelled' | 'payment_overdue';
   engagementScore: number;
   churnRisk: 'low' | 'medium' | 'high';
   lastSession: string;
@@ -621,6 +621,15 @@ export type BillingData = {
   failedCount: number;
 };
 
+/**
+ * Fetches billing KPIs and package breakdown from the database.
+ *
+ * NOTE — MRR sourcing: this function computes MRR from DB payment_events/memberships
+ * (historical, not real-time). The billing page server component overrides the mrr KPI
+ * with live Stripe subscription data via `fetchLocationMrr` when Stripe is configured.
+ * If you reuse this function elsewhere and need authoritative live MRR, supplement it
+ * with `fetchLocationMrr` from `@/lib/stripe/mrrUtils` and override kpis.mrr there too.
+ */
 export async function getBillingData(supabase: SupabaseClient, tenantId: string): Promise<BillingData> {
   const [kpis, packages] = await Promise.all([
     getOwnerKPIs(supabase, tenantId),
@@ -935,6 +944,11 @@ export type MemberDetail = OwnerMember & {
   pointsBalance: number;
   timeline: TimelineEvent[];
   recentPayments: RecentPaymentEvent[];
+  stripeSubscriptionId: string | null;
+  subscriptionStatus: 'active' | 'past_due' | 'payment_overdue' | 'cancelled' | 'none';
+  nextBillingAt: string | null;
+  /** ISO timestamp when a cancel_at_period_end subscription will terminate. Null if not pending cancellation. */
+  cancelAt: string | null;
 };
 
 export async function getMemberDetail(
@@ -954,6 +968,9 @@ export async function getMemberDetail(
       started_at,
       kid_id,
       family_id,
+      stripe_subscription_id,
+      next_billing_at,
+      cancel_at,
       kids!inner(id, first_name, last_name, age_group, points_balance),
       families!inner(parent_first_name, parent_last_name)
     `)
@@ -1087,8 +1104,20 @@ export async function getMemberDetail(
   const days = daysSince(lastBookingTs);
   const risk = churnRisk(days);
   const planType = mem.plan_type as 'eft' | 'otc';
-  const memberStatus = mem.status === 'active' && risk === 'high' ? 'at-risk'
-    : (mem.status as 'active' | 'paused' | 'cancelled');
+  const rawStatus = mem.status as string;
+  const memberStatus = rawStatus === 'active' && risk === 'high' ? 'at-risk'
+    : (rawStatus as 'active' | 'paused' | 'cancelled' | 'payment_overdue');
+
+  // Subscription billing fields (Phase 3)
+  const stripeSubscriptionId = (mem.stripe_subscription_id as string | null) ?? null;
+  const nextBillingAt = (mem.next_billing_at as string | null) ?? null;
+  let subscriptionStatus: MemberDetail['subscriptionStatus'] = 'none';
+  if (stripeSubscriptionId) {
+    if (rawStatus === 'active') subscriptionStatus = 'active';
+    else if (rawStatus === 'payment_overdue') subscriptionStatus = 'payment_overdue';
+    else if (rawStatus === 'cancelled') subscriptionStatus = 'cancelled';
+    else subscriptionStatus = 'active';
+  }
 
   const lifetimeRes = await supabase
     .from('payment_events')
@@ -1124,6 +1153,10 @@ export async function getMemberDetail(
     pointsBalance: kid.points_balance,
     timeline,
     recentPayments,
+    stripeSubscriptionId,
+    subscriptionStatus,
+    nextBillingAt,
+    cancelAt: (mem.cancel_at as string | null) ?? null,
   };
 }
 

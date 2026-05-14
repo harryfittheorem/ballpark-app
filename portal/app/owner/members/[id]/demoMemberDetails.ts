@@ -1,6 +1,6 @@
 import type { MemberDetail, TimelineEvent, RecentPaymentEvent } from '@/lib/supabase/ownerQueries';
 
-export type DemoMemberDetail = MemberDetail & {
+export type DemoMemberDetail = Omit<MemberDetail, 'stripeSubscriptionId' | 'subscriptionStatus' | 'nextBillingAt'> & {
   memberForMonths: number;
   bestVeloMph: number;
   homeworkScore: number;
@@ -11,6 +11,9 @@ export type DemoMemberDetail = MemberDetail & {
   hittraxBestVelo: number;
   hittraxLaunchAngle: number;
   sparklinePoints: number[];
+  stripeSubscriptionId?: string | null;
+  subscriptionStatus?: MemberDetail['subscriptionStatus'];
+  nextBillingAt?: string | null;
 };
 
 function tl(id: string, kind: 'booking' | 'payment', daysAgo: number, title: string, subtitle: string, status: 'completed' | 'confirmed' | 'pending' | 'cancelled' | 'paid' | 'failed', amount?: number): TimelineEvent {
@@ -45,6 +48,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t5', 'payment', 5, 'Payment processed', 'Unlimited Monthly — Auto-pay', 'paid', 280),
     ],
     recentPayments: [pmt('p1', 5, 280, 'paid', 'Visa ·4242'), pmt('p2', 35, 280, 'paid', 'Visa ·4242'), pmt('p3', 65, 280, 'paid', 'Visa ·4242')],
+    cancelAt: null,
   },
   d02: {
     id: 'd02', kidId: 'k02', name: 'Tyler Johnson', age: '14U', parent: 'Brad Johnson',
@@ -62,6 +66,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t4', 'booking', 37, 'Session completed', 'Team Training · Coach Alex', 'completed'),
     ],
     recentPayments: [pmt('p1', 10, 450, 'paid', 'Visa ·8891'), pmt('p2', 40, 450, 'paid', 'Visa ·8891')],
+    cancelAt: null,
   },
   d03: {
     id: 'd03', kidId: 'k03', name: 'Marcus Williams', age: '10U', parent: 'Darius Williams',
@@ -79,6 +84,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t4', 'payment', 33, 'Payment processed', 'Unlimited Monthly — Auto-pay', 'paid', 280),
     ],
     recentPayments: [pmt('p1', 3, 280, 'failed', 'Visa ·3310'), pmt('p2', 33, 280, 'paid', 'Visa ·3310')],
+    cancelAt: null,
   },
   d04: {
     id: 'd04', kidId: 'k04', name: 'Ryan Chen', age: '11U', parent: 'David Chen',
@@ -95,6 +101,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t4', 'payment', 21, 'Payment processed', '8-Pack Lessons — one-time', 'paid', 640),
     ],
     recentPayments: [pmt('p1', 21, 640, 'paid', 'Visa ·5544')],
+    cancelAt: null,
   },
   d05: {
     id: 'd05', kidId: 'k05', name: 'Ethan Brooks', age: '13U', parent: 'Kevin Brooks',
@@ -112,6 +119,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t4', 'booking', 38, 'Cage rental', 'Cage 3 · 60 min', 'completed'),
     ],
     recentPayments: [pmt('p1', 8, 120, 'paid', 'MC ·7731'), pmt('p2', 38, 120, 'paid', 'MC ·7731')],
+    cancelAt: null,
   },
   d06: {
     id: 'd06', kidId: 'k06', name: 'Noah Patel', age: '11U', parent: 'Raj Patel',
@@ -128,6 +136,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t4', 'booking', 35, 'Session completed', 'Private · Coach Alex · Cage 1', 'completed'),
     ],
     recentPayments: [pmt('p1', 5, 280, 'paid', 'Visa ·6612'), pmt('p2', 35, 280, 'paid', 'Visa ·6612')],
+    cancelAt: null,
   },
   d07: {
     id: 'd07', kidId: 'k07', name: 'Logan Scott', age: '9U', parent: 'James Scott',
@@ -143,6 +152,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t3', 'payment', 30, 'Payment processed', '4-Pack Lessons — one-time', 'paid', 320),
     ],
     recentPayments: [pmt('p1', 30, 320, 'paid', 'Visa ·9901')],
+    cancelAt: null,
   },
   d08: {
     id: 'd08', kidId: 'k08', name: 'Aiden Torres', age: '12U', parent: 'Maria Torres',
@@ -159,6 +169,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t4', 'booking', 8, 'Session completed', 'Team Training · Coach Alex', 'completed'),
     ],
     recentPayments: [pmt('p1', 7, 450, 'paid', 'Visa ·2278'), pmt('p2', 37, 450, 'paid', 'Visa ·2278')],
+    cancelAt: null,
   },
   d09: {
     id: 'd09', kidId: 'k09', name: 'Caleb Nguyen', age: '13U', parent: 'Linh Nguyen',
@@ -175,6 +186,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t4', 'payment', 6, 'Payment processed', 'Unlimited Monthly — Auto-pay', 'paid', 280),
     ],
     recentPayments: [pmt('p1', 6, 280, 'paid', 'MC ·4488'), pmt('p2', 36, 280, 'paid', 'MC ·4488')],
+    cancelAt: null,
   },
   d10: {
     id: 'd10', kidId: 'k10', name: 'Jaxon Rivera', age: '10U', parent: 'Sofia Rivera',
@@ -190,6 +202,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t3', 'booking', 17, 'Cage rental', 'Cage 2 · 60 min', 'completed'),
     ],
     recentPayments: [pmt('p1', 8, 120, 'paid', 'Visa ·1190'), pmt('p2', 38, 120, 'paid', 'Visa ·1190')],
+    cancelAt: null,
   },
   d11: {
     id: 'd11', kidId: 'k11', name: 'Owen Murphy', age: '15U', parent: 'Patrick Murphy',
@@ -205,6 +218,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t3', 'booking', 42, 'Session completed', 'Team Training · Coach Alex', 'completed'),
     ],
     recentPayments: [pmt('p1', 40, 225, 'refunded', 'Visa ·7723')],
+    cancelAt: null,
   },
   d12: {
     id: 'd12', kidId: 'k12', name: 'Liam Perez', age: '11U', parent: 'Ana Perez',
@@ -220,6 +234,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t3', 'payment', 25, 'Payment processed', '8-Pack Lessons — one-time', 'paid', 480),
     ],
     recentPayments: [pmt('p1', 25, 480, 'paid', 'MC ·5567')],
+    cancelAt: null,
   },
   d13: {
     id: 'd13', kidId: 'k13', name: 'Zane Harris', age: '14U', parent: 'Terry Harris',
@@ -235,6 +250,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t3', 'booking', 13, 'Session completed', 'Private · Coach Alex', 'completed'),
     ],
     recentPayments: [pmt('p1', 8, 280, 'paid', 'Visa ·8843'), pmt('p2', 38, 280, 'paid', 'Visa ·8843')],
+    cancelAt: null,
   },
   d14: {
     id: 'd14', kidId: 'k14', name: 'Carter Simmons', age: '12U', parent: 'Gina Simmons',
@@ -250,6 +266,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t3', 'booking', 60, 'Session completed', 'Private · Coach Mike', 'completed'),
     ],
     recentPayments: [pmt('p1', 55, 320, 'failed', 'Visa ·4422')],
+    cancelAt: null,
   },
   d15: {
     id: 'd15', kidId: 'k15', name: 'Hunter Davis', age: '13U', parent: 'Todd Davis',
@@ -265,5 +282,6 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
       tl('t3', 'booking', 19, 'Cage rental', 'Cage 3 · 60 min', 'completed'),
     ],
     recentPayments: [pmt('p1', 11, 120, 'paid', 'Visa ·3355'), pmt('p2', 41, 120, 'paid', 'Visa ·3355')],
+    cancelAt: null,
   },
 };

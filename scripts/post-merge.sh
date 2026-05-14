@@ -34,7 +34,8 @@ if [ -d "supabase/functions" ]; then
   for fn in mux-create-upload send-push-notification send-coach-video-notification \
             hittrax-associate hittrax-poll hittrax-disconnect account-delete \
             notify-achievement notify-leaderboard-weekly notify-assignment-reviewed \
-            stripe-create-payment-intent; do
+            stripe-create-payment-intent stripe-setup-intent stripe-create-subscription \
+            stripe-cancel-subscription; do
     if [ -f "supabase/functions/$fn/index.ts" ]; then
       echo "[post-merge] supabase functions deploy $fn"
       npx --yes supabase functions deploy "$fn" >/dev/null 2>&1 || \

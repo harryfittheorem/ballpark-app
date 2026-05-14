@@ -10,15 +10,46 @@
  * Mounts at the NavigationContainer level. AuthProvider must wrap this.
  */
 
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/hooks/useAuth';
 import { colors } from '@/theme';
+import type { MainTabParamList } from './types';
 
 import AuthNavigator from './AuthNavigator';
 import CoachTabNavigator from './CoachTabNavigator';
 import MainTabNavigator from './MainTabNavigator';
+
+// ── Deep-link routing ─────────────────────────────────────────────────────────
+// Maps inbound URLs (custom scheme + HTTPS universal links) to screens.
+//
+// Supported deep links:
+//   ballpark://me/payment-method  → Me tab → PaymentMethod screen
+//   ballpark://auth/callback      → Auth callback (handled by Supabase PKCE)
+//
+// The `ballpark` scheme is registered in app.json.
+// HTTPS universal links (when EXPO_PUBLIC_AUTH_REDIRECT_HOST is set) use the
+// same path structure under https://{host}/.
+const linking: LinkingOptions<MainTabParamList> = {
+  prefixes: [
+    'ballpark://',
+    ...(process.env.EXPO_PUBLIC_AUTH_REDIRECT_HOST
+      ? [`https://${process.env.EXPO_PUBLIC_AUTH_REDIRECT_HOST}/`]
+      : []),
+  ],
+  config: {
+    screens: {
+      Me: {
+        path: 'me',
+        screens: {
+          MeHome: '',
+          PaymentMethod: 'payment-method',
+        },
+      },
+    },
+  },
+};
 
 function Splash() {
   return (
@@ -42,6 +73,7 @@ function Inner() {
 export default function RootNavigator() {
   return (
     <NavigationContainer
+      linking={linking}
       theme={{
         dark: true,
         colors: {

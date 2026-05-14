@@ -114,6 +114,7 @@ export function OButton({
   size = 'md',
   icon: Icon,
   onClick,
+  disabled = false,
   style: extraStyle = {},
 }: {
   children?: ReactNode;
@@ -121,18 +122,20 @@ export function OButton({
   size?: OBtnSize;
   icon?: React.ElementType;
   onClick?: () => void;
+  disabled?: boolean;
   style?: CSSProperties;
 }) {
   const v = btnVariants[variant];
   const s = btnSizes[size];
   return (
-    <button onClick={onClick} style={{
+    <button onClick={onClick} disabled={disabled} style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
       padding: s.padding, fontSize: s.fontSize,
       background: v.bg, color: v.color,
       border: `1px solid ${v.border}`, borderRadius: 8,
-      fontWeight: 700, cursor: 'pointer',
+      fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
       fontFamily: fonts.display, letterSpacing: 0.5, textTransform: 'uppercase',
+      opacity: disabled ? 0.6 : 1,
       ...extraStyle,
     }}>
       {Icon && <Icon size={s.fontSize + 2} strokeWidth={2.5} />}

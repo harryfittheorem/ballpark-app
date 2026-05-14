@@ -45,6 +45,7 @@ export default function LocationPickerScreen({ route, navigation }: Props) {
         const { data: locs, error: locsErr } = await supabase
           .from('locations')
           .select('id, name, city, state, tenant_id')
+          // @ts-expect-error is_active exists in DB but is not yet in generated types
           .eq('is_active', true)
           .order('name');
 

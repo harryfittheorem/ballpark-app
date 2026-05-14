@@ -58,11 +58,15 @@ const columns: TableColumn<OwnerMember & Record<string, unknown>>[] = [
   },
   {
     label: 'Status', key: 'status', sortable: true,
-    render: (r) => (
-      <Chip color={r.status === 'active' ? 'success' : r.status === 'paused' ? 'warning' : 'danger'}>
-        {r.status as string}
-      </Chip>
-    ),
+    render: (r) => {
+      const rawStatus = r.status as string;
+      const label = rawStatus === 'payment_overdue' ? 'Payment Overdue'
+        : rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
+      const color = rawStatus === 'active' ? 'success'
+        : rawStatus === 'paused' ? 'warning'
+        : 'danger';
+      return <Chip color={color}>{label}</Chip>;
+    },
   },
   {
     label: 'Engagement', key: 'engagementScore', sortable: true,

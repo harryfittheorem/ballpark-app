@@ -4,6 +4,7 @@ import BookingDetailScreen from '@/screens/Me/BookingDetailScreen';
 import BookingsListScreen from '@/screens/Me/BookingsListScreen';
 import ConnectHitTraxScreen from '@/screens/Me/ConnectHitTraxScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
+import PaymentMethodScreen from '@/screens/Me/PaymentMethodScreen';
 import ProfileScreen from '@/screens/Me/ProfileScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
@@ -44,6 +45,11 @@ export default function MeStackNavigator() {
         name="ConnectHitTrax"
         component={ConnectHitTraxScreen}
         options={{ title: 'HitTrax' }}
+      />
+      <Stack.Screen
+        name="PaymentMethod"
+        component={PaymentMethodScreen}
+        options={{ title: 'Payment Method' }}
       />
     </Stack.Navigator>
   );

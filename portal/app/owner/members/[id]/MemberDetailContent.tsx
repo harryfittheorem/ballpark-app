@@ -5,7 +5,9 @@ import { OButton, PageHeader, SectionHeader, OCard, Chip } from '@/components/ow
 import {
   Calendar, MessageCircle, Edit2, Activity, Clock,
   CheckCircle, XCircle, CreditCard, Star, Zap, TrendingUp,
+  AlertCircle,
 } from 'lucide-react';
+import { useState, useCallback } from 'react';
 import type { MemberDetail } from '@/lib/supabase/ownerQueries';
 import type { DemoMemberDetail } from './demoMemberDetails';
 
@@ -24,6 +26,14 @@ function monthsAgo(joinedDate: string): number {
   if (mon < 0 || isNaN(yr)) return 0;
   const now = new Date();
   return Math.max(1, (now.getFullYear() - yr) * 12 + (now.getMonth() - mon));
+}
+
+function formatNextBilling(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
 function KPIBlock({ label, value, sub, highlight }: { label: string; value: string | number; sub?: string; highlight?: boolean }) {
@@ -87,9 +97,263 @@ function InfoRow({ label, value, large }: { label: string; value: string; large?
   );
 }
 
+function SubscriptionSection({ member }: { member: MemberDetail }) {
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelDone, setCancelDone] = useState<string | null>(null);
+  const [cancelErr, setCancelErr] = useState<string | null>(null);
+  const [activating, setActivating] = useState(false);
+  const [activateDone, setActivateDone] = useState<{ subId: string; nextBilling: string | null } | null>(null);
+  const [activateErr, setActivateErr] = useState<string | null>(null);
+
+  const handleCancel = useCallback(async () => {
+    if (!confirm('Cancel this subscription at the end of the current billing period? The member will keep access until then.')) return;
+
+    setCancelling(true);
+    setCancelErr(null);
+    try {
+      const res = await fetch('/api/stripe/subscription/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ membership_id: member.id }),
+      });
+      const data = await res.json() as { ok?: boolean; cancel_at?: string; error?: string };
+      if (!res.ok || !data.ok) {
+        setCancelErr(data.error ?? `Error ${res.status}`);
+      } else {
+        const label = data.cancel_at
+          ? `Cancels ${formatNextBilling(data.cancel_at)}`
+          : 'Cancelled';
+        setCancelDone(label);
+      }
+    } catch (err) {
+      setCancelErr(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setCancelling(false);
+    }
+  }, [member.id]);
+
+  const handleActivate = useCallback(async () => {
+    if (!confirm('Activate this membership and start automated Stripe billing? If the family has a saved payment card, Stripe will be set up automatically.')) return;
+
+    setActivating(true);
+    setActivateErr(null);
+    try {
+      // POST /api/memberships/activate — combined endpoint that:
+      //   1. Marks membership active
+      //   2. Automatically creates Stripe Subscription if family has stripe_customer_id
+      // This eliminates the need for a separate manual "link billing" step.
+      const res = await fetch('/api/memberships/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ membership_id: member.id }),
+      });
+      const data = await res.json() as {
+        ok?: boolean;
+        subscription_id?: string;
+        next_billing_at?: string;
+        stripe_skipped?: boolean;
+        stripe_error?: string;
+        reason?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.ok) {
+        setActivateErr(typeof data.error === 'string' ? data.error : `Error ${res.status}`);
+      } else if (data.stripe_skipped) {
+        // Membership activated but Stripe subscription not yet linked:
+        // family hasn't saved a payment card yet (or plan is not EFT).
+        setActivateDone({ subId: '', nextBilling: null });
+      } else {
+        setActivateDone({
+          subId: data.subscription_id ?? '',
+          nextBilling: data.next_billing_at ?? null,
+        });
+      }
+    } catch (err) {
+      setActivateErr(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setActivating(false);
+    }
+  }, [member.id]);
+
+  const { subscriptionStatus, nextBillingAt, stripeSubscriptionId, cancelAt: persistedCancelAt } = member;
+
+  // If DB already has a cancel_at (persisted when cancel was first triggered),
+  // pre-populate cancelDone so the "Cancels on <date>" label survives page reloads.
+  // We only set it once on mount — if the admin cancels again in this session,
+  // the handleCancel callback will overwrite it via setCancelDone.
+  const persistedCancelLabel = persistedCancelAt
+    ? `Cancels ${formatNextBilling(persistedCancelAt)}`
+    : null;
+
+  // Use in-session cancelDone if set, otherwise fall back to persisted DB value.
+  const effectiveCancelDone = cancelDone ?? persistedCancelLabel;
+
+  // ── No subscription yet — offer to activate ──────────────────────────────
+  if (subscriptionStatus === 'none' && !activateDone) {
+    return (
+      <div>
+        <SectionHeader title="Subscription" />
+        <OCard style={{ padding: 14 }}>
+          <div style={{ fontSize: 12, color: brand.textMuted, marginBottom: 12 }}>
+            No Stripe subscription linked yet. Activating will mark the membership active
+            and automatically start recurring billing on Stripe — provided the family has
+            saved a payment card in the Ballpark app (Me → Payment Method).
+          </div>
+          {activateErr && (
+            <div style={{ fontSize: 11, color: brand.danger, marginBottom: 8 }}>{activateErr}</div>
+          )}
+          <OButton
+            variant="gold"
+            size="sm"
+            icon={CreditCard}
+            onClick={handleActivate}
+            disabled={activating}
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            {activating ? 'Activating…' : 'Activate & Start Billing'}
+          </OButton>
+        </OCard>
+      </div>
+    );
+  }
+
+  // ── Just activated ────────────────────────────────────────────────────────
+  if (activateDone) {
+    return (
+      <div>
+        <SectionHeader title="Subscription" />
+        <OCard style={{ padding: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Chip color="success">Active</Chip>
+          </div>
+          <div style={{ fontSize: 12, color: brand.textMuted }}>
+            Subscription activated. Next billing: {formatNextBilling(activateDone.nextBilling)}.
+          </div>
+          <div style={{
+            marginTop: 8, fontSize: 10, color: brand.textMuted,
+            fontFamily: fonts.mono, wordBreak: 'break-all',
+          }}>
+            {activateDone.subId}
+          </div>
+        </OCard>
+      </div>
+    );
+  }
+
+  const statusColor = subscriptionStatus === 'active' ? 'success'
+    : subscriptionStatus === 'payment_overdue' ? 'danger'
+    : subscriptionStatus === 'cancelled' ? 'warning'
+    : 'default' as const;
+
+  const statusLabel = subscriptionStatus === 'payment_overdue' ? 'Payment Overdue'
+    : subscriptionStatus.charAt(0).toUpperCase() + subscriptionStatus.slice(1);
+
+  const canCancel = (subscriptionStatus === 'active' || subscriptionStatus === 'payment_overdue')
+    && !effectiveCancelDone;
+
+  return (
+    <div>
+      <SectionHeader title="Subscription" />
+      <OCard style={{ padding: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <Chip color={statusColor as 'success' | 'warning' | 'danger' | 'default'}>{statusLabel}</Chip>
+          {subscriptionStatus === 'payment_overdue' && (
+            <AlertCircle size={14} color={brand.danger} />
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: brand.textMuted }}>Monthly amount</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: brand.text }}>
+              {member.mrr > 0 ? `$${member.mrr.toFixed(2)}/mo` : '—'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: brand.textMuted }}>Next billing</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: brand.text }}>
+              {effectiveCancelDone ? '—' : formatNextBilling(nextBillingAt)}
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: brand.textMuted }}>Stripe sub</span>
+            <span style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: brand.textMuted,
+              fontFamily: 'monospace',
+              maxWidth: 120,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {stripeSubscriptionId ?? '—'}
+            </span>
+          </div>
+        </div>
+
+        {effectiveCancelDone && (
+          <div style={{
+            padding: '8px 10px',
+            background: brand.surfaceAlt,
+            borderRadius: 6,
+            fontSize: 12,
+            color: brand.success,
+            fontWeight: 600,
+            marginBottom: 8,
+          }}>
+            {effectiveCancelDone}
+          </div>
+        )}
+
+        {cancelErr && (
+          <div style={{
+            padding: '8px 10px',
+            background: brand.dangerBg,
+            borderRadius: 6,
+            fontSize: 12,
+            color: brand.danger,
+            marginBottom: 8,
+          }}>
+            {cancelErr}
+          </div>
+        )}
+
+        {canCancel && (
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            style={{
+              width: '100%',
+              padding: '8px 0',
+              borderRadius: 6,
+              border: `1px solid ${brand.danger}`,
+              background: 'transparent',
+              color: brand.danger,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: cancelling ? 'not-allowed' : 'pointer',
+              opacity: cancelling ? 0.6 : 1,
+              letterSpacing: 0.5,
+            }}
+          >
+            {cancelling ? 'Cancelling…' : 'Cancel Subscription'}
+          </button>
+        )}
+      </OCard>
+    </div>
+  );
+}
+
 export function MemberDetailContent({ member: m }: Props) {
   const demo = isDemo(m) ? m : null;
   const mo = demo ? demo.memberForMonths : monthsAgo(m.joinedDate);
+
+  const rawMemberStatus = m.status as string;
+  const statusChipColor = rawMemberStatus === 'active' ? 'success'
+    : rawMemberStatus === 'paused' ? 'warning'
+    : rawMemberStatus === 'payment_overdue' ? 'danger'
+    : 'danger';
 
   return (
     <div>
@@ -232,8 +496,8 @@ export function MemberDetailContent({ member: m }: Props) {
             <SectionHeader title="Status" />
             <OCard style={{ padding: 14 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                <Chip color={m.status === 'active' ? 'success' : m.status === 'paused' ? 'warning' : 'danger'}>
-                  {m.status}
+                <Chip color={statusChipColor as 'success' | 'warning' | 'danger'}>
+                  {rawMemberStatus === 'payment_overdue' ? 'Payment Overdue' : rawMemberStatus}
                 </Chip>
                 <Chip color={m.churnRisk === 'low' ? 'success' : m.churnRisk === 'medium' ? 'warning' : 'danger'}>
                   Risk: {m.churnRisk}
@@ -306,6 +570,11 @@ export function MemberDetailContent({ member: m }: Props) {
               )}
             </OCard>
           </div>
+
+          {/* Subscription (Phase 3) */}
+          {!demo && (
+            <SubscriptionSection member={m as MemberDetail} />
+          )}
         </div>
       </div>
     </div>

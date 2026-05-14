@@ -127,6 +127,7 @@ export type MeStackParamList = {
   BookingDetail: { bookingId: string };
   Orders: undefined;
   ConnectHitTrax: undefined;
+  PaymentMethod: undefined;
 };
 
 export type MeStackScreenProps<T extends keyof MeStackParamList> = CompositeScreenProps<

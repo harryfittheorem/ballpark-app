@@ -3,6 +3,7 @@ import {
   BookOpen,
   CalendarCheck,
   ChevronRight,
+  CreditCard,
   Gauge,
   Gift,
   type LucideIcon,
@@ -292,6 +293,13 @@ export default function ProfileScreen({ navigation }: Props) {
           icon={Gift}
           label="Orders"
           onPress={() => navigation.navigate('Orders')}
+        />
+        <Row
+          icon={CreditCard}
+          label="Payment Method"
+          subtitle="Manage billing card"
+          subtitleTone="muted"
+          onPress={() => navigation.navigate('PaymentMethod')}
         />
         <Row
           icon={Activity}
