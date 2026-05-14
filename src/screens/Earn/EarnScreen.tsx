@@ -79,7 +79,14 @@ export default function EarnScreen() {
         {tab === 'rewards' && (
           <RewardsTab pointsBalance={kid?.points_balance ?? 0} onSelect={handleSelect} />
         )}
-        {tab === 'store' && <StoreTab />}
+        {tab === 'store' && (
+          <StoreTab
+            onBuyWithCard={(p) => {
+              if (!kid) return;
+              navigation.navigate('StoreCheckout', { productId: p.id, kidId: kid.id });
+            }}
+          />
+        )}
         {tab === 'ranks' && <RanksTab ownKidIds={kid ? [kid.id] : []} />}
         {tab === 'rules' && <EarnRulesTab kidId={kid?.id ?? null} />}
       </View>

@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import EarnScreen from '@/screens/Earn/EarnScreen';
 import RewardRedeemScreen from '@/screens/Earn/RewardRedeemScreen';
+import StoreCheckoutScreen from '@/screens/Earn/StoreCheckoutScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
 import type { EarnStackParamList } from './types';
@@ -26,6 +27,11 @@ export default function EarnStackNavigator() {
         name="RewardRedeem"
         component={RewardRedeemScreen}
         options={{ title: 'Redeem reward' }}
+      />
+      <Stack.Screen
+        name="StoreCheckout"
+        component={StoreCheckoutScreen}
+        options={{ title: 'Card checkout', headerShown: false }}
       />
     </Stack.Navigator>
   );

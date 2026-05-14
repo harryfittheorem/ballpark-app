@@ -92,9 +92,11 @@ export type FailedPayment = {
   amount: number;
   package: string;
   failedDate: string;
+  failedAt: string;     // ISO timestamp used for stable chronological sorting
   reason: string;
   attempts: number;
   nextAttempt: string;
+  source: 'membership' | 'store_order';
 };
 
 export type RevenueMonth = {
@@ -404,7 +406,10 @@ export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string
 // ─── Failed Payments ────────────────────────────────────────────────────────
 
 export async function getFailedPayments(supabase: SupabaseClient, tenantId: string): Promise<FailedPayment[]> {
-  const { data, error } = await supabase
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // ── Membership payment failures (recurring billing) ───────────────────────
+  const { data: membershipFailures } = await supabase
     .from('payment_events')
     .select(`
       id, amount_cents, error_code, created_at,
@@ -418,9 +423,7 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
     .eq('status', 'failed')
     .order('created_at', { ascending: false });
 
-  if (error || !data) return [];
-
-  return data.map((row, i) => {
+  const membershipRows: FailedPayment[] = (membershipFailures ?? []).map((row, i) => {
     const mem = row.memberships as unknown as {
       plan_name: string;
       kids: { first_name: string; last_name: string | null };
@@ -430,7 +433,6 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
     const fam = mem.families;
     const failedDate = new Date(row.created_at);
     const nextAttempt = new Date(failedDate.getTime() + 7 * 86_400_000);
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
     return {
       id: row.id,
@@ -439,11 +441,56 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
       amount: row.amount_cents / 100,
       package: mem.plan_name,
       failedDate: `${months[failedDate.getMonth()]} ${failedDate.getDate()}`,
+      failedAt: row.created_at,
       reason: row.error_code ?? 'Card declined',
       attempts: i + 1,
       nextAttempt: `${months[nextAttempt.getMonth()]} ${nextAttempt.getDate()}`,
+      source: 'membership' as const,
     };
   });
+
+  // ── Store order card payment failures ─────────────────────────────────────
+  const { data: orderFailures } = await supabase
+    .from('orders')
+    .select(`
+      id, amount_paid_cents, created_at, failure_reason,
+      kid_id,
+      kids!inner(first_name, last_name),
+      families!inner(parent_first_name, parent_last_name),
+      products!inner(name)
+    `)
+    .eq('tenant_id', tenantId)
+    .eq('payment_method', 'card')
+    .eq('status', 'payment_failed')
+    .order('created_at', { ascending: false });
+
+  const orderRows: FailedPayment[] = (orderFailures ?? []).map((row) => {
+    const kid = row.kids as unknown as { first_name: string; last_name: string | null };
+    const fam = row.families as unknown as { parent_first_name: string; parent_last_name: string | null };
+    const product = row.products as unknown as { name: string };
+    const rowWithReason = row as unknown as { failure_reason?: string | null };
+    const failedDate = new Date(row.created_at);
+    const nextAttempt = new Date(failedDate.getTime() + 3 * 86_400_000);
+
+    return {
+      id: row.id,
+      member: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
+      parent: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),
+      amount: (row.amount_paid_cents ?? 0) / 100,
+      package: product.name,
+      failedDate: `${months[failedDate.getMonth()]} ${failedDate.getDate()}`,
+      failedAt: row.created_at,
+      reason: rowWithReason.failure_reason ?? 'Card declined',
+      attempts: 1,
+      nextAttempt: `${months[nextAttempt.getMonth()]} ${nextAttempt.getDate()}`,
+      source: 'store_order' as const,
+    };
+  });
+
+  // Merge and sort by raw ISO timestamp (stable, year-aware, locale-independent)
+  return [...membershipRows, ...orderRows].sort(
+    (a, b) => new Date(b.failedAt).getTime() - new Date(a.failedAt).getTime(),
+  );
 }
 
 // ─── Monthly Revenue ─────────────────────────────────────────────────────────

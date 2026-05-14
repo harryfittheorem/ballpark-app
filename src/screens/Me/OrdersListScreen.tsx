@@ -24,6 +24,7 @@ const STATUS_LABEL: Record<string, string> = {
   fulfilled: 'Fulfilled',
   cancelled: 'Cancelled',
   refunded: 'Refunded',
+  payment_failed: 'Payment failed',
 };
 
 function formatDateTime(iso: string): string {
@@ -46,25 +47,37 @@ function OrderRow({ order }: { order: OrderWithProduct }) {
   const productName = order.product?.name ?? 'Unknown product';
   const kidName = order.kid ? `${order.kid.first_name}` : '';
   const statusLabel = STATUS_LABEL[order.status] ?? order.status;
-  const showCode = order.status === 'ordered';
+  const showCode = order.status === 'ordered' || order.status === 'fulfilled';
+  const isFailed = order.status === 'payment_failed';
 
   return (
     <View style={styles.row}>
       <View style={styles.rowHeader}>
         <Text style={styles.productName}>{productName}</Text>
-        <View style={[styles.badge, order.status === 'fulfilled' && styles.badgeFulfilled]}>
-          <Text style={styles.badgeText}>{statusLabel}</Text>
+        <View style={[
+          styles.badge,
+          order.status === 'fulfilled' && styles.badgeFulfilled,
+          isFailed && styles.badgeFailed,
+        ]}>
+          <Text style={[styles.badgeText, isFailed && styles.badgeTextFailed]}>
+            {statusLabel}
+          </Text>
         </View>
       </View>
       <Text style={styles.meta}>
         {kidName ? `${kidName} · ` : ''}
         {cost} · {formatDateTime(order.created_at)}
       </Text>
-      {showCode ? (
+      {showCode && !isFailed ? (
         <View style={styles.codeBox}>
           <Text style={styles.codeLabel}>Front-desk code</Text>
           <Text style={styles.codeValue}>{order.redemption_code}</Text>
         </View>
+      ) : null}
+      {isFailed ? (
+        <Text style={styles.failedNote}>
+          Payment was not successful. Please try again or visit the front desk.
+        </Text>
       ) : null}
     </View>
   );
@@ -170,6 +183,19 @@ const styles = StyleSheet.create({
   badgeFulfilled: {
     backgroundColor: colors.successBg,
     borderColor: colors.success,
+  },
+  badgeFailed: {
+    backgroundColor: colors.dangerBg,
+    borderColor: colors.danger,
+  },
+  badgeTextFailed: {
+    color: colors.danger,
+  },
+  failedNote: {
+    marginTop: spacing.lg,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    color: colors.danger,
   },
   badgeText: {
     fontFamily: fontFamilies.interBold,

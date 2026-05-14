@@ -33,7 +33,8 @@ node scripts/check-mux-asset-id-constraint.mjs
 if [ -d "supabase/functions" ]; then
   for fn in mux-create-upload send-push-notification send-coach-video-notification \
             hittrax-associate hittrax-poll hittrax-disconnect account-delete \
-            notify-achievement notify-leaderboard-weekly notify-assignment-reviewed; do
+            notify-achievement notify-leaderboard-weekly notify-assignment-reviewed \
+            stripe-create-payment-intent; do
     if [ -f "supabase/functions/$fn/index.ts" ]; then
       echo "[post-merge] supabase functions deploy $fn"
       npx --yes supabase functions deploy "$fn" >/dev/null 2>&1 || \

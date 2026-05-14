@@ -1,3 +1,4 @@
+import { StripeProvider } from '@stripe/stripe-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -10,6 +11,8 @@ import { AuthProvider } from '@/hooks/useAuth';
 import { queryClient } from '@/lib/queryClient';
 import RootNavigator from '@/navigation/RootNavigator';
 import { colors, useAppFonts } from '@/theme';
+
+const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
 export default function App() {
   const [fontsLoaded] = useAppFonts();
@@ -24,18 +27,20 @@ export default function App() {
   }
 
   const inner = (
-    <GestureHandlerRootView style={styles.flex}>
-      <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <ToastProvider>
-              <RootNavigator />
-              <StatusBar style="light" />
-            </ToastProvider>
-          </AuthProvider>
-        </QueryClientProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.fittheorem.ballpark">
+      <GestureHandlerRootView style={styles.flex}>
+        <SafeAreaProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <ToastProvider>
+                <RootNavigator />
+                <StatusBar style="light" />
+              </ToastProvider>
+            </AuthProvider>
+          </QueryClientProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </StripeProvider>
   );
 
   if (Platform.OS === 'web') {

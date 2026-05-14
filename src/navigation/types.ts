@@ -81,6 +81,7 @@ export type WorkStackScreenProps<T extends keyof WorkStackParamList> = Composite
 export type EarnStackParamList = {
   EarnHome: { initialSubTab?: 'rewards' | 'store' | 'ranks' | 'rules' } | undefined;
   RewardRedeem: { productId: string; kidId: string };
+  StoreCheckout: { productId: string; kidId: string };
 };
 
 export type EarnStackScreenProps<T extends keyof EarnStackParamList> = CompositeScreenProps<

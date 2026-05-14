@@ -64,7 +64,8 @@
           "microphonePermission": "Ballpark needs microphone access so the audio in coach video messages is recorded.",
           "photosPermission": "Ballpark needs photo library access so coaches can pick existing videos to send to athletes."
         }
-      ]
+      ],
+      "@stripe/stripe-react-native"
     ],
     "extra": {
       "eas": {

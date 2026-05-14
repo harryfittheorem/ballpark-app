@@ -1,11 +1,16 @@
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 
+import type { Product } from '@/api/earn';
 import { useProducts } from '@/hooks/useProducts';
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 
 import ProductCard from './ProductCard';
 
-export default function StoreTab() {
+type Props = {
+  onBuyWithCard: (product: Product) => void;
+};
+
+export default function StoreTab({ onBuyWithCard }: Props) {
   const { data, isPending, isError, error } = useProducts();
 
   if (isPending) {
@@ -32,26 +37,13 @@ export default function StoreTab() {
       numColumns={2}
       contentContainerStyle={styles.list}
       columnWrapperStyle={styles.row}
-      ListHeaderComponent={
-        <View style={styles.banner}>
-          <Text style={styles.bannerTitle}>Front-desk pickup</Text>
-          <Text style={styles.bannerBody}>
-            Card checkout is coming soon. Tap an item to reserve it and pay at the desk.
-          </Text>
-        </View>
-      }
       ListEmptyComponent={<Text style={styles.empty}>No store items yet.</Text>}
       renderItem={({ item }) => (
         <ProductCard
           product={item}
           mode="store"
           pointsBalance={0}
-          onPress={() =>
-            Alert.alert(
-              item.name,
-              'Card checkout ships in v0.5+. For now, mention this item at the front desk.',
-            )
-          }
+          onPress={() => onBuyWithCard(item)}
         />
       )}
     />
@@ -65,25 +57,6 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   row: { gap: spacing.lg },
-  banner: {
-    backgroundColor: colors.darker,
-    borderColor: colors.borderGold,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: spacing['2xl'],
-    marginBottom: spacing['2xl'],
-  },
-  bannerTitle: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.lg,
-    color: colors.gold,
-    marginBottom: spacing.xs,
-  },
-  bannerBody: {
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.md,
-    color: colors.textLight,
-  },
   centered: {
     flex: 1,
     alignItems: 'center',
