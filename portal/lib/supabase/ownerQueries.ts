@@ -1103,3 +1103,46 @@ export async function getTenantName(supabase: SupabaseClient, tenantId: string):
     .single();
   return data?.name ?? 'Your Location';
 }
+
+// ─── Location Stripe Status ───────────────────────────────────────────────────
+
+export type LocationStripeStatus = {
+  id: string;
+  name: string;
+  stripe_account_id: string | null;
+  stripe_onboarding_status: 'not_connected' | 'pending' | 'connected' | 'restricted';
+  stripe_account_name: string | null;
+  stripe_payout_interval: string | null;
+};
+
+export async function getLocationsStripeStatus(
+  supabase: SupabaseClient,
+  tenantId: string,
+): Promise<LocationStripeStatus[]> {
+  if (!tenantId) return [];
+  const { data, error } = await supabase
+    .from('locations')
+    .select('id, name, stripe_account_id, stripe_onboarding_status, stripe_account_name, stripe_payout_interval')
+    .eq('tenant_id', tenantId)
+    .order('name');
+
+  if (error || !data) return [];
+
+  return data.map(row => ({
+    id: row.id as string,
+    name: row.name as string,
+    stripe_account_id: (row.stripe_account_id as string | null) ?? null,
+    stripe_onboarding_status: ((row.stripe_onboarding_status as string | null) ?? 'not_connected') as LocationStripeStatus['stripe_onboarding_status'],
+    stripe_account_name: (row.stripe_account_name as string | null) ?? null,
+    stripe_payout_interval: (row.stripe_payout_interval as string | null) ?? null,
+  }));
+}
+
+/** Convenience: returns the first location's stripe status (for dashboard banner). */
+export async function getLocationStripeStatus(
+  supabase: SupabaseClient,
+  tenantId: string,
+): Promise<LocationStripeStatus | null> {
+  const all = await getLocationsStripeStatus(supabase, tenantId);
+  return all[0] ?? null;
+}

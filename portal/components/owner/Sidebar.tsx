@@ -51,6 +51,7 @@ const ownerNav: NavSection[] = [
     label: 'Config',
     items: [
       { label: 'Points & Rewards', href: '/owner/points-rewards', icon: Sparkles },
+      { label: 'Payments',         href: '/owner/payments',       icon: CreditCard },
     ],
   },
 ];

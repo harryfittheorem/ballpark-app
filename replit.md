@@ -34,6 +34,7 @@ node scripts/delete-portal-seed-data.mjs  # remove every seeded record by its de
 - `SUPABASE_SERVICE_ROLE_KEY` (server-side only)
 - `EXPO_PUBLIC_AUTH_REDIRECT_HOST` (optional; when set, signup confirmations redirect to `https://{host}/auth/callback` and `app.config.js` registers iOS/Android associated domains. Unset → falls back to `ballpark://` scheme.)
 - Edge Function secrets (set via `npx supabase secrets set`): `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET`, `MUX_WEBHOOK_SECRET`, `HITTRAX_BASE_URL`, `HITTRAX_PARTNER_ID`, `HITTRAX_API_KEY`, `HITTRAX_CONTENT_TYPE`.
+- Stripe Connect (portal env vars): `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_CONNECT_CLIENT_ID`, `STRIPE_WEBHOOK_SECRET`. Also set `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` as Supabase Edge Function secrets via `npx supabase secrets set`. See `docs/STRIPE_SETUP.md` for the full runbook.
 
 ## Stack
 

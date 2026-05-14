@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import {
@@ -7,7 +8,7 @@ import {
 } from '@/components/owner/ui';
 import {
   DollarSign, Users, TrendingUp, AlertTriangle, AlertCircle,
-  Download, Plus, Calendar, CheckCircle2, XCircle,
+  Download, Plus, Calendar, CheckCircle2, XCircle, CreditCard, X,
 } from 'lucide-react';
 import type { OwnerKPIs, OwnerMember, RevenueMonth, MembershipPackage } from '@/lib/supabase/ownerQueries';
 
@@ -18,6 +19,7 @@ type Props = {
   packages: MembershipPackage[];
   locationName: string;
   tenantName: string;
+  stripeConnected?: boolean;
 };
 
 // ── Demo data (shown when no live DB data exists) ──────────────────────────
@@ -66,8 +68,9 @@ const DEMO_PACKAGES: MembershipPackage[] = [
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMonthly: rawRevenue, packages: rawPackages, tenantName }: Props) {
+export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMonthly: rawRevenue, packages: rawPackages, tenantName, stripeConnected }: Props) {
   const router = useRouter();
+  const [stripeBannerDismissed, setStripeBannerDismissed] = React.useState(false);
 
   const hasLiveData    = rawKpis.mrr > 0 || rawKpis.activeMembers > 0;
   const kpis           = hasLiveData        ? rawKpis    : DEMO_KPIS;
@@ -99,6 +102,48 @@ export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMo
           </>
         }
       />
+
+      {stripeConnected === false && !stripeBannerDismissed && (
+        <div style={{
+          margin: '0 24px',
+          padding: '12px 16px',
+          borderRadius: 8,
+          background: brand.warningBg,
+          border: `1px solid ${brand.warning}`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}>
+          <CreditCard size={16} color={brand.warning} style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1, fontSize: 13, color: brand.text }}>
+            <strong>Card payments are not yet enabled.</strong>
+            {' '}Connect a Stripe account to allow parents to pay by card.
+          </div>
+          <OButton
+            variant="secondary"
+            size="sm"
+            onClick={() => router.push('/owner/payments')}
+          >
+            Set Up Payments →
+          </OButton>
+          <button
+            onClick={() => setStripeBannerDismissed(true)}
+            aria-label="Dismiss"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 4,
+              display: 'flex',
+              alignItems: 'center',
+              color: brand.textMuted,
+              flexShrink: 0,
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       <div style={{ padding: 24 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>

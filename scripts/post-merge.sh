@@ -40,9 +40,9 @@ if [ -d "supabase/functions" ]; then
         echo "[post-merge] WARN: deploy $fn failed (env not configured?); continuing"
     fi
   done
-  # --no-verify-jwt deploys: callers (Mux, HitTrax) authenticate with their
-  # own signature/credential schemes and never carry a Supabase JWT.
-  for fn in mux-webhook hittrax-registration-complete hittrax-forget; do
+  # --no-verify-jwt deploys: callers (Mux, HitTrax, Stripe) authenticate with
+  # their own signature/credential schemes and never carry a Supabase JWT.
+  for fn in mux-webhook hittrax-registration-complete hittrax-forget stripe-webhook; do
     if [ -f "supabase/functions/$fn/index.ts" ]; then
       echo "[post-merge] supabase functions deploy $fn --no-verify-jwt"
       npx --yes supabase functions deploy "$fn" --no-verify-jwt >/dev/null 2>&1 || \
