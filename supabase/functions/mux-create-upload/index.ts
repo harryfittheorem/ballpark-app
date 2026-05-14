@@ -154,7 +154,8 @@ serve(async (req) => {
   const purpose: Purpose = (bodyJson.purpose as Purpose | undefined) ?? "coach_message";
 
   // Role check, defence-in-depth on top of DB RLS:
-  //   coach_message / drill   -> app_role='coach'
+  //   coach_message / drill   -> app_role='coach' OR app_role='owner'
+  //                             (owner sends on behalf of a coach from portal)
   //   parent_to_coach         -> app_role='parent'
   //   training                -> app_role='admin' (HQ-curated catalog;
   //                             v0.7 task #121)
@@ -167,8 +168,8 @@ serve(async (req) => {
       return jsonError(403, "forbidden", "Admin role required for training uploads");
     }
   } else {
-    if (appRole !== "coach") {
-      return jsonError(403, "forbidden", "Coach role required");
+    if (appRole !== "coach" && appRole !== "owner") {
+      return jsonError(403, "forbidden", "Coach or owner role required");
     }
   }
 

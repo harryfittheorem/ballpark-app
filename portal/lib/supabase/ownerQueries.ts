@@ -74,6 +74,7 @@ export type OwnerMember = {
 
 export type OwnerCoach = {
   id: string;
+  userId: string | null;
   name: string;
   specialty: string;
   students: number;
@@ -359,7 +360,7 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
 export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string): Promise<OwnerCoach[]> {
   const { data: coaches, error } = await supabase
     .from('coaches')
-    .select('id, first_name, last_name, is_active, created_at')
+    .select('id, user_id, first_name, last_name, is_active, created_at')
     .eq('tenant_id', tenantId)
     .eq('is_active', true);
 
@@ -390,6 +391,7 @@ export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string
 
     return {
       id: c.id,
+      userId: (c as unknown as { user_id: string | null }).user_id ?? null,
       name: `${c.first_name} ${c.last_name}`,
       specialty: 'Hitting Coach',
       students,

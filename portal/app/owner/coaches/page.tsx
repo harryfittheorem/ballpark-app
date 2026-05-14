@@ -8,5 +8,5 @@ export default async function CoachesPage() {
   const { data: { session } } = await supabase.auth.getSession();
   const tenantId = readTenantId(session) ?? '';
   const coaches = await getOwnerCoaches(supabase, tenantId);
-  return <CoachesContent coaches={coaches} />;
+  return <CoachesContent coaches={coaches} tenantId={tenantId} />;
 }

@@ -1,87 +1,114 @@
 'use client';
 
+import { useState } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, SectionHeader, OCard, OTable, BarChart } from '@/components/owner/ui';
 import type { TableColumn } from '@/components/owner/ui';
-import { UserCog, Activity, TrendingUp, DollarSign, Download, Plus, Star } from 'lucide-react';
+import { UserCog, Activity, TrendingUp, DollarSign, Download, Plus, Star, MessageCircle } from 'lucide-react';
 import type { OwnerCoach } from '@/lib/supabase/ownerQueries';
+import { CoachMessagePanel } from './CoachMessagePanel';
 
-type Props = { coaches: OwnerCoach[] };
-
-// ── Demo data ──────────────────────────────────────────────────────────────
+type Props = { coaches: OwnerCoach[]; tenantId: string };
 
 const DEMO_COACHES: OwnerCoach[] = [
-  { id: 'c1', name: 'Mike Rodriguez',  specialty: 'Hitting / Power',       students: 48, utilization: 92, retention: 94, avgRating: 4.9, revenue: 13440, weeklyHours: 38, joinedDate: 'Jan 2023' },
-  { id: 'c2', name: 'Sarah Kim',       specialty: 'Pitching / Mechanics',  students: 41, utilization: 85, retention: 91, avgRating: 4.8, revenue: 11480, weeklyHours: 34, joinedDate: 'Mar 2023' },
-  { id: 'c3', name: 'Dave Thompson',   specialty: 'Fielding / Speed',      students: 36, utilization: 78, retention: 88, avgRating: 4.7, revenue: 10080, weeklyHours: 30, joinedDate: 'Aug 2023' },
-  { id: 'c4', name: 'Jess Morales',    specialty: 'Catching / Defence',    students: 22, utilization: 68, retention: 86, avgRating: 4.6, revenue: 6160,  weeklyHours: 22, joinedDate: 'Feb 2024' },
+  { id: 'c1', userId: null, name: 'Mike Rodriguez',  specialty: 'Hitting / Power',       students: 48, utilization: 92, retention: 94, avgRating: 4.9, revenue: 13440, weeklyHours: 38, joinedDate: 'Jan 2023' },
+  { id: 'c2', userId: null, name: 'Sarah Kim',       specialty: 'Pitching / Mechanics',  students: 41, utilization: 85, retention: 91, avgRating: 4.8, revenue: 11480, weeklyHours: 34, joinedDate: 'Mar 2023' },
+  { id: 'c3', userId: null, name: 'Dave Thompson',   specialty: 'Fielding / Speed',      students: 36, utilization: 78, retention: 88, avgRating: 4.7, revenue: 10080, weeklyHours: 30, joinedDate: 'Aug 2023' },
+  { id: 'c4', userId: null, name: 'Jess Morales',    specialty: 'Catching / Defence',    students: 22, utilization: 68, retention: 86, avgRating: 4.6, revenue: 6160,  weeklyHours: 22, joinedDate: 'Feb 2024' },
 ];
 
-// ── Table columns ──────────────────────────────────────────────────────────
-
-const columns: TableColumn<OwnerCoach & Record<string, unknown>>[] = [
-  {
-    label: 'Coach', key: 'name',
-    render: (r) => (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 18, background: brand.dark, color: brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, fontFamily: fonts.display }}>
-          {(r.name as string).split(' ').pop()?.charAt(0) ?? '?'}
-        </div>
-        <div>
-          <div style={{ fontWeight: 700 }}>{r.name as string}</div>
-          <div style={{ fontSize: 11, color: brand.textMuted }}>{r.specialty as string}</div>
-        </div>
-      </div>
-    ),
-  },
-  {
-    label: 'Students', key: 'students', align: 'right',
-    render: (r) => <span style={{ fontFamily: fonts.mono, fontWeight: 700 }}>{r.students as number}</span>,
-  },
-  {
-    label: 'Utilization', key: 'utilization',
-    render: (r) => {
-      const v = r.utilization as number;
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 80, height: 6, background: brand.border, borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{ width: `${v}%`, height: '100%', background: v >= 80 ? brand.success : v >= 70 ? brand.warning : brand.danger }} />
-          </div>
-          <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fonts.mono }}>{v}%</span>
-        </div>
-      );
-    },
-  },
-  {
-    label: 'Retention', key: 'retention', align: 'right',
-    render: (r) => <span style={{ color: (r.retention as number) >= 90 ? brand.success : brand.warning, fontWeight: 700 }}>{r.retention as number}%</span>,
-  },
-  {
-    label: 'Rating', key: 'avgRating', align: 'right',
-    render: (r) => (
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-        <Star size={12} color={brand.goldDeep} fill={brand.goldDeep} />
-        <span style={{ fontWeight: 700, fontFamily: fonts.display }}>{r.avgRating as number}</span>
-      </div>
-    ),
-  },
-  {
-    label: 'Hours/wk', key: 'weeklyHours', align: 'right',
-    render: (r) => <span style={{ fontFamily: fonts.mono }}>{r.weeklyHours as number}</span>,
-  },
-  {
-    label: 'Joined', key: 'joinedDate',
-    render: (r) => <span style={{ fontSize: 11, color: brand.textMuted }}>{r.joinedDate as string}</span>,
-  },
-];
-
-// ── Component ──────────────────────────────────────────────────────────────
-
-export function CoachesContent({ coaches: rawCoaches }: Props) {
+export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
   const coaches       = rawCoaches.length ? rawCoaches : DEMO_COACHES;
+  const isDemo        = !rawCoaches.length;
   const totalStudents = coaches.reduce((s, c) => s + c.students, 0);
   const avgUtil       = coaches.length > 0 ? Math.round(coaches.reduce((s, c) => s + c.utilization, 0) / coaches.length) : 0;
   const avgRet        = coaches.length > 0 ? Math.round(coaches.reduce((s, c) => s + c.retention, 0) / coaches.length * 10) / 10 : 0;
+
+  const [activeCoach, setActiveCoach] = useState<OwnerCoach | null>(null);
+
+  const columns: TableColumn<OwnerCoach & Record<string, unknown>>[] = [
+    {
+      label: 'Coach', key: 'name',
+      render: (r) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 18, background: brand.dark, color: brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, fontFamily: fonts.display }}>
+            {(r.name as string).split(' ').pop()?.charAt(0) ?? '?'}
+          </div>
+          <div>
+            <div style={{ fontWeight: 700 }}>{r.name as string}</div>
+            <div style={{ fontSize: 11, color: brand.textMuted }}>{r.specialty as string}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      label: 'Students', key: 'students', align: 'right',
+      render: (r) => <span style={{ fontFamily: fonts.mono, fontWeight: 700 }}>{r.students as number}</span>,
+    },
+    {
+      label: 'Utilization', key: 'utilization',
+      render: (r) => {
+        const v = r.utilization as number;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 80, height: 6, background: brand.border, borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ width: `${v}%`, height: '100%', background: v >= 80 ? brand.success : v >= 70 ? brand.warning : brand.danger }} />
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fonts.mono }}>{v}%</span>
+          </div>
+        );
+      },
+    },
+    {
+      label: 'Retention', key: 'retention', align: 'right',
+      render: (r) => <span style={{ color: (r.retention as number) >= 90 ? brand.success : brand.warning, fontWeight: 700 }}>{r.retention as number}%</span>,
+    },
+    {
+      label: 'Rating', key: 'avgRating', align: 'right',
+      render: (r) => (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+          <Star size={12} color={brand.goldDeep} fill={brand.goldDeep} />
+          <span style={{ fontWeight: 700, fontFamily: fonts.display }}>{r.avgRating as number}</span>
+        </div>
+      ),
+    },
+    {
+      label: 'Hours/wk', key: 'weeklyHours', align: 'right',
+      render: (r) => <span style={{ fontFamily: fonts.mono }}>{r.weeklyHours as number}</span>,
+    },
+    {
+      label: 'Joined', key: 'joinedDate',
+      render: (r) => <span style={{ fontSize: 11, color: brand.textMuted }}>{r.joinedDate as string}</span>,
+    },
+    {
+      label: '', key: 'actions',
+      render: (r) => {
+        const coach = r as unknown as OwnerCoach;
+        const disabled = isDemo || !coach.userId;
+        return (
+          <button
+            onClick={() => { if (!disabled) setActiveCoach(coach); }}
+            disabled={disabled}
+            title={isDemo ? 'Demo mode — connect real data to send messages' : !coach.userId ? 'Coach has no login account' : `Send message as ${coach.name}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+              fontFamily: fonts.display, letterSpacing: 0.5, textTransform: 'uppercase',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              background: disabled ? brand.surfaceAlt : brand.dark,
+              color: disabled ? brand.textLight : brand.gold,
+              border: `1px solid ${disabled ? brand.border : brand.dark}`,
+              opacity: disabled ? 0.6 : 1,
+              transition: 'opacity 0.15s',
+            }}
+          >
+            <MessageCircle size={12} />
+            Message
+          </button>
+        );
+      },
+    },
+  ];
 
   return (
     <div>
@@ -139,6 +166,14 @@ export function CoachesContent({ coaches: rawCoaches }: Props) {
           </div>
         )}
       </div>
+
+      {activeCoach && (
+        <CoachMessagePanel
+          coach={activeCoach}
+          tenantId={tenantId}
+          onClose={() => setActiveCoach(null)}
+        />
+      )}
     </div>
   );
 }
