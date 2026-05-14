@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, CheckCircle2, Zap } from "lucide-react";
+import { useState, useRef } from "react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Calendar, ChevronDown, ChevronUp } from "lucide-react";
 
 const GOLD = "#D4AF37";
 const DARK = "#0F0F0F";
@@ -8,222 +8,291 @@ const BORDER = "#2A2A2A";
 const MUTED = "#6B6B6B";
 const TEXT = "#F5F5F5";
 const GREEN = "#22C55E";
+const SURFACE = "#111111";
 
 const sessionTypes = [
-  { id: "cage", label: "Cage Rental", price: "$25", duration: "60 min", desc: "Private batting cage time" },
-  { id: "private", label: "Private Lesson", price: "$80", duration: "60 min", desc: "1-on-1 with a coach" },
-  { id: "group", label: "Group Clinic", price: "$40", duration: "90 min", desc: "Small group instruction" },
+  { id: "cage", label: "Cage Rental", price: "$25", icon: "⚾", duration: "60 min" },
+  { id: "private", label: "Private Lesson", price: "$80", icon: "🎯", duration: "60 min" },
+  { id: "group", label: "Group Clinic", price: "$40", icon: "👥", duration: "90 min" },
 ];
 
-const slots = [
-  { day: "TODAY", date: "May 14", dateLabel: "Thu May 14", times: ["9:00 AM", "10:00 AM", "11:00 AM"], coach: "Mike Anderson" },
-  { day: "TOMORROW", date: "May 15", dateLabel: "Fri May 15", times: ["10:00 AM", "2:00 PM"], coach: "Dallas N." },
+const quickSlots = [
+  {
+    day: "TODAY",
+    date: "Thu May 14",
+    slots: [
+      { time: "9:00 AM", coach: "Mike Anderson", spotsLeft: 1 },
+      { time: "10:00 AM", coach: "Mike Anderson", spotsLeft: 3 },
+      { time: "11:00 AM", coach: "Dallas N.", spotsLeft: 2 },
+    ],
+  },
+  {
+    day: "TOMORROW",
+    date: "Fri May 15",
+    slots: [
+      { time: "10:00 AM", coach: "Dallas N.", spotsLeft: 4 },
+      { time: "2:00 PM", coach: "Mike Anderson", spotsLeft: 2 },
+    ],
+  },
 ];
 
 const calendarDays = [
   { d: 14, avail: true }, { d: 15, avail: true }, { d: 16, avail: false },
   { d: 17, avail: true }, { d: 18, avail: false }, { d: 19, avail: true },
   { d: 20, avail: false }, { d: 21, avail: true }, { d: 22, avail: true },
+  { d: 23, avail: false }, { d: 24, avail: true }, { d: 25, avail: true },
 ];
 
+const calendarTimesForDate: Record<number, { time: string; coach: string }[]> = {
+  14: [{ time: "9:00 AM", coach: "Mike Anderson" }, { time: "10:00 AM", coach: "Mike Anderson" }, { time: "11:00 AM", coach: "Dallas N." }],
+  15: [{ time: "10:00 AM", coach: "Dallas N." }, { time: "2:00 PM", coach: "Mike Anderson" }],
+  17: [{ time: "9:00 AM", coach: "Mike Anderson" }, { time: "3:00 PM", coach: "Dallas N." }],
+  19: [{ time: "11:00 AM", coach: "Mike Anderson" }],
+  21: [{ time: "9:00 AM", coach: "Dallas N." }, { time: "1:00 PM", coach: "Mike Anderson" }],
+  22: [{ time: "10:00 AM", coach: "Mike Anderson" }, { time: "4:00 PM", coach: "Dallas N." }],
+  24: [{ time: "9:00 AM", coach: "Mike Anderson" }],
+  25: [{ time: "2:00 PM", coach: "Dallas N." }, { time: "4:00 PM", coach: "Mike Anderson" }],
+};
+
 interface Booking {
-  day: string;
   dateLabel: string;
   time: string;
   coach: string;
 }
 
 export function ProposedFlow() {
-  const [selected, setSelected] = useState("cage");
+  const [sessionId, setSessionId] = useState("cage");
   const [booking, setBooking] = useState<Booking | null>(null);
+  const [calOpen, setCalOpen] = useState(false);
   const [calDay, setCalDay] = useState<number | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleSlotPick = (slot: typeof slots[0], time: string) => {
-    setBooking({ day: slot.day, dateLabel: slot.dateLabel, time, coach: slot.coach });
-    setCalDay(slot.day === "TODAY" ? 14 : 15);
+  const session = sessionTypes.find(s => s.id === sessionId)!;
+
+  const pickSlot = (dateLabel: string, time: string, coach: string) => {
+    setBooking({ dateLabel, time, coach });
+    setCalOpen(false);
     setTimeout(() => {
-      document.getElementById("summary-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      summaryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
   };
 
-  const handleCalendarDay = (d: number, avail: boolean) => {
-    if (!avail) return;
+  const pickCalDay = (d: number) => {
     setCalDay(d);
-    if (booking) {
-      setBooking({ ...booking, dateLabel: `May ${d}`, day: d === 14 ? "TODAY" : d === 15 ? "TOMORROW" : `May ${d}` });
-    }
   };
 
-  if (confirmed) {
+  if (confirmed && booking) {
     return (
-      <div style={{ background: DARK, minHeight: "100vh", fontFamily: "'Inter', sans-serif", color: TEXT, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
-        <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#1A2A1A", border: `2px solid ${GREEN}`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
-          <CheckCircle2 size={36} color={GREEN} />
+      <div style={{ background: DARK, height: "100vh", fontFamily: "'Inter', sans-serif", color: TEXT, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, gap: 0 }}>
+        <div style={{ width: 68, height: 68, borderRadius: "50%", background: "#0A1F0A", border: `2px solid ${GREEN}`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+          <CheckCircle2 size={32} color={GREEN} />
         </div>
-        <div style={{ fontSize: 20, fontWeight: 800, color: TEXT, marginBottom: 8 }}>Booking Confirmed!</div>
-        <div style={{ color: MUTED, fontSize: 14, textAlign: "center", marginBottom: 24 }}>
-          {booking?.dateLabel} · {booking?.time}<br />with {booking?.coach}
+        <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 0.5, marginBottom: 6 }}>You're booked!</div>
+        <div style={{ color: MUTED, fontSize: 14, textAlign: "center", lineHeight: 1.6 }}>
+          {session.label}<br />
+          {booking.dateLabel} · {booking.time}<br />
+          with {booking.coach}
         </div>
-        <button onClick={() => { setConfirmed(false); setBooking(null); setCalDay(null); }}
-          style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 24px", color: TEXT, fontSize: 13, cursor: "pointer" }}>
-          Book Another
+        <div style={{ marginTop: 28, background: "#1E1A0E", border: `1px solid ${GOLD}44`, borderRadius: 12, padding: "12px 20px", textAlign: "center" }}>
+          <span style={{ fontSize: 13, color: GOLD, fontWeight: 600 }}>+10 pts earned on completion</span>
+        </div>
+        <button onClick={() => { setConfirmed(false); setBooking(null); setCalDay(null); setCalOpen(false); }}
+          style={{ marginTop: 24, background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 28px", color: MUTED, fontSize: 13, cursor: "pointer" }}>
+          Book another
         </button>
       </div>
     );
   }
 
   return (
-    <div style={{ background: DARK, minHeight: "100vh", fontFamily: "'Inter', sans-serif", color: TEXT, fontSize: 14 }}>
-      {/* Status bar */}
-      <div style={{ background: DARK, padding: "12px 16px 0", display: "flex", justifyContent: "space-between", fontSize: 12, color: MUTED }}>
-        <span>9:41 AM</span><span>●●● WiFi 100%</span>
-      </div>
-
+    <div style={{ background: DARK, height: "100vh", fontFamily: "'Inter', sans-serif", color: TEXT, fontSize: 14, display: "flex", flexDirection: "column" }}>
       {/* Nav */}
-      <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: `1px solid ${BORDER}` }}>
-        <ChevronLeft size={20} color={GOLD} />
-        <span style={{ flex: 1, textAlign: "center", fontWeight: 700, letterSpacing: 2, fontSize: 13, color: TEXT }}>BOOK A SESSION</span>
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", padding: "14px 16px 12px", borderBottom: `1px solid ${BORDER}`, background: DARK }}>
+        <ChevronLeft size={20} color={GOLD} style={{ cursor: "pointer" }} />
+        <span style={{ flex: 1, textAlign: "center", fontWeight: 800, letterSpacing: 2, fontSize: 12, color: TEXT }}>BOOK A SESSION</span>
         <div style={{ width: 20 }} />
       </div>
 
-      <div id="top" style={{ overflowY: "auto", maxHeight: "calc(100vh - 100px)", padding: "0 0 80px" }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", paddingBottom: 100 }}>
 
-        {/* Session Types */}
-        <div style={{ padding: "16px 16px 8px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: MUTED, marginBottom: 10 }}>WHAT CAN I BOOK?</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* ── SESSION TYPE ── */}
+        <div style={{ padding: "16px 16px 4px" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: MUTED, marginBottom: 10 }}>WHAT ARE YOU BOOKING?</div>
+          <div style={{ display: "flex", gap: 8 }}>
             {sessionTypes.map(s => (
-              <button key={s.id} onClick={() => { setSelected(s.id); setBooking(null); setCalDay(null); }}
-                style={{ background: selected === s.id ? "#1E1A0E" : CARD, border: `1.5px solid ${selected === s.id ? GOLD : BORDER}`, borderRadius: 10, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", textAlign: "left" }}>
-                <div>
-                  <div style={{ fontWeight: 700, color: selected === s.id ? GOLD : TEXT, fontSize: 14 }}>{s.label}</div>
-                  <div style={{ color: MUTED, fontSize: 12, marginTop: 2 }}>{s.desc} · {s.duration}</div>
-                </div>
-                <div style={{ fontWeight: 700, color: GOLD, fontSize: 15 }}>{s.price}</div>
+              <button key={s.id} onClick={() => { setSessionId(s.id); setBooking(null); setCalDay(null); }}
+                style={{
+                  flex: 1, background: sessionId === s.id ? "#1E1A0E" : CARD,
+                  border: `1.5px solid ${sessionId === s.id ? GOLD : BORDER}`,
+                  borderRadius: 12, padding: "12px 8px", cursor: "pointer", textAlign: "center",
+                  transition: "all 0.15s"
+                }}>
+                <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
+                <div style={{ fontWeight: 700, color: sessionId === s.id ? GOLD : TEXT, fontSize: 11, lineHeight: 1.2 }}>{s.label}</div>
+                <div style={{ color: MUTED, fontSize: 10, marginTop: 2 }}>{s.duration}</div>
+                <div style={{ fontWeight: 800, color: GOLD, fontSize: 13, marginTop: 4 }}>{s.price}</div>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Available Slots */}
-        <div style={{ padding: "8px 16px 8px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: MUTED, marginBottom: 10 }}>AVAILABLE SLOTS</div>
-          {slots.map(slot => (
-            <div key={slot.day} style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6 }}>{slot.day} · {slot.date}</div>
+        {/* ── AVAILABLE SLOTS ── */}
+        <div style={{ padding: "16px 16px 4px" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: MUTED, marginBottom: 12 }}>AVAILABLE SLOTS</div>
+          {quickSlots.map(group => (
+            <div key={group.day} style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: group.day === "TODAY" ? GOLD : TEXT, letterSpacing: 1 }}>{group.day}</span>
+                <span style={{ fontSize: 11, color: MUTED }}>{group.date}</span>
+              </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {slot.times.map(time => {
-                  const isActive = booking?.day === slot.day && booking?.time === time;
+                {group.slots.map(slot => {
+                  const isActive = booking?.dateLabel === group.date && booking?.time === slot.time;
                   return (
-                    <button key={time} onClick={() => handleSlotPick(slot, time)}
-                      style={{ background: isActive ? "#1E1A0E" : CARD, border: `1.5px solid ${isActive ? GOLD : BORDER}`, borderRadius: 8, padding: "8px 14px", color: TEXT, fontSize: 13, fontWeight: 600, cursor: "pointer", position: "relative" }}>
-                      {time}
-                      {isActive && <span style={{ position: "absolute", top: -4, right: -4, width: 8, height: 8, borderRadius: "50%", background: GREEN }} />}
+                    <button key={slot.time} onClick={() => pickSlot(group.date, slot.time, slot.coach)}
+                      style={{
+                        background: isActive ? "#1E1A0E" : CARD,
+                        border: `1.5px solid ${isActive ? GOLD : BORDER}`,
+                        borderRadius: 10, padding: "10px 14px", cursor: "pointer",
+                        textAlign: "left", minWidth: 90, transition: "all 0.15s"
+                      }}>
+                      <div style={{ fontWeight: 700, color: isActive ? GOLD : TEXT, fontSize: 14 }}>{slot.time}</div>
+                      <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>{slot.coach.split(" ")[0]}</div>
                     </button>
                   );
                 })}
               </div>
-              <div style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>Coach: {slot.coach}</div>
             </div>
           ))}
-        </div>
 
-        {/* Tap hint */}
-        {!booking && (
-          <div style={{ margin: "0 16px 12px", background: "#1A1A2E", border: `1px solid #2A2A4E`, borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", gap: 8 }}>
-            <Zap size={14} color="#7C7CEA" />
-            <span style={{ fontSize: 12, color: "#7C7CEA" }}>Tap a slot to jump straight to confirmation</span>
-          </div>
-        )}
-
-        {/* Jump-to indicator when slot is picked */}
-        {booking && (
-          <div style={{ margin: "0 16px 8px", display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ flex: 1, height: 1, background: BORDER }} />
-            <div style={{ fontSize: 11, color: GREEN, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
-              <Zap size={11} color={GREEN} /> JUMPED TO SUMMARY
+          {/* Browse other dates button */}
+          <button onClick={() => { setCalOpen(v => !v); setCalDay(null); }}
+            style={{
+              width: "100%", background: calOpen ? CARD : "transparent",
+              border: `1px dashed ${calOpen ? GOLD : BORDER}`,
+              borderRadius: 10, padding: "11px 14px", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              marginTop: 4
+            }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Calendar size={14} color={calOpen ? GOLD : MUTED} />
+              <span style={{ fontSize: 13, color: calOpen ? GOLD : MUTED, fontWeight: calOpen ? 700 : 400 }}>
+                Browse other dates
+              </span>
             </div>
-            <div style={{ flex: 1, height: 1, background: BORDER }} />
-          </div>
-        )}
+            {calOpen ? <ChevronUp size={14} color={GOLD} /> : <ChevronDown size={14} color={MUTED} />}
+          </button>
 
-        {/* Calendar — still available for date browsing */}
-        <div style={{ padding: "8px 16px 8px", opacity: booking ? 0.6 : 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: MUTED }}>DATE</div>
-            <div style={{ fontSize: 10, color: MUTED }}>· Browse other dates</div>
-          </div>
-          <div style={{ background: CARD, borderRadius: 12, border: `1px solid ${BORDER}`, padding: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <ChevronLeft size={16} color={MUTED} />
-              <span style={{ fontWeight: 700, fontSize: 14 }}>May 2026</span>
-              <ChevronRight size={16} color={MUTED} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, textAlign: "center" }}>
-              {["S","M","T","W","T","F","S"].map((d, i) => (
-                <div key={i} style={{ fontSize: 10, color: MUTED, fontWeight: 600, padding: "2px 0" }}>{d}</div>
-              ))}
-              {[null, null, null, null, null, null].map((_, i) => <div key={`e${i}`} />)}
-              {calendarDays.map(({ d, avail }) => (
-                <button key={d} onClick={() => handleCalendarDay(d, avail)}
-                  style={{ padding: "6px 2px", borderRadius: 6, border: "none", background: calDay === d ? GOLD : "transparent", color: calDay === d ? "#000" : avail ? TEXT : MUTED, fontWeight: calDay === d ? 700 : 400, cursor: avail ? "pointer" : "default", fontSize: 13, opacity: avail ? 1 : 0.4 }}>
-                  {d}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{ marginTop: 6, fontSize: 11, color: MUTED }}>
-            Want a different date? Pick above — slots will update.
-          </div>
-        </div>
-
-        {/* SUMMARY — jump target */}
-        <div id="summary-section" style={{ padding: "12px 16px 8px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: booking ? GOLD : MUTED, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-            {booking && <CheckCircle2 size={13} color={GREEN} />}
-            SUMMARY
-          </div>
-          {booking ? (
-            <div style={{ background: "#141208", borderRadius: 12, border: `1.5px solid ${GOLD}`, padding: 14, boxShadow: `0 0 0 3px ${GOLD}22` }}>
-              <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                <Zap size={13} color={GREEN} />
-                <span style={{ fontSize: 12, color: GREEN, fontWeight: 600 }}>Ready to confirm — all details filled from your slot</span>
+          {/* Inline calendar — only shown when requested */}
+          {calOpen && (
+            <div style={{ marginTop: 10, background: CARD, borderRadius: 12, border: `1px solid ${BORDER}`, padding: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <ChevronLeft size={16} color={MUTED} style={{ cursor: "pointer" }} />
+                <span style={{ fontWeight: 700, fontSize: 13 }}>May 2026</span>
+                <ChevronRight size={16} color={MUTED} style={{ cursor: "pointer" }} />
               </div>
-              {[["Session", "Cage Rental"], ["Date", booking.dateLabel], ["Time", booking.time], ["Coach", booking.coach], ["Price", "$25"]].map(([k, v]) => (
-                <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${BORDER}` }}>
-                  <span style={{ color: MUTED, fontSize: 13 }}>{k}</span>
-                  <span style={{ fontWeight: 600, color: k === "Price" ? GOLD : TEXT, fontSize: 13 }}>{v}</span>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, textAlign: "center", marginBottom: 4 }}>
+                {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d, i) => (
+                  <div key={i} style={{ fontSize: 9, color: MUTED, fontWeight: 600, padding: "2px 0" }}>{d}</div>
+                ))}
+                {Array(3).fill(null).map((_, i) => <div key={`e${i}`} />)}
+                {calendarDays.map(({ d, avail }) => (
+                  <button key={d} onClick={() => avail && pickCalDay(d)}
+                    style={{
+                      padding: "7px 2px", borderRadius: 6, border: "none",
+                      background: calDay === d ? GOLD : "transparent",
+                      color: calDay === d ? "#000" : avail ? TEXT : "#333",
+                      fontWeight: calDay === d ? 800 : 400,
+                      cursor: avail ? "pointer" : "default", fontSize: 13,
+                    }}>
+                    {d}
+                  </button>
+                ))}
+              </div>
+
+              {/* Times for selected calendar date */}
+              {calDay && calendarTimesForDate[calDay] && (
+                <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 12, marginTop: 4 }}>
+                  <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
+                    TIMES FOR MAY {calDay}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {calendarTimesForDate[calDay].map(t => (
+                      <button key={t.time}
+                        onClick={() => pickSlot(`May ${calDay}`, t.time, t.coach)}
+                        style={{
+                          background: SURFACE, border: `1.5px solid ${BORDER}`,
+                          borderRadius: 8, padding: "9px 14px", cursor: "pointer", textAlign: "left"
+                        }}>
+                        <div style={{ fontWeight: 700, color: TEXT, fontSize: 14 }}>{t.time}</div>
+                        <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>{t.coach.split(" ")[0]}</div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              ))}
-              <button onClick={() => setConfirmed(true)}
-                style={{ width: "100%", marginTop: 14, background: GOLD, color: "#000", fontWeight: 800, fontSize: 15, padding: "13px", borderRadius: 10, border: "none", cursor: "pointer", letterSpacing: 1 }}>
-                CONFIRM BOOKING
-              </button>
-            </div>
-          ) : (
-            <div style={{ background: CARD, borderRadius: 10, border: `1px solid ${BORDER}`, padding: "14px", display: "flex", alignItems: "center", gap: 8, opacity: 0.5 }}>
-              <span style={{ color: MUTED, fontSize: 13 }}>Tap any slot above — summary appears here instantly</span>
+              )}
             </div>
           )}
         </div>
 
-        {booking && (
-          <div style={{ padding: "4px 16px 0", textAlign: "center" }}>
-            <span style={{ fontSize: 11, color: GREEN }}>✓ 2 taps to book: select session type → tap slot</span>
+        {/* ── SUMMARY ── */}
+        <div ref={summaryRef} style={{ padding: "16px 16px 8px" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: booking ? GOLD : MUTED, marginBottom: 10 }}>
+            SUMMARY
           </div>
-        )}
-      </div>
 
-      {/* Sticky bottom CTA (only when no booking yet) */}
-      {!booking && (
-        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "12px 16px 24px", background: DARK, borderTop: `1px solid ${BORDER}` }}>
-          <button style={{ width: "100%", background: BORDER, color: MUTED, fontWeight: 800, fontSize: 15, padding: "14px", borderRadius: 12, border: "none", cursor: "default", letterSpacing: 1 }}>
-            CONFIRM BOOKING
-          </button>
-          <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: MUTED }}>Tap any available slot to continue</div>
+          {booking ? (
+            <div style={{
+              background: "#13110A", borderRadius: 14,
+              border: `1.5px solid ${GOLD}`,
+              padding: 16, boxShadow: `0 0 24px ${GOLD}18`
+            }}>
+              {[
+                ["Session", `${session.icon} ${session.label}`],
+                ["Date", booking.dateLabel],
+                ["Time", booking.time],
+                ["Coach", booking.coach],
+                ["Price", session.price],
+              ].map(([k, v], i, arr) => (
+                <div key={k} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "9px 0",
+                  borderBottom: i < arr.length - 1 ? `1px solid ${BORDER}` : "none"
+                }}>
+                  <span style={{ color: MUTED, fontSize: 13 }}>{k}</span>
+                  <span style={{ fontWeight: 600, color: k === "Price" ? GOLD : TEXT, fontSize: 13 }}>{v}</span>
+                </div>
+              ))}
+
+              <button onClick={() => setConfirmed(true)}
+                style={{
+                  width: "100%", marginTop: 14, background: GOLD, color: "#000",
+                  fontWeight: 800, fontSize: 15, padding: "14px", borderRadius: 10,
+                  border: "none", cursor: "pointer", letterSpacing: 1
+                }}>
+                CONFIRM BOOKING
+              </button>
+
+              <button onClick={() => setBooking(null)}
+                style={{ width: "100%", marginTop: 8, background: "transparent", border: "none", color: MUTED, fontSize: 12, cursor: "pointer" }}>
+                Change selection
+              </button>
+            </div>
+          ) : (
+            <div style={{
+              background: CARD, borderRadius: 12, border: `1px dashed ${BORDER}`,
+              padding: "20px 16px", textAlign: "center"
+            }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>👆</div>
+              <div style={{ color: MUTED, fontSize: 13 }}>Tap any slot above</div>
+              <div style={{ color: "#444", fontSize: 12, marginTop: 4 }}>Your booking summary appears here</div>
+            </div>
+          )}
         </div>
-      )}
+
+      </div>
     </div>
   );
 }
