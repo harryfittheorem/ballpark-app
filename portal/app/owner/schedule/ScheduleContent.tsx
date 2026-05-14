@@ -93,6 +93,12 @@ export function ScheduleContent({ data }: Props) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
+  // Resync local bookings if server data refreshes (e.g. router.refresh())
+  useEffect(() => {
+    setBookings(hasLiveData ? data.bookings : DEMO_BOOKINGS);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.bookings]);
+
   const totalToday   = hasLiveData ? data.totalToday   : DEMO_BOOKINGS.length;
   const occupancyPct = hasLiveData ? data.occupancyPct : 78;
   const peakHour     = hasLiveData ? data.peakHour     : '4 PM';
@@ -135,11 +141,12 @@ export function ScheduleContent({ data }: Props) {
   const openPopover = useCallback((booking: ScheduleBooking, e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    // position:fixed uses viewport coordinates — no scrollX/Y adjustment needed
     setPopover({
       bookingId:   booking.id,
       currentCage: booking.cage,
-      top:         rect.bottom + window.scrollY + 4,
-      left:        rect.left + window.scrollX,
+      top:         rect.bottom + 4,
+      left:        rect.left,
     });
     setErrorMsg(null);
   }, []);
