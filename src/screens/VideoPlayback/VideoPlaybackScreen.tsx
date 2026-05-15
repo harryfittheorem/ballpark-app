@@ -93,7 +93,10 @@ export default function VideoPlaybackScreen() {
   const { data: message, isPending, error } = useCoachMessage(messageId, {
     refetchInterval: (query) => {
       const d = query.state.data as { video?: { status?: string } | null } | null | undefined;
-      if (!d || !d.video || d.video.status === 'processing') return 3000;
+      // Only poll while a message exists but its video is still processing.
+      // If data is null/undefined (not found) or video is in a terminal state
+      // (ready / errored), stop polling immediately.
+      if (d && d.video && d.video.status === 'processing') return 3000;
       return false;
     },
   });
