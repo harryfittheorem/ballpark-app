@@ -14,6 +14,11 @@ const TILES = [
     body: "Curate the Train tab catalog.",
   },
   {
+    href: "/admin/messages",
+    title: "Messages",
+    body: "View all coach–family messages and videos sent through the app.",
+  },
+  {
     href: "/admin/settings",
     title: "Tenant settings",
     body: "Configure per-location settings such as the HitTrax Facility ID.",
