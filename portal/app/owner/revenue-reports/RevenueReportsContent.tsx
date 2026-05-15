@@ -1,9 +1,11 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, SectionHeader, OCard } from '@/components/owner/ui';
 import { Download, FileText, CreditCard, DollarSign, ArrowUpRight } from 'lucide-react';
 import type { RevenueReportsData } from '@/lib/supabase/ownerQueries';
+import { exportCsv } from '@/lib/exportCsv';
 
 type Props = { data: RevenueReportsData };
 
@@ -110,6 +112,11 @@ function ProgramDonut({ programs, total }: { programs: typeof DEMO_PROGRAMS; tot
 
 export function RevenueReportsContent({ data }: Props) {
   const { eftVsOtc, monthly, cohortRetention } = data;
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }
+  }, [toast]);
 
   // Use live data when available, fall back to demo
   const hasLiveData = eftVsOtc.eftTotal + eftVsOtc.otcTotal > 0;
@@ -130,14 +137,20 @@ export function RevenueReportsContent({ data }: Props) {
   const twelveMax = Math.max(...twelveMonth.map(d => d.value), 1);
 
   return (
+    <>
     <div>
       <PageHeader
         title="Revenue Reports"
         subtitle="Deep dive into revenue by program, package, and time period"
         actions={
           <>
-            <OButton variant="secondary" icon={Download}>Export</OButton>
-            <OButton variant="gold" icon={FileText}>Schedule</OButton>
+            <OButton variant="secondary" icon={Download} onClick={() => {
+              const rows = (hasLiveData ? monthly : DEMO_SIX_MONTH) as Record<string, unknown>[];
+              exportCsv(`revenue-report-${new Date().toISOString().slice(0, 10)}.csv`, rows,
+                [{ label: 'Month', key: 'month' }, { label: 'EFT ($)', key: 'eft' }, { label: 'OTC ($)', key: 'otc' }, { label: 'Total ($)', key: 'total' }]);
+              setToast('Revenue report exported as CSV');
+            }}>Export</OButton>
+            <OButton variant="gold" icon={FileText} onClick={() => setToast('Monthly report scheduled — you\'ll receive it by email on the 1st')}>Schedule</OButton>
           </>
         }
       />
@@ -373,5 +386,12 @@ export function RevenueReportsContent({ data }: Props) {
 
       </div>
     </div>
+    {/* Toast */}
+    {toast && (
+      <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 500, background: brand.dark, color: brand.gold, padding: '12px 20px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.24)', fontSize: 13, fontWeight: 600, maxWidth: 380 }}>
+        {toast}
+      </div>
+    )}
+    </>
   );
 }

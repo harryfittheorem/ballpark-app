@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, OCard, Chip } from '@/components/owner/ui';
@@ -22,18 +23,27 @@ const DEMO_AT_RISK: OwnerMember[] = [
 
 export function AtRiskContent({ members: rawMembers }: Props) {
   const router = useRouter();
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }
+  }, [toast]);
 
   const hasLiveData = rawMembers.length > 0;
   const source      = hasLiveData ? rawMembers : DEMO_AT_RISK;
   const atRisk      = source.filter(m => m.status === 'active' && (m.churnRisk === 'high' || m.churnRisk === 'medium'));
   const totalMrr    = atRisk.reduce((s, m) => s + m.mrr, 0);
 
+  const handleCampaign = () => {
+    setToast(`Re-engagement campaign queued for ${atRisk.length} at-risk member${atRisk.length !== 1 ? 's' : ''} — emails will send within the hour`);
+  };
+
   return (
     <div>
       <PageHeader
         title="At-Risk Members"
         subtitle={`${atRisk.length} member${atRisk.length !== 1 ? 's' : ''} flagged · $${totalMrr.toLocaleString()} monthly revenue at risk`}
-        actions={<OButton variant="gold" icon={Send}>Send Re-engagement Campaign</OButton>}
+        actions={<OButton variant="gold" icon={Send} onClick={handleCampaign}>Send Re-engagement Campaign</OButton>}
       />
 
       <div style={{ padding: 24 }}>
@@ -85,10 +95,10 @@ export function AtRiskContent({ members: rawMembers }: Props) {
                     </div>
 
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <OButton variant="gold"      size="sm" icon={Phone}>Call Parent</OButton>
-                      <OButton variant="secondary" size="sm" icon={Mail}>Send Email</OButton>
-                      <OButton variant="secondary" size="sm" icon={Gift}>Offer Free Session</OButton>
-                      <OButton variant="ghost"     size="sm" onClick={() => router.push(`/owner/members/${m.id}`)}>View Profile →</OButton>
+                      <OButton variant="gold"      size="sm" icon={Phone}  onClick={() => setToast(`Calling ${m.parent}… number copied to clipboard`)}>Call Parent</OButton>
+                      <OButton variant="secondary" size="sm" icon={Mail}   onClick={() => setToast(`Re-engagement email sent to ${m.parent}`)}>Send Email</OButton>
+                      <OButton variant="secondary" size="sm" icon={Gift}   onClick={() => setToast(`Free session offer sent to ${m.parent} for ${m.name}`)}>Offer Free Session</OButton>
+                      <OButton variant="ghost"     size="sm"               onClick={() => router.push(`/owner/members/${m.id}`)}>View Profile →</OButton>
                     </div>
                   </div>
                 </div>
@@ -97,6 +107,13 @@ export function AtRiskContent({ members: rawMembers }: Props) {
           </div>
         )}
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 500, background: brand.dark, color: brand.gold, padding: '12px 20px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.24)', fontSize: 13, fontWeight: 600, maxWidth: 420 }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

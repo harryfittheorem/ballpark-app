@@ -1,11 +1,13 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, SectionHeader, OCard, OTable, DonutChart, Chip } from '@/components/owner/ui';
 import type { TableColumn } from '@/components/owner/ui';
 import { DollarSign, CheckCircle2, Activity, AlertCircle, Download, FileText } from 'lucide-react';
 import type { BillingData, RecentTransaction, MembershipPackage } from '@/lib/supabase/ownerQueries';
+import { exportCsv } from '@/lib/exportCsv';
 
 type Props = { data: BillingData };
 
@@ -45,6 +47,11 @@ const txColumns: TableColumn<RecentTransaction & Record<string, unknown>>[] = [
 
 export function BillingContent({ data }: Props) {
   const router = useRouter();
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }
+  }, [toast]);
 
   const hasLiveData = data.kpis.mrr > 0 || data.packages.length > 0 || data.recentTransactions.length > 0;
 
@@ -63,6 +70,39 @@ export function BillingContent({ data }: Props) {
   const totalAttempted = paidCount + failedCount;
   const successRate    = totalAttempted > 0 ? Math.round((paidCount / totalAttempted) * 100) : 100;
 
+  const handleExport = () => {
+    exportCsv(`billing-transactions-${new Date().toISOString().slice(0, 10)}.csv`,
+      recentTransactions as unknown as Record<string, unknown>[],
+      [
+        { label: 'Date',    key: 'date' },
+        { label: 'Member',  key: 'member' },
+        { label: 'Package', key: 'package' },
+        { label: 'Amount',  key: 'amount' },
+        { label: 'Method',  key: 'method' },
+        { label: 'Status',  key: 'status' },
+      ],
+    );
+    setToast(`Exported ${recentTransactions.length} transactions as CSV`);
+  };
+
+  const handleGenerateStatement = () => {
+    const rows = [
+      { label: 'MRR',             value: `$${kpis.mrr.toLocaleString()}` },
+      { label: 'Collected (MTD)', value: `$${kpis.collectedMtd.toLocaleString()}` },
+      { label: 'Auto-Pay Rate',   value: `${kpis.autoPayRate}%` },
+      { label: 'Past Due',        value: `$${kpis.pastDue.toLocaleString()}` },
+      { label: 'Active Members',  value: String(kpis.activeMembers) },
+      { label: 'Success Rate',    value: `${successRate}%` },
+      { label: 'Failed Payments', value: String(kpis.failedPaymentsCount) },
+    ] as { label: string; value: string }[];
+
+    exportCsv(`billing-statement-${new Date().toISOString().slice(0, 10)}.csv`,
+      rows as unknown as Record<string, unknown>[],
+      [{ label: 'Metric', key: 'label' }, { label: 'Value', key: 'value' }],
+    );
+    setToast('Statement downloaded as CSV');
+  };
+
   return (
     <div>
       <PageHeader
@@ -70,8 +110,8 @@ export function BillingContent({ data }: Props) {
         subtitle="Revenue, auto-collect health, and payment status"
         actions={
           <>
-            <OButton variant="secondary" icon={Download}>Export</OButton>
-            <OButton variant="gold" icon={FileText}>Generate Statement</OButton>
+            <OButton variant="secondary" icon={Download} onClick={handleExport}>Export</OButton>
+            <OButton variant="gold" icon={FileText} onClick={handleGenerateStatement}>Generate Statement</OButton>
           </>
         }
       />
@@ -175,12 +215,19 @@ export function BillingContent({ data }: Props) {
           </div>
         </div>
 
-        <SectionHeader title="Recent Transactions" action={<OButton variant="ghost" size="sm">View All →</OButton>} />
+        <SectionHeader title="Recent Transactions" action={<OButton variant="ghost" size="sm" onClick={handleExport}>View All →</OButton>} />
         <OTable
           columns={txColumns as TableColumn<Record<string, unknown>>[]}
           rows={recentTransactions as unknown as Record<string, unknown>[]}
         />
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 500, background: brand.dark, color: brand.gold, padding: '12px 20px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.24)', fontSize: 13, fontWeight: 600, maxWidth: 380 }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

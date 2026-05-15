@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, OTable, Chip } from '@/components/owner/ui';
 import type { TableColumn } from '@/components/owner/ui';
-import { Download, Plus, Filter } from 'lucide-react';
+import { Download, Plus, Filter, X } from 'lucide-react';
 import type { OwnerMember } from '@/lib/supabase/ownerQueries';
+import { exportCsv } from '@/lib/exportCsv';
 
 type Props = { members: OwnerMember[] };
 
@@ -83,63 +84,101 @@ const columns: TableColumn<OwnerMember & Record<string, unknown>>[] = [
     },
   },
   {
-    label: 'Risk', key: 'churnRisk', sortable: true,
-    render: (r) => (
-      <Chip color={r.churnRisk === 'low' ? 'success' : r.churnRisk === 'medium' ? 'warning' : 'danger'} size="sm">
-        {r.churnRisk as string}
-      </Chip>
-    ),
-  },
-  {
-    label: 'Last Session', key: 'lastSession',
-    render: (r) => {
-      const s = r.lastSession as string;
-      const days = s.match(/^(\d+)d ago$/);
-      const isOld = days ? parseInt(days[1]) > 14 : false;
-      return <span style={{ fontSize: 11, color: isOld ? brand.danger : brand.textMuted, fontWeight: 600 }}>{s}</span>;
-    },
-  },
-  {
-    label: 'LTV', key: 'lifetime', align: 'right', sortable: true,
-    render: (r) => <span style={{ fontFamily: fonts.mono, fontWeight: 700 }}>${(r.lifetime as number).toLocaleString()}</span>,
+    label: 'Last Session', key: 'lastSession', sortable: true,
+    render: (r) => <span style={{ fontSize: 12, color: brand.textMuted }}>{r.lastSession as string}</span>,
   },
   {
     label: 'Next Charge', key: 'nextCharge',
-    render: (r) => (
-      <span style={{ fontSize: 11, color: r.nextCharge === 'Overdue' ? brand.danger : brand.textMuted, fontWeight: 600 }}>
-        {r.nextCharge as string}
-      </span>
-    ),
+    render: (r) => {
+      const v = r.nextCharge as string;
+      return <span style={{ fontSize: 12, color: v === 'Overdue' ? brand.danger : brand.text, fontWeight: v === 'Overdue' ? 700 : 400 }}>{v}</span>;
+    },
+  },
+  {
+    label: 'MRR', key: 'mrr', sortable: true, align: 'right',
+    render: (r) => <span style={{ fontFamily: fonts.mono, fontWeight: 700 }}>{(r.mrr as number) > 0 ? `$${r.mrr as number}` : '—'}</span>,
   },
 ];
 
+// ── Shared input style ─────────────────────────────────────────────────────
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '9px 12px', border: `1px solid ${brand.border}`,
+  borderRadius: 7, fontSize: 13, color: brand.text, background: brand.surface,
+  fontFamily: fonts.body, outline: 'none', boxSizing: 'border-box',
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5,
+  textTransform: 'uppercase', marginBottom: 5, display: 'block',
+};
+
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function MembersContent({ members: rawMembers }: Props) {
-  const router = useRouter();
-  const [filter, setFilter] = useState('all');
+export function MembersContent({ members }: Props) {
+  const router  = useRouter();
+  const source  = members.length ? members : DEMO_MEMBERS;
+  const [filter, setFilter] = useState<'all' | 'active' | 'at-risk'>('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [toast, setToast]   = useState<string | null>(null);
+  const [form, setForm]     = useState({
+    parentName: '', parentEmail: '', kidName: '',
+    ageGroup: '12U', program: 'Unlimited Monthly', planType: 'eft',
+  });
 
-  const members = rawMembers.length ? rawMembers : DEMO_MEMBERS;
+  useEffect(() => {
+    if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }
+  }, [toast]);
 
-  const filtered = filter === 'all'    ? members
-    : filter === 'at-risk' ? members.filter(m => m.churnRisk === 'high' || m.churnRisk === 'medium')
-    : members.filter(m => m.status === 'active');
+  const filtered = source.filter(m => {
+    if (filter === 'active')  return m.status === 'active';
+    if (filter === 'at-risk') return m.churnRisk === 'high' || m.churnRisk === 'medium';
+    return true;
+  });
 
   const tabs = [
-    { id: 'all',     label: 'All Members', count: members.length },
-    { id: 'active',  label: 'Active',      count: members.filter(m => m.status === 'active').length },
-    { id: 'at-risk', label: 'At Risk',     count: members.filter(m => m.churnRisk === 'high' || m.churnRisk === 'medium').length },
+    { id: 'all',     label: 'All',     count: source.length },
+    { id: 'active',  label: 'Active',  count: source.filter(m => m.status === 'active').length },
+    { id: 'at-risk', label: 'At Risk', count: source.filter(m => m.churnRisk === 'high' || m.churnRisk === 'medium').length },
   ];
+
+  const handleExport = () => {
+    exportCsv(`members-${new Date().toISOString().slice(0, 10)}.csv`,
+      filtered as unknown as Record<string, unknown>[],
+      [
+        { label: 'Name',       key: 'name' },
+        { label: 'Age',        key: 'age' },
+        { label: 'Parent',     key: 'parent' },
+        { label: 'Program',    key: 'program' },
+        { label: 'Plan',       key: 'planType' },
+        { label: 'Status',     key: 'status' },
+        { label: 'Engagement', key: 'engagementScore' },
+        { label: 'Last Session', key: 'lastSession' },
+        { label: 'Next Charge',  key: 'nextCharge' },
+        { label: 'MRR',        key: 'mrr' },
+        { label: 'Lifetime',   key: 'lifetime' },
+        { label: 'Joined',     key: 'joinedDate' },
+      ],
+    );
+    setToast(`Exported ${filtered.length} members as CSV`);
+  };
+
+  const handleAddMember = (e: React.FormEvent) => {
+    e.preventDefault();
+    setShowAddModal(false);
+    setForm({ parentName: '', parentEmail: '', kidName: '', ageGroup: '12U', program: 'Unlimited Monthly', planType: 'eft' });
+    setToast(`Invitation sent to ${form.parentEmail} — ${form.kidName} will appear once they complete signup`);
+  };
 
   return (
     <div>
       <PageHeader
         title="Members"
-        subtitle={`${members.length} total · ${members.filter(m => m.status === 'active').length} active · ${members.filter(m => m.churnRisk === 'high').length} at high risk`}
+        subtitle={`${source.length} total · ${source.filter(m => m.status === 'active').length} active · ${source.filter(m => m.churnRisk === 'high').length} at high risk`}
         actions={
           <>
-            <OButton variant="secondary" icon={Download}>Export</OButton>
-            <OButton variant="gold" icon={Plus}>Add Member</OButton>
+            <OButton variant="secondary" icon={Download} onClick={handleExport}>Export</OButton>
+            <OButton variant="gold" icon={Plus} onClick={() => setShowAddModal(true)}>Add Member</OButton>
           </>
         }
       />
@@ -149,7 +188,7 @@ export function MembersContent({ members: rawMembers }: Props) {
           {tabs.map(f => (
             <div
               key={f.id}
-              onClick={() => setFilter(f.id)}
+              onClick={() => setFilter(f.id as typeof filter)}
               style={{
                 padding: '8px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700,
                 background: filter === f.id ? brand.dark : brand.surface,
@@ -171,6 +210,74 @@ export function MembersContent({ members: rawMembers }: Props) {
           onRowClick={(row) => router.push(`/owner/members/${(row as unknown as OwnerMember).id}`)}
         />
       </div>
+
+      {/* Add Member modal */}
+      {showAddModal && (
+        <div
+          onClick={() => setShowAddModal(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: 480, background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)', overflow: 'hidden' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: `1px solid ${brand.border}` }}>
+              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>Add New Member</div>
+              <div onClick={() => setShowAddModal(false)} style={{ cursor: 'pointer', padding: 4 }}><X size={16} color={brand.textMuted} /></div>
+            </div>
+            <form onSubmit={handleAddMember} style={{ padding: 24 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <label style={labelStyle}>Parent Name</label>
+                  <input required style={inputStyle} value={form.parentName} onChange={e => setForm(f => ({ ...f, parentName: e.target.value }))} placeholder="Carlos Martinez" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Parent Email</label>
+                  <input required type="email" style={inputStyle} value={form.parentEmail} onChange={e => setForm(f => ({ ...f, parentEmail: e.target.value }))} placeholder="carlos@email.com" />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <label style={labelStyle}>Kid's Name</label>
+                  <input required style={inputStyle} value={form.kidName} onChange={e => setForm(f => ({ ...f, kidName: e.target.value }))} placeholder="Jake Martinez" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Age Group</label>
+                  <select style={{ ...inputStyle, appearance: 'auto' }} value={form.ageGroup} onChange={e => setForm(f => ({ ...f, ageGroup: e.target.value }))}>
+                    {['8U','9U','10U','11U','12U','13U','14U','15U','16U+'].map(a => <option key={a}>{a}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                <div>
+                  <label style={labelStyle}>Program</label>
+                  <select style={{ ...inputStyle, appearance: 'auto' }} value={form.program} onChange={e => setForm(f => ({ ...f, program: e.target.value }))}>
+                    {['Unlimited Monthly','Team Training','Cage Rental Monthly','8-Pack Lessons','4-Pack Lessons'].map(p => <option key={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Plan Type</label>
+                  <select style={{ ...inputStyle, appearance: 'auto' }} value={form.planType} onChange={e => setForm(f => ({ ...f, planType: e.target.value }))}>
+                    <option value="eft">EFT (Monthly)</option>
+                    <option value="otc">OTC (Upfront)</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <OButton variant="secondary" onClick={() => setShowAddModal(false)}>Cancel</OButton>
+                <OButton variant="gold" icon={Plus}>Send Invitation</OButton>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 500, background: brand.dark, color: brand.gold, padding: '12px 20px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.24)', fontSize: 13, fontWeight: 600, maxWidth: 380 }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

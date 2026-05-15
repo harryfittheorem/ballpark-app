@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, SectionHeader, OCard, OTable, BarChart } from '@/components/owner/ui';
 import type { TableColumn } from '@/components/owner/ui';
-import { UserCog, Activity, TrendingUp, DollarSign, Download, Plus, Star, MessageCircle } from 'lucide-react';
+import { UserCog, Activity, TrendingUp, DollarSign, Download, Plus, Star, MessageCircle, X } from 'lucide-react';
 import type { OwnerCoach } from '@/lib/supabase/ownerQueries';
 import { CoachMessagePanel } from './CoachMessagePanel';
+import { exportCsv } from '@/lib/exportCsv';
 
 type Props = { coaches: OwnerCoach[]; tenantId: string };
 
@@ -17,6 +18,17 @@ const DEMO_COACHES: OwnerCoach[] = [
   { id: 'c4', userId: null, name: 'Jess Morales',    specialty: 'Catching / Defence',    students: 22, utilization: 68, retention: 86, avgRating: 4.6, revenue: 6160,  weeklyHours: 22, joinedDate: 'Feb 2024' },
 ];
 
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '9px 12px', border: `1px solid ${brand.border}`,
+  borderRadius: 7, fontSize: 13, color: brand.text, background: brand.surface,
+  fontFamily: fonts.body, outline: 'none', boxSizing: 'border-box',
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5,
+  textTransform: 'uppercase', marginBottom: 5, display: 'block',
+};
+
 export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
   const coaches       = rawCoaches.length ? rawCoaches : DEMO_COACHES;
   const isDemo        = !rawCoaches.length;
@@ -24,7 +36,39 @@ export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
   const avgUtil       = coaches.length > 0 ? Math.round(coaches.reduce((s, c) => s + c.utilization, 0) / coaches.length) : 0;
   const avgRet        = coaches.length > 0 ? Math.round(coaches.reduce((s, c) => s + c.retention, 0) / coaches.length * 10) / 10 : 0;
 
-  const [activeCoach, setActiveCoach] = useState<OwnerCoach | null>(null);
+  const [activeCoach,  setActiveCoach]  = useState<OwnerCoach | null>(null);
+  const [showHireModal, setShowHireModal] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [hireForm, setHireForm] = useState({ name: '', email: '', specialty: '', weeklyHours: '30' });
+
+  useEffect(() => {
+    if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }
+  }, [toast]);
+
+  const handleExport = () => {
+    exportCsv(`coaches-${new Date().toISOString().slice(0, 10)}.csv`,
+      coaches as unknown as Record<string, unknown>[],
+      [
+        { label: 'Name',        key: 'name' },
+        { label: 'Specialty',   key: 'specialty' },
+        { label: 'Students',    key: 'students' },
+        { label: 'Utilization', key: 'utilization' },
+        { label: 'Retention',   key: 'retention' },
+        { label: 'Rating',      key: 'avgRating' },
+        { label: 'Revenue',     key: 'revenue' },
+        { label: 'Hours/wk',    key: 'weeklyHours' },
+        { label: 'Joined',      key: 'joinedDate' },
+      ],
+    );
+    setToast(`Exported ${coaches.length} coaches as CSV`);
+  };
+
+  const handleHireSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setShowHireModal(false);
+    setHireForm({ name: '', email: '', specialty: '', weeklyHours: '30' });
+    setToast(`Invitation sent to ${hireForm.email} — ${hireForm.name} will appear once they complete onboarding`);
+  };
 
   const columns: TableColumn<OwnerCoach & Record<string, unknown>>[] = [
     {
@@ -117,8 +161,8 @@ export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
         subtitle={`${coaches.length} coach${coaches.length !== 1 ? 'es' : ''} on staff · ${totalStudents} total students`}
         actions={
           <>
-            <OButton variant="secondary" icon={Download}>Export</OButton>
-            <OButton variant="gold" icon={Plus}>Hire Coach</OButton>
+            <OButton variant="secondary" icon={Download} onClick={handleExport}>Export</OButton>
+            <OButton variant="gold" icon={Plus} onClick={() => setShowHireModal(true)}>Hire Coach</OButton>
           </>
         }
       />
@@ -173,6 +217,66 @@ export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
           tenantId={tenantId}
           onClose={() => setActiveCoach(null)}
         />
+      )}
+
+      {/* Hire Coach modal */}
+      {showHireModal && (
+        <div
+          onClick={() => setShowHireModal(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: 460, background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)', overflow: 'hidden' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: `1px solid ${brand.border}` }}>
+              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>Hire New Coach</div>
+              <div onClick={() => setShowHireModal(false)} style={{ cursor: 'pointer', padding: 4 }}><X size={16} color={brand.textMuted} /></div>
+            </div>
+            <form onSubmit={handleHireSubmit} style={{ padding: 24 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <label style={labelStyle}>Full Name</label>
+                  <input required style={inputStyle} value={hireForm.name} onChange={e => setHireForm(f => ({ ...f, name: e.target.value }))} placeholder="Alex Johnson" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Email</label>
+                  <input required type="email" style={inputStyle} value={hireForm.email} onChange={e => setHireForm(f => ({ ...f, email: e.target.value }))} placeholder="alex@infinitehitting.com" />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                <div>
+                  <label style={labelStyle}>Specialty</label>
+                  <select style={{ ...inputStyle, appearance: 'auto' }} value={hireForm.specialty} onChange={e => setHireForm(f => ({ ...f, specialty: e.target.value }))}>
+                    <option>Hitting / Power</option>
+                    <option>Pitching / Mechanics</option>
+                    <option>Fielding / Speed</option>
+                    <option>Catching / Defence</option>
+                    <option>General / Multi-skill</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Weekly Hours</label>
+                  <input type="number" min="1" max="60" style={inputStyle} value={hireForm.weeklyHours} onChange={e => setHireForm(f => ({ ...f, weeklyHours: e.target.value }))} />
+                </div>
+              </div>
+              <div style={{ padding: '12px 14px', background: brand.surfaceAlt, borderRadius: 8, marginBottom: 20, fontSize: 12, color: brand.textMuted, lineHeight: 1.5 }}>
+                An invitation email will be sent to the coach. They&apos;ll set their password and appear in the roster once they complete onboarding.
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <OButton variant="secondary" onClick={() => setShowHireModal(false)}>Cancel</OButton>
+                <OButton variant="gold" icon={Plus}>Send Invitation</OButton>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 500, background: brand.dark, color: brand.gold, padding: '12px 20px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.24)', fontSize: 13, fontWeight: 600, maxWidth: 380 }}>
+          {toast}
+        </div>
       )}
     </div>
   );

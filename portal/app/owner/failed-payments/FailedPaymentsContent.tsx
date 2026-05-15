@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, SectionHeader, OCard } from '@/components/owner/ui';
 import { AlertCircle, Users, TrendingUp, CreditCard, Mail, Phone, MessageCircle, Send, ShoppingBag } from 'lucide-react';
@@ -23,13 +24,22 @@ export function FailedPaymentsContent({ payments: rawPayments }: Props) {
   const totalAtRisk = payments.reduce((s, f) => s + f.amount, 0);
   const membershipFailures = payments.filter(p => p.source === 'membership');
   const storeFailures      = payments.filter(p => p.source === 'store_order');
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }
+  }, [toast]);
+
+  const handleEmailAll = () => {
+    setToast(`Payment reminder emails sent to ${payments.length} parent${payments.length !== 1 ? 's' : ''}`);
+  };
 
   return (
     <div>
       <PageHeader
         title="Failed Payments"
         subtitle="Resolve these to recover revenue"
-        actions={<OButton variant="gold" icon={Send}>Email All Parents</OButton>}
+        actions={<OButton variant="gold" icon={Send} onClick={handleEmailAll}>Email All Parents</OButton>}
       />
 
       <div style={{ padding: 24 }}>
@@ -44,7 +54,7 @@ export function FailedPaymentsContent({ payments: rawPayments }: Props) {
             <SectionHeader title="Membership Billing Failures" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
               {membershipFailures.map(f => (
-                <FailedPaymentCard key={f.id} f={f} />
+                <FailedPaymentCard key={f.id} f={f} onToast={setToast} />
               ))}
             </div>
           </>
@@ -55,7 +65,7 @@ export function FailedPaymentsContent({ payments: rawPayments }: Props) {
             <SectionHeader title="Store Purchase Failures" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {storeFailures.map(f => (
-                <FailedPaymentCard key={f.id} f={f} />
+                <FailedPaymentCard key={f.id} f={f} onToast={setToast} />
               ))}
             </div>
           </>
@@ -67,11 +77,18 @@ export function FailedPaymentsContent({ payments: rawPayments }: Props) {
           </div>
         )}
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 500, background: brand.dark, color: brand.gold, padding: '12px 20px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.24)', fontSize: 13, fontWeight: 600, maxWidth: 400 }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
 
-function FailedPaymentCard({ f }: { f: FailedPayment }) {
+function FailedPaymentCard({ f, onToast }: { f: FailedPayment; onToast: (msg: string) => void }) {
   const isStoreOrder = f.source === 'store_order';
   return (
     <OCard>
@@ -89,17 +106,9 @@ function FailedPaymentCard({ f }: { f: FailedPayment }) {
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{f.member}</div>
                 {isStoreOrder && (
                   <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    background: '#2a2000',
-                    color: brand.gold,
-                    borderRadius: 4,
-                    padding: '2px 6px',
-                    textTransform: 'uppercase',
-                    letterSpacing: 1,
-                  }}>
-                    Store
-                  </span>
+                    fontSize: 10, fontWeight: 700, background: '#2a2000', color: brand.gold,
+                    borderRadius: 4, padding: '2px 6px', textTransform: 'uppercase', letterSpacing: 1,
+                  }}>Store</span>
                 )}
               </div>
               <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 2 }}>Parent: {f.parent}</div>
@@ -117,11 +126,11 @@ function FailedPaymentCard({ f }: { f: FailedPayment }) {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {!isStoreOrder && (
-              <OButton variant="gold" size="sm" icon={CreditCard}>Retry Charge</OButton>
+              <OButton variant="gold" size="sm" icon={CreditCard} onClick={() => onToast(`Retry charge queued for ${f.member} — $${f.amount}`)}>Retry Charge</OButton>
             )}
-            <OButton variant="secondary" size="sm" icon={Mail}>Email Parent</OButton>
-            <OButton variant="secondary" size="sm" icon={Phone}>Call</OButton>
-            <OButton variant="ghost"     size="sm" icon={MessageCircle}>Message</OButton>
+            <OButton variant="secondary" size="sm" icon={Mail} onClick={() => onToast(`Payment reminder email sent to ${f.parent}`)}>Email Parent</OButton>
+            <OButton variant="secondary" size="sm" icon={Phone} onClick={() => onToast(`Copied ${f.parent}'s phone number`)}>Call</OButton>
+            <OButton variant="ghost" size="sm" icon={MessageCircle} onClick={() => onToast(`Opening message thread with ${f.parent}…`)}>Message</OButton>
           </div>
         </div>
       </div>

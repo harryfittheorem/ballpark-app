@@ -10,6 +10,7 @@ import {
   DollarSign, Users, TrendingUp, AlertTriangle, AlertCircle,
   Download, Plus, Calendar, CheckCircle2, XCircle, CreditCard, X,
 } from 'lucide-react';
+import { exportCsv } from '@/lib/exportCsv';
 import type { OwnerKPIs, OwnerMember, RevenueMonth, MembershipPackage } from '@/lib/supabase/ownerQueries';
 
 type Props = {
@@ -71,6 +72,11 @@ const DEMO_PACKAGES: MembershipPackage[] = [
 export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMonthly: rawRevenue, packages: rawPackages, tenantName, stripeConnected }: Props) {
   const router = useRouter();
   const [stripeBannerDismissed, setStripeBannerDismissed] = React.useState(false);
+  const [toast, setToast] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }
+  }, [toast]);
 
   const hasLiveData    = rawKpis.mrr > 0 || rawKpis.activeMembers > 0;
   const kpis           = hasLiveData        ? rawKpis    : DEMO_KPIS;
@@ -91,14 +97,25 @@ export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMo
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   return (
+    <>
     <div>
       <PageHeader
         title="Welcome back"
         subtitle={`${tenantName} · ${kpis.activeMembers} active members`}
         actions={
           <>
-            <OButton variant="secondary" icon={Download}>Export</OButton>
-            <OButton variant="gold" icon={Plus}>New Member</OButton>
+            <OButton variant="secondary" icon={Download} onClick={() => {
+              exportCsv(`members-${new Date().toISOString().slice(0, 10)}.csv`,
+                members as unknown as Record<string, unknown>[],
+                [
+                  { label: 'Name', key: 'name' }, { label: 'Age', key: 'age' },
+                  { label: 'Parent', key: 'parent' }, { label: 'Program', key: 'program' },
+                  { label: 'Status', key: 'status' }, { label: 'MRR', key: 'mrr' },
+                  { label: 'Lifetime', key: 'lifetime' }, { label: 'Joined', key: 'joinedDate' },
+                ]);
+              setToast(`Exported ${members.length} members as CSV`);
+            }}>Export</OButton>
+            <OButton variant="gold" icon={Plus} onClick={() => router.push('/owner/members')}>New Member</OButton>
           </>
         }
       />
@@ -321,5 +338,12 @@ export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMo
         </div>
       </div>
     </div>
+    {/* Toast */}
+    {toast && (
+      <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 500, background: brand.dark, color: brand.gold, padding: '12px 20px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.24)', fontSize: 13, fontWeight: 600, maxWidth: 380 }}>
+        {toast}
+      </div>
+    )}
+    </>
   );
 }
