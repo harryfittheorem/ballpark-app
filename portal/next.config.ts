@@ -20,7 +20,10 @@ const nextConfig: NextConfig = {
     },
   },
   async rewrites() {
-    return [
+    // beforeFiles: run BEFORE Next.js app-router pages so the expo-platform
+    // requests are proxied to Metro (port 8080) before the auth layer can
+    // redirect unauthenticated requests to /login.
+    const expoRewrites = [
       // Expo manifest request (expo-platform header present)
       {
         source: "/",
@@ -54,6 +57,9 @@ const nextConfig: NextConfig = {
         destination: "http://localhost:8080/symbolicate",
       },
     ];
+    return {
+      beforeFiles: expoRewrites,
+    };
   },
 };
 
