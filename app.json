@@ -65,7 +65,12 @@
           "photosPermission": "Ballpark needs photo library access so coaches can pick existing videos to send to athletes."
         }
       ],
-      "@stripe/stripe-react-native"
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.ballpark.app"
+        }
+      ]
     ],
     "extra": {
       "eas": {
