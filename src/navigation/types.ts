@@ -66,6 +66,7 @@ export type WorkStackParamList = {
   MessagesInbox: undefined;
   MessageThread: { kidId: string; coachUserId: string };
   TrainingVideoPlayer: { videoId: string };
+  VideoPlayback: { messageId: string };
 };
 
 export type WorkStackScreenProps<T extends keyof WorkStackParamList> = CompositeScreenProps<

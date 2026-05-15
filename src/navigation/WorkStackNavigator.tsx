@@ -9,6 +9,7 @@ import SessionDetailScreen from '@/screens/Videos/SessionDetailScreen';
 import ShareCardScreen from '@/screens/ShareCard/ShareCardScreen';
 import SwingDetailScreen from '@/screens/Videos/SwingDetailScreen';
 import TrainingVideoPlayerScreen from '@/screens/Train/TrainingVideoPlayerScreen';
+import VideoPlaybackScreen from '@/screens/VideoPlayback/VideoPlaybackScreen';
 import WorkScreen from '@/screens/Work/WorkScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
@@ -73,6 +74,11 @@ export default function WorkStackNavigator() {
       <Stack.Screen
         name="TrainingVideoPlayer"
         component={TrainingVideoPlayerScreen}
+        options={{ headerShown: false, presentation: 'fullScreenModal' }}
+      />
+      <Stack.Screen
+        name="VideoPlayback"
+        component={VideoPlaybackScreen}
         options={{ headerShown: false, presentation: 'fullScreenModal' }}
       />
     </Stack.Navigator>

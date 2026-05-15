@@ -1,24 +1,29 @@
 /**
  * Video Playback screen (v0.4 Step 4.13).
  *
- * Full-screen Mux HLS player for a single coach_message. The first time
- * playback actually starts we fire `markCoachMessageViewed` (idempotent,
- * column-restricted via the GRANT in Step 4.1) so the coach's Sent Videos
- * list (Step 4.11) flips the row to "Viewed" on next refresh. On unmount
- * we invalidate the Home "latest coach message" cache so the badge /
- * dot on the Home card refreshes immediately on the way back.
+ * Full-screen Mux HLS player for a single coach_message. Registered in
+ * both HomeStackNavigator and WorkStackNavigator so the X button always
+ * returns to whichever tab the user came from (goBack within the current
+ * stack, not a cross-tab navigate).
  *
- * Player choice: `expo-av`'s <Video /> with `useNativeControls` — gives
- * us a play/pause/scrubber chrome on both platforms with no custom UI.
- * Mux HLS URL is `https://stream.mux.com/{playback_id}.m3u8`.
+ * Fixes applied in Task #200:
+ *   - `key={messageId}` on <Video> forces a fresh AVPlayer mount each
+ *     time the screen opens, eliminating the black-screen-on-second-play
+ *     caused by the native layer not resetting.
+ *   - `isBuffering` state drives an ActivityIndicator overlay while the
+ *     HLS stream is loading, so the user sees a spinner instead of a
+ *     blank black screen.
+ *   - When the video is still processing, `refetchInterval` polls Supabase
+ *     every 3 s and the UI shows "Getting video ready…" with a spinner
+ *     rather than a dead-end error — it auto-transitions to the player
+ *     once the status flips to 'ready'.
  *
+ * Player choice: `expo-av`'s <Video /> with `useNativeControls`.
  * Audio: we deliberately do NOT call `Audio.setAudioModeAsync` —
- * expo-av's default respects the iOS silent switch, which is the polite
- * behavior for a kid/parent app. A "let it play through silent mode"
- * opt-in can land later if anyone asks for it.
+ * expo-av's default respects the iOS silent switch.
  */
 
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ResizeMode,
@@ -26,7 +31,7 @@ import {
   type AVPlaybackStatus,
 } from 'expo-av';
 import { X } from 'lucide-react-native';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -38,21 +43,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { markCoachMessageViewed } from '@/api/coachMessages';
 import { useCoachMessage } from '@/hooks/useCoachMessage';
-import type { HomeStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
-type Route = HomeStackScreenProps<'VideoPlayback'>['route'];
-type Nav = HomeStackScreenProps<'VideoPlayback'>['navigation'];
+// Generic param type — works whether this screen is mounted in HomeStack
+// or WorkStack (both define VideoPlayback: { messageId: string }).
+type VideoPlaybackParams = { messageId: string };
+type Route = RouteProp<{ VideoPlayback: VideoPlaybackParams }, 'VideoPlayback'>;
 
 function muxHlsUrl(playbackId: string): string {
   return `https://stream.mux.com/${playbackId}.m3u8`;
 }
 
 function CloseButton({ onPress }: { onPress: () => void }) {
-  // Absolute-positioned overlay so the player itself fills the entire
-  // viewport behind it. SafeAreaView keeps the tap target clear of the
-  // notch / status bar on both platforms.
   return (
     <SafeAreaView
       pointerEvents="box-none"
@@ -77,31 +80,39 @@ function CloseButton({ onPress }: { onPress: () => void }) {
 
 export default function VideoPlaybackScreen() {
   const route = useRoute<Route>();
-  const navigation = useNavigation<Nav>();
+  // useNavigation without a generic — we only need goBack() / canGoBack(),
+  // which exist on every navigation object regardless of stack.
+  const navigation = useNavigation();
   const { messageId } = route.params;
 
   const qc = useQueryClient();
-  const { data: message, isPending, error } = useCoachMessage(messageId);
 
-  // Guard so the mark-viewed mutation only fires once per mount, no matter
-  // how many `onPlaybackStatusUpdate` ticks land before the network
-  // round-trip completes.
+  // Poll every 3 s while the video is still processing so the screen
+  // auto-advances to the player without the user having to navigate away
+  // and back.
+  const { data: message, isPending, error } = useCoachMessage(messageId, {
+    refetchInterval: (query) => {
+      const d = query.state.data as { video?: { status?: string } | null } | null | undefined;
+      if (!d || !d.video || d.video.status === 'processing') return 3000;
+      return false;
+    },
+  });
+
+  // Track native player buffering state so we can show a spinner overlay.
+  const [isBuffering, setIsBuffering] = useState(true);
+
+  // Guard so the mark-viewed mutation only fires once per mount.
   const markedRef = useRef(false);
 
   const markViewed = useMutation({
     mutationFn: () => markCoachMessageViewed(messageId),
-    // Failures are swallowed deliberately — viewed_at is best-effort
-    // analytics and shouldn't surface as a player error to the parent.
     onError: (err) => {
       // eslint-disable-next-line no-console
       console.warn('markCoachMessageViewed failed:', errorMessage(err));
     },
   });
 
-  // Invalidate the Home "latest coach message" cache on unmount so the
-  // card on the way back reflects the new viewed_at. Prefix invalidation
-  // covers every kid-keyed entry without us having to know which kid this
-  // message belongs to from this screen's params.
+  // Invalidate the Home "latest coach message" cache on unmount.
   useEffect(() => {
     return () => {
       void qc.invalidateQueries({ queryKey: ['coachMessages', 'latest'] });
@@ -110,11 +121,14 @@ export default function VideoPlaybackScreen() {
 
   const onStatusUpdate = useCallback(
     (status: AVPlaybackStatus) => {
+      // Update buffering overlay: hide once the player is loaded and not buffering.
+      if (status.isLoaded) {
+        setIsBuffering(status.isBuffering);
+      }
+
+      // Mark-viewed guard (fires at most once per mount).
       if (markedRef.current) return;
       if (!status.isLoaded) return;
-      // Either a non-zero position or an active isPlaying flag is enough
-      // to call this "playback started" — covers the case where the
-      // first tick lands while the player is still buffering at 0ms.
       if (status.isPlaying || (status.positionMillis ?? 0) > 0) {
         markedRef.current = true;
         markViewed.mutate();
@@ -159,17 +173,30 @@ export default function VideoPlaybackScreen() {
   }
 
   const video = message.video;
-  if (!video || video.status !== 'ready' || !video.muxPlaybackId) {
-    const errored = video?.status === 'errored';
+
+  // Video errored — permanent dead end.
+  if (video?.status === 'errored') {
     return (
       <View style={styles.messageWrap}>
-        <Text style={styles.messageTitle}>
-          {errored ? 'This video couldn\u2019t be processed' : 'Still processing'}
-        </Text>
+        <Text style={styles.messageTitle}>This video couldn&rsquo;t be processed</Text>
         <Text style={styles.messageBody}>
-          {errored
-            ? 'Your coach will need to re-record and send this one again.'
-            : 'This video is still processing \u2014 check back in a moment.'}
+          Your coach will need to re-record and send this one again.
+        </Text>
+        <CloseButton onPress={goBack} />
+      </View>
+    );
+  }
+
+  // Video is still processing — show a spinner and let the refetchInterval
+  // above poll until status becomes 'ready', then the component re-renders
+  // into the player branch automatically.
+  if (!video || video.status !== 'ready' || !video.muxPlaybackId) {
+    return (
+      <View style={styles.messageWrap}>
+        <ActivityIndicator size="large" color={colors.gold} style={styles.processingSpinner} />
+        <Text style={styles.messageTitle}>Getting video ready&hellip;</Text>
+        <Text style={styles.messageBody}>
+          Your video is on its way &mdash; this usually takes under a minute.
         </Text>
         <CloseButton onPress={goBack} />
       </View>
@@ -178,7 +205,13 @@ export default function VideoPlaybackScreen() {
 
   return (
     <View style={styles.fill}>
+      {/*
+       * key={messageId} forces a fresh AVPlayer native instance every time
+       * this screen is opened. Without it, expo-av can reuse a stale player
+       * from a previous mount and show a black screen on the second open.
+       */}
       <Video
+        key={messageId}
         style={styles.video}
         source={{ uri: muxHlsUrl(video.muxPlaybackId) }}
         resizeMode={ResizeMode.CONTAIN}
@@ -186,6 +219,11 @@ export default function VideoPlaybackScreen() {
         useNativeControls
         onPlaybackStatusUpdate={onStatusUpdate}
       />
+      {isBuffering && (
+        <View style={styles.bufferOverlay}>
+          <ActivityIndicator size="large" color={colors.gold} />
+        </View>
+      )}
       <CloseButton onPress={goBack} />
     </View>
   );
@@ -198,12 +236,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Mirror of the fix in CoachVideoPlaybackScreen: <Video> must NOT be
-  // sized via flex inside a centering container, or iOS collapses the
-  // AVPlayerLayer to 0x0 (audio plays, picture is invisible). Absolute-
-  // fill it so the native layer always has explicit screen-sized bounds.
+  // <Video> must NOT be sized via flex inside a centering container, or iOS
+  // collapses the AVPlayerLayer to 0×0 (audio plays, picture is invisible).
+  // Absolute-fill it so the native layer always has explicit screen-sized bounds.
   video: {
     ...StyleSheet.absoluteFillObject,
+  },
+  bufferOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.darkest,
   },
   closeOverlay: {
     position: 'absolute',
@@ -230,6 +273,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing['4xl'],
     gap: spacing.md,
+  },
+  processingSpinner: {
+    marginBottom: spacing.lg,
   },
   messageTitle: {
     fontFamily: fontFamilies.oswaldBold,

@@ -1,3 +1,4 @@
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, MessageCircle, PlayCircle, Send } from 'lucide-react-native';
@@ -43,6 +44,9 @@ export default function MessagesBody() {
   const { user } = useAuth();
   const { family, kids } = useFamily();
   const kid = kids[0] ?? null;
+
+  // Used to correctly offset the keyboard avoiding view for any tab bar height.
+  const tabBarHeight = useBottomTabBarHeight();
 
   const { data: coaches } = useTenantCoachesForParent();
   const { data: inbox } = useParentInbox(kid?.id);
@@ -151,8 +155,9 @@ export default function MessagesBody() {
     }
   }, [uploading, kid, family, coachUserId, sendMutation, showToast]);
 
+  // Navigate within the Work stack so pressing X returns here, not Home.
   const onPlayCoachVideo = (messageId: string) =>
-    navigation.navigate('Home', { screen: 'VideoPlayback', params: { messageId } });
+    navigation.navigate('VideoPlayback', { messageId });
 
   const onSend = () => {
     const text = draft.trim();
@@ -195,8 +200,8 @@ export default function MessagesBody() {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? tabBarHeight : 0}
     >
       {showCoachPicker ? (
         <View style={styles.pickerRow}>
@@ -246,8 +251,10 @@ export default function MessagesBody() {
             </Text>
           </View>
         ) : (
+          // inverted FlatList: index 0 renders at the bottom.
+          // Data must be newest-first so the latest message sits at the bottom.
           <FlatList
-            data={messages ?? []}
+            data={[...(messages ?? [])].reverse()}
             inverted
             keyExtractor={(m) => m.id}
             contentContainerStyle={styles.threadContent}

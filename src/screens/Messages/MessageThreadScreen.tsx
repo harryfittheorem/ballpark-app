@@ -124,10 +124,7 @@ export default function MessageThreadScreen() {
               message={item}
               isSelf={!!user && item.senderUserId === user.id}
               onPlayCoachVideo={(messageId) =>
-                navigation.navigate('Home', {
-                  screen: 'VideoPlayback',
-                  params: { messageId },
-                })
+                navigation.navigate('VideoPlayback', { messageId })
               }
             />
           )}

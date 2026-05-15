@@ -5,9 +5,12 @@
  * Mux playback id, the lifecycle status, and the existing `viewed_at`
  * value for the row that was tapped on Home. Disabled until a messageId
  * is in hand so we never fire a request the RLS policy would reject.
+ *
+ * Accepts an optional `refetchInterval` so callers (e.g. VideoPlaybackScreen)
+ * can poll while the video is still processing.
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
 
 import {
   getCoachMessageById,
@@ -18,12 +21,16 @@ export function coachMessageKey(messageId: string) {
   return ['coachMessages', 'detail', messageId] as const;
 }
 
-export function useCoachMessage(messageId: string | null | undefined) {
+export function useCoachMessage(
+  messageId: string | null | undefined,
+  opts?: Pick<UseQueryOptions<CoachMessageDetail | null, Error>, 'refetchInterval'>,
+) {
   return useQuery<CoachMessageDetail | null, Error>({
     queryKey: messageId
       ? coachMessageKey(messageId)
       : ['coachMessages', 'detail', 'none'],
     queryFn: () => getCoachMessageById(messageId as string),
     enabled: !!messageId,
+    ...opts,
   });
 }
