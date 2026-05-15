@@ -1,4 +1,3 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, MessageCircle, PlayCircle, Send } from 'lucide-react-native';
@@ -7,8 +6,6 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -44,9 +41,6 @@ export default function MessagesBody() {
   const { user } = useAuth();
   const { family, kids } = useFamily();
   const kid = kids[0] ?? null;
-
-  // Used to correctly offset the keyboard avoiding view for any tab bar height.
-  const tabBarHeight = useBottomTabBarHeight();
 
   const { data: coaches } = useTenantCoachesForParent();
   const { data: inbox } = useParentInbox(kid?.id);
@@ -197,12 +191,10 @@ export default function MessagesBody() {
 
   const showCoachPicker = (coaches?.length ?? 0) > 1;
 
+  // Keyboard avoidance is handled by the parent WorkScreen's
+  // KeyboardAvoidingView, so this component is a plain View.
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? tabBarHeight : 0}
-    >
+    <View style={styles.flex}>
       {showCoachPicker ? (
         <View style={styles.pickerRow}>
           {coaches!.map((c) => {
@@ -312,7 +304,7 @@ export default function MessagesBody() {
           <Send size={18} color={colors.dark} />
         </Pressable>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

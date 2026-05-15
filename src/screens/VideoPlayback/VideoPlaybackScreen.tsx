@@ -6,30 +6,21 @@
  * returns to whichever tab the user came from (goBack within the current
  * stack, not a cross-tab navigate).
  *
- * Fixes applied in Task #200:
- *   - `key={messageId}` on <Video> forces a fresh AVPlayer mount each
- *     time the screen opens, eliminating the black-screen-on-second-play
- *     caused by the native layer not resetting.
- *   - `isBuffering` state drives an ActivityIndicator overlay while the
- *     HLS stream is loading, so the user sees a spinner instead of a
- *     blank black screen.
- *   - When the video is still processing, `refetchInterval` polls Supabase
- *     every 3 s and the UI shows "Getting video ready…" with a spinner
- *     rather than a dead-end error — it auto-transitions to the player
- *     once the status flips to 'ready'.
- *
- * Player choice: `expo-av`'s <Video /> with `useNativeControls`.
- * Audio: we deliberately do NOT call `Audio.setAudioModeAsync` —
- * expo-av's default respects the iOS silent switch.
+ * Fixes (Task #200 / #202):
+ *   - `key={messageId}` forces a fresh AVPlayer native instance each open.
+ *   - `isBuffering` overlay clears via `onPlaybackStatusUpdate`; a safety
+ *     timeout (BUFFERING_TIMEOUT_MS) forces it off if the event is delayed.
+ *     `didJustFinish` explicitly sets isBuffering=false so the overlay
+ *     doesn't re-appear when the user replays a finished video.
+ *   - Close button uses `useSafeAreaInsets` directly so it never collapses
+ *     to the wrong position regardless of device or presentation context.
+ *   - When video is still processing, polls every 3 s and auto-transitions
+ *     to the player once status becomes 'ready'.
  */
 
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  ResizeMode,
-  Video,
-  type AVPlaybackStatus,
-} from 'expo-av';
+import { ResizeMode, Video, type AVPlaybackStatus } from 'expo-av';
 import { X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -39,7 +30,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { markCoachMessageViewed } from '@/api/coachMessages';
 import { useCoachMessage } from '@/hooks/useCoachMessage';
@@ -51,22 +42,28 @@ import { errorMessage } from '@/utils/error';
 type VideoPlaybackParams = { messageId: string };
 type Route = RouteProp<{ VideoPlayback: VideoPlaybackParams }, 'VideoPlayback'>;
 
+// How long to wait for the first AVPlaybackStatus event before forcibly
+// clearing the buffering overlay. Avoids an infinite spinner when the HLS
+// manifest loads slowly or the event is briefly delayed on cold start.
+const BUFFERING_TIMEOUT_MS = 8000;
+
 function muxHlsUrl(playbackId: string): string {
   return `https://stream.mux.com/${playbackId}.m3u8`;
 }
 
-function CloseButton({ onPress }: { onPress: () => void }) {
+// Close button positioned using explicit safe-area insets so it never
+// collapses to the wrong corner regardless of device or modal context.
+function CloseButton({ onPress, topInset }: { onPress: () => void; topInset: number }) {
   return (
-    <SafeAreaView
+    <View
       pointerEvents="box-none"
-      style={styles.closeOverlay}
-      edges={['top', 'left']}
+      style={[styles.closeOverlay, { top: topInset }]}
     >
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel="Close video"
-        hitSlop={12}
+        hitSlop={16}
         style={({ pressed }) => [
           styles.closeButton,
           pressed && styles.closePressed,
@@ -74,7 +71,7 @@ function CloseButton({ onPress }: { onPress: () => void }) {
       >
         <X size={22} color={colors.gold} />
       </Pressable>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -83,26 +80,25 @@ export default function VideoPlaybackScreen() {
   // useNavigation without a generic — we only need goBack() / canGoBack(),
   // which exist on every navigation object regardless of stack.
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { messageId } = route.params;
 
   const qc = useQueryClient();
 
   // Poll every 3 s while the video is still processing so the screen
-  // auto-advances to the player without the user having to navigate away
-  // and back.
+  // auto-advances to the player without the user having to navigate away.
   const { data: message, isPending, error } = useCoachMessage(messageId, {
     refetchInterval: (query) => {
       const d = query.state.data as { video?: { status?: string } | null } | null | undefined;
-      // Only poll while a message exists but its video is still processing.
-      // If data is null/undefined (not found) or video is in a terminal state
-      // (ready / errored), stop polling immediately.
       if (d && d.video && d.video.status === 'processing') return 3000;
       return false;
     },
   });
 
-  // Track native player buffering state so we can show a spinner overlay.
+  // Track native player buffering state to show/hide the spinner overlay.
+  // Starts true; cleared by onPlaybackStatusUpdate or the safety timeout.
   const [isBuffering, setIsBuffering] = useState(true);
+  const bufferTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Guard so the mark-viewed mutation only fires once per mount.
   const markedRef = useRef(false);
@@ -115,6 +111,21 @@ export default function VideoPlaybackScreen() {
     },
   });
 
+  // Start the safety timeout once we know the video is ready. Cleared if
+  // onPlaybackStatusUpdate fires first (normal path).
+  useEffect(() => {
+    const video = (message as { video?: { status?: string; muxPlaybackId?: string } | null } | null)?.video;
+    if (!video || video.status !== 'ready' || !video.muxPlaybackId) return;
+
+    bufferTimerRef.current = setTimeout(() => {
+      setIsBuffering(false);
+    }, BUFFERING_TIMEOUT_MS);
+
+    return () => {
+      if (bufferTimerRef.current) clearTimeout(bufferTimerRef.current);
+    };
+  }, [message]);
+
   // Invalidate the Home "latest coach message" cache on unmount.
   useEffect(() => {
     return () => {
@@ -124,9 +135,20 @@ export default function VideoPlaybackScreen() {
 
   const onStatusUpdate = useCallback(
     (status: AVPlaybackStatus) => {
-      // Update buffering overlay: hide once the player is loaded and not buffering.
       if (status.isLoaded) {
-        setIsBuffering(status.isBuffering);
+        // didJustFinish: video is at end, not buffering — make sure overlay
+        // stays hidden so a subsequent replay doesn't show a stuck spinner.
+        if (status.didJustFinish) {
+          setIsBuffering(false);
+        } else {
+          setIsBuffering(status.isBuffering);
+        }
+
+        // Cancel the safety timeout once we receive a real status update.
+        if (!status.isBuffering && bufferTimerRef.current) {
+          clearTimeout(bufferTimerRef.current);
+          bufferTimerRef.current = null;
+        }
       }
 
       // Mark-viewed guard (fires at most once per mount).
@@ -144,11 +166,14 @@ export default function VideoPlaybackScreen() {
     if (navigation.canGoBack()) navigation.goBack();
   }, [navigation]);
 
+  // Inset used for all CloseButton instances in this render.
+  const topInset = insets.top;
+
   if (isPending) {
     return (
       <View style={styles.fill}>
         <ActivityIndicator color={colors.gold} />
-        <CloseButton onPress={goBack} />
+        <CloseButton onPress={goBack} topInset={topInset} />
       </View>
     );
   }
@@ -156,9 +181,9 @@ export default function VideoPlaybackScreen() {
   if (error) {
     return (
       <View style={styles.messageWrap}>
-        <Text style={styles.messageTitle}>Couldn&rsquo;t load video</Text>
+        <Text style={styles.messageTitle}>Couldn't load video</Text>
         <Text style={styles.messageBody}>{errorMessage(error)}</Text>
-        <CloseButton onPress={goBack} />
+        <CloseButton onPress={goBack} topInset={topInset} />
       </View>
     );
   }
@@ -170,7 +195,7 @@ export default function VideoPlaybackScreen() {
         <Text style={styles.messageBody}>
           This message may have been removed.
         </Text>
-        <CloseButton onPress={goBack} />
+        <CloseButton onPress={goBack} topInset={topInset} />
       </View>
     );
   }
@@ -181,27 +206,26 @@ export default function VideoPlaybackScreen() {
   if (video?.status === 'errored') {
     return (
       <View style={styles.messageWrap}>
-        <Text style={styles.messageTitle}>This video couldn&rsquo;t be processed</Text>
+        <Text style={styles.messageTitle}>This video couldn't be processed</Text>
         <Text style={styles.messageBody}>
           Your coach will need to re-record and send this one again.
         </Text>
-        <CloseButton onPress={goBack} />
+        <CloseButton onPress={goBack} topInset={topInset} />
       </View>
     );
   }
 
-  // Video is still processing — show a spinner and let the refetchInterval
-  // above poll until status becomes 'ready', then the component re-renders
-  // into the player branch automatically.
+  // Video is still processing — show a spinner and let refetchInterval
+  // poll until status flips to 'ready', then re-render into the player.
   if (!video || video.status !== 'ready' || !video.muxPlaybackId) {
     return (
       <View style={styles.messageWrap}>
         <ActivityIndicator size="large" color={colors.gold} style={styles.processingSpinner} />
-        <Text style={styles.messageTitle}>Getting video ready&hellip;</Text>
+        <Text style={styles.messageTitle}>Getting video ready…</Text>
         <Text style={styles.messageBody}>
-          Your video is on its way &mdash; this usually takes under a minute.
+          Your video is on its way — this usually takes under a minute.
         </Text>
-        <CloseButton onPress={goBack} />
+        <CloseButton onPress={goBack} topInset={topInset} />
       </View>
     );
   }
@@ -227,7 +251,7 @@ export default function VideoPlaybackScreen() {
           <ActivityIndicator size="large" color={colors.gold} />
         </View>
       )}
-      <CloseButton onPress={goBack} />
+      <CloseButton onPress={goBack} topInset={topInset} />
     </View>
   );
 }
@@ -239,9 +263,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // <Video> must NOT be sized via flex inside a centering container, or iOS
-  // collapses the AVPlayerLayer to 0×0 (audio plays, picture is invisible).
-  // Absolute-fill it so the native layer always has explicit screen-sized bounds.
+  // <Video> must be absolute-fill so the native AVPlayerLayer always has
+  // explicit bounds. Sizing via flex inside a centering container collapses
+  // the layer to 0×0 on iOS (audio plays but picture is invisible).
   video: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -251,20 +275,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.darkest,
   },
+  // Positioned absolutely at top:0 + topInset (injected as inline style).
+  // Using a plain View instead of SafeAreaView avoids the collapse bug where
+  // SafeAreaView computes zero height in some fullScreenModal presentations.
   closeOverlay: {
     position: 'absolute',
-    top: 0,
     left: 0,
     right: 0,
   },
   closeButton: {
     margin: spacing.md,
-    width: spacing['5xl'],
-    height: spacing['5xl'],
-    borderRadius: 9999,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(15, 14, 14, 0.6)',
+    backgroundColor: 'rgba(15, 14, 14, 0.72)',
   },
   closePressed: {
     opacity: 0.7,

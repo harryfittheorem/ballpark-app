@@ -1,6 +1,6 @@
 import { useRoute } from '@react-navigation/native';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAssignments } from '@/hooks/useAssignments';
@@ -87,6 +87,11 @@ export default function WorkScreen() {
     }
   }, [tab]);
 
+  // Keyboard avoidance is lifted here so it wraps only the body area,
+  // sitting below the SafeAreaView + header + sub-tab bar. This means
+  // the KAV's effective offset is zero — the view above it is already
+  // outside the KAV and the system correctly measures from here.
+  // On Android we leave behavior undefined (same as every other screen).
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
@@ -122,15 +127,19 @@ export default function WorkScreen() {
           })}
         </ScrollView>
       </View>
-      <View style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <Body />
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.darkest },
+  flex: { flex: 1 },
   header: {
     paddingHorizontal: spacing['3xl'],
     paddingTop: spacing['2xl'],
