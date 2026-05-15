@@ -3,19 +3,20 @@
  *
  * Full-screen Mux HLS player for a single coach_message. Registered in
  * both HomeStackNavigator and WorkStackNavigator so the X button always
- * returns to whichever tab the user came from (goBack within the current
- * stack, not a cross-tab navigate).
+ * returns to whichever tab the user came from.
  *
- * Fixes (Task #200 / #202):
- *   - `key={messageId}` forces a fresh AVPlayer native instance each open.
- *   - `isBuffering` overlay clears via `onPlaybackStatusUpdate`; a safety
- *     timeout (BUFFERING_TIMEOUT_MS) forces it off if the event is delayed.
- *     `didJustFinish` explicitly sets isBuffering=false so the overlay
- *     doesn't re-appear when the user replays a finished video.
- *   - Close button uses `useSafeAreaInsets` directly so it never collapses
- *     to the wrong position regardless of device or presentation context.
- *   - When video is still processing, polls every 3 s and auto-transitions
- *     to the player once status becomes 'ready'.
+ * Overlay logic (three-layer guard):
+ *   1. `videoReady` — false until onReadyForDisplay fires (actual pixels on
+ *      screen). Prevents the "black screen + timer running" bug where the
+ *      AVPlayerLayer is playing audio but hasn't painted a frame yet.
+ *   2. `isBuffering` — from onPlaybackStatusUpdate. Safety timeout re-arms
+ *      on every buffering event so replay after finish never gets stuck.
+ *   3. `BUFFERING_TIMEOUT_MS` safety — force-clears both guards if no event
+ *      arrives within 8 s (slow HLS manifest / cold start / iOS quirks).
+ *
+ * key={messageId} on <Video> forces a fresh AVPlayer native instance each
+ * time the screen is opened so a previously-stale layer can't cause a
+ * black-screen repro on the second open.
  */
 
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -37,22 +38,15 @@ import { useCoachMessage } from '@/hooks/useCoachMessage';
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
-// Generic param type — works whether this screen is mounted in HomeStack
-// or WorkStack (both define VideoPlayback: { messageId: string }).
 type VideoPlaybackParams = { messageId: string };
 type Route = RouteProp<{ VideoPlayback: VideoPlaybackParams }, 'VideoPlayback'>;
 
-// How long to wait for the first AVPlaybackStatus event before forcibly
-// clearing the buffering overlay. Avoids an infinite spinner when the HLS
-// manifest loads slowly or the event is briefly delayed on cold start.
 const BUFFERING_TIMEOUT_MS = 8000;
 
 function muxHlsUrl(playbackId: string): string {
   return `https://stream.mux.com/${playbackId}.m3u8`;
 }
 
-// Close button positioned using explicit safe-area insets so it never
-// collapses to the wrong corner regardless of device or modal context.
 function CloseButton({ onPress, topInset }: { onPress: () => void; topInset: number }) {
   return (
     <View
@@ -77,16 +71,12 @@ function CloseButton({ onPress, topInset }: { onPress: () => void; topInset: num
 
 export default function VideoPlaybackScreen() {
   const route = useRoute<Route>();
-  // useNavigation without a generic — we only need goBack() / canGoBack(),
-  // which exist on every navigation object regardless of stack.
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { messageId } = route.params;
 
   const qc = useQueryClient();
 
-  // Poll every 3 s while the video is still processing so the screen
-  // auto-advances to the player without the user having to navigate away.
   const { data: message, isPending, error } = useCoachMessage(messageId, {
     refetchInterval: (query) => {
       const d = query.state.data as { video?: { status?: string } | null } | null | undefined;
@@ -95,79 +85,103 @@ export default function VideoPlaybackScreen() {
     },
   });
 
-  // Track native player buffering state to show/hide the spinner overlay.
-  // Starts true; cleared by onPlaybackStatusUpdate or the safety timeout.
-  const [isBuffering, setIsBuffering] = useState(true);
-  const bufferTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // videoReady: true once onReadyForDisplay fires (actual pixels painted).
+  // Starts false — overlay stays on until AVPlayerLayer has real frames.
+  const [videoReady, setVideoReady] = useState(false);
+  // isBuffering: mirrors the native player's buffering state.
+  // Starts false because the overlay is already covered by !videoReady.
+  const [isBuffering, setIsBuffering] = useState(false);
 
-  // Guard so the mark-viewed mutation only fires once per mount.
+  const bufferTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markedRef = useRef(false);
 
-  const markViewed = useMutation({
-    mutationFn: () => markCoachMessageViewed(messageId),
-    onError: (err) => {
-      // eslint-disable-next-line no-console
-      console.warn('markCoachMessageViewed failed:', errorMessage(err));
-    },
-  });
+  // Re-usable helper: arm (or re-arm) the safety timeout.
+  // Called on initial video-ready and on every subsequent buffering event
+  // so replay after finish never produces a permanently-stuck spinner.
+  const armSafetyTimeout = useCallback(() => {
+    if (bufferTimerRef.current) clearTimeout(bufferTimerRef.current);
+    bufferTimerRef.current = setTimeout(() => {
+      setVideoReady(true);
+      setIsBuffering(false);
+    }, BUFFERING_TIMEOUT_MS);
+  }, []);
 
-  // Start the safety timeout once we know the video is ready. Cleared if
-  // onPlaybackStatusUpdate fires first (normal path).
+  const clearSafetyTimeout = useCallback(() => {
+    if (bufferTimerRef.current) {
+      clearTimeout(bufferTimerRef.current);
+      bufferTimerRef.current = null;
+    }
+  }, []);
+
+  // Arm the initial safety timeout as soon as the video row is ready.
+  // Cleanup on unmount (or when message changes during processing-poll).
   useEffect(() => {
     const video = (message as { video?: { status?: string; muxPlaybackId?: string } | null } | null)?.video;
     if (!video || video.status !== 'ready' || !video.muxPlaybackId) return;
+    armSafetyTimeout();
+    return () => clearSafetyTimeout();
+  }, [message, armSafetyTimeout, clearSafetyTimeout]);
 
-    bufferTimerRef.current = setTimeout(() => {
-      setIsBuffering(false);
-    }, BUFFERING_TIMEOUT_MS);
-
-    return () => {
-      if (bufferTimerRef.current) clearTimeout(bufferTimerRef.current);
-    };
-  }, [message]);
-
-  // Invalidate the Home "latest coach message" cache on unmount.
+  // Invalidate the Home card cache on unmount.
   useEffect(() => {
     return () => {
       void qc.invalidateQueries({ queryKey: ['coachMessages', 'latest'] });
     };
   }, [qc]);
 
+  // onReadyForDisplay fires when AVPlayerLayer has painted the first frame.
+  // This is the right signal to hide the "black screen" overlay — NOT the
+  // first isBuffering=false event, which can arrive before pixels show.
+  const onReadyForDisplay = useCallback(() => {
+    setVideoReady(true);
+    clearSafetyTimeout();
+  }, [clearSafetyTimeout]);
+
   const onStatusUpdate = useCallback(
     (status: AVPlaybackStatus) => {
-      if (status.isLoaded) {
-        // didJustFinish: video is at end, not buffering — make sure overlay
-        // stays hidden so a subsequent replay doesn't show a stuck spinner.
-        if (status.didJustFinish) {
-          setIsBuffering(false);
-        } else {
-          setIsBuffering(status.isBuffering);
-        }
+      if (!status.isLoaded) return;
 
-        // Cancel the safety timeout once we receive a real status update.
-        if (!status.isBuffering && bufferTimerRef.current) {
-          clearTimeout(bufferTimerRef.current);
-          bufferTimerRef.current = null;
-        }
+      if (status.didJustFinish) {
+        // Video reached the end. Clear overlay so replay is clean.
+        setIsBuffering(false);
+        clearSafetyTimeout();
+      } else if (status.isBuffering) {
+        // Mid-playback buffer stall OR replay-seek buffer.
+        // Re-arm the safety timeout so we never get permanently stuck.
+        setIsBuffering(true);
+        armSafetyTimeout();
+      } else {
+        setIsBuffering(false);
+        clearSafetyTimeout();
       }
 
       // Mark-viewed guard (fires at most once per mount).
       if (markedRef.current) return;
-      if (!status.isLoaded) return;
       if (status.isPlaying || (status.positionMillis ?? 0) > 0) {
         markedRef.current = true;
         markViewed.mutate();
       }
     },
-    [markViewed],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [armSafetyTimeout, clearSafetyTimeout],
   );
+
+  const markViewed = useMutation({
+    mutationFn: () => markCoachMessageViewed(messageId),
+    onError: (err) => {
+      console.warn('markCoachMessageViewed failed:', errorMessage(err));
+    },
+  });
 
   const goBack = useCallback(() => {
     if (navigation.canGoBack()) navigation.goBack();
   }, [navigation]);
 
-  // Inset used for all CloseButton instances in this render.
   const topInset = insets.top;
+
+  // Overlay is visible when AVPlayer hasn't painted frames yet OR is
+  // mid-buffer stall. Both guards must be clear before we hide it.
+  const showOverlay = !videoReady || isBuffering;
 
   if (isPending) {
     return (
@@ -202,7 +216,6 @@ export default function VideoPlaybackScreen() {
 
   const video = message.video;
 
-  // Video errored — permanent dead end.
   if (video?.status === 'errored') {
     return (
       <View style={styles.messageWrap}>
@@ -215,8 +228,6 @@ export default function VideoPlaybackScreen() {
     );
   }
 
-  // Video is still processing — show a spinner and let refetchInterval
-  // poll until status flips to 'ready', then re-render into the player.
   if (!video || video.status !== 'ready' || !video.muxPlaybackId) {
     return (
       <View style={styles.messageWrap}>
@@ -234,8 +245,7 @@ export default function VideoPlaybackScreen() {
     <View style={styles.fill}>
       {/*
        * key={messageId} forces a fresh AVPlayer native instance every time
-       * this screen is opened. Without it, expo-av can reuse a stale player
-       * from a previous mount and show a black screen on the second open.
+       * this screen is opened, preventing stale-layer black-screen repros.
        */}
       <Video
         key={messageId}
@@ -244,9 +254,10 @@ export default function VideoPlaybackScreen() {
         resizeMode={ResizeMode.CONTAIN}
         shouldPlay
         useNativeControls
+        onReadyForDisplay={onReadyForDisplay}
         onPlaybackStatusUpdate={onStatusUpdate}
       />
-      {isBuffering && (
+      {showOverlay && (
         <View style={styles.bufferOverlay}>
           <ActivityIndicator size="large" color={colors.gold} />
         </View>
@@ -263,9 +274,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // <Video> must be absolute-fill so the native AVPlayerLayer always has
-  // explicit bounds. Sizing via flex inside a centering container collapses
-  // the layer to 0×0 on iOS (audio plays but picture is invisible).
   video: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -275,9 +283,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.darkest,
   },
-  // Positioned absolutely at top:0 + topInset (injected as inline style).
-  // Using a plain View instead of SafeAreaView avoids the collapse bug where
-  // SafeAreaView computes zero height in some fullScreenModal presentations.
   closeOverlay: {
     position: 'absolute',
     left: 0,

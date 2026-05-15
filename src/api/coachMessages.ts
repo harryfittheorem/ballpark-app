@@ -246,6 +246,10 @@ export async function getLatestCoachMessageForKid(
       'id, created_at, viewed_at, message_text, sender_user_id, video:videos(status, mux_playback_id, duration_seconds)',
     )
     .eq('recipient_kid_id', kidId)
+    // Only coach→family messages on the Home card. Parent→coach messages
+    // (recipient_coach_user_id IS NOT NULL) are in the Work tab thread and
+    // should not surface here as "latest video from coach".
+    .is('recipient_coach_user_id', null)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
