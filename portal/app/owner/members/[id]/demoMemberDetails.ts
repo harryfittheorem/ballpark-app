@@ -32,6 +32,24 @@ function pmt(id: string, daysAgo: number, amount: number, status: 'paid' | 'fail
 }
 
 export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
+  d00: {
+    id: 'd00', kidId: 'k00', name: 'Alex Owner Jr.', age: '12U', parent: 'Owner Demo',
+    program: 'Unlimited Monthly', planType: 'eft', status: 'active', engagementScore: 38,
+    churnRisk: 'high', lastSession: '31d ago', nextCharge: 'Overdue', mrr: 280, lifetime: 2240, joinedDate: 'May 2024',
+    riskReason: '31 days without a session and one failed payment. This is your owner test account — use it to verify email delivery.',
+    memberForMonths: 24, bookingCount: 14, hittraxSessionCount: 7, pointsBalance: 410,
+    bestVeloMph: 62, homeworkScore: 4, parentEmail: 'owner@infinitehitting.com', parentPhone: '(214) 555-0001',
+    paymentMethod: 'Visa ·0001', hittraxAvgExitVelo: 59.5, hittraxBestVelo: 62, hittraxLaunchAngle: 12,
+    sparklinePoints: [56, 57, 58, 59, 60, 61, 62, 61, 60, 59],
+    timeline: [
+      tl('t1', 'payment', 4, 'Payment failed', 'Unlimited Monthly — Card declined', 'failed', 280),
+      tl('t2', 'booking', 31, 'Last session', 'Private · Coach Mike · Cage 1', 'completed'),
+      tl('t3', 'booking', 45, 'Session completed', 'Private · Coach Mike · Cage 3', 'completed'),
+      tl('t4', 'payment', 35, 'Payment processed', 'Unlimited Monthly — Auto-pay', 'paid', 280),
+    ],
+    recentPayments: [pmt('p1', 4, 280, 'failed', 'Visa ·0001'), pmt('p2', 35, 280, 'paid', 'Visa ·0001')],
+    cancelAt: null,
+  },
   d01: {
     id: 'd01', kidId: 'k01', name: 'Jake Martinez', age: '12U', parent: 'Carlos Martinez',
     program: 'Unlimited Monthly', planType: 'eft', status: 'active', engagementScore: 92,
