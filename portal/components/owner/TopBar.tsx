@@ -227,7 +227,7 @@ export function TopBar({ role, onRoleChange, userName = 'Owner', locationName = 
                 Dashboard
               </div>
               <div
-                onClick={() => { setUserOpen(false); router.push('/logout'); }}
+                onClick={() => { setUserOpen(false); window.location.href = '/logout'; }}
                 style={{ ...dropItem, color: brand.danger, borderTop: `1px solid ${brand.border}` }}
                 onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = brand.dangerBg; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
@@ -258,6 +258,7 @@ export function TopBar({ role, onRoleChange, userName = 'Owner', locationName = 
                 onChange={e => setSearchQuery(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && filtered.length > 0) go(filtered[0].path); }}
                 placeholder="Search pages, members, payments..."
+                className="search-modal-input"
                 style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, color: brand.text, background: 'transparent', fontFamily: fonts.body }}
               />
               <div onClick={() => setSearchOpen(false)} style={{ cursor: 'pointer', padding: 4, borderRadius: 4 }}>

@@ -87,6 +87,11 @@ body {
   color: var(--color-cream-light);
 }
 
+.search-modal-input::selection {
+  background-color: #2d2b2a;
+  color: #f1e5ad;
+}
+
 .font-display {
   font-family: var(--font-display);
   letter-spacing: 0.01em;

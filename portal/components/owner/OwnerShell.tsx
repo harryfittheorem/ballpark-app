@@ -7,7 +7,13 @@ import { brand } from '@/lib/ownerBrandTokens';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
-export function OwnerShell({ children }: { children: ReactNode }) {
+interface OwnerShellProps {
+  children: ReactNode;
+  locationName?: string;
+  userName?: string;
+}
+
+export function OwnerShell({ children, locationName, userName }: OwnerShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
@@ -25,7 +31,7 @@ export function OwnerShell({ children }: { children: ReactNode }) {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} role={role} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <TopBar role={role} onRoleChange={handleRoleChange} />
+          <TopBar role={role} onRoleChange={handleRoleChange} locationName={locationName} userName={userName} />
           <div style={{ flex: 1, overflowY: 'auto', background: brand.cream }}>
             {children}
           </div>
