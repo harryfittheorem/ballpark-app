@@ -8,5 +8,5 @@ export default async function SchedulePage() {
   const { data: { session } } = await supabase.auth.getSession();
   const tenantId = readTenantId(session) ?? '';
   const data = await getOwnerScheduleData(supabase, tenantId);
-  return <ScheduleContent data={data} />;
+  return <ScheduleContent data={data} tenantId={tenantId} />;
 }

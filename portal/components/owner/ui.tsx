@@ -116,6 +116,7 @@ export function OButton({
   onClick,
   disabled = false,
   style: extraStyle = {},
+  type = 'button',
 }: {
   children?: ReactNode;
   variant?: OBtnVariant;
@@ -124,11 +125,12 @@ export function OButton({
   onClick?: () => void;
   disabled?: boolean;
   style?: CSSProperties;
+  type?: 'button' | 'submit' | 'reset';
 }) {
   const v = btnVariants[variant];
   const s = btnSizes[size];
   return (
-    <button onClick={onClick} disabled={disabled} style={{
+    <button type={type} onClick={onClick} disabled={disabled} style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
       padding: s.padding, fontSize: s.fontSize,
       background: v.bg, color: v.color,
