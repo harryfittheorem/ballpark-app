@@ -196,6 +196,8 @@ export function ScheduleContent({ data, tenantId }: Props) {
   useEffect(() => {
     if (!tenantId) return;
 
+    let cancelled = false;
+
     let rangeStart: Date, rangeEnd: Date;
     if (viewMode === 'month') {
       rangeStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1, 0, 0, 0, 0);
@@ -212,7 +214,7 @@ export function ScheduleContent({ data, tenantId }: Props) {
     const supabase = createClient();
     (async () => {
       try {
-        const { data: raw } = await supabase
+        const { data: raw, error } = await supabase
           .from('bookings')
           .select(`id, scheduled_start, scheduled_end, cage_number, status,
                    session_types(name), kids(first_name, last_name), coaches(first_name, last_name)`)
@@ -220,6 +222,8 @@ export function ScheduleContent({ data, tenantId }: Props) {
           .gte('scheduled_start', rangeStart.toISOString())
           .lte('scheduled_start', rangeEnd.toISOString())
           .order('scheduled_start');
+        if (cancelled) return;
+        if (error) { console.error('[schedule] fetch error:', error.message); return; }
         if (!raw) return;
         const mapped: ScheduleBooking[] = raw.map(b => {
           const kid   = b.kids as unknown as { first_name: string; last_name: string | null } | null;
@@ -241,9 +245,11 @@ export function ScheduleContent({ data, tenantId }: Props) {
           return [...mapped, ...local];
         });
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+
+    return () => { cancelled = true; };
   }, [tenantId, currentDate, viewMode]);
 
   // ── Toast auto-clear ─────────────────────────────────────────────────────
