@@ -238,7 +238,7 @@ export function MembersContent({ members }: Props) {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                 <div>
-                  <label style={labelStyle}>Kid's Name</label>
+                  <label style={labelStyle}>Kid&apos;s Name</label>
                   <input required style={inputStyle} value={form.kidName} onChange={e => setForm(f => ({ ...f, kidName: e.target.value }))} placeholder="Jake Martinez" />
                 </div>
                 <div>
