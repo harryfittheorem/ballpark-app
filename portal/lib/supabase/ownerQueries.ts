@@ -1171,6 +1171,24 @@ export async function getTenantName(supabase: SupabaseClient, tenantId: string):
   return data?.name ?? 'Your Location';
 }
 
+/**
+ * Look up a tenant name by slug using a service-role client (bypasses RLS).
+ * Used as a fallback when the caller's JWT lacks a `tenant_id` claim — e.g.
+ * sessions issued before the custom_access_token_hook was updated for
+ * owner/admin accounts.
+ */
+export async function getTenantNameBySlug(
+  serviceSupabase: SupabaseClient,
+  slug: string,
+): Promise<string> {
+  const { data } = await serviceSupabase
+    .from('tenants')
+    .select('name')
+    .eq('slug', slug)
+    .single();
+  return data?.name ?? 'Your Location';
+}
+
 // ─── Location Stripe Status ───────────────────────────────────────────────────
 
 export type LocationStripeStatus = {

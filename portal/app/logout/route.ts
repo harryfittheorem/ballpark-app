@@ -9,17 +9,42 @@ import { createClient } from "@/lib/supabase/server";
  *
  * `?reason=parent` is preserved so the login screen can show the
  * "this portal is for coaches and admins" message after the redirect.
+ *
+ * URL construction: Replit's proxy routes all external traffic to the
+ * portal (port 3000) regardless of the URL port suffix, so
+ * `request.nextUrl` can carry a host of `0.0.0.0:5000` (the Expo Metro
+ * server port). We use the `x-forwarded-host` / `x-forwarded-proto`
+ * headers set by the proxy when available. For direct container access
+ * we normalise any raw-IP host to port 3000.
  */
 async function handler(request: NextRequest) {
   const supabase = await createClient();
   await supabase.auth.signOut();
 
   const reason = request.nextUrl.searchParams.get("reason") ?? "signedout";
-  const url = request.nextUrl.clone();
-  url.pathname = "/login";
-  url.search = "";
-  url.searchParams.set("reason", reason);
-  return NextResponse.redirect(url);
+
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const forwardedProto =
+    request.headers.get("x-forwarded-proto") ?? "https";
+
+  let loginUrl: URL;
+
+  if (forwardedHost) {
+    loginUrl = new URL(
+      `/login?reason=${encodeURIComponent(reason)}`,
+      `${forwardedProto}://${forwardedHost}`,
+    );
+  } else {
+    const url = request.nextUrl.clone();
+    const rawIP = /^(0\.0\.0\.0|127\.0\.0\.1|localhost)$/.test(url.hostname);
+    if (rawIP) url.port = "3000";
+    url.pathname = "/login";
+    url.search = "";
+    url.searchParams.set("reason", reason);
+    loginUrl = url;
+  }
+
+  return NextResponse.redirect(loginUrl);
 }
 
 export const GET = handler;
