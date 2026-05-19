@@ -30,9 +30,12 @@ async function handler(request: NextRequest) {
   let loginUrl: URL;
 
   if (forwardedHost) {
+    // x-forwarded-host can be a comma-separated list when multiple proxies
+    // are in play; take only the first (outermost) token and strip whitespace.
+    const safeHost = forwardedHost.split(",")[0].trim();
     loginUrl = new URL(
       `/login?reason=${encodeURIComponent(reason)}`,
-      `${forwardedProto}://${forwardedHost}`,
+      `${forwardedProto}://${safeHost}`,
     );
   } else {
     const url = request.nextUrl.clone();
