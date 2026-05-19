@@ -126,6 +126,7 @@ export function PointsRewardsContent({ data }: Props) {
 
   const [editForm, setEditForm] = useState({ action: '', points: '' });
   const [addForm,  setAddForm]  = useState({ action: '', points: '' });
+  const [hoveredEditId, setHoveredEditId] = useState<number | null>(null);
 
   const hasLiveData       = data.totalPointsIssued > 0 || data.products.length > 0 || data.topEarners.length > 0;
   const products          = hasLiveData ? data.products    : DEMO_PRODUCTS;
@@ -174,7 +175,12 @@ export function PointsRewardsContent({ data }: Props) {
         title="Points & Rewards"
         subtitle="Configure the points system that drives athlete engagement"
         actions={
-          <OButton variant="gold" icon={Plus} onClick={tab === 'rules' ? openAdd : undefined}>
+          <OButton
+            variant="gold"
+            icon={Plus}
+            onClick={tab === 'rules' ? openAdd : undefined}
+            disabled={tab === 'rewards'}
+          >
             {tab === 'rules' ? 'Add Rule' : 'Add Reward'}
           </OButton>
         }
@@ -231,10 +237,10 @@ export function PointsRewardsContent({ data }: Props) {
                     onClick={() => openEdit(r)}
                     title="Edit rule"
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', flexShrink: 0 }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = brand.goldDeep; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = brand.textMuted; }}
+                    onMouseEnter={() => setHoveredEditId(r.id)}
+                    onMouseLeave={() => setHoveredEditId(null)}
                   >
-                    <Edit2 size={14} color={brand.textMuted} />
+                    <Edit2 size={14} color={hoveredEditId === r.id ? brand.goldDeep : brand.textMuted} />
                   </button>
                 </div>
               ))}
