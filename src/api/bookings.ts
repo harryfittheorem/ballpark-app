@@ -29,10 +29,43 @@ export async function listSessionTypes(): Promise<SessionType[]> {
 }
 
 /**
- * Fetch all coach_availability rows the caller can see (RLS scopes by tenant).
+ * Fetch coach_availability rows the caller can see (RLS scopes by tenant).
  * Returns recurring weekly windows; one row per coach + day_of_week.
+ *
+ * When `locationId` is provided, only returns availability for coaches that
+ * are assigned to that location via the `coach_locations` junction table.
+ * coach_availability has no location_id column, so we resolve the coach
+ * set first, then filter availability by coach_id.
+ *
+ * coach_locations is a Phase 2 table not yet in generated database.ts types;
+ * the untyped client is used for that query only.
  */
-export async function listCoachAvailability(): Promise<CoachAvailability[]> {
+export async function listCoachAvailability(
+  locationId?: string | null,
+): Promise<CoachAvailability[]> {
+  if (locationId) {
+    // Resolve which coach_ids are assigned to this location.
+    const { data: coachLocs, error: clErr } = await (
+      supabase as unknown as import('@supabase/supabase-js').SupabaseClient
+    )
+      .from('coach_locations')
+      .select('coach_id')
+      .eq('location_id', locationId);
+    if (clErr) throw clErr;
+
+    const coachIds: string[] = (coachLocs ?? []).map(
+      (r: { coach_id: string }) => r.coach_id,
+    );
+    if (coachIds.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('coach_availability')
+      .select('*')
+      .in('coach_id', coachIds);
+    if (error) throw error;
+    return data ?? [];
+  }
+
   const { data, error } = await supabase
     .from('coach_availability')
     .select('*');
@@ -60,9 +93,41 @@ export async function listDayBookings(
 }
 
 /**
- * Fetch all active coaches the caller can see (RLS scopes by tenant).
+ * Fetch active coaches the caller can see (RLS scopes by tenant).
+ *
+ * When `locationId` is provided, only coaches assigned to that location via
+ * the `coach_locations` junction table are returned. A coach is visible at a
+ * location regardless of which location is their primary — any assignment row
+ * in coach_locations qualifies.
+ *
+ * coach_locations is a Phase 2 table not yet in generated database.ts types;
+ * the untyped client is used for that query only.
  */
-export async function listCoaches(): Promise<Coach[]> {
+export async function listCoaches(locationId?: string | null): Promise<Coach[]> {
+  if (locationId) {
+    const { data: coachLocs, error: clErr } = await (
+      supabase as unknown as import('@supabase/supabase-js').SupabaseClient
+    )
+      .from('coach_locations')
+      .select('coach_id')
+      .eq('location_id', locationId);
+    if (clErr) throw clErr;
+
+    const coachIds: string[] = (coachLocs ?? []).map(
+      (r: { coach_id: string }) => r.coach_id,
+    );
+    if (coachIds.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('coaches')
+      .select('*')
+      .eq('is_active', true)
+      .in('id', coachIds)
+      .order('first_name', { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  }
+
   const { data, error } = await supabase
     .from('coaches')
     .select('*')

@@ -6,7 +6,7 @@ import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/th
 import { useCoachAvailability } from '../hooks/useCoachAvailability';
 import { useCoaches } from '../hooks/useCoaches';
 import { useDayBookings } from '../hooks/useDayBookings';
-import { usePrimaryLocation } from '../hooks/usePrimaryLocation';
+import { useActiveLocation } from '../hooks/useActiveLocation';
 import {
   formatSlotTime,
   generateDaySlots,
@@ -33,7 +33,7 @@ export default function TimeSection({
   onSelectSlot,
 }: Props) {
   const availability = useCoachAvailability();
-  const location = usePrimaryLocation();
+  const location = useActiveLocation();
   const coaches = useCoaches();
   const bookings = useDayBookings(date, location.data?.timezone ?? null);
 

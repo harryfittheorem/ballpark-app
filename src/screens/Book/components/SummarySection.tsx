@@ -7,7 +7,7 @@ import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 
 import { useCoaches } from '../hooks/useCoaches';
 import { useCreateBooking } from '../hooks/useCreateBooking';
-import { usePrimaryLocation } from '../hooks/usePrimaryLocation';
+import { useActiveLocation } from '../hooks/useActiveLocation';
 import type { SessionType } from '@/api/bookings';
 import type { Slot } from '../utils/slots';
 import SectionCard from './SectionCard';
@@ -69,7 +69,7 @@ export default function SummarySection({
   onBooked,
 }: Props) {
   const { family, kids } = useFamily();
-  const location = usePrimaryLocation();
+  const location = useActiveLocation();
   const coaches = useCoaches();
   const createBooking = useCreateBooking();
   const [errorVisible, setErrorVisible] = useState(false);

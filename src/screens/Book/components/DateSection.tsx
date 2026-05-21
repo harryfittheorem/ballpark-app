@@ -4,7 +4,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 
 import { useCoachAvailability } from '../hooks/useCoachAvailability';
-import { usePrimaryLocation } from '../hooks/usePrimaryLocation';
+import { useActiveLocation } from '../hooks/useActiveLocation';
 import { computeAvailableDates } from '../utils/availability';
 import Calendar from './Calendar';
 import SectionCard from './SectionCard';
@@ -23,7 +23,7 @@ export default function DateSection({
   onSelectDate,
 }: Props) {
   const availability = useCoachAvailability();
-  const location = usePrimaryLocation();
+  const location = useActiveLocation();
 
   const computed = useMemo(() => {
     if (!availability.data || durationMinutes == null) return null;

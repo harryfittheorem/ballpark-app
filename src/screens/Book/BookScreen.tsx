@@ -13,10 +13,12 @@ import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/th
 
 import BookHeader from './components/BookHeader';
 import DateSection from './components/DateSection';
+import LocationContextPill from './components/LocationContextPill';
 import MultiDaySlotList from './components/MultiDaySlotList';
 import SessionTypeSection from './components/SessionTypeSection';
 import SummarySection from './components/SummarySection';
 import TimeSection from './components/TimeSection';
+import { useLocationContext } from './hooks/useLocationContext';
 import { useSessionTypes } from './hooks/useSessionTypes';
 import { styles as flowStyles } from './styles';
 import type { Slot } from './utils/slots';
@@ -86,6 +88,13 @@ export default function BookScreen() {
   const { data: sessionTypes } = useSessionTypes();
   const selectedSessionType: SessionType | null =
     sessionTypes?.find((s) => s.id === selectedSessionTypeId) ?? null;
+
+  const {
+    activeLocation,
+    allowCrossLocation,
+    allLocations,
+    setActiveLocationId,
+  } = useLocationContext();
 
   const { data: bookings } = useFamilyBookings();
   const today = new Date();
@@ -180,6 +189,16 @@ export default function BookScreen() {
   return (
     <SafeAreaView style={flowStyles.safe} edges={['top']}>
       <BookHeader />
+      {activeLocation ? (
+        <View style={shellStyles.locationPillWrap}>
+          <LocationContextPill
+            locationName={activeLocation.name}
+            allowSwitch={allowCrossLocation}
+            allLocations={allLocations}
+            onSelect={setActiveLocationId}
+          />
+        </View>
+      ) : null}
       <ScrollView
         ref={scrollRef}
         style={flowStyles.scroll}
@@ -399,6 +418,10 @@ export default function BookScreen() {
 }
 
 const shellStyles = StyleSheet.create({
+  locationPillWrap: {
+    paddingHorizontal: spacing['3xl'],
+    paddingBottom: spacing.lg,
+  },
   tabBar: {
     paddingHorizontal: spacing['3xl'],
     paddingVertical: spacing.lg,

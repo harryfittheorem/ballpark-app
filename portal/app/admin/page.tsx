@@ -23,6 +23,11 @@ const TILES = [
     title: "Tenant settings",
     body: "Configure per-location settings such as the HitTrax Facility ID.",
   },
+  {
+    href: "/admin/coaches",
+    title: "Coaches",
+    body: "Manage coach location assignments across facilities.",
+  },
 ];
 
 export default function AdminPage() {
