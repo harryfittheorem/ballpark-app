@@ -24,6 +24,9 @@ export type SignUpInput = {
   phone?: string;
   /** Override the baked-in tenant slug. Used by LocationPickerScreen. */
   tenantSlug?: string;
+  /** The UUID of the location the parent selected. Used by LocationPickerScreen.
+   *  When present, `handle_new_user` sets `families.primary_location_id`. */
+  locationId?: string;
 };
 
 export async function signUpParent(input: SignUpInput) {
@@ -45,6 +48,7 @@ export async function signUpParent(input: SignUpInput) {
         first_name: input.firstName.trim(),
         last_name: input.lastName.trim(),
         phone: input.phone?.trim() ?? null,
+        ...(input.locationId ? { location_id: input.locationId } : {}),
       },
     },
   });

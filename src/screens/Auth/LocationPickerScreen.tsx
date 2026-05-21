@@ -120,6 +120,7 @@ export default function LocationPickerScreen({ route, navigation }: Props) {
         lastName: signUpData.lastName,
         phone: signUpData.phone,
         tenantSlug: loc.tenantSlug,
+        locationId: loc.id,
       });
       // Auth state listener in RootNavigator routes the user into the app.
     } catch (err) {
