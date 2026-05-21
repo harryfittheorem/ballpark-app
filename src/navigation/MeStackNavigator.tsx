@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import BookingDetailScreen from '@/screens/Me/BookingDetailScreen';
 import BookingsListScreen from '@/screens/Me/BookingsListScreen';
+import ChangeLocationScreen from '@/screens/Me/ChangeLocationScreen';
 import ConnectHitTraxScreen from '@/screens/Me/ConnectHitTraxScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
 import PaymentMethodScreen from '@/screens/Me/PaymentMethodScreen';
@@ -50,6 +51,11 @@ export default function MeStackNavigator() {
         name="PaymentMethod"
         component={PaymentMethodScreen}
         options={{ title: 'Payment Method' }}
+      />
+      <Stack.Screen
+        name="ChangeLocation"
+        component={ChangeLocationScreen}
+        options={{ title: 'My Location' }}
       />
     </Stack.Navigator>
   );

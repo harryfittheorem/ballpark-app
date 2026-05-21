@@ -9,6 +9,7 @@ import {
   type LucideIcon,
   LogOut,
   type LucideProps,
+  MapPin,
   Ruler,
   Sparkles,
   Star,
@@ -44,6 +45,7 @@ import { useFamily } from '@/hooks/useFamily';
 import { useHitTraxLink } from '@/hooks/useHitTraxLink';
 import { usePersonalBestsForKid, useSwingsForKid } from '@/hooks/useSwings';
 import type { MeStackScreenProps } from '@/navigation/types';
+import { usePrimaryLocation } from '@/screens/Book/hooks/usePrimaryLocation';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
@@ -100,6 +102,8 @@ export default function ProfileScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { family, kids } = useFamily();
   const kid = kids[0] ?? null;
+
+  const { data: primaryLocation } = usePrimaryLocation();
 
   const { data: hittraxLink } = useHitTraxLink(kid?.id);
   const hittraxStatus =
@@ -300,6 +304,13 @@ export default function ProfileScreen({ navigation }: Props) {
           subtitle="Manage billing card"
           subtitleTone="muted"
           onPress={() => navigation.navigate('PaymentMethod')}
+        />
+        <Row
+          icon={MapPin}
+          label="My Location"
+          subtitle={primaryLocation?.name ?? (family?.primary_location_id ? 'Loading…' : 'Not set')}
+          subtitleTone="muted"
+          onPress={() => navigation.navigate('ChangeLocation')}
         />
         <Row
           icon={Activity}

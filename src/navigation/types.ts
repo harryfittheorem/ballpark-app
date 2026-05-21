@@ -129,6 +129,7 @@ export type MeStackParamList = {
   Orders: undefined;
   ConnectHitTrax: undefined;
   PaymentMethod: undefined;
+  ChangeLocation: undefined;
 };
 
 export type MeStackScreenProps<T extends keyof MeStackParamList> = CompositeScreenProps<
