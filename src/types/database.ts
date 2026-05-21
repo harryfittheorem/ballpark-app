@@ -805,6 +805,9 @@ export type Database = {
           phone: string | null
           state: string | null
           stripe_account_id: string | null
+          stripe_account_name: string | null
+          stripe_onboarding_status: string
+          stripe_payout_interval: string | null
           tenant_id: string
           timezone: string
           updated_at: string
@@ -820,6 +823,9 @@ export type Database = {
           phone?: string | null
           state?: string | null
           stripe_account_id?: string | null
+          stripe_account_name?: string | null
+          stripe_onboarding_status?: string
+          stripe_payout_interval?: string | null
           tenant_id: string
           timezone?: string
           updated_at?: string
@@ -835,6 +841,9 @@ export type Database = {
           phone?: string | null
           state?: string | null
           stripe_account_id?: string | null
+          stripe_account_name?: string | null
+          stripe_onboarding_status?: string
+          stripe_payout_interval?: string | null
           tenant_id?: string
           timezone?: string
           updated_at?: string
@@ -1491,6 +1500,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          royalty_config: Json
           slug: string
           stripe_account_id: string | null
           updated_at: string
@@ -1501,6 +1511,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          royalty_config?: Json
           slug: string
           stripe_account_id?: string | null
           updated_at?: string
@@ -1511,6 +1522,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          royalty_config?: Json
           slug?: string
           stripe_account_id?: string | null
           updated_at?: string
