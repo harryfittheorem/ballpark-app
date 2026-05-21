@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { readAppRole } from "@/lib/auth";
-import { SiteHeader } from "@/components/SiteHeader";
+import { PortalShell } from "@/components/PortalShell";
 
 export default async function CoachLayout({
   children,
@@ -10,8 +10,6 @@ export default async function CoachLayout({
 }) {
   const supabase = await createClient();
 
-  // Verified auth check (validates JWT with Supabase). Middleware also
-  // gates /coach/* but layouts re-check as defence in depth.
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -24,16 +22,12 @@ export default async function CoachLayout({
 
   if (role === "admin") redirect("/admin");
   if (role !== "coach") {
-    // Parent (or unknown role) — bounce through the logout route so the
-    // session cookie is actually cleared (Server Components can't write
-    // cookies; Route Handlers can).
     redirect("/logout?reason=parent");
   }
 
   return (
-    <div className="min-h-screen">
-      <SiteHeader email={user.email ?? null} role="coach" />
+    <PortalShell role="coach" email={user.email ?? null}>
       <div className="mx-auto max-w-5xl px-6 py-8">{children}</div>
-    </div>
+    </PortalShell>
   );
 }

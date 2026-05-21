@@ -99,7 +99,7 @@ type OBtnSize = 'sm' | 'md';
 const btnVariants: Record<OBtnVariant, { bg: string; color: string; border: string }> = {
   primary: { bg: brand.dark, color: brand.gold, border: brand.dark },
   gold: { bg: brand.gold, color: brand.dark, border: brand.gold },
-  secondary: { bg: brand.white, color: brand.text, border: brand.borderStrong },
+  secondary: { bg: brand.darker, color: brand.cream, border: brand.borderStrong },
   ghost: { bg: 'transparent', color: brand.textMuted, border: 'transparent' },
 };
 

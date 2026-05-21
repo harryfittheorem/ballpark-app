@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { OwnerShell } from '@/components/owner/OwnerShell';
+import { PortalShell } from '@/components/PortalShell';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { readTenantId } from '@/lib/auth';
@@ -12,6 +12,7 @@ export const metadata = {
 export default async function OwnerLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
 
   const tenantId = readTenantId(session);
 
@@ -33,8 +34,13 @@ export default async function OwnerLayout({ children }: { children: ReactNode })
     ?? 'Owner';
 
   return (
-    <OwnerShell locationName={locationName} userName={userName}>
+    <PortalShell
+      role="owner"
+      email={user?.email ?? null}
+      userName={userName}
+      locationName={locationName}
+    >
       {children}
-    </OwnerShell>
+    </PortalShell>
   );
 }

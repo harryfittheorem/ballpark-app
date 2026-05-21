@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { readAppRole } from "@/lib/auth";
-import { SiteHeader } from "@/components/SiteHeader";
+import { PortalShell } from "@/components/PortalShell";
 
 export default async function AdminLayout({
   children,
@@ -10,7 +10,6 @@ export default async function AdminLayout({
 }) {
   const supabase = await createClient();
 
-  // Verified auth check — see CoachLayout for rationale.
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -27,9 +26,8 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen">
-      <SiteHeader email={user.email ?? null} role="admin" />
+    <PortalShell role="admin" email={user.email ?? null}>
       <div className="mx-auto max-w-5xl px-6 py-8">{children}</div>
-    </div>
+    </PortalShell>
   );
 }
