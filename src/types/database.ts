@@ -324,6 +324,45 @@ export type Database = {
           },
         ]
       }
+      coach_locations: {
+        Row: {
+          coach_id: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          location_id: string
+        }
+        Insert: {
+          coach_id: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          location_id: string
+        }
+        Update: {
+          coach_id?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          location_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_locations_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coach_messages: {
         Row: {
           created_at: string
