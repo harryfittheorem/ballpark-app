@@ -1,0 +1,6 @@
+ClientID,SaleDate,Description,Quantity,Price,PaymentMethod
+MB001,2024-01-01,Elite Monthly Membership,1,299.00,EFT
+MB001,2024-02-01,Elite Monthly Membership,1,299.00,EFT
+MB003,2024-03-01,Group Classes Membership,1,79.00,EFT
+MB004,2024-06-01,Elite Monthly Membership,1,299.00,Credit Card
+MB005,2024-02-01,8-Pack Private Lessons,1,480.00,Cash

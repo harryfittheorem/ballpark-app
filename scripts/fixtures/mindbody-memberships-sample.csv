@@ -1,0 +1,6 @@
+ClientID,ContractName,StartDate,EndDate,AutoRenew,Status,AutoPayAmount
+MB001,Elite Monthly,2024-01-01,,Yes,Active,299.00
+MB003,Group Classes,2024-03-01,2024-09-01,No,Cancelled,79.00
+MB004,Elite Monthly,2024-06-01,,Yes,Active,299.00
+MB005,8-Pack Lessons,2024-02-01,,No,Active,480.00
+MB002,Group Classes,2024-04-01,2024-10-01,No,Cancelled,79.00

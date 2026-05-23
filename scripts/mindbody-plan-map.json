@@ -1,0 +1,10 @@
+{
+  "_comment": "Maps MindBody ContractName values to Ballpark plan_name + plan_type. Edit before running import.",
+  "Elite Monthly":         { "plan_name": "Elite Monthly",           "plan_type": "eft" },
+  "Group Classes":         { "plan_name": "Group Classes",           "plan_type": "eft" },
+  "8-Pack Lessons":        { "plan_name": "8-Pack Private Lessons",  "plan_type": "otc" },
+  "Cage Rental":           { "plan_name": "Cage Rental",             "plan_type": "otc" },
+  "Team Training":         { "plan_name": "Team Training",           "plan_type": "eft" },
+  "Private Hitting":       { "plan_name": "Private Hitting Lessons", "plan_type": "eft" },
+  "Unlimited Monthly":     { "plan_name": "Unlimited Monthly",       "plan_type": "eft" }
+}

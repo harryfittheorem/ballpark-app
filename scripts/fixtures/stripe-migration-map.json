@@ -1,0 +1,7 @@
+[
+  {
+    "old_customer_id": "cus_OLD001",
+    "new_customer_id": "cus_NEW123TEST",
+    "email": "john.smith@example.com"
+  }
+]
