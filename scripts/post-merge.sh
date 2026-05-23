@@ -57,6 +57,7 @@ if [ -d "supabase/functions" ]; then
   deploy_fn notify-achievement
   deploy_fn notify-leaderboard-weekly
   deploy_fn notify-assignment-reviewed
+  deploy_fn send-booking-reminders
   deploy_fn stripe-create-payment-intent
   deploy_fn stripe-setup-intent
   deploy_fn stripe-create-subscription
