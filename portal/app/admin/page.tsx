@@ -4,6 +4,11 @@ import { Card } from "@/components/ui/Card";
 
 const TILES = [
   {
+    href: "/admin/check-in",
+    title: "Check-In",
+    body: "Mark athletes as arrived for today's sessions. Real-time across all tablets.",
+  },
+  {
     href: "/admin/redemptions",
     title: "Redemptions",
     body: "Mark front-desk reward redemptions as fulfilled.",

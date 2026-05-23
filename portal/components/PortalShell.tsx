@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, Calendar, CreditCard, TrendingDown, TrendingUp,
   UserCog, Sparkles, AlertCircle, Clock, AlertTriangle, BarChart3,
   MessageSquare, BookOpen, Video, Settings, ChevronLeft, ChevronRight,
-  Menu, X, LogOut,
+  Menu, X, LogOut, ClipboardCheck,
 } from 'lucide-react';
 import { signOut } from '@/app/login/actions';
 
@@ -27,6 +27,7 @@ const COACH_NAV: NavSection[] = [
   {
     items: [
       { label: 'Inbox', href: '/coach/inbox', icon: MessageSquare },
+      { label: 'My Sessions', href: '/coach/sessions', icon: ClipboardCheck },
       { label: 'Assignments', href: '/coach/assignments', icon: BookOpen },
     ],
   },
@@ -35,6 +36,7 @@ const COACH_NAV: NavSection[] = [
 const ADMIN_NAV: NavSection[] = [
   {
     items: [
+      { label: 'Check-In', href: '/admin/check-in', icon: ClipboardCheck },
       { label: 'Redemptions', href: '/admin/redemptions', icon: Sparkles },
       { label: 'Training Videos', href: '/admin/training-videos', icon: Video },
       { label: 'Messages', href: '/admin/messages', icon: MessageSquare },
