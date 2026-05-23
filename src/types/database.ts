@@ -167,6 +167,38 @@ export type Database = {
           },
         ]
       }
+      booking_reminder_log: {
+        Row: {
+          booking_id: string
+          created_at: string
+          id: string
+          reminder_type: string
+          sent_at: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          id?: string
+          reminder_type: string
+          sent_at?: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          id?: string
+          reminder_type?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_reminder_log_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           attended_at: string | null
@@ -543,6 +575,10 @@ export type Database = {
       }
       families: {
         Row: {
+          card_brand: string | null
+          card_exp_month: number | null
+          card_exp_year: number | null
+          card_last4: string | null
           created_at: string
           id: string
           parent_email: string
@@ -557,6 +593,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
+          card_last4?: string | null
           created_at?: string
           id?: string
           parent_email: string
@@ -571,6 +611,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
+          card_last4?: string | null
           created_at?: string
           id?: string
           parent_email?: string
@@ -597,6 +641,48 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_waivers: {
+        Row: {
+          app_version: string | null
+          family_id: string
+          id: string
+          ip_address: string | null
+          signed_at: string
+          waiver_id: string
+        }
+        Insert: {
+          app_version?: string | null
+          family_id: string
+          id?: string
+          ip_address?: string | null
+          signed_at?: string
+          waiver_id: string
+        }
+        Update: {
+          app_version?: string | null
+          family_id?: string
+          id?: string
+          ip_address?: string | null
+          signed_at?: string
+          waiver_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_waivers_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_waivers_waiver_id_fkey"
+            columns: ["waiver_id"]
+            isOneToOne: false
+            referencedRelation: "waivers"
             referencedColumns: ["id"]
           },
         ]
@@ -902,11 +988,16 @@ export type Database = {
         Row: {
           amount_cents: number
           billing_anchor_day: number | null
+          cancel_effective_at: string | null
+          cancel_requested_at: string | null
           cancelled_at: string | null
           created_at: string
           family_id: string
           id: string
           kid_id: string
+          pause_end: string | null
+          pause_start: string | null
+          paused_at: string | null
           plan_name: string
           plan_type: string
           started_at: string
@@ -918,11 +1009,16 @@ export type Database = {
         Insert: {
           amount_cents: number
           billing_anchor_day?: number | null
+          cancel_effective_at?: string | null
+          cancel_requested_at?: string | null
           cancelled_at?: string | null
           created_at?: string
           family_id: string
           id?: string
           kid_id: string
+          pause_end?: string | null
+          pause_start?: string | null
+          paused_at?: string | null
           plan_name: string
           plan_type: string
           started_at?: string
@@ -934,11 +1030,16 @@ export type Database = {
         Update: {
           amount_cents?: number
           billing_anchor_day?: number | null
+          cancel_effective_at?: string | null
+          cancel_requested_at?: string | null
           cancelled_at?: string | null
           created_at?: string
           family_id?: string
           id?: string
           kid_id?: string
+          pause_end?: string | null
+          pause_start?: string | null
+          paused_at?: string | null
           plan_name?: string
           plan_type?: string
           started_at?: string
@@ -1334,6 +1435,62 @@ export type Database = {
           },
         ]
       }
+      promo_codes: {
+        Row: {
+          applicable_plan_names: string[]
+          code: string
+          created_at: string
+          discount_type: string
+          discount_value: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_redemptions: number | null
+          redemptions_used: number
+          stripe_coupon_id: string | null
+          stripe_promotion_code_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          applicable_plan_names?: string[]
+          code: string
+          created_at?: string
+          discount_type: string
+          discount_value: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_redemptions?: number | null
+          redemptions_used?: number
+          stripe_coupon_id?: string | null
+          stripe_promotion_code_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          applicable_plan_names?: string[]
+          code?: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_redemptions?: number | null
+          redemptions_used?: number
+          stripe_coupon_id?: string | null
+          stripe_promotion_code_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_codes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_types: {
         Row: {
           base_price_cents: number
@@ -1385,8 +1542,10 @@ export type Database = {
         Row: {
           avg_exit_velocity_mph: number | null
           best_exit_velocity_mph: number | null
+          booking_id: string | null
           capture_session_id: string | null
           capture_source: string
+          coach_id: string | null
           created_at: string
           ended_at: string | null
           facility_id: string | null
@@ -1402,8 +1561,10 @@ export type Database = {
         Insert: {
           avg_exit_velocity_mph?: number | null
           best_exit_velocity_mph?: number | null
+          booking_id?: string | null
           capture_session_id?: string | null
           capture_source: string
+          coach_id?: string | null
           created_at?: string
           ended_at?: string | null
           facility_id?: string | null
@@ -1419,8 +1580,10 @@ export type Database = {
         Update: {
           avg_exit_velocity_mph?: number | null
           best_exit_velocity_mph?: number | null
+          booking_id?: string | null
           capture_session_id?: string | null
           capture_source?: string
+          coach_id?: string | null
           created_at?: string
           ended_at?: string | null
           facility_id?: string | null
@@ -1434,6 +1597,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sessions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessions_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sessions_kid_id_fkey"
             columns: ["kid_id"]
@@ -1574,22 +1751,31 @@ export type Database = {
       tenant_config: {
         Row: {
           allow_cross_location_booking: boolean
+          booking_cancel_fee_cents: number
+          booking_cancel_window_hours: number
           created_at: string
           id: string
+          membership_cancel_notice_days: number
           tenant_id: string
           updated_at: string
         }
         Insert: {
           allow_cross_location_booking?: boolean
+          booking_cancel_fee_cents?: number
+          booking_cancel_window_hours?: number
           created_at?: string
           id?: string
+          membership_cancel_notice_days?: number
           tenant_id: string
           updated_at?: string
         }
         Update: {
           allow_cross_location_booking?: boolean
+          booking_cancel_fee_cents?: number
+          booking_cancel_window_hours?: number
           created_at?: string
           id?: string
+          membership_cancel_notice_days?: number
           tenant_id?: string
           updated_at?: string
         }
@@ -1797,6 +1983,44 @@ export type Database = {
           },
         ]
       }
+      waivers: {
+        Row: {
+          body_text: string
+          created_at: string
+          effective_date: string
+          id: string
+          is_active: boolean
+          tenant_id: string
+          version: number
+        }
+        Insert: {
+          body_text: string
+          created_at?: string
+          effective_date?: string
+          id?: string
+          is_active?: boolean
+          tenant_id: string
+          version: number
+        }
+        Update: {
+          body_text?: string
+          created_at?: string
+          effective_date?: string
+          id?: string
+          is_active?: boolean
+          tenant_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waivers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1818,6 +2042,15 @@ export type Database = {
         Args: { p_assignment_id: string }
         Returns: string
       }
+      cancel_booking: {
+        Args: { p_booking_id: string; p_override?: boolean; p_reason?: string }
+        Returns: Json
+      }
+      cancel_membership: {
+        Args: { p_membership_id: string; p_override?: boolean }
+        Returns: Json
+      }
+      check_in_booking: { Args: { p_booking_id: string }; Returns: Json }
       complete_assignment_for_kid: {
         Args: { p_assignment_id: string }
         Returns: {
@@ -1825,6 +2058,10 @@ export type Database = {
           new_balance: number
           points_credited: number
         }[]
+      }
+      consume_promo_code: {
+        Args: { p_code: string; p_plan_name?: string }
+        Returns: Json
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       gen_redemption_code: { Args: never; Returns: string }
@@ -1845,6 +2082,7 @@ export type Database = {
         Args: { p_message_id: string }
         Returns: undefined
       }
+      mark_no_show: { Args: { p_booking_id: string }; Returns: Json }
       mark_redemption_fulfilled: {
         Args: { p_code: string }
         Returns: {
@@ -1871,6 +2109,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      pause_membership: {
+        Args: { p_membership_id: string; p_pause_end: string }
+        Returns: Json
+      }
       record_training_view: {
         Args: { p_kid_id: string; p_video_id: string }
         Returns: boolean
@@ -1887,6 +2129,7 @@ export type Database = {
         Args: { p_expo_push_token: string; p_platform: string }
         Returns: undefined
       }
+      resume_membership: { Args: { p_membership_id: string }; Returns: Json }
       review_assignment: {
         Args: { p_assignment_id: string; p_feedback: string; p_rating: number }
         Returns: {
@@ -1917,7 +2160,12 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      sign_waiver: {
+        Args: { p_app_version?: string; p_waiver_id: string }
+        Returns: undefined
+      }
       toggle_swing_favorite: { Args: { p_swing_id: string }; Returns: boolean }
+      undo_check_in: { Args: { p_booking_id: string }; Returns: Json }
       update_assignment_for_coach: {
         Args: {
           p_assignment_id: string
@@ -1953,6 +2201,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      validate_promo_code: {
+        Args: { p_code: string; p_plan_name?: string }
+        Returns: Json
       }
     }
     Enums: {
