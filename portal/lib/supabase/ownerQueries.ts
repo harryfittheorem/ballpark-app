@@ -1160,6 +1160,105 @@ export async function getMemberDetail(
   };
 }
 
+// ─── Coach Hours ─────────────────────────────────────────────────────────────
+
+export type CoachHoursRow = {
+  coach_id: string;
+  coach_name: string;
+  confirmed_count: number;
+  completed_count: number;
+  no_show_count: number;
+  cancelled_count: number;
+  total_hours: number;
+};
+
+export async function getCoachHours(
+  supabase: SupabaseClient,
+  tenantId: string,
+  startDate: string,
+  endDate: string,
+): Promise<CoachHoursRow[]> {
+  const { data, error } = await supabase
+    .rpc('get_coach_hours', {
+      p_tenant_id:  tenantId,
+      p_start_date: startDate,
+      p_end_date:   endDate,
+    });
+
+  if (error) {
+    console.error('[getCoachHours]', error.message);
+    return [];
+  }
+
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    coach_id:        r.coach_id as string,
+    coach_name:      r.coach_name as string,
+    confirmed_count: Number(r.confirmed_count ?? 0),
+    completed_count: Number(r.completed_count ?? 0),
+    no_show_count:   Number(r.no_show_count ?? 0),
+    cancelled_count: Number(r.cancelled_count ?? 0),
+    total_hours:     Number(r.total_hours ?? 0),
+  }));
+}
+
+// ─── Revenue Transactions (real payment_events for the report page) ───────────
+
+export type RevenueTransaction = {
+  id: string;
+  date: string;
+  memberName: string;
+  planName: string;
+  planType: string;
+  amountDollars: number;
+  paymentMethod: string;
+  status: 'paid' | 'failed' | 'refunded';
+};
+
+export async function getRevenueTransactions(
+  supabase: SupabaseClient,
+  tenantId: string,
+  startDate: string,
+  endDate: string,
+): Promise<RevenueTransaction[]> {
+  const { data, error } = await supabase
+    .from('payment_events')
+    .select(`
+      id, amount_cents, payment_method, status, created_at,
+      memberships(plan_name, plan_type, kids(first_name, last_name))
+    `)
+    .eq('tenant_id', tenantId)
+    .gte('created_at', new Date(startDate).toISOString())
+    .lt('created_at', new Date(new Date(endDate).getTime() + 86_400_000).toISOString())
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[getRevenueTransactions]', error.message);
+    return [];
+  }
+
+  return (data ?? []).map(e => {
+    const mem = e.memberships as unknown as {
+      plan_name: string;
+      plan_type: string;
+      kids: { first_name: string; last_name: string | null } | null;
+    } | null;
+    const d = new Date(e.created_at);
+    const memberName = mem?.kids
+      ? [mem.kids.first_name, mem.kids.last_name].filter(Boolean).join(' ')
+      : '—';
+    return {
+      id:            e.id,
+      date:          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,
+      memberName,
+      planName:      mem?.plan_name ?? '—',
+      planType:      mem?.plan_type?.toUpperCase() ?? '—',
+      amountDollars: e.amount_cents / 100,
+      paymentMethod: (e.payment_method ?? 'eft').toUpperCase(),
+      status:        e.status as 'paid' | 'failed' | 'refunded',
+    };
+  });
+}
+
 // ─── Tenant / Location Name ──────────────────────────────────────────────────
 
 export async function getTenantName(supabase: SupabaseClient, tenantId: string): Promise<string> {

@@ -1,13 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, SectionHeader, OCard } from '@/components/owner/ui';
 import { Download, FileText, CreditCard, DollarSign, ArrowUpRight } from 'lucide-react';
-import type { RevenueReportsData } from '@/lib/supabase/ownerQueries';
+import type { RevenueReportsData, RevenueTransaction } from '@/lib/supabase/ownerQueries';
 import { exportCsv } from '@/lib/exportCsv';
 
-type Props = { data: RevenueReportsData };
+type Props = {
+  data: RevenueReportsData;
+  transactions: RevenueTransaction[];
+  startDate: string;
+  endDate: string;
+  defaultStart: string;
+  defaultEnd: string;
+};
 
 // ── Demo data (shown when live DB has no revenue records yet) ──────────────
 
@@ -31,7 +39,7 @@ const DEMO_PROGRAMS = [
   { name: 'Assessments',             revenue: 2800  },
   { name: 'Merch & Retail',          revenue: 1800  },
 ];
-const DEMO_TOTAL_REVENUE = DEMO_PROGRAMS.reduce((s, p) => s + p.revenue, 0); // 80400
+const DEMO_TOTAL_REVENUE = DEMO_PROGRAMS.reduce((s, p) => s + p.revenue, 0);
 
 const DEMO_LTV = [
   { name: 'Team Training',       ltv: 5480 },
@@ -74,8 +82,6 @@ function fmtK(n: number) {
   return `$${n}`;
 }
 
-// ── Inline donut (SVG) ─────────────────────────────────────────────────────
-
 function ProgramDonut({ programs, total }: { programs: typeof DEMO_PROGRAMS; total: number }) {
   const size = 160;
   const radius = 62;
@@ -108,15 +114,42 @@ function ProgramDonut({ programs, total }: { programs: typeof DEMO_PROGRAMS; tot
   );
 }
 
+const STATUS_COLOR: Record<string, string> = {
+  paid:     brand.success,
+  failed:   brand.danger,
+  refunded: brand.warning,
+};
+
+const inputStyle: React.CSSProperties = {
+  padding: '6px 10px',
+  borderRadius: 6,
+  border: `1px solid ${brand.border}`,
+  background: brand.surface,
+  fontSize: 13,
+  color: brand.text,
+  fontFamily: fonts.mono,
+};
+
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function RevenueReportsContent({ data }: Props) {
+export function RevenueReportsContent({ data, transactions, startDate, endDate, defaultStart, defaultEnd }: Props) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const { eftVsOtc, monthly, cohortRetention } = data;
   const [toast, setToast] = useState<string | null>(null);
+  const [start, setStart] = useState(startDate);
+  const [end, setEnd]     = useState(endDate);
 
-  useEffect(() => {
-    if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }
-  }, [toast]);
+  function applyFilter() {
+    startTransition(() => {
+      router.push(`/owner/revenue-reports?start=${start}&end=${end}`);
+    });
+  }
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3500);
+  }
 
   // Use live data when available, fall back to demo
   const hasLiveData = eftVsOtc.eftTotal + eftVsOtc.otcTotal > 0;
@@ -129,12 +162,41 @@ export function RevenueReportsContent({ data }: Props) {
   const otcPct      = hasLiveData ? 100 - eftPct : DEMO_OTC.pct;
 
   const sixMonth  = monthly.length >= 2 ? monthly.slice(-6) : DEMO_SIX_MONTH;
-  const sixMax    = Math.max(...sixMonth.map(m => ('total' in m ? (m as typeof DEMO_SIX_MONTH[0]).total : (m as typeof DEMO_SIX_MONTH[0]).total) || 0), 1);
+  const sixMax    = Math.max(...sixMonth.map(m => ('total' in m ? (m as typeof DEMO_SIX_MONTH[0]).total : 0)), 1);
 
   const twelveMonth = monthly.length >= 6
     ? monthly.slice(-12).map(m => ({ month: m.month, value: Math.round(m.total / 1000) }))
     : DEMO_TWELVE_MONTH;
   const twelveMax = Math.max(...twelveMonth.map(d => d.value), 1);
+
+  function handleExportTransactions() {
+    if (transactions.length === 0) return;
+    exportCsv(
+      `revenue-transactions-${start}-to-${end}.csv`,
+      transactions.map(t => ({
+        date:           t.date,
+        member_name:    t.memberName,
+        plan_name:      t.planName,
+        plan_type:      t.planType,
+        amount:         t.amountDollars.toFixed(2),
+        payment_method: t.paymentMethod,
+        status:         t.status,
+      })),
+      [
+        { label: 'Date',           key: 'date'           },
+        { label: 'Member Name',    key: 'member_name'    },
+        { label: 'Plan Name',      key: 'plan_name'      },
+        { label: 'Plan Type',      key: 'plan_type'      },
+        { label: 'Amount ($)',     key: 'amount'         },
+        { label: 'Payment Method', key: 'payment_method' },
+        { label: 'Status',         key: 'status'         },
+      ],
+    );
+    showToast(`Exported ${transactions.length} transaction${transactions.length !== 1 ? 's' : ''} as CSV`);
+  }
+
+  const isDefaultRange = startDate === defaultStart && endDate === defaultEnd;
+  const rangeLabel = isDefaultRange ? 'Current Month' : `${startDate} – ${endDate}`;
 
   return (
     <>
@@ -144,13 +206,8 @@ export function RevenueReportsContent({ data }: Props) {
         subtitle="Deep dive into revenue by program, package, and time period"
         actions={
           <>
-            <OButton variant="secondary" icon={Download} onClick={() => {
-              const rows = (hasLiveData ? monthly : DEMO_SIX_MONTH) as Record<string, unknown>[];
-              exportCsv(`revenue-report-${new Date().toISOString().slice(0, 10)}.csv`, rows,
-                [{ label: 'Month', key: 'month' }, { label: 'EFT ($)', key: 'eft' }, { label: 'OTC ($)', key: 'otc' }, { label: 'Total ($)', key: 'total' }]);
-              setToast('Revenue report exported as CSV');
-            }}>Export</OButton>
-            <OButton variant="gold" icon={FileText} onClick={() => setToast('Monthly report scheduled — you\'ll receive it by email on the 1st')}>Schedule</OButton>
+            <OButton variant="secondary" icon={Download} onClick={handleExportTransactions} disabled={transactions.length === 0}>Export CSV</OButton>
+            <OButton variant="gold" icon={FileText} onClick={() => showToast('Monthly report scheduled — you\'ll receive it by email on the 1st')}>Schedule</OButton>
           </>
         }
       />
@@ -317,7 +374,7 @@ export function RevenueReportsContent({ data }: Props) {
 
         {/* ── Row 4: Revenue by Package — Monthly Detail ── */}
         <SectionHeader title="Revenue by Package — Monthly Detail" />
-        <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 24 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: brand.surfaceAlt, borderBottom: `1px solid ${brand.border}` }}>
@@ -346,7 +403,92 @@ export function RevenueReportsContent({ data }: Props) {
           </table>
         </div>
 
-        {/* ── Cohort Retention (kept as-is, only shown when DB has data) ── */}
+        {/* ── Row 5: Transaction List (real data) ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <SectionHeader title={`Transactions — ${rangeLabel}`} />
+        </div>
+
+        {/* Date range filter */}
+        <OCard style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: brand.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              Date Range
+            </div>
+            <input type="date" value={start} onChange={e => setStart(e.target.value)} style={inputStyle} />
+            <span style={{ fontSize: 12, color: brand.textMuted }}>to</span>
+            <input type="date" value={end} onChange={e => setEnd(e.target.value)} style={inputStyle} />
+            <OButton variant="gold" size="sm" onClick={applyFilter}>Apply</OButton>
+            <span style={{ fontSize: 11, color: brand.textMuted, marginLeft: 'auto' }}>
+              {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </OCard>
+
+        {transactions.length === 0 ? (
+          <OCard>
+            <div style={{ textAlign: 'center', padding: '32px 0', color: brand.textMuted }}>
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>No transactions in this period</div>
+              <div style={{ fontSize: 12 }}>Try expanding the date range.</div>
+            </div>
+          </OCard>
+        ) : (
+          <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: brand.surfaceAlt, borderBottom: `1px solid ${brand.border}` }}>
+                  {[
+                    { label: 'Date',           align: 'left'  },
+                    { label: 'Member Name',    align: 'left'  },
+                    { label: 'Plan Name',      align: 'left'  },
+                    { label: 'Plan Type',      align: 'left'  },
+                    { label: 'Amount ($)',     align: 'right' },
+                    { label: 'Payment Method', align: 'left'  },
+                    { label: 'Status',         align: 'left'  },
+                  ].map((h, i) => (
+                    <th key={i} style={{
+                      padding: '12px 16px',
+                      textAlign: h.align as 'left' | 'right',
+                      fontSize: 10, fontWeight: 800, color: brand.textMuted,
+                      letterSpacing: 1, textTransform: 'uppercase',
+                      fontFamily: fonts.display, whiteSpace: 'nowrap',
+                    }}>
+                      {h.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((t, i) => (
+                  <tr key={t.id} style={{ borderBottom: i < transactions.length - 1 ? `1px solid ${brand.border}` : 'none' }}>
+                    <td style={{ padding: '13px 16px', fontSize: 12, fontFamily: fonts.mono, color: brand.textMuted, whiteSpace: 'nowrap' }}>{t.date}</td>
+                    <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 700, color: brand.text }}>{t.memberName}</td>
+                    <td style={{ padding: '13px 16px', fontSize: 12, color: brand.text }}>{t.planName}</td>
+                    <td style={{ padding: '13px 16px', fontSize: 11, fontFamily: fonts.mono, color: brand.textMuted }}>{t.planType}</td>
+                    <td style={{ padding: '13px 16px', fontSize: 13, fontFamily: fonts.mono, fontWeight: 700, color: brand.text, textAlign: 'right' }}>
+                      {t.amountDollars.toFixed(2)}
+                    </td>
+                    <td style={{ padding: '13px 16px', fontSize: 12, fontFamily: fonts.mono, color: brand.textMuted }}>{t.paymentMethod}</td>
+                    <td style={{ padding: '13px 16px' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        background: `${STATUS_COLOR[t.status] ?? brand.border}22`,
+                        color: STATUS_COLOR[t.status] ?? brand.textMuted,
+                      }}>
+                        {t.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ── Cohort Retention ── */}
         {cohortRetention.length > 0 && (
           <div style={{ marginTop: 24 }}>
             <SectionHeader title="Cohort Retention" subtitle="% of members still active since joining" />
@@ -383,10 +525,9 @@ export function RevenueReportsContent({ data }: Props) {
             </OCard>
           </div>
         )}
-
       </div>
     </div>
-    {/* Toast */}
+
     {toast && (
       <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 500, background: brand.dark, color: brand.gold, padding: '12px 20px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.24)', fontSize: 13, fontWeight: 600, maxWidth: 380 }}>
         {toast}

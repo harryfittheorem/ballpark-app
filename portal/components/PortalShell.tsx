@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, Calendar, CreditCard, TrendingDown, TrendingUp,
   UserCog, Sparkles, AlertCircle, Clock, AlertTriangle, BarChart3,
   MessageSquare, BookOpen, Video, Settings, ChevronLeft, ChevronRight,
-  Menu, X, LogOut, ClipboardCheck,
+  Menu, X, LogOut, ClipboardCheck, ClipboardList,
 } from 'lucide-react';
 import { signOut } from '@/app/login/actions';
 
@@ -61,6 +61,7 @@ const OWNER_NAV: NavSection[] = [
       { label: 'Billing', href: '/owner/billing', icon: CreditCard },
       { label: 'Failed Payments', href: '/owner/failed-payments', icon: AlertCircle },
       { label: 'Revenue Reports', href: '/owner/revenue-reports', icon: BarChart3 },
+      { label: 'Coach Hours', href: '/owner/coach-hours', icon: ClipboardList },
     ],
   },
   {
