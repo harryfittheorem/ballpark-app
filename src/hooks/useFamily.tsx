@@ -12,7 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { supabase } from '@/lib/supabase';
-import type { Tables, TablesInsert } from '@/types/database';
+import type { Tables, TablesInsert, TablesUpdate } from '@/types/database';
 
 import { useAuth } from './useAuth';
 
@@ -66,6 +66,10 @@ export function useFamily() {
     // When there's no user we resolve to the empty shape rather than
     // staying in a loading state.
     loading: !!userId && query.isPending,
+    // True while a background refetch is in flight (e.g. after adding a kid
+    // and invalidating the query). Used by useSelectedKid to avoid premature
+    // fallback to kids[0] before the new kid appears in the fetched list.
+    isFetching: query.isFetching,
     error: (query.error as Error | null) ?? null,
   };
 }
@@ -137,3 +141,64 @@ export function useAddKid() {
 type AddKidInput = Omit<TablesInsert<'kids'>, 'family_id'> & {
   primary_location_id?: string | null;
 };
+
+type EditKidInput = {
+  kidId: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  age_group?: string | null;
+  primary_position?: string | null;
+  jersey_number?: number | null;
+};
+
+export function useEditKid() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async ({ kidId, ...fields }: EditKidInput) => {
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('kids')
+        .update(fields as TablesUpdate<'kids'>)
+        .eq('id', kidId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      if (user) {
+        void qc.invalidateQueries({ queryKey: familyKey(user.id) });
+      }
+    },
+  });
+
+  return useCallback(
+    (input: EditKidInput) => mutation.mutateAsync(input),
+    [mutation],
+  );
+}
+
+export function useDeleteKid() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (kidId: string) => {
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('kids')
+        .delete()
+        .eq('id', kidId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      if (user) {
+        void qc.invalidateQueries({ queryKey: familyKey(user.id) });
+      }
+    },
+  });
+
+  return useCallback(
+    (kidId: string) => mutation.mutateAsync(kidId),
+    [mutation],
+  );
+}

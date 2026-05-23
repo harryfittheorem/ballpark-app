@@ -1,6 +1,8 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import AddKidScreen from '@/screens/Auth/AddKidScreen';
 import BookingDetailScreen from '@/screens/Me/BookingDetailScreen';
+import EditKidScreen from '@/screens/Me/EditKidScreen';
 import BookingsListScreen from '@/screens/Me/BookingsListScreen';
 import CancelMembershipScreen from '@/screens/Me/CancelMembershipScreen';
 import ChangeLocationScreen from '@/screens/Me/ChangeLocationScreen';
@@ -68,6 +70,16 @@ export default function MeStackNavigator() {
         name="PauseMembership"
         component={PauseMembershipScreen}
         options={{ title: 'Pause Membership' }}
+      />
+      <Stack.Screen
+        name="AddKid"
+        component={AddKidScreen}
+        options={{ title: 'Add Athlete', headerShown: false }}
+      />
+      <Stack.Screen
+        name="EditKid"
+        component={EditKidScreen}
+        options={{ title: 'Edit Athlete' }}
       />
     </Stack.Navigator>
   );

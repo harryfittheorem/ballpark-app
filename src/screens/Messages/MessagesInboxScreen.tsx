@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import { useParentInbox } from '@/hooks/useParentMessages';
 import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
@@ -27,8 +27,8 @@ type Nav = WorkStackScreenProps<'MessagesInbox'>['navigation'];
 
 export default function MessagesInboxScreen() {
   const navigation = useNavigation<Nav>();
-  const { kids } = useFamily();
-  const kid = kids[0] ?? null;
+  const { kid } = useSelectedKid();
+  
   const { data, isPending, isError, error, refetch, isFetching } = useParentInbox(kid?.id);
 
   return (

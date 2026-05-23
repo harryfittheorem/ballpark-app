@@ -3,7 +3,7 @@ import { ZapOff } from 'lucide-react-native';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useAssignments } from '@/hooks/useAssignments';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import type { WorkStackScreenProps } from '@/navigation/types';
 import AssignmentRow from '@/screens/Work/components/AssignmentRow';
 import EmptyState from '@/screens/Videos/components/EmptyState';
@@ -13,8 +13,7 @@ type Nav = WorkStackScreenProps<'WorkHome'>['navigation'];
 
 export default function HwBody() {
   const navigation = useNavigation<Nav>();
-  const { kids } = useFamily();
-  const kid = kids[0] ?? null;
+  const { kid } = useSelectedKid();
   const { data: assignments } = useAssignments(kid?.id, ['submitted', 'reviewed']);
   const list = assignments ?? [];
 

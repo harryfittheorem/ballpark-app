@@ -28,7 +28,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useEffect } from 'react';
 
 import { useAuth } from '@/hooks/useAuth';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import { useLatestCoachMessage } from '@/hooks/useLatestCoachMessage';
 import {
   useCoachMessageSeenStore,
@@ -39,8 +39,7 @@ export function useNewCoachMessage() {
   useHydrateCoachMessageSeen();
 
   const { user } = useAuth();
-  const { kids } = useFamily();
-  const kid = kids[0];
+  const { kid } = useSelectedKid();
   // Polling, focus refetch, and the isNew → toast effect must only run
   // while the Home tab is actually visible. `useIsFocused` returns true
   // for HomeMain when both the Home tab is selected AND the inner stack

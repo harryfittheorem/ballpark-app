@@ -17,7 +17,7 @@ import { createMuxUpload } from '@/api/mux';
 import type { ThreadMessage } from '@/api/parentMessages';
 import { useToast } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import {
   useMessageThread,
   useParentInbox,
@@ -39,8 +39,7 @@ export default function MessagesBody() {
   const navigation = useNavigation<Nav>();
   const { showToast } = useToast();
   const { user } = useAuth();
-  const { family, kids } = useFamily();
-  const kid = kids[0] ?? null;
+  const { family, kid } = useSelectedKid();
 
   const { data: coaches } = useTenantCoachesForParent();
   const { data: inbox } = useParentInbox(kid?.id);

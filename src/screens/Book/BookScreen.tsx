@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/ui';
 import { useFamilyBookings } from '@/hooks/useFamilyBookings';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import type { MainTabScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
@@ -96,6 +97,7 @@ export default function BookScreen() {
     setActiveLocationId,
   } = useLocationContext();
 
+  const { kid } = useSelectedKid();
   const { data: bookings } = useFamilyBookings();
   const today = new Date();
   const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
@@ -104,13 +106,18 @@ export default function BookScreen() {
     if (!bookings) return [];
     const now = Date.now();
     return bookings
-      .filter((b) => b.status !== 'cancelled' && new Date(b.scheduled_start).getTime() >= now)
+      .filter(
+        (b) =>
+          b.status !== 'cancelled' &&
+          new Date(b.scheduled_start).getTime() >= now &&
+          (!kid || b.kid_id === kid.id),
+      )
       .sort(
         (a, b) =>
           new Date(a.scheduled_start).getTime() - new Date(b.scheduled_start).getTime(),
       )
       .slice(0, 3);
-  }, [bookings]);
+  }, [bookings, kid]);
 
   const handleSelectSessionType = useCallback((id: string) => {
     setSelectedSessionTypeId(id);

@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAssignments } from '@/hooks/useAssignments';
 import { useAuth } from '@/hooks/useAuth';
-import { useFamily } from '@/hooks/useFamily';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { useProducts } from '@/hooks/useProducts';
 import {
@@ -16,10 +15,12 @@ import {
 } from '@/hooks/useLatestCoachMessage';
 import { personalBestsKeys, useLatestPersonalBest } from '@/hooks/useSwings';
 import { upcomingSessionKey, useUpcomingSession } from '@/hooks/useUpcomingSession';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import type { HomeStackScreenProps } from '@/navigation/types';
 import { colors, spacing } from '@/theme';
 import { formatRelativeTime } from '@/utils/time';
 
+import KidSwitcherSheet from '@/components/ui/KidSwitcherSheet';
 import CoachMessageToast from './components/CoachMessageToast';
 import CoachVideoCard from './components/CoachVideoCard';
 import EmptyHomeCard from './components/EmptyHomeCard';
@@ -43,11 +44,11 @@ export default function HomeScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<Nav>();
   const [refreshing, setRefreshing] = useState(false);
+  const [switcherVisible, setSwitcherVisible] = useState(false);
   const qc = useQueryClient();
   const { user } = useAuth();
 
-  const { kids, loading: familyLoading } = useFamily();
-  const kid = kids[0];
+  const { kid, kids, loading: familyLoading, selectedKidId, setSelectedKid } = useSelectedKid();
   const showEmpty = !kid && !familyLoading;
   const { session: upcoming } = useUpcomingSession(kid?.id);
   const isFocused = useIsFocused();
@@ -134,9 +135,17 @@ export default function HomeScreen() {
     );
   };
 
+  const handleAddAthlete = () => {
+    navigation.navigate('AddKid', { fromMe: false });
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <HomeHeader kidFirstName={kid?.first_name ?? 'CHAMP'} />
+      <HomeHeader
+        kidFirstName={kid?.first_name ?? 'CHAMP'}
+        multipleKids={kids.length > 1}
+        onSwitchPress={() => setSwitcherVisible(true)}
+      />
       <CoachMessageToast />
       <ScrollView
         style={styles.scroll}
@@ -222,6 +231,15 @@ export default function HomeScreen() {
           </View>
         )}
       </ScrollView>
+
+      <KidSwitcherSheet
+        visible={switcherVisible}
+        kids={kids}
+        selectedKidId={selectedKidId}
+        onSelect={setSelectedKid}
+        onAddAthlete={handleAddAthlete}
+        onClose={() => setSwitcherVisible(false)}
+      />
     </SafeAreaView>
   );
 }

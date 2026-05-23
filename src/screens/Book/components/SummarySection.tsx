@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui';
-import { useFamily } from '@/hooks/useFamily';
-import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
+import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
+import type { Tables } from '@/types/database';
 
 import { useCoaches } from '../hooks/useCoaches';
 import { useCreateBooking } from '../hooks/useCreateBooking';
@@ -11,6 +12,8 @@ import { useActiveLocation } from '../hooks/useActiveLocation';
 import type { SessionType } from '@/api/bookings';
 import type { Slot } from '../utils/slots';
 import SectionCard from './SectionCard';
+
+type Kid = Tables<'kids'>;
 
 type Props = {
   locked: boolean;
@@ -29,8 +32,6 @@ function formatPriceUSD(cents: number): string {
 }
 
 function formatDateLabel(ymd: string, timezone: string | null | undefined): string {
-  // Render "Thu, May 14" using the location's timezone. We anchor on noon
-  // UTC of the calendar day to avoid offset rollovers near midnight.
   const [y, m, d] = ymd.split('-').map(Number);
   const anchor = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
   try {
@@ -68,11 +69,23 @@ export default function SummarySection({
   selectedCoachId,
   onBooked,
 }: Props) {
-  const { family, kids } = useFamily();
+  const { family, kid: defaultKid, kids } = useSelectedKid();
   const location = useActiveLocation();
   const coaches = useCoaches();
   const createBooking = useCreateBooking();
   const [errorVisible, setErrorVisible] = useState(false);
+  const [kidPickerVisible, setKidPickerVisible] = useState(false);
+  const [overrideKidId, setOverrideKidId] = useState<string | null>(null);
+
+  // The kid to book for — parent may override via the picker
+  const activeKid: Kid | null = useMemo(() => {
+    if (overrideKidId) {
+      return kids.find((k) => k.id === overrideKidId) ?? defaultKid;
+    }
+    return defaultKid;
+  }, [overrideKidId, kids, defaultKid]);
+
+  const multipleKids = kids.length > 1;
 
   const tz = location.data?.timezone ?? null;
   const coach = useMemo(
@@ -80,8 +93,6 @@ export default function SummarySection({
     [coaches.data, selectedCoachId],
   );
 
-  // Defensive: if any required input is missing, render the placeholder. The
-  // Book screen's gating already prevents this, but Summary stays resilient.
   const ready =
     !locked &&
     !!sessionType &&
@@ -89,7 +100,7 @@ export default function SummarySection({
     !!slot &&
     !!coach &&
     !!family &&
-    kids.length > 0 &&
+    !!activeKid &&
     !!location.data;
 
   const dateLabel = ready ? formatDateLabel(date as string, tz) : null;
@@ -98,14 +109,13 @@ export default function SummarySection({
   const priceLabel = sessionType ? formatPriceUSD(sessionType.base_price_cents) : null;
 
   const handleConfirm = () => {
-    if (!ready || createBooking.isPending) return;
+    if (!ready || createBooking.isPending || !activeKid) return;
     setErrorVisible(false);
 
-    const kid = kids[0];
     const insert = {
       tenant_id: family!.tenant_id,
       location_id: location.data!.id,
-      kid_id: kid.id,
+      kid_id: activeKid.id,
       coach_id: coach!.id,
       session_type_id: sessionType!.id,
       scheduled_start: (slot as Slot).start,
@@ -124,56 +134,127 @@ export default function SummarySection({
   };
 
   return (
-    <SectionCard
-      title="Summary"
-      locked={locked}
-      lockedHint={locked ? lockedHint : undefined}
-    >
-      {ready ? (
-        <View style={styles.lines}>
-          <SummaryLine label="Session" value={sessionType!.name} />
-          <SummaryLine label="Date" value={dateLabel as string} />
-          <SummaryLine label="Time" value={timeLabel as string} />
-          <SummaryLine label="Coach" value={coachName as string} />
-          <SummaryLine label="Price" value={priceLabel as string} />
-        </View>
-      ) : (
-        <View style={styles.placeholder}>
-          <Text style={styles.placeholderText}>
-            Tap any slot above — your summary appears here instantly.
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.confirmWrap}>
-        <Button
-          label={createBooking.isPending ? 'Booking…' : 'Confirm Booking'}
-          onPress={handleConfirm}
-          variant="primary"
-          loading={createBooking.isPending}
-          disabled={!ready || createBooking.isPending}
-        />
-
-        {errorVisible ? (
-          <View style={styles.errorBlock}>
-            <Text style={styles.errorText}>
-              Couldn&apos;t book that session — please try again.
-            </Text>
-            {__DEV__ && createBooking.error ? (
-              <Text style={styles.errorDevText} numberOfLines={3}>
-                {createBooking.error.message}
-              </Text>
+    <>
+      <SectionCard
+        title="Summary"
+        locked={locked}
+        lockedHint={locked ? lockedHint : undefined}
+      >
+        {ready ? (
+          <View style={styles.lines}>
+            <SummaryLine label="Session" value={sessionType!.name} />
+            <SummaryLine label="Date" value={dateLabel as string} />
+            <SummaryLine label="Time" value={timeLabel as string} />
+            <SummaryLine label="Coach" value={coachName as string} />
+            <SummaryLine label="Price" value={priceLabel as string} />
+            {/* Kid selector row — only shown when family has multiple kids */}
+            {multipleKids ? (
+              <View style={styles.kidRow}>
+                <Text style={styles.lineLabel}>BOOKING FOR</Text>
+                <Pressable
+                  onPress={() => setKidPickerVisible(true)}
+                  style={({ pressed }) => [styles.kidPill, pressed && { opacity: 0.75 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Booking for ${activeKid?.first_name ?? ''}. Tap to change.`}
+                >
+                  <Text style={styles.kidPillName}>
+                    {activeKid?.first_name ?? '—'}
+                  </Text>
+                  <Text style={styles.kidPillChange}>Change</Text>
+                </Pressable>
+              </View>
             ) : null}
-            <Button
-              label="Tap to retry"
-              variant="tertiary"
-              tone="gold"
-              onPress={handleConfirm}
-            />
           </View>
-        ) : null}
-      </View>
-    </SectionCard>
+        ) : (
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderText}>
+              Tap any slot above — your summary appears here instantly.
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.confirmWrap}>
+          <Button
+            label={createBooking.isPending ? 'Booking…' : 'Confirm Booking'}
+            onPress={handleConfirm}
+            variant="primary"
+            loading={createBooking.isPending}
+            disabled={!ready || createBooking.isPending}
+          />
+
+          {errorVisible ? (
+            <View style={styles.errorBlock}>
+              <Text style={styles.errorText}>
+                Couldn&apos;t book that session — please try again.
+              </Text>
+              {__DEV__ && createBooking.error ? (
+                <Text style={styles.errorDevText} numberOfLines={3}>
+                  {createBooking.error.message}
+                </Text>
+              ) : null}
+              <Button
+                label="Tap to retry"
+                variant="tertiary"
+                tone="gold"
+                onPress={handleConfirm}
+              />
+            </View>
+          ) : null}
+        </View>
+      </SectionCard>
+
+      {/* Kid picker modal ------------------------------------------------- */}
+      <Modal
+        visible={kidPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setKidPickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setKidPickerVisible(false)}
+          />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>BOOKING FOR</Text>
+            <View style={styles.modalKids}>
+              {kids.map((k) => {
+                const isActive = k.id === (activeKid?.id ?? null);
+                return (
+                  <Pressable
+                    key={k.id}
+                    onPress={() => {
+                      setOverrideKidId(k.id);
+                      setKidPickerVisible(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.modalKidRow,
+                      isActive && styles.modalKidRowActive,
+                      pressed && { opacity: 0.8 },
+                    ]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: isActive }}
+                  >
+                    <Text
+                      style={[
+                        styles.modalKidName,
+                        isActive && styles.modalKidNameActive,
+                      ]}
+                    >
+                      {`${k.first_name} ${k.last_name ?? ''}`.trim()}
+                    </Text>
+                    {isActive ? (
+                      <Text style={styles.modalKidCheck}>✓</Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -221,6 +302,34 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     color: colors.textOnDark,
   },
+  kidRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing['2xl'],
+  },
+  kidPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(232,167,71,0.12)',
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+  },
+  kidPillName: {
+    fontFamily: fontFamilies.interSemiBold,
+    fontSize: fontSizes.base,
+    color: colors.gold,
+  },
+  kidPillChange: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.xs,
+    color: colors.textLight,
+    textDecorationLine: 'underline',
+  },
   confirmWrap: {
     marginTop: spacing['3xl'],
     gap: spacing.lg,
@@ -241,9 +350,69 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
   },
-  retry: {
-    fontFamily: fontFamilies.interSemiBold,
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  modalSheet: {
+    backgroundColor: colors.darker,
+    borderTopLeftRadius: radius['3xl'],
+    borderTopRightRadius: radius['3xl'],
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: colors.borderGold,
+    padding: spacing['3xl'],
+    paddingBottom: spacing['6xl'],
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: spacing['2xl'],
+  },
+  modalTitle: {
+    fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.base,
+    color: colors.gold,
+    letterSpacing: tracking.wider,
+    marginBottom: spacing['2xl'],
+  },
+  modalKids: {
+    gap: spacing.lg,
+  },
+  modalKidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing['2xl'],
+    borderRadius: radius['2xl'],
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.dark,
+  },
+  modalKidRowActive: {
+    borderColor: colors.borderGold,
+    backgroundColor: 'rgba(232,167,71,0.08)',
+  },
+  modalKidName: {
+    fontFamily: fontFamilies.interSemiBold,
+    fontSize: fontSizes.lg,
+    color: colors.textOnDark,
+  },
+  modalKidNameActive: {
+    color: colors.gold,
+  },
+  modalKidCheck: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.lg,
     color: colors.gold,
   },
 });

@@ -44,7 +44,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { createMuxUpload } from '@/api/mux';
 import { COMPOSER_LABELS, type ComposerLabel } from '@/api/parentMessages';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import {
   useSendParentMessage,
   useTenantCoachesForParent,
@@ -69,8 +69,8 @@ export default function SendVideoToCoachScreen() {
   const route = useRoute<Route>();
   const initialCoachId = route.params?.coachUserId ?? null;
 
-  const { family, kids } = useFamily();
-  const kid = kids[0] ?? null;
+  const { family, kid } = useSelectedKid();
+  
   const { data: coaches, isPending: coachesPending } = useTenantCoachesForParent();
 
   const [step, setStep] = useState<Step>(1);

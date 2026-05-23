@@ -15,7 +15,7 @@ import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Input } from '@/components/ui';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import {
   useAssociateHitTrax,
   useDisconnectHitTrax,
@@ -36,8 +36,7 @@ function formatRelative(iso: string | null | undefined): string {
 }
 
 export default function ConnectHitTraxScreen() {
-  const { kids } = useFamily();
-  const kid = kids[0];
+  const { kid } = useSelectedKid();
   const { data: link, isPending } = useHitTraxLink(kid?.id);
   const associate = useAssociateHitTrax(kid?.id);
   const disconnect = useDisconnectHitTrax(kid?.id);

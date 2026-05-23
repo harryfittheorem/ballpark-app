@@ -12,7 +12,7 @@ import {
 
 import type { AssignmentWithRefs } from '@/api/assignments';
 import { useAssignments } from '@/hooks/useAssignments';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import type { WorkStackScreenProps } from '@/navigation/types';
 import AssignmentRow from '@/screens/Work/components/AssignmentRow';
 import { colors, fontFamilies, fontSizes, spacing, tracking } from '@/theme';
@@ -24,8 +24,7 @@ type Section = { title: string; data: AssignmentWithRefs[] };
 
 export default function AssignBody() {
   const navigation = useNavigation<Nav>();
-  const { kids, loading: familyLoading } = useFamily();
-  const kid = kids[0] ?? null;
+  const { kid, loading: familyLoading } = useSelectedKid();
   const { data, isPending, isError, error, refetch, isRefetching } = useAssignments(kid?.id);
   const [manualRefreshing, setManualRefreshing] = useState(false);
 

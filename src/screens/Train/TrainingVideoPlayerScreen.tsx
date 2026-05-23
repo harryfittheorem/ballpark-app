@@ -28,7 +28,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TRAINING_CATEGORIES } from '@/api/trainingVideos';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import { useRecordTrainingView, useTrainingVideo } from '@/hooks/useTrainingVideos';
 import type { WorkStackScreenProps } from '@/navigation/types';
 import { readProgress, writeProgress } from '@/store/trainingProgress';
@@ -57,8 +57,8 @@ export default function TrainingVideoPlayerScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { videoId } = route.params;
-  const { kids } = useFamily();
-  const kid = kids[0] ?? null;
+  const { kid } = useSelectedKid();
+  
 
   const { data: video, isPending, error } = useTrainingVideo(videoId);
   const recordView = useRecordTrainingView();

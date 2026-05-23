@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
@@ -17,7 +17,8 @@ import { signOut } from '@/api/auth';
 import { Button, Input, PickerField, type PickerOption } from '@/components/ui';
 import { AGE_GROUPS, type AgeGroup } from '@/constants/kid';
 import { useFamily, useAddKid } from '@/hooks/useFamily';
-import type { HomeStackScreenProps } from '@/navigation/types';
+import { useSelectedKidStore } from '@/store/selectedKid';
+import type { HomeStackScreenProps, MeStackScreenProps } from '@/navigation/types';
 import {
   addKidSchema,
   type AddKidFormOutput,
@@ -32,18 +33,24 @@ const AGE_GROUP_OPTIONS: ReadonlyArray<PickerOption<AgeGroup>> = AGE_GROUPS.map(
   label: g,
 }));
 
+type HomeRoute = HomeStackScreenProps<'AddKid'>['route'];
+type MeRoute = MeStackScreenProps<'AddKid'>['route'];
+
 export default function AddKidScreen() {
   const addKid = useAddKid();
   const { family } = useFamily();
   const locations = useTenantLocations();
-  // Typed nav so we can push ConnectHitTraxOnboarding (in HomeStack).
+  const setSelectedKid = useSelectedKidStore((s) => s.setSelectedKid);
+
+  // The screen lives in both HomeStack and MeStack. Check route params to
+  // determine origin — MeStack always passes fromMe: true.
+  const route = useRoute<HomeRoute | MeRoute>();
+  const fromMe = (route.params as { fromMe?: boolean } | undefined)?.fromMe ?? false;
+
+  // Navigation typed to the HomeStack version (superset of goBack + full
+  // tab navigate). When fromMe we only call goBack() so MeStack is safe.
   const navigation = useNavigation<HomeStackScreenProps<'AddKid'>['navigation']>();
-  // When AddKid is pushed from the Home empty state, we want to pop back
-  // to Home after a successful add. When AddKid is the top of the
-  // navigator (no back stack) it's only reachable as the first thing a
-  // freshly-signed-up parent sees, but with the kids list now flipping
-  // RootNavigator/MainTabs render Home directly — there's no `canGoBack`
-  // to use, and the screen unmounts naturally.
+
   const [signingOut, setSigningOut] = useState(false);
 
   const locationOptions = useMemo<ReadonlyArray<PickerOption<string>>>(
@@ -69,9 +76,6 @@ export default function AddKidScreen() {
     },
   });
 
-  // Default the picker to the trigger-set primary_location_id once the
-  // family + locations both load. Only set if the parent hasn't already
-  // touched the field.
   const watchedLocationId = watch('locationId');
   const familyDefault = family?.primary_location_id ?? null;
   useEffect(() => {
@@ -100,10 +104,17 @@ export default function AddKidScreen() {
         primary_position: values.position,
         primary_location_id: values.locationId,
       });
-      // Pass the freshly-created kid id explicitly so the onboarding gate
-      // doesn't race the family refetch (kids[0] could be stale or empty
-      // for a tick). The screen falls back to kids[0] when not provided.
-      navigation.navigate('ConnectHitTraxOnboarding', { kidId: created.id });
+
+      // Always switch to the newly added kid.
+      setSelectedKid(created.id);
+
+      if (fromMe) {
+        // Opened from the Me tab — just pop back to profile.
+        navigation.goBack();
+      } else {
+        // Onboarding flow — proceed to HitTrax linking gate.
+        navigation.navigate('ConnectHitTraxOnboarding', { kidId: created.id });
+      }
     } catch (err) {
       console.error('addKid failed', err);
       Alert.alert('Could not add kid', errorMessage(err));
@@ -131,8 +142,12 @@ export default function AddKidScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <Text style={styles.title}>Add your kid</Text>
-          <Text style={styles.subtitle}>You can add more later from the Me tab.</Text>
+          <Text style={styles.title}>{fromMe ? 'Add another athlete' : 'Add your kid'}</Text>
+          <Text style={styles.subtitle}>
+            {fromMe
+              ? 'Fill in their details below to add them to your account.'
+              : 'You can add more later from the Me tab.'}
+          </Text>
 
           <Controller
             control={control}
@@ -219,26 +234,25 @@ export default function AddKidScreen() {
           />
 
           <Button
-            label="Add kid"
+            label={fromMe ? 'Add athlete' : 'Add kid'}
             onPress={onSubmit}
             loading={submitting}
             disabled={busy}
             testID="addkid-submit"
           />
 
-          {/* Escape hatch: a user with a stale or wrong session is otherwise
-              trapped here (no kid → can't reach the Me tab → can't sign out).
-              The auth listener in useAuth flips RootNavigator back to SignIn. */}
-          <View style={styles.signOutWrap}>
-            <Button
-              label="SIGN OUT"
-              onPress={handleSignOut}
-              variant="tertiary"
-              tone="muted"
-              disabled={busy}
-              testID="addkid-sign-out"
-            />
-          </View>
+          {fromMe ? null : (
+            <View style={styles.signOutWrap}>
+              <Button
+                label="SIGN OUT"
+                onPress={handleSignOut}
+                variant="tertiary"
+                tone="muted"
+                disabled={busy}
+                testID="addkid-sign-out"
+              />
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

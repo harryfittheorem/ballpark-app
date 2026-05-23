@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 
 import type { Swing } from '@/api/swings';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import {
   useFavoriteSwingIds,
   useSessionsForKid,
@@ -29,8 +29,7 @@ type Mode = 'session' | 'all';
 
 export default function SwingsBody() {
   const navigation = useNavigation<Nav>();
-  const { kids, loading: familyLoading } = useFamily();
-  const kid = kids[0] ?? null;
+  const { kid, loading: familyLoading } = useSelectedKid();
   const [mode, setMode] = useState<Mode>('session');
 
   const { data: swings, isPending: swingsPending, isError, error } = useSwingsForKid(kid?.id);

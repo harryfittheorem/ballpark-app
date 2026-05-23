@@ -38,7 +38,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import { usePersonalBestsForKid, useSwing } from '@/hooks/useSwings';
 import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies } from '@/theme';
@@ -58,8 +58,8 @@ export default function ShareCardScreen() {
   const route = useRoute<Route>();
   const navigation = useNavigation<Nav>();
   const { swingId } = route.params;
-  const { kids } = useFamily();
-  const kid = kids[0] ?? null;
+  const { kid } = useSelectedKid();
+  
 
   const { data: swing, isPending, isError, error } = useSwing(swingId);
   const { data: prs } = usePersonalBestsForKid(kid?.id);

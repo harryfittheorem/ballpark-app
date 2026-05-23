@@ -25,6 +25,7 @@ import {
   BookCheck,
   Activity,
   XCircle,
+  UserPlus,
 } from 'lucide-react-native';
 import { useMemo } from 'react';
 import {
@@ -40,24 +41,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { deleteAccount } from '@/api/account';
 import { signOut } from '@/api/auth';
 import { useAuth } from '@/hooks/useAuth';
+import { useDeleteKid } from '@/hooks/useFamily';
 import {
   useAchievementsCatalog,
   useEarnedAchievements,
 } from '@/hooks/useAchievements';
 import { useFamily } from '@/hooks/useFamily';
-import { useHitTraxLink } from '@/hooks/useHitTraxLink';
 import { useMembership } from '@/hooks/useMembership';
 import { usePersonalBestsForKid, useSwingsForKid } from '@/hooks/useSwings';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
+import { useHitTraxLink } from '@/hooks/useHitTraxLink';
 import type { MeStackScreenProps } from '@/navigation/types';
 import { usePrimaryLocation } from '@/screens/Book/hooks/usePrimaryLocation';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
+import type { Tables } from '@/types/database';
 
 type Props = MeStackScreenProps<'MeHome'>;
+type Kid = Tables<'kids'>;
 
-// Map Postgres icon strings -> lucide icon components. Anything we don't
-// recognise falls back to Sparkles so a future catalog entry never breaks
-// the grid render.
 const ICONS: Record<string, LucideIcon> = {
   Award,
   Sparkles,
@@ -74,10 +76,6 @@ const ICONS: Record<string, LucideIcon> = {
   Activity,
 };
 
-// Contact rate isn't a `personal_bests` row — it's derived from swings
-// (count of contact swings ÷ total swings). We synthesise it as a
-// special tile and pull the value from the swings query rather than the
-// PRs map.
 type PbMetric =
   | 'exit_velocity_mph'
   | 'launch_angle_deg'
@@ -110,9 +108,9 @@ function formatDate(isoDate: string): string {
 
 export default function ProfileScreen({ navigation }: Props) {
   const { user } = useAuth();
-  const { family, kids } = useFamily();
-  const kid = kids[0] ?? null;
+  const { family, kid, kids, setSelectedKid } = useSelectedKid();
   const { membership, resume } = useMembership();
+  const deleteKid = useDeleteKid();
 
   const { data: primaryLocation } = usePrimaryLocation();
 
@@ -129,8 +127,6 @@ export default function ProfileScreen({ navigation }: Props) {
   const { data: prs } = usePersonalBestsForKid(kid?.id);
   const { data: swings } = useSwingsForKid(kid?.id);
 
-  // Contact rate: % of swings with measurable exit velocity > 0. NULL
-  // exit velocity means HitTrax didn't register contact (whiff or miss).
   const contactRate = useMemo<number | null>(() => {
     if (!swings || swings.length === 0) return null;
     const total = swings.length;
@@ -243,6 +239,66 @@ export default function ProfileScreen({ navigation }: Props) {
             </View>
           ) : null}
         </View>
+
+        {/* Athletes section ------------------------------------------------ */}
+        {kids.length > 0 ? (
+          <>
+            <View style={styles.sectionRow}>
+              <Text style={styles.sectionLabel}>ATHLETES</Text>
+            </View>
+            {kids.map((k) => (
+              <KidCard
+                key={k.id}
+                kid={k}
+                isSelected={k.id === kid?.id}
+                onSwitch={() => setSelectedKid(k.id)}
+                onEdit={() => navigation.navigate('EditKid', { kidId: k.id })}
+                onDelete={async () => {
+                  if (kids.length === 1) {
+                    Alert.alert(
+                      'Cannot delete',
+                      'You need at least one athlete on your account.',
+                    );
+                    return;
+                  }
+                  Alert.alert(
+                    `Delete ${k.first_name}?`,
+                    'This will permanently remove all of this athlete\u2019s data including stats, bookings, and HitTrax history. This cannot be undone.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete athlete',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            if (k.id === kid?.id) {
+                              const next = kids.find((o) => o.id !== k.id);
+                              if (next) setSelectedKid(next.id);
+                            }
+                            await deleteKid(k.id);
+                          } catch (err) {
+                            Alert.alert('Could not delete athlete', String(err));
+                          }
+                        },
+                      },
+                    ],
+                  );
+                }}
+              />
+            ))}
+            <TouchableOpacity
+              style={styles.addAthleteBtn}
+              onPress={() => navigation.navigate('AddKid', { fromMe: true })}
+              accessibilityRole="button"
+            >
+              <View style={styles.addAthleteIcon}>
+                <UserPlus size={18} color={colors.gold} />
+              </View>
+              <Text style={styles.addAthleteText}>Add Another Athlete</Text>
+              <ChevronRight size={18} color={colors.gold} />
+            </TouchableOpacity>
+          </>
+        ) : null}
 
         {/* Personal Bests ------------------------------------------------- */}
         <Text style={styles.sectionLabel}>PERSONAL BESTS</Text>
@@ -415,6 +471,55 @@ export default function ProfileScreen({ navigation }: Props) {
   );
 }
 
+function KidCard({
+  kid,
+  isSelected,
+  onSwitch,
+  onEdit,
+  onDelete,
+}: {
+  kid: Kid;
+  isSelected: boolean;
+  onSwitch: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const initial = (kid.first_name?.[0] ?? '?').toUpperCase();
+  const fullName = `${kid.first_name} ${kid.last_name ?? ''}`.trim();
+  const meta = [kid.age_group, kid.primary_position].filter(Boolean).join(' · ');
+  return (
+    <View style={[styles.kidCard, isSelected && styles.kidCardSelected]}>
+      <View style={[styles.kidAvatar, isSelected && styles.kidAvatarSelected]}>
+        <Text style={[styles.kidAvatarText, isSelected && styles.kidAvatarTextSelected]}>
+          {initial}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.kidName, isSelected && styles.kidNameSelected]}>{fullName}</Text>
+        {meta ? <Text style={styles.kidMeta}>{meta}</Text> : null}
+        <Text style={styles.kidPoints}>{kid.points_balance.toLocaleString()} pts</Text>
+        <View style={styles.kidActions}>
+          <TouchableOpacity onPress={onEdit} style={styles.kidActionBtn} accessibilityRole="button">
+            <Text style={styles.kidActionText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onDelete} style={[styles.kidActionBtn, styles.kidActionDelete]} accessibilityRole="button">
+            <Text style={[styles.kidActionText, styles.kidActionDeleteText]}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      {!isSelected ? (
+        <TouchableOpacity onPress={onSwitch} style={styles.switchBtn} accessibilityRole="button">
+          <Text style={styles.switchBtnText}>Switch</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.activeTag}>
+          <Text style={styles.activeTagText}>Active</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 function Row({
   icon: Icon,
   label,
@@ -532,6 +637,132 @@ const styles = StyleSheet.create({
     color: colors.textLight,
   },
 
+  kidCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    padding: spacing['2xl'],
+    borderRadius: radius['2xl'],
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.dark,
+    marginBottom: spacing.lg,
+  },
+  kidCardSelected: {
+    borderColor: colors.borderGold,
+    backgroundColor: 'rgba(232,167,71,0.05)',
+  },
+  kidAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.xl,
+    backgroundColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  kidAvatarSelected: { backgroundColor: colors.gold },
+  kidAvatarText: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xl,
+    color: colors.textLight,
+  },
+  kidAvatarTextSelected: { color: colors.dark },
+  kidName: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.lg,
+    color: colors.textOnDark,
+  },
+  kidNameSelected: { color: colors.gold },
+  kidMeta: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  kidPoints: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
+    color: colors.textLight,
+    marginTop: 2,
+  },
+  kidActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  kidActionBtn: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  kidActionDelete: {
+    borderColor: 'rgba(220,38,38,0.4)',
+  },
+  kidActionText: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+  },
+  kidActionDeleteText: {
+    color: 'rgba(220,38,38,0.8)',
+  },
+
+  switchBtn: {
+    paddingHorizontal: spacing['2xl'],
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.gold,
+  },
+  switchBtnText: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.sm,
+    color: colors.gold,
+    letterSpacing: tracking.wide,
+  },
+  activeTag: {
+    paddingHorizontal: spacing['2xl'],
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(232,167,71,0.12)',
+  },
+  activeTagText: {
+    fontFamily: fontFamilies.interSemiBold,
+    fontSize: fontSizes.sm,
+    color: colors.gold,
+  },
+
+  addAthleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    padding: spacing['2xl'],
+    borderRadius: radius['2xl'],
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    marginBottom: spacing.lg,
+  },
+  addAthleteIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.xl,
+    backgroundColor: 'rgba(232,167,71,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  addAthleteText: {
+    flex: 1,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.lg,
+    color: colors.gold,
+    letterSpacing: tracking.wide,
+  },
+
   pbGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -572,7 +803,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.interSemiBold,
     fontSize: fontSizes.sm,
     color: colors.textMuted,
-    letterSpacing: tracking.wide,
   },
 
   badgeGrid: {

@@ -12,7 +12,8 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Product } from '@/api/earn';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
+import KidSwitcherPill from '@/components/ui/KidSwitcherPill';
 import type { EarnStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
@@ -35,8 +36,7 @@ const TABS: { key: SubTab; label: string }[] = [
 export default function EarnScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { kids } = useFamily();
-  const kid = kids[0] ?? null;
+  const { kid } = useSelectedKid();
   const initial = route.params?.initialSubTab ?? 'rewards';
   const [tab, setTab] = useState<SubTab>(initial);
 
@@ -52,7 +52,10 @@ export default function EarnScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Earn</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Earn</Text>
+          <KidSwitcherPill />
+        </View>
         <Text style={styles.subtitle}>
           Redeem points, browse the store, climb the leaderboard
         </Text>
@@ -100,6 +103,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing['3xl'],
     paddingTop: spacing['2xl'],
     paddingBottom: spacing['3xl'],
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
   },
   title: {
     color: colors.gold,

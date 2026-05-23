@@ -5,9 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAssignments } from '@/hooks/useAssignments';
 import { useCoachMessagesForKid } from '@/hooks/useCoachMessages';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import { useSwingsForKid } from '@/hooks/useSwings';
 import { useTrainingVideos } from '@/hooks/useTrainingVideos';
+import KidSwitcherPill from '@/components/ui/KidSwitcherPill';
 import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
@@ -47,8 +48,7 @@ export default function WorkScreen() {
 
   // Sub-tab count badges. We fan out the same hooks the bodies already
   // use so React Query dedupes and the badges stay live in sync.
-  const { kids } = useFamily();
-  const kid = kids[0] ?? null;
+  const { kid } = useSelectedKid();
   const { data: swings } = useSwingsForKid(kid?.id);
   const { data: assignments } = useAssignments(kid?.id);
   const { data: coachMsgs } = useCoachMessagesForKid(kid?.id);
@@ -95,7 +95,10 @@ export default function WorkScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Work</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Work</Text>
+          <KidSwitcherPill />
+        </View>
         <Text style={styles.subtitle}>Train, review, and message your coach</Text>
       </View>
       <View style={styles.tabBarWrapper}>
@@ -144,6 +147,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing['3xl'],
     paddingTop: spacing['2xl'],
     paddingBottom: spacing.lg,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
   },
   title: {
     color: colors.gold,

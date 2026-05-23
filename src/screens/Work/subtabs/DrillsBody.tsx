@@ -18,7 +18,7 @@ import {
   type TrainingVideo,
   type TrainingVideoCategory,
 } from '@/api/trainingVideos';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import { useTrainingProgress, useTrainingVideos } from '@/hooks/useTrainingVideos';
 import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
@@ -48,8 +48,7 @@ function fmtDuration(sec: number | null): string {
 
 export default function DrillsBody() {
   const navigation = useNavigation<Nav>();
-  const { kids } = useFamily();
-  const kid = kids[0] ?? null;
+  const { kid } = useSelectedKid();
 
   const [filter, setFilter] = useState<Filter>('all');
   const { data: videos, isPending, refetch, isRefetching } = useTrainingVideos(filter);

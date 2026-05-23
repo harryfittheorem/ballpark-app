@@ -35,7 +35,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Swing } from '@/api/swings';
-import { useFamily } from '@/hooks/useFamily';
+import { useSelectedKid } from '@/hooks/useSelectedKid';
 import {
   useFavoriteSwingIds,
   usePersonalBestsForKid,
@@ -74,8 +74,8 @@ export default function SwingDetailScreen() {
   const route = useRoute<Route>();
   const navigation = useNavigation<Nav>();
   const { swingId } = route.params;
-  const { kids } = useFamily();
-  const kid = kids[0] ?? null;
+  const { kid } = useSelectedKid();
+  
 
   const { data: swing, isPending, isError, error } = useSwing(swingId);
   const { data: favorites } = useFavoriteSwingIds();

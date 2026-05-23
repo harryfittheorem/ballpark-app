@@ -39,7 +39,7 @@ export type MainTabScreenProps<T extends keyof MainTabParamList> = BottomTabScre
 export type HomeStackParamList = {
   HomeMain: undefined;
   VideoPlayback: { messageId: string };
-  AddKid: undefined;
+  AddKid: { fromMe?: boolean } | undefined;
   ConnectHitTraxOnboarding: { kidId: string } | undefined;
 };
 
@@ -132,6 +132,8 @@ export type MeStackParamList = {
   ChangeLocation: undefined;
   CancelMembership: undefined;
   PauseMembership: undefined;
+  AddKid: { fromMe: true };
+  EditKid: { kidId: string };
 };
 
 export type MeStackScreenProps<T extends keyof MeStackParamList> = CompositeScreenProps<
