@@ -14,6 +14,8 @@ import { NavigationContainer, type LinkingOptions } from '@react-navigation/nati
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/hooks/useAuth';
+import { useWaiverGate } from '@/hooks/useWaiver';
+import WaiverScreen from '@/screens/Auth/WaiverScreen';
 import { colors } from '@/theme';
 import type { MainTabParamList } from './types';
 
@@ -62,12 +64,32 @@ function Splash() {
 function Inner() {
   const { session, loading: authLoading, appRole } = useAuth();
 
+  // Waiver gate — only applies to parents (coaches don't sign waivers).
+  // useWaiverGate is a no-op when there's no session (queries are disabled).
+  const { loading: waiverLoading, needsWaiver, activeWaiver } = useWaiverGate();
+
   if (authLoading) return <Splash />;
   if (!session) return <AuthNavigator />;
+
   // Coaches don't have a family record — `useFamily` is only mounted under
   // MainTabNavigator (parent surface), so coaches never trigger that fetch.
   if (appRole === 'coach') return <CoachTabNavigator />;
-  return <MainTabNavigator />;
+
+  // While checking the waiver status, show the splash so there's no
+  // unprotected flash of the main tabs.
+  if (waiverLoading) return <Splash />;
+
+  // Mount MainTabNavigator regardless so navigation state initialises. The
+  // WaiverScreen is a full-screen Modal that sits on top and blocks until
+  // the parent taps "I Agree" and the query cache is invalidated.
+  return (
+    <>
+      <MainTabNavigator />
+      {needsWaiver && activeWaiver ? (
+        <WaiverScreen waiver={activeWaiver} />
+      ) : null}
+    </>
+  );
 }
 
 export default function RootNavigator() {

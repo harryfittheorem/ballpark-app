@@ -19,6 +19,11 @@ const TILES = [
     body: "View all coach–family messages and videos sent through the app.",
   },
   {
+    href: "/admin/waivers",
+    title: "Waivers",
+    body: "View liability waiver status for every family. Filter by unsigned and export to CSV.",
+  },
+  {
     href: "/admin/settings",
     title: "Tenant settings",
     body: "Configure per-location settings such as the HitTrax Facility ID.",
