@@ -16,6 +16,9 @@
 //
 // Idempotent: if the email already exists, checks for a super_admins row and
 // inserts it if missing, then exits 0.
+//
+// Cleanup: if the auth user was freshly created and the DB upsert fails,
+// the script deletes the orphaned auth user before exiting with code 1.
 // =============================================================================
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -45,6 +48,7 @@ const listRes = await fetch(
 const listBody = await listRes.json();
 const existing = (listBody?.users ?? []).find((u) => u.email === email);
 let userId;
+let userWasCreatedByUs = false;
 
 if (existing) {
   console.log(`-> user already exists: user_id=${existing.id}`);
@@ -71,7 +75,24 @@ if (existing) {
     process.exit(1);
   }
   userId = createBody.id;
+  userWasCreatedByUs = true;
   console.log(`-> auth user created: user_id=${userId}`);
+}
+
+// ─── Helper: delete an orphaned auth user we just created ────────────────────
+async function deleteOrphanedUser(uid) {
+  console.error(`-> cleaning up orphaned auth user: user_id=${uid}`);
+  const delRes = await fetch(`${url}/auth/v1/admin/users/${uid}`, {
+    method: 'DELETE',
+    headers: adminHeaders,
+  });
+  if (delRes.status < 400) {
+    console.error(`-> orphaned auth user deleted.`);
+  } else {
+    const delBody = await delRes.text();
+    console.error(`-> WARNING: could not delete orphaned user (${delRes.status}): ${delBody}`);
+    console.error(`-> Manual cleanup required: DELETE from auth.users WHERE id = '${uid}'`);
+  }
 }
 
 // ─── Step 3: upsert super_admins row ─────────────────────────────────────────
@@ -92,6 +113,12 @@ const upsertRes = await fetch(`${url}/rest/v1/super_admins`, {
 if (upsertRes.status >= 400) {
   const errBody = await upsertRes.text();
   console.error(`FAIL upsert super_admins (${upsertRes.status}):`, errBody);
+
+  // Clean up orphaned auth user only if we created it in this run.
+  if (userWasCreatedByUs) {
+    await deleteOrphanedUser(userId);
+  }
+
   process.exit(1);
 }
 

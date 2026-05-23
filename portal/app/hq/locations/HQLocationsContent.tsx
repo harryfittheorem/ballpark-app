@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
-import { MapPin, Plus, CheckCircle2, AlertCircle, Clock, XCircle } from 'lucide-react';
+import { MapPin, Plus, CheckCircle2, AlertCircle, Clock, XCircle, Pencil } from 'lucide-react';
 import type { HQLocation } from '@/lib/supabase/hqQueries';
 import { HQNewLocationModal } from './HQNewLocationModal';
+import { HQEditLocationModal } from './HQEditLocationModal';
 
 interface Props {
   locations: HQLocation[];
@@ -32,7 +33,8 @@ function stripeStatusChip(status: string) {
 }
 
 export function HQLocationsContent({ locations }: Props) {
-  const [showModal, setShowModal] = useState(false);
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [editLocation, setEditLocation] = useState<HQLocation | null>(null);
 
   return (
     <div style={{ padding: 28 }}>
@@ -47,7 +49,7 @@ export function HQLocationsContent({ locations }: Props) {
           </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => setShowNewModal(true)}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '9px 18px', borderRadius: 8, border: 'none',
@@ -66,7 +68,7 @@ export function HQLocationsContent({ locations }: Props) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: brand.surfaceAlt, borderBottom: `1px solid ${brand.border}` }}>
-              {['Location', 'Tenant', 'Region', 'Stripe', 'Members', 'Royalty Rate', 'Status'].map(h => (
+              {['Location', 'Tenant', 'Region', 'Stripe', 'Members', 'Royalty Rate', 'Status', ''].map(h => (
                 <th key={h} style={{
                   padding: '11px 16px', textAlign: 'left',
                   fontSize: 11, fontWeight: 700, color: brand.textMuted,
@@ -80,7 +82,7 @@ export function HQLocationsContent({ locations }: Props) {
           <tbody>
             {locations.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: brand.textMuted, fontSize: 13 }}>
+                <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: brand.textMuted, fontSize: 13 }}>
                   No locations yet. Click &ldquo;New Location&rdquo; to add one.
                 </td>
               </tr>
@@ -89,6 +91,7 @@ export function HQLocationsContent({ locations }: Props) {
                 <tr key={loc.id} style={{
                   borderBottom: i < locations.length - 1 ? `1px solid ${brand.border}` : 'none',
                   background: 'transparent',
+                  opacity: loc.isActive ? 1 : 0.6,
                 }}>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -131,6 +134,19 @@ export function HQLocationsContent({ locations }: Props) {
                       {loc.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <button
+                      onClick={() => setEditLocation(loc)}
+                      title="Edit location"
+                      style={{
+                        background: 'none', border: `1px solid ${brand.border}`,
+                        borderRadius: 6, padding: '5px 8px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <Pencil size={12} color={brand.textMuted} />
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
@@ -138,7 +154,8 @@ export function HQLocationsContent({ locations }: Props) {
         </table>
       </div>
 
-      {showModal && <HQNewLocationModal onClose={() => setShowModal(false)} />}
+      {showNewModal && <HQNewLocationModal onClose={() => setShowNewModal(false)} />}
+      {editLocation && <HQEditLocationModal location={editLocation} onClose={() => setEditLocation(null)} />}
     </div>
   );
 }

@@ -15,8 +15,13 @@ export type HQLocation = {
   tenantName: string;
   tenantSlug: string;
   name: string;
+  address: string | null;
   city: string | null;
   state: string | null;
+  zip: string | null;
+  phone: string | null;
+  email: string | null;
+  timezone: string;
   isActive: boolean;
   stripeStatus: string;
   stripeAccountName: string | null;
@@ -34,6 +39,7 @@ export type HQTeamMember = {
   locationName: string | null;
   createdAt: string;
   lastSignIn: string | null;
+  banned: boolean;
 };
 
 export type HQNetworkKPIs = {
@@ -57,6 +63,8 @@ export type HQLocationRevenue = {
 export type HQRecentTransaction = {
   id: string;
   tenantName: string;
+  locationName: string | null;
+  familyName: string | null;
   amount: number;
   status: string;
   createdAt: string;
@@ -101,7 +109,7 @@ function buildCountByLocation(
 export async function getHQLocations(supabase: SupabaseClient): Promise<HQLocation[]> {
   const { data: locations, error } = await supabase
     .from('locations')
-    .select('id, tenant_id, name, city, state, is_active, stripe_onboarding_status, stripe_account_name')
+    .select('id, tenant_id, name, address, city, state, zip, phone, email, timezone, is_active, stripe_onboarding_status, stripe_account_name')
     .order('name');
 
   if (error || !locations) return [];
@@ -151,8 +159,13 @@ export async function getHQLocations(supabase: SupabaseClient): Promise<HQLocati
       tenantName: tenant?.name ?? '—',
       tenantSlug: tenant?.slug ?? '',
       name: l.name,
+      address: l.address ?? null,
       city: l.city ?? null,
       state: l.state ?? null,
+      zip: l.zip ?? null,
+      phone: l.phone ?? null,
+      email: l.email ?? null,
+      timezone: l.timezone ?? 'America/Chicago',
       isActive: l.is_active ?? true,
       stripeStatus: l.stripe_onboarding_status ?? 'not_connected',
       stripeAccountName: l.stripe_account_name ?? null,
@@ -169,6 +182,7 @@ type AdminUser = {
   email: string;
   created_at: string;
   last_sign_in_at: string | null;
+  banned_until: string | null;
   raw_user_meta_data: {
     app_role?: string;
     first_name?: string;
@@ -198,6 +212,11 @@ async function fetchAdminUsers(): Promise<AdminUser[]> {
   } catch {
     return [];
   }
+}
+
+function isUserBanned(bannedUntil: string | null): boolean {
+  if (!bannedUntil) return false;
+  return new Date(bannedUntil) > new Date();
 }
 
 export async function getHQTeam(supabase: SupabaseClient): Promise<HQTeamMember[]> {
@@ -241,6 +260,7 @@ export async function getHQTeam(supabase: SupabaseClient): Promise<HQTeamMember[
       locationName: null,
       createdAt: sa.created_at ?? new Date().toISOString(),
       lastSignIn: au?.last_sign_in_at ?? null,
+      banned: isUserBanned(au?.banned_until ?? null),
     };
   });
 
@@ -257,6 +277,7 @@ export async function getHQTeam(supabase: SupabaseClient): Promise<HQTeamMember[
       locationName: c.primary_location_id ? (locationMap.get(c.primary_location_id) ?? null) : null,
       createdAt: c.created_at ?? new Date().toISOString(),
       lastSignIn: au?.last_sign_in_at ?? null,
+      banned: isUserBanned(au?.banned_until ?? null),
     };
   });
 
@@ -290,6 +311,7 @@ export async function getHQTeam(supabase: SupabaseClient): Promise<HQTeamMember[
         locationName: null,
         createdAt: u.created_at,
         lastSignIn: u.last_sign_in_at ?? null,
+        banned: isUserBanned(u.banned_until ?? null),
       };
     });
 
@@ -436,28 +458,62 @@ export async function getHQLocationRevenue(supabase: SupabaseClient): Promise<HQ
 export async function getHQRecentTransactions(supabase: SupabaseClient, limit = 20): Promise<HQRecentTransaction[]> {
   const { data, error } = await supabase
     .from('payment_events')
-    .select('id, tenant_id, amount_cents, status, created_at, membership_id')
+    .select('id, tenant_id, family_id, amount_cents, status, created_at')
     .eq('status', 'paid')
     .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error || !data) return [];
 
-  const tenantIds = [...new Set(data.map(p => p.tenant_id))];
-  const { data: tenants } = await supabase
-    .from('tenants')
-    .select('id, name')
-    .in('id', tenantIds);
+  const tenantIds  = [...new Set(data.map(p => p.tenant_id))];
+  const familyIds  = [...new Set(data.map(p => p.family_id).filter(Boolean))];
+
+  const [tenantsRes, familiesRes] = await Promise.all([
+    supabase.from('tenants').select('id, name').in('id', tenantIds),
+    familyIds.length > 0
+      ? supabase
+          .from('families')
+          .select('id, parent_first_name, parent_last_name, primary_location_id')
+          .in('id', familyIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
 
   const tenantMap = new Map<string, string>();
-  for (const t of (tenants ?? [])) tenantMap.set(t.id, t.name);
+  for (const t of (tenantsRes.data ?? [])) tenantMap.set(t.id, t.name);
 
-  return data.map(p => ({
-    id: p.id,
-    tenantName: tenantMap.get(p.tenant_id) ?? '—',
-    amount: (p.amount_cents ?? 0) / 100,
-    status: p.status,
-    createdAt: p.created_at,
-    memberName: null,
-  }));
+  const locationIds = [...new Set(
+    (familiesRes.data ?? [])
+      .map(f => f.primary_location_id)
+      .filter((id): id is string => Boolean(id))
+  )];
+
+  const locationsRes = locationIds.length > 0
+    ? await supabase.from('locations').select('id, name').in('id', locationIds)
+    : { data: [] };
+
+  const locationMap = new Map<string, string>();
+  for (const l of (locationsRes.data ?? [])) locationMap.set(l.id, l.name);
+
+  const familyMap = new Map<string, { name: string; locationName: string | null }>();
+  for (const f of (familiesRes.data ?? [])) {
+    const fullName = [f.parent_first_name, f.parent_last_name].filter(Boolean).join(' ') || null;
+    familyMap.set(f.id, {
+      name: fullName ?? '—',
+      locationName: f.primary_location_id ? (locationMap.get(f.primary_location_id) ?? null) : null,
+    });
+  }
+
+  return data.map(p => {
+    const family = familyMap.get(p.family_id);
+    return {
+      id: p.id,
+      tenantName: tenantMap.get(p.tenant_id) ?? '—',
+      locationName: family?.locationName ?? null,
+      familyName: family?.name ?? null,
+      amount: (p.amount_cents ?? 0) / 100,
+      status: p.status,
+      createdAt: p.created_at,
+      memberName: null,
+    };
+  });
 }

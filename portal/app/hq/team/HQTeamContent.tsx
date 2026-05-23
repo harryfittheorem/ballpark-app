@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
-import { Users, Plus, Shield, UserCog, Crown } from 'lucide-react';
+import { Users, Plus, Shield, UserCog, Crown, Pencil } from 'lucide-react';
 import type { HQTeamMember, HQLocation } from '@/lib/supabase/hqQueries';
 import { HQInviteModal } from './HQInviteModal';
+import { HQEditTeamMemberModal } from './HQEditTeamMemberModal';
 
 interface Props {
   team: HQTeamMember[];
@@ -58,7 +59,8 @@ function initials(name: string) {
 }
 
 export function HQTeamContent({ team, locations }: Props) {
-  const [showModal, setShowModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [editMember, setEditMember] = useState<HQTeamMember | null>(null);
   const [filter, setFilter] = useState<FilterRole>('all');
 
   const filtered = filter === 'all' ? team : team.filter(m => m.role === filter);
@@ -84,7 +86,7 @@ export function HQTeamContent({ team, locations }: Props) {
           </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => setShowInviteModal(true)}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '9px 18px', borderRadius: 8, border: 'none',
@@ -125,7 +127,7 @@ export function HQTeamContent({ team, locations }: Props) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: brand.surfaceAlt, borderBottom: `1px solid ${brand.border}` }}>
-              {['Member', 'Role', 'Location', 'Franchise', 'Last Sign-In', 'Joined'].map(h => (
+              {['Member', 'Role', 'Location', 'Franchise', 'Last Sign-In', 'Joined', ''].map(h => (
                 <th key={h} style={{
                   padding: '11px 16px', textAlign: 'left',
                   fontSize: 11, fontWeight: 700, color: brand.textMuted,
@@ -139,13 +141,16 @@ export function HQTeamContent({ team, locations }: Props) {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: brand.textMuted, fontSize: 13 }}>
+                <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: brand.textMuted, fontSize: 13 }}>
                   No team members found. Click &ldquo;Invite&rdquo; to add someone.
                 </td>
               </tr>
             ) : (
               filtered.map((m, i) => (
-                <tr key={m.id} style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${brand.border}` : 'none' }}>
+                <tr key={m.id} style={{
+                  borderBottom: i < filtered.length - 1 ? `1px solid ${brand.border}` : 'none',
+                  opacity: m.banned ? 0.6 : 1,
+                }}>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{
@@ -157,7 +162,18 @@ export function HQTeamContent({ team, locations }: Props) {
                         {initials(m.name).toUpperCase() || <Users size={14} color={brand.goldDeep} />}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 600, color: brand.text }}>{m.name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontWeight: 600, color: brand.text }}>{m.name}</span>
+                          {m.banned && (
+                            <span style={{
+                              padding: '1px 7px', borderRadius: 20,
+                              background: brand.dangerBg, color: brand.danger,
+                              fontSize: 10, fontWeight: 700,
+                            }}>
+                              DEACTIVATED
+                            </span>
+                          )}
+                        </div>
                         {m.email && <div style={{ fontSize: 11, color: brand.textMuted }}>{m.email}</div>}
                       </div>
                     </div>
@@ -167,6 +183,19 @@ export function HQTeamContent({ team, locations }: Props) {
                   <td style={{ padding: '12px 16px', color: brand.text }}>{m.tenantName ?? '—'}</td>
                   <td style={{ padding: '12px 16px', color: brand.textMuted }}>{formatLastSignIn(m.lastSignIn)}</td>
                   <td style={{ padding: '12px 16px', color: brand.textMuted }}>{formatJoined(m.createdAt)}</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <button
+                      onClick={() => setEditMember(m)}
+                      title="Edit member"
+                      style={{
+                        background: 'none', border: `1px solid ${brand.border}`,
+                        borderRadius: 6, padding: '5px 8px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <Pencil size={12} color={brand.textMuted} />
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
@@ -174,7 +203,8 @@ export function HQTeamContent({ team, locations }: Props) {
         </table>
       </div>
 
-      {showModal && <HQInviteModal onClose={() => setShowModal(false)} locations={locations} />}
+      {showInviteModal && <HQInviteModal onClose={() => setShowInviteModal(false)} locations={locations} />}
+      {editMember && <HQEditTeamMemberModal member={editMember} onClose={() => setEditMember(null)} />}
     </div>
   );
 }

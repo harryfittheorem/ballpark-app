@@ -1,8 +1,9 @@
 'use client';
 
 import { brand, fonts } from '@/lib/ownerBrandTokens';
-import { DollarSign, MapPin, TrendingUp, AlertCircle, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { DollarSign, MapPin, TrendingUp, AlertCircle, CheckCircle2, Clock, XCircle, Download } from 'lucide-react';
 import type { HQNetworkKPIs, HQLocationRevenue, HQRecentTransaction } from '@/lib/supabase/hqQueries';
+import { exportCsv } from '@/lib/exportCsv';
 
 interface Props {
   kpis: HQNetworkKPIs;
@@ -21,6 +22,11 @@ function fmtSmall(n: number) {
 function fmtDate(ts: string) {
   const d = new Date(ts);
   return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${d.getDate()}`;
+}
+
+function fmtDateFull(ts: string) {
+  const d = new Date(ts);
+  return d.toISOString().slice(0, 10);
 }
 
 function stripeIcon(status: string) {
@@ -58,15 +64,53 @@ function KPICard({ label, value, sub, icon: Icon, accent = brand.goldDeep }: KPI
 }
 
 export function HQRevenueContent({ kpis, locationRevenue, recentTransactions }: Props) {
+  function handleExportCsv() {
+    exportCsv(
+      `ballpark-transactions-30d-${new Date().toISOString().slice(0, 10)}.csv`,
+      recentTransactions.map(tx => ({
+        date: fmtDateFull(tx.createdAt),
+        tenant: tx.tenantName,
+        location: tx.locationName ?? '',
+        family: tx.familyName ?? '',
+        amount: fmtSmall(tx.amount),
+        type: tx.status,
+      })),
+      [
+        { label: 'Date',      key: 'date' },
+        { label: 'Tenant',    key: 'tenant' },
+        { label: 'Location',  key: 'location' },
+        { label: 'Family',    key: 'family' },
+        { label: 'Amount',    key: 'amount' },
+        { label: 'Type',      key: 'type' },
+      ],
+    );
+  }
+
   return (
     <div style={{ padding: 28 }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontFamily: fonts.display, fontSize: 26, fontWeight: 800, color: brand.text, margin: 0, letterSpacing: 0.5 }}>
-          Network Revenue
-        </h1>
-        <p style={{ color: brand.textMuted, fontSize: 13, margin: '4px 0 0' }}>
-          Cross-location financial overview · 30-day window
-        </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div>
+          <h1 style={{ fontFamily: fonts.display, fontSize: 26, fontWeight: 800, color: brand.text, margin: 0, letterSpacing: 0.5 }}>
+            Network Revenue
+          </h1>
+          <p style={{ color: brand.textMuted, fontSize: 13, margin: '4px 0 0' }}>
+            Cross-location financial overview · 30-day window
+          </p>
+        </div>
+        <button
+          onClick={handleExportCsv}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '9px 18px', borderRadius: 8,
+            border: `1px solid ${brand.border}`,
+            background: 'transparent', color: brand.text,
+            fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            fontFamily: fonts.display,
+          }}
+        >
+          <Download size={14} />
+          Export CSV
+        </button>
       </div>
 
       {/* KPI Grid */}
@@ -126,7 +170,10 @@ export function HQRevenueContent({ kpis, locationRevenue, recentTransactions }: 
 
         {/* Recent large transactions */}
         <div style={{ background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: `1px solid ${brand.border}` }}>
+          <div style={{
+            padding: '16px 20px', borderBottom: `1px solid ${brand.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: brand.text, fontFamily: fonts.display }}>Recent Transactions</div>
           </div>
           <div style={{ overflowX: 'auto' }}>
