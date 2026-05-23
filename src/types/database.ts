@@ -1828,6 +1828,18 @@ export type Database = {
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       gen_redemption_code: { Args: never; Returns: string }
+      get_coach_hours: {
+        Args: { p_end_date: string; p_start_date: string; p_tenant_id: string }
+        Returns: {
+          cancelled_count: number
+          coach_id: string
+          coach_name: string
+          completed_count: number
+          confirmed_count: number
+          no_show_count: number
+          total_hours: number
+        }[]
+      }
       get_kid_weekly_rank_delta: { Args: { p_kid_id: string }; Returns: number }
       mark_coach_message_viewed: {
         Args: { p_message_id: string }
