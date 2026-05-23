@@ -133,7 +133,7 @@ const DEMO_BOOKINGS: ScheduleBooking[] = [
 
 type ViewMode = 'day' | 'week' | 'month';
 
-type Popover = { bookingId: string; currentCage: string | null; top: number; left: number };
+type Popover = { bookingId: string; currentCage: string | null; top: number; left: number; isDemo?: boolean };
 
 type Props = { data: OwnerScheduleData; tenantId: string };
 
@@ -167,6 +167,7 @@ export function ScheduleContent({ data, tenantId }: Props) {
   const [loading,        setLoading]       = useState(false);
   const [popover,        setPopover]       = useState<Popover | null>(null);
   const [saving,         setSaving]        = useState<string | null>(null);
+  const [cancelling,     setCancelling]    = useState<string | null>(null);
   const [errorMsg,       setErrorMsg]      = useState<string | null>(null);
   const [viewMode,       setViewMode]      = useState<ViewMode>('day');
   const [currentDate,    setCurrentDate]   = useState<Date>(() => new Date());
@@ -321,8 +322,45 @@ export function ScheduleContent({ data, tenantId }: Props) {
   const openPopover = useCallback((booking: ScheduleBooking, e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setPopover({ bookingId: booking.id, currentCage: booking.cage, top: rect.bottom + 4, left: rect.left });
+    setPopover({
+      bookingId: booking.id,
+      currentCage: booking.cage,
+      top: rect.bottom + 4,
+      left: rect.left,
+      isDemo: booking.id.startsWith('b') && !booking.id.startsWith('local-'),
+    });
     setErrorMsg(null);
+  }, []);
+
+  const cancelBookingOverride = useCallback(async (bookingId: string) => {
+    if (!confirm('Cancel this booking immediately? This bypasses the cancellation policy.')) return;
+    setPopover(null);
+    if (bookingId.startsWith('local-') || bookingId.match(/^b\d+$/)) {
+      // Demo booking — remove from local state only
+      setBookings(prev => prev.filter(b => b.id !== bookingId));
+      setToast('Demo booking cancelled (no DB write).');
+      return;
+    }
+    setCancelling(bookingId);
+    setErrorMsg(null);
+    try {
+      const res = await fetch('/api/bookings/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: bookingId, reason: 'Staff override' }),
+      });
+      const resData = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok || !resData.ok) {
+        setErrorMsg(resData.error ?? `Cancel failed (${res.status})`);
+        return;
+      }
+      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b));
+      setToast('Booking cancelled.');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setCancelling(null);
+    }
   }, []);
 
   const assignCage = useCallback(async (bookingId: string, cageName: string) => {
@@ -677,12 +715,12 @@ export function ScheduleContent({ data, tenantId }: Props) {
         </div>
       </div>
 
-      {/* ── Cage assignment popover ──────────────────────────────────────── */}
+      {/* ── Cage assignment + actions popover ───────────────────────────── */}
       {popover && (
         <div
           ref={popoverRef}
           onClick={e => e.stopPropagation()}
-          style={{ position: 'fixed', top: Math.min(popover.top, window.innerHeight - 260), left: Math.min(popover.left, window.innerWidth - 180), zIndex: 1000, background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.18)', padding: 8, minWidth: 160 }}
+          style={{ position: 'fixed', top: Math.min(popover.top, window.innerHeight - 320), left: Math.min(popover.left, window.innerWidth - 180), zIndex: 1000, background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.18)', padding: 8, minWidth: 160 }}
         >
           <div style={{ fontSize: 10, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, textTransform: 'uppercase', padding: '4px 8px 6px', borderBottom: `1px solid ${brand.border}`, marginBottom: 4 }}>
             Assign Cage
@@ -702,6 +740,23 @@ export function ScheduleContent({ data, tenantId }: Props) {
               </button>
             );
           })}
+
+          {/* Staff actions */}
+          <div style={{ borderTop: `1px solid ${brand.border}`, marginTop: 6, paddingTop: 6 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, textTransform: 'uppercase', padding: '0 8px 5px' }}>
+              Actions
+            </div>
+            <button
+              type="button"
+              disabled={cancelling === popover.bookingId}
+              onClick={() => void cancelBookingOverride(popover.bookingId)}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = `${brand.danger}18`; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', border: 'none', borderRadius: 5, cursor: cancelling === popover.bookingId ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700, background: 'transparent', color: brand.danger, opacity: cancelling === popover.bookingId ? 0.6 : 1 }}
+            >
+              {cancelling === popover.bookingId ? 'Cancelling…' : 'Cancel (Staff Override)'}
+            </button>
+          </div>
         </div>
       )}
 

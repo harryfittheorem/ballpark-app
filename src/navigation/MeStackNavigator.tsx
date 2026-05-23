@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import BookingDetailScreen from '@/screens/Me/BookingDetailScreen';
 import BookingsListScreen from '@/screens/Me/BookingsListScreen';
+import CancelMembershipScreen from '@/screens/Me/CancelMembershipScreen';
 import ChangeLocationScreen from '@/screens/Me/ChangeLocationScreen';
 import ConnectHitTraxScreen from '@/screens/Me/ConnectHitTraxScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
@@ -56,6 +57,11 @@ export default function MeStackNavigator() {
         name="ChangeLocation"
         component={ChangeLocationScreen}
         options={{ title: 'My Location' }}
+      />
+      <Stack.Screen
+        name="CancelMembership"
+        component={CancelMembershipScreen}
+        options={{ title: 'Cancel Membership' }}
       />
     </Stack.Navigator>
   );

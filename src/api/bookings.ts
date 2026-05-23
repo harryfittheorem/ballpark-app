@@ -202,13 +202,40 @@ export async function getFamilyBookingById(id: string): Promise<FamilyBooking | 
 }
 
 /**
- * Cancel a booking by setting status='cancelled', cancelled_at=now(), and
- * (optionally) cancellation_reason. RLS's `bookings_update_own_family` policy
- * gates this to the parent of the kid on the booking; coaches don't have an
- * UPDATE policy on the table.
+ * Cancel a booking via the `cancel_booking` SECURITY DEFINER RPC.
+ * The RPC enforces cancellation-window policy and returns a `LATE_CANCEL`
+ * code when the booking is inside the tenant's configured window without
+ * override. Pass `override = true` to bypass the window check (staff only).
  *
- * Note: this is a soft cancel — the row is preserved for history and shows
- * up in the Past section of BookingsListScreen with a "Cancelled" badge.
+ * Returns:
+ *   { ok: true }  — booking cancelled successfully
+ *   { code: 'LATE_CANCEL', fee_cents: N, window_hours: N }  — inside window
+ *   throws on DB/network error
+ */
+export type CancelBookingResult =
+  | { ok: true }
+  | { code: 'LATE_CANCEL'; fee_cents: number; window_hours: number; message: string }
+  | { code: 'NOT_FOUND' | 'ALREADY_CANCELLED'; message: string };
+
+export async function cancelBookingRpc(
+  bookingId: string,
+  reason?: string,
+  override = false,
+): Promise<CancelBookingResult> {
+  const { data, error } = await (
+    supabase as unknown as import('@supabase/supabase-js').SupabaseClient
+  ).rpc('cancel_booking', {
+    p_booking_id: bookingId,
+    p_reason: reason?.trim() || null,
+    p_override: override,
+  });
+  if (error) throw error;
+  return data as CancelBookingResult;
+}
+
+/**
+ * @deprecated Use cancelBookingRpc instead. This direct-table cancel is kept
+ * for backward compatibility but does not enforce cancellation-window policy.
  */
 export async function cancelBooking(
   bookingId: string,
@@ -227,6 +254,37 @@ export async function cancelBooking(
     .single();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Cancel a membership via the `cancel_membership` SECURITY DEFINER RPC.
+ * Sets cancel_requested_at + cancel_effective_at (≥ notice_days from now).
+ * Does NOT immediately cancel the Stripe subscription.
+ *
+ * Returns:
+ *   { ok: true, cancel_effective_at: ISO string }  — request recorded
+ *   { code: 'NOT_EFT' | 'ALREADY_CANCELLED' | 'ALREADY_REQUESTED' | 'NOT_FOUND', message: string }
+ */
+export type CancelMembershipResult =
+  | { ok: true; cancel_effective_at: string }
+  | {
+      code: 'NOT_EFT' | 'ALREADY_CANCELLED' | 'ALREADY_REQUESTED' | 'NOT_FOUND';
+      message: string;
+      cancel_effective_at?: string;
+    };
+
+export async function cancelMembershipRpc(
+  membershipId: string,
+  override = false,
+): Promise<CancelMembershipResult> {
+  const { data, error } = await (
+    supabase as unknown as import('@supabase/supabase-js').SupabaseClient
+  ).rpc('cancel_membership', {
+    p_membership_id: membershipId,
+    p_override: override,
+  });
+  if (error) throw error;
+  return data as CancelMembershipResult;
 }
 
 /**

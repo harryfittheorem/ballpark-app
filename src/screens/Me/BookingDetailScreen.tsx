@@ -1,13 +1,13 @@
 /**
- * BookingDetailScreen — full info for a single booking + soft-cancel action.
+ * BookingDetailScreen — full info for a single booking + policy-aware cancel.
  *
- * Loads via `useBooking(bookingId)` so the screen is robust to direct
- * deep-links and refresh (it doesn't depend on the BookingsList cache being
- * warm). The Cancel button only renders when the booking is in a
- * cancellable state: status === 'confirmed' | 'pending' AND
- * scheduled_start is in the future. Two-step UX: confirm Alert → optional
- * `Alert.prompt` reason on iOS (Android falls back to a no-reason cancel
- * since `Alert.prompt` is iOS-only).
+ * Cancellation flow:
+ *  1. User taps "Cancel booking"
+ *  2. App calls cancel_booking RPC (no override) via useCancelBookingPolicy
+ *  3a. { ok: true } → queries invalidated, navigate back
+ *  3b. { code: 'LATE_CANCEL' } → bottom sheet shown with policy + fee
+ *        "Go Back"       — dismiss, booking unchanged
+ *        "Cancel Anyway" — re-calls RPC with override=true
  */
 
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -15,7 +15,9 @@ import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,7 +28,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { FamilyBooking } from '@/api/bookings';
 import { useBooking } from '@/hooks/useBooking';
-import { useCancelBooking } from '@/hooks/useCancelBooking';
+import { useCancelBookingPolicy } from '@/hooks/useCancelBookingPolicy';
 import type { MeStackParamList, MeStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
@@ -64,6 +66,10 @@ function isCancellable(b: FamilyBooking): boolean {
   return new Date(b.scheduled_start).getTime() > Date.now();
 }
 
+function formatFeeDollars(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.field}>
@@ -73,60 +79,71 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
+type LateSheet = {
+  window_hours: number;
+  fee_cents: number;
+  pendingReason?: string;
+};
+
 export default function BookingDetailScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<RouteProp<MeStackParamList, 'BookingDetail'>>();
   const { bookingId } = route.params;
 
   const { data: booking, isPending, isError, error, refetch } = useBooking(bookingId);
-  const cancelMut = useCancelBooking();
+  const cancelMut = useCancelBookingPolicy();
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [lateSheet, setLateSheet] = useState<LateSheet | null>(null);
 
   const cancellable = useMemo(() => (booking ? isCancellable(booking) : false), [booking]);
 
-  const performCancel = (reason?: string) => {
+  const performCancel = (reason?: string, override = false) => {
     setSubmitError(null);
     cancelMut.mutate(
-      { bookingId, reason },
+      { bookingId, reason, override },
       {
-        onSuccess: () => navigation.goBack(),
+        onSuccess: (result) => {
+          if ('ok' in result && result.ok) {
+            navigation.goBack();
+            return;
+          }
+          if ('code' in result && result.code === 'LATE_CANCEL') {
+            setLateSheet({
+              window_hours: (result as { window_hours: number }).window_hours,
+              fee_cents: (result as { fee_cents: number }).fee_cents,
+              pendingReason: reason,
+            });
+            return;
+          }
+          if ('code' in result) {
+            setSubmitError((result as { message: string }).message);
+          }
+        },
         onError: (err) => setSubmitError(errorMessage(err)),
       },
     );
   };
 
   const handleCancelPress = () => {
-    Alert.alert(
-      'Cancel this booking?',
-      'You can re-book the slot afterwards if it is still available.',
-      [
-        { text: 'Keep booking', style: 'cancel' },
-        {
-          text: 'Cancel booking',
-          style: 'destructive',
-          onPress: () => {
-            // Alert.prompt is iOS-only. On Android we proceed without a
-            // typed reason; v0.5+ can replace this with a custom modal.
-            if (Platform.OS === 'ios' && typeof Alert.prompt === 'function') {
-              Alert.prompt(
-                'Reason (optional)',
-                'Let your coach know why if you want.',
-                [
-                  { text: 'Skip', style: 'cancel', onPress: () => performCancel() },
-                  {
-                    text: 'Send',
-                    onPress: (text?: string) => performCancel(text),
-                  },
-                ],
-                'plain-text',
-              );
-            } else {
-              performCancel();
-            }
-          },
-        },
-      ],
-    );
+    if (Platform.OS === 'ios' && typeof Alert.prompt === 'function') {
+      Alert.prompt(
+        'Reason (optional)',
+        'Let your coach know why if you want.',
+        [
+          { text: 'Skip', style: 'cancel', onPress: () => performCancel() },
+          { text: 'Send', onPress: (text?: string) => performCancel(text) },
+        ],
+        'plain-text',
+      );
+    } else {
+      performCancel();
+    }
+  };
+
+  const handleCancelAnyway = () => {
+    const reason = lateSheet?.pendingReason;
+    setLateSheet(null);
+    performCancel(reason, true);
   };
 
   if (isPending) {
@@ -229,6 +246,53 @@ export default function BookingDetailScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      {/* Late cancellation warning bottom sheet */}
+      <Modal
+        visible={lateSheet !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setLateSheet(null)}
+      >
+        <Pressable style={styles.sheetOverlay} onPress={() => setLateSheet(null)}>
+          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Cancellation Policy</Text>
+            <Text style={styles.sheetBody}>
+              This booking is within the{' '}
+              <Text style={styles.sheetEmphasis}>
+                {lateSheet?.window_hours}-hour cancellation window
+              </Text>
+              .
+              {lateSheet?.fee_cents && lateSheet.fee_cents > 0
+                ? ` A late cancellation fee of ${formatFeeDollars(lateSheet.fee_cents)} may be collected at the front desk.`
+                : ' No fee applies, but your coach has limited time to fill the slot.'}
+            </Text>
+            <Text style={styles.sheetSubtext}>
+              You can go back and keep this booking, or cancel it anyway.
+            </Text>
+            <View style={styles.sheetActions}>
+              <TouchableOpacity
+                style={styles.sheetBackBtn}
+                onPress={() => setLateSheet(null)}
+              >
+                <Text style={styles.sheetBackText}>Go Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sheetCancelBtn, cancelMut.isPending && styles.cancelBtnDisabled]}
+                onPress={handleCancelAnyway}
+                disabled={cancelMut.isPending}
+              >
+                {cancelMut.isPending ? (
+                  <ActivityIndicator color={colors.danger} size="small" />
+                ) : (
+                  <Text style={styles.sheetCancelText}>Cancel Anyway</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -340,6 +404,87 @@ const styles = StyleSheet.create({
   },
   retryText: {
     color: colors.gold,
+    fontFamily: fontFamilies.interBold,
+    fontSize: fontSizes.md,
+    textTransform: 'uppercase',
+    letterSpacing: tracking.wide,
+  },
+
+  // Late cancel bottom sheet
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.darker,
+    borderTopLeftRadius: radius['3xl'],
+    borderTopRightRadius: radius['3xl'],
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: colors.border,
+    padding: spacing['3xl'],
+    paddingBottom: spacing['6xl'],
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing['3xl'],
+  },
+  sheetTitle: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['2xl'],
+    color: colors.textOnDark,
+    marginBottom: spacing.lg,
+  },
+  sheetBody: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.md,
+    color: colors.textLight,
+    lineHeight: 22,
+    marginBottom: spacing.lg,
+  },
+  sheetEmphasis: {
+    fontFamily: fontFamilies.interBold,
+    color: colors.danger,
+  },
+  sheetSubtext: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    color: colors.textMuted,
+    marginBottom: spacing['4xl'],
+  },
+  sheetActions: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+  },
+  sheetBackBtn: {
+    flex: 1,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: spacing['2xl'],
+    alignItems: 'center',
+  },
+  sheetBackText: {
+    color: colors.textLight,
+    fontFamily: fontFamilies.interBold,
+    fontSize: fontSizes.md,
+  },
+  sheetCancelBtn: {
+    flex: 1,
+    borderColor: colors.danger,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: spacing['2xl'],
+    alignItems: 'center',
+  },
+  sheetCancelText: {
+    color: colors.danger,
     fontFamily: fontFamilies.interBold,
     fontSize: fontSizes.md,
     textTransform: 'uppercase',

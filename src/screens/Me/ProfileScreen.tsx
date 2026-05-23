@@ -22,6 +22,7 @@ import {
   GraduationCap,
   BookCheck,
   Activity,
+  XCircle,
 } from 'lucide-react-native';
 import { useMemo } from 'react';
 import {
@@ -326,6 +327,14 @@ export default function ProfileScreen({ navigation }: Props) {
                   : 'muted'
           }
           onPress={() => navigation.navigate('ConnectHitTrax')}
+        />
+
+        <Row
+          icon={XCircle}
+          label="Cancel Membership"
+          subtitle="Manage recurring plan"
+          subtitleTone="muted"
+          onPress={() => navigation.navigate('CancelMembership')}
         />
 
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
