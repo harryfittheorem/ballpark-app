@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { CheckCircle, XCircle, RotateCcw, Clock, UserCircle } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, Clock, UserCircle, Users } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 
 export type CheckInBooking = {
@@ -17,6 +17,11 @@ export type CheckInBooking = {
   coach_first_name: string | null;
   coach_last_name: string | null;
   session_type_name: string | null;
+};
+
+export type WaitlistCount = {
+  hour_label: string;
+  count: number;
 };
 
 type BookingState = CheckInBooking & { pending?: 'checkin' | 'noshow' | 'undo' };
@@ -58,10 +63,11 @@ function isWithinUndo(b: CheckInBooking): boolean {
   return Date.now() - new Date(b.attended_at).getTime() < 5 * 60 * 1000;
 }
 
-type Props = { initialBookings: CheckInBooking[]; tenantId: string };
+type Props = { initialBookings: CheckInBooking[]; waitlistCounts: WaitlistCount[]; tenantId: string };
 
-export function CheckInBoard({ initialBookings, tenantId }: Props) {
+export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Props) {
   const [bookings, setBookings] = useState<BookingState[]>(initialBookings);
+  const waitlistByHour = new Map(waitlistCounts.map((w) => [w.hour_label, w.count]));
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
   const showToast = useCallback((msg: string, ok = true) => {
@@ -221,6 +227,12 @@ export function CheckInBoard({ initialBookings, tenantId }: Props) {
               <span className="text-xs text-text-light">
                 {slots.length} session{slots.length !== 1 ? 's' : ''}
               </span>
+              {waitlistByHour.get(hour) ? (
+                <span className="flex items-center gap-1 rounded-full border border-amber-600 bg-amber-900/20 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
+                  <Users size={10} />
+                  Waitlist: {waitlistByHour.get(hour)}
+                </span>
+              ) : null}
             </div>
 
             <div className="space-y-2">

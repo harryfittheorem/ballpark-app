@@ -21,6 +21,8 @@ import SummarySection from './components/SummarySection';
 import TimeSection from './components/TimeSection';
 import { useLocationContext } from './hooks/useLocationContext';
 import { useSessionTypes } from './hooks/useSessionTypes';
+import { useActiveLocation } from './hooks/useActiveLocation';
+import { useSlotAvailability } from '@/hooks/useSlotAvailability';
 import { styles as flowStyles } from './styles';
 import type { Slot } from './utils/slots';
 import type { SessionType } from '@/api/bookings';
@@ -98,6 +100,32 @@ export default function BookScreen() {
   } = useLocationContext();
 
   const { kid } = useSelectedKid();
+
+  const activeLocationData = useActiveLocation();
+  const timezone = activeLocationData.data?.timezone ?? null;
+
+  // Slot availability (capacity check) — only for group/cage
+  const slotAvailability = useSlotAvailability(
+    selectedDate,
+    selectedSessionTypeId,
+    selectedSessionType?.type_category ?? null,
+    timezone,
+  );
+
+  // Determine if the selected slot is at capacity.
+  // Slot key must be canonical ISO-no-ms to match DB `to_char(..., 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`.
+  const selectedWaitlistSlotKey = selectedSlot
+    ? `${selectedSlot.coach_id}_${new Date(selectedSlot.start).toISOString().replace(/\.\d{3}Z$/, 'Z')}`
+    : null;
+
+  const selectedSlotInfo = selectedWaitlistSlotKey
+    ? slotAvailability.data?.get(selectedWaitlistSlotKey)
+    : null;
+
+  const slotIsFull =
+    !!selectedSlotInfo &&
+    selectedSlotInfo.confirmed_count >= selectedSlotInfo.capacity;
+
   const { data: bookings } = useFamilyBookings();
   const today = new Date();
   const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
@@ -166,6 +194,13 @@ export default function BookScreen() {
       showToast(`Session booked for ${formattedWhen}`);
     },
     [navigation, resetSelection, showToast],
+  );
+
+  const handleWaitlistJoined = useCallback(
+    (position: number) => {
+      showToast(`You're #${position} on the waitlist!`);
+    },
+    [showToast],
   );
 
   const handleMultiDaySlotPick = useCallback(
@@ -354,7 +389,9 @@ export default function BookScreen() {
             date={selectedDate}
             slot={selectedSlot}
             selectedCoachId={selectedCoachId}
+            slotIsFull={slotIsFull}
             onBooked={handleBooked}
+            onWaitlistJoined={handleWaitlistJoined}
           />
         </View>
       </ScrollView>

@@ -63,6 +63,7 @@ if [ -d "supabase/functions" ]; then
   deploy_fn stripe-create-subscription
   deploy_fn stripe-cancel-subscription
   deploy_fn save-payment-method
+  deploy_fn promote-waitlist
 
   # --no-verify-jwt: Mux / HitTrax / Stripe authenticate with their own schemes
   deploy_fn mux-webhook              "--no-verify-jwt"

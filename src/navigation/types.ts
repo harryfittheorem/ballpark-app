@@ -126,6 +126,7 @@ export type MeStackParamList = {
   MeHome: undefined;
   BookingsList: undefined;
   BookingDetail: { bookingId: string };
+  WaitlistClaim: { waitlistId: string };
   Orders: undefined;
   ConnectHitTrax: undefined;
   PaymentMethod: undefined;

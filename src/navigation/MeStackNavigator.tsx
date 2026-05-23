@@ -11,6 +11,7 @@ import OrdersListScreen from '@/screens/Me/OrdersListScreen';
 import PauseMembershipScreen from '@/screens/Me/PauseMembershipScreen';
 import PaymentMethodScreen from '@/screens/Me/PaymentMethodScreen';
 import ProfileScreen from '@/screens/Me/ProfileScreen';
+import WaitlistClaimScreen from '@/screens/Me/WaitlistClaimScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
 import type { MeStackParamList } from './types';
@@ -40,6 +41,11 @@ export default function MeStackNavigator() {
         name="BookingDetail"
         component={BookingDetailScreen}
         options={{ title: 'Booking' }}
+      />
+      <Stack.Screen
+        name="WaitlistClaim"
+        component={WaitlistClaimScreen}
+        options={{ title: 'Claim Spot' }}
       />
       <Stack.Screen
         name="Orders"

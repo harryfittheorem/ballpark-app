@@ -164,6 +164,7 @@ export function ScheduleContent({ data, tenantId }: Props) {
   const todayDate   = useMemo(() => new Date(), []);
 
   const [bookings,       setBookings]      = useState<ScheduleBooking[]>(hasLiveData ? data.bookings : DEMO_BOOKINGS);
+  const [waitlistByHour, setWaitlistByHour] = useState<Map<string, number>>(new Map());
   const [loading,        setLoading]       = useState(false);
   const [popover,        setPopover]       = useState<Popover | null>(null);
   const [saving,         setSaving]        = useState<string | null>(null);
@@ -215,15 +216,25 @@ export function ScheduleContent({ data, tenantId }: Props) {
     const supabase = createClient();
     (async () => {
       try {
-        const { data: raw, error } = await supabase
-          .from('bookings')
-          .select(`id, scheduled_start, scheduled_end, cage_number, status,
-                   session_types(name), kids(first_name, last_name), coaches(first_name, last_name)`)
-          .eq('tenant_id', tenantId)
-          .gte('scheduled_start', rangeStart.toISOString())
-          .lte('scheduled_start', rangeEnd.toISOString())
-          .order('scheduled_start');
+        const [bookingRes, waitlistRes] = await Promise.all([
+          supabase
+            .from('bookings')
+            .select(`id, scheduled_start, scheduled_end, cage_number, status,
+                     session_types(name), kids(first_name, last_name), coaches(first_name, last_name)`)
+            .eq('tenant_id', tenantId)
+            .gte('scheduled_start', rangeStart.toISOString())
+            .lte('scheduled_start', rangeEnd.toISOString())
+            .order('scheduled_start'),
+          supabase
+            .from('booking_waitlist')
+            .select('scheduled_start')
+            .eq('tenant_id', tenantId)
+            .in('status', ['waiting', 'notified'])
+            .gte('scheduled_start', rangeStart.toISOString())
+            .lte('scheduled_start', rangeEnd.toISOString()),
+        ]);
         if (cancelled) return;
+        const { data: raw, error } = bookingRes;
         if (error) { console.error('[schedule] fetch error:', error.message); return; }
         if (!raw) return;
         const mapped: ScheduleBooking[] = raw.map(b => {
@@ -245,6 +256,14 @@ export function ScheduleContent({ data, tenantId }: Props) {
           const local = prev.filter(bk => bk.id.startsWith('local-'));
           return [...mapped, ...local];
         });
+
+        // Build waitlist counts by hour label
+        const wMap = new Map<string, number>();
+        for (const row of waitlistRes.data ?? []) {
+          const lbl = localHourLabel(row.scheduled_start);
+          wMap.set(lbl, (wMap.get(lbl) ?? 0) + 1);
+        }
+        setWaitlistByHour(wMap);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -554,7 +573,14 @@ export function ScheduleContent({ data, tenantId }: Props) {
                 {/* Hour rows */}
                 {HOURS.map((hr, hi) => (
                   <div key={hi} style={{ display: 'grid', gridTemplateColumns: '60px repeat(8, 1fr) minmax(80px, 0.8fr)', gap: 4, marginBottom: 4, minHeight: 48 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: brand.textMuted, padding: '14px 0', textAlign: 'right', paddingRight: 8 }}>{hr}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: brand.textMuted, padding: '14px 0', textAlign: 'right', paddingRight: 8 }}>
+                      {hr}
+                      {waitlistByHour.get(hr) ? (
+                        <div style={{ marginTop: 2, fontSize: 8, fontWeight: 800, color: '#f59e0b', letterSpacing: 0, whiteSpace: 'nowrap' }}>
+                          +{waitlistByHour.get(hr)} waitlist
+                        </div>
+                      ) : null}
+                    </div>
                     {CAGES.map((cage, ci) => {
                       const slot = slotsForDayHourCage(filteredViewBookings, cage, hr);
                       const statusColor = slot[0] ? (STATUS_COLOR[slot[0].status] ?? brand.info) : null;

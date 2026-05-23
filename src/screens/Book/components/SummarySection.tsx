@@ -4,6 +4,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/ui';
 import { useSelectedKid } from '@/hooks/useSelectedKid';
 import { useActiveMembership } from '@/hooks/useActiveMembership';
+import { useJoinWaitlist } from '@/hooks/useWaitlistEntries';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import type { Tables } from '@/types/database';
 
@@ -23,7 +24,10 @@ type Props = {
   date: string | null;
   slot: Slot | null;
   selectedCoachId: string | null;
+  /** When true the slot is at capacity — show "Join Waitlist" instead of "Confirm Booking" */
+  slotIsFull?: boolean;
   onBooked: (formattedWhen: string) => void;
+  onWaitlistJoined?: (position: number) => void;
 };
 
 function formatPriceUSD(cents: number): string {
@@ -68,13 +72,16 @@ export default function SummarySection({
   date,
   slot,
   selectedCoachId,
+  slotIsFull = false,
   onBooked,
+  onWaitlistJoined,
 }: Props) {
   const { family, kid: defaultKid, kids } = useSelectedKid();
   const location = useActiveLocation();
   const coaches = useCoaches();
   const createBooking = useCreateBooking();
   const { data: membership } = useActiveMembership();
+  const joinWaitlist = useJoinWaitlist();
 
   const [errorVisible, setErrorVisible] = useState(false);
   // Task #242: sibling / kid-picker
@@ -83,6 +90,8 @@ export default function SummarySection({
   // Task #237: session credit gating
   const [noCreditsVisible, setNoCreditsVisible] = useState(false);
   const [bookingResult, setBookingResult] = useState<CreateBookingResult | null>(null);
+  // Task #239: waitlist
+  const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
 
   // The kid to book for — parent may override via the picker (Task #242)
   const activeKid: Kid | null = useMemo(() => {
@@ -174,6 +183,33 @@ export default function SummarySection({
     onBooked(formattedWhenRef.current);
   };
 
+  const handleJoinWaitlist = () => {
+    if (!ready || joinWaitlist.isPending) return;
+    setErrorVisible(false);
+
+    const slotKey = `${(slot as Slot).coach_id}_${new Date((slot as Slot).start).toISOString().replace(/\.\d{3}Z$/, 'Z')}`;
+
+    joinWaitlist.mutate(
+      {
+        session_slot_key: slotKey,
+        coach_id: coach!.id,
+        session_type_id: sessionType!.id,
+        location_id: location.data!.id,
+        scheduled_start: (slot as Slot).start,
+        scheduled_end: (slot as Slot).end,
+      },
+      {
+        onSuccess: (entry) => {
+          setWaitlistPosition(entry.position);
+          onWaitlistJoined?.(entry.position);
+        },
+        onError: () => {
+          setErrorVisible(true);
+        },
+      },
+    );
+  };
+
   // Task #237: confirmed state — show balance before navigating
   if (bookingResult !== null) {
     const balanceAfter = bookingResult.sessionsRemaining;
@@ -212,7 +248,11 @@ export default function SummarySection({
             <SummaryLine label="Date" value={dateLabel as string} />
             <SummaryLine label="Time" value={timeLabel as string} />
             <SummaryLine label="Coach" value={coachName as string} />
-            <SummaryLine label="Price" value={priceLabel as string} />
+            {!slotIsFull ? (
+              <SummaryLine label="Price" value={priceLabel as string} />
+            ) : (
+              <SummaryLine label="Status" value="Session Full — Waitlist" />
+            )}
 
             {/* Kid selector row (Task #242) — only shown when family has multiple kids */}
             {multipleKids ? (
@@ -232,8 +272,8 @@ export default function SummarySection({
               </View>
             ) : null}
 
-            {/* Pack balance line (Task #237) */}
-            {isOtcPack && sessionsRemaining !== null && sessionsTotal !== null ? (
+            {/* Pack balance line (Task #237) — only shown when booking (not waitlisting) */}
+            {!slotIsFull && isOtcPack && sessionsRemaining !== null && sessionsTotal !== null ? (
               <SummaryLine
                 label="Pack balance"
                 value={
@@ -253,53 +293,99 @@ export default function SummarySection({
           </View>
         )}
 
-        <View style={styles.confirmWrap}>
-          {/* Out-of-credits warning (Task #237) — shown proactively before the user taps */}
-          {outOfCredits && ready ? (
-            <View style={styles.errorBlock}>
-              <Text style={styles.errorText}>
-                You&apos;ve used all your sessions. Contact the front desk to add more.
-              </Text>
-            </View>
-          ) : null}
+        {/* Waitlist success state (Task #239) */}
+        {waitlistPosition !== null ? (
+          <View style={styles.waitlistSuccess}>
+            <Text style={styles.waitlistSuccessTitle}>
+              ✓ You&apos;re #{waitlistPosition} on the waitlist
+            </Text>
+            <Text style={styles.waitlistSuccessBody}>
+              We&apos;ll notify you if a spot opens. You can leave the waitlist from Me → Bookings.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.confirmWrap}>
+            {slotIsFull ? (
+              /* Waitlist flow (Task #239) */
+              <>
+                <Button
+                  label={joinWaitlist.isPending ? 'Joining Waitlist…' : 'Join Waitlist'}
+                  onPress={handleJoinWaitlist}
+                  variant="primary"
+                  loading={joinWaitlist.isPending}
+                  disabled={!ready || joinWaitlist.isPending}
+                />
+                {errorVisible ? (
+                  <View style={styles.errorBlock}>
+                    <Text style={styles.errorText}>
+                      Couldn&apos;t join the waitlist — please try again.
+                    </Text>
+                    {__DEV__ && joinWaitlist.error ? (
+                      <Text style={styles.errorDevText} numberOfLines={3}>
+                        {joinWaitlist.error.message}
+                      </Text>
+                    ) : null}
+                    <Button
+                      label="Tap to retry"
+                      variant="tertiary"
+                      tone="gold"
+                      onPress={handleJoinWaitlist}
+                    />
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              /* Normal booking flow (Tasks #237 + #242) */
+              <>
+                {/* Out-of-credits warning (Task #237) — shown proactively before the user taps */}
+                {outOfCredits && ready ? (
+                  <View style={styles.errorBlock}>
+                    <Text style={styles.errorText}>
+                      You&apos;ve used all your sessions. Contact the front desk to add more.
+                    </Text>
+                  </View>
+                ) : null}
 
-          <Button
-            label={createBooking.isPending ? 'Booking…' : 'Confirm Booking'}
-            onPress={handleConfirm}
-            variant="primary"
-            loading={createBooking.isPending}
-            disabled={!ready || createBooking.isPending || outOfCredits}
-          />
+                <Button
+                  label={createBooking.isPending ? 'Booking…' : 'Confirm Booking'}
+                  onPress={handleConfirm}
+                  variant="primary"
+                  loading={createBooking.isPending}
+                  disabled={!ready || createBooking.isPending || outOfCredits}
+                />
 
-          {/* NO_SESSION_CREDITS race-condition error (Task #237) */}
-          {noCreditsVisible ? (
-            <View style={styles.errorBlock}>
-              <Text style={styles.errorText}>
-                You&apos;ve used all your sessions. Contact the front desk to add more.
-              </Text>
-            </View>
-          ) : null}
+                {/* NO_SESSION_CREDITS race-condition error (Task #237) */}
+                {noCreditsVisible ? (
+                  <View style={styles.errorBlock}>
+                    <Text style={styles.errorText}>
+                      You&apos;ve used all your sessions. Contact the front desk to add more.
+                    </Text>
+                  </View>
+                ) : null}
 
-          {/* Generic error with retry (Task #242/HEAD) */}
-          {errorVisible ? (
-            <View style={styles.errorBlock}>
-              <Text style={styles.errorText}>
-                Couldn&apos;t book that session — please try again.
-              </Text>
-              {__DEV__ && createBooking.error ? (
-                <Text style={styles.errorDevText} numberOfLines={3}>
-                  {createBooking.error.message}
-                </Text>
-              ) : null}
-              <Button
-                label="Tap to retry"
-                variant="tertiary"
-                tone="gold"
-                onPress={handleConfirm}
-              />
-            </View>
-          ) : null}
-        </View>
+                {/* Generic booking error with retry */}
+                {errorVisible ? (
+                  <View style={styles.errorBlock}>
+                    <Text style={styles.errorText}>
+                      Couldn&apos;t book that session — please try again.
+                    </Text>
+                    {__DEV__ && createBooking.error ? (
+                      <Text style={styles.errorDevText} numberOfLines={3}>
+                        {createBooking.error.message}
+                      </Text>
+                    ) : null}
+                    <Button
+                      label="Tap to retry"
+                      variant="tertiary"
+                      tone="gold"
+                      onPress={handleConfirm}
+                    />
+                  </View>
+                ) : null}
+              </>
+            )}
+          </View>
+        )}
       </SectionCard>
 
       {/* Kid picker modal (Task #242) */}
@@ -448,6 +534,27 @@ const styles = StyleSheet.create({
   confirmWrap: {
     marginTop: spacing['3xl'],
     gap: spacing.lg,
+  },
+  // Task #239: waitlist success
+  waitlistSuccess: {
+    marginTop: spacing['3xl'],
+    padding: spacing['2xl'],
+    backgroundColor: 'rgba(168,198,127,0.12)',
+    borderWidth: 1,
+    borderColor: colors.success,
+    borderRadius: 12,
+    gap: spacing.sm,
+  },
+  waitlistSuccessTitle: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.lg,
+    color: colors.success,
+  },
+  waitlistSuccessBody: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.base,
+    color: colors.textLight,
+    lineHeight: 20,
   },
   errorBlock: {
     gap: spacing.xs,

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { readAppRole, readTenantId } from '@/lib/auth';
-import { CheckInBoard, type CheckInBooking } from './CheckInBoard';
+import { CheckInBoard, type CheckInBooking, type WaitlistCount } from './CheckInBoard';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,11 +63,39 @@ export default async function CheckInPage() {
     session_type_name: r.session_type?.name ?? null,
   }));
 
+  // Waitlist counts grouped by hour label — matches how CheckInBoard groups rows
+  const { data: waitlistRows } = await supabase
+    .from('booking_waitlist')
+    .select('scheduled_start')
+    .eq('tenant_id', tenantId)
+    .in('status', ['waiting', 'notified'])
+    .gte('scheduled_start', todayStart.toISOString())
+    .lte('scheduled_start', todayEnd.toISOString());
+
+  function toHourLabel(iso: string): string {
+    const d = new Date(iso);
+    const h24 = d.getHours();
+    const period = h24 >= 12 ? 'PM' : 'AM';
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    return `${h12}:00 ${period}`;
+  }
+
+  const hourCounts = new Map<string, number>();
+  for (const row of waitlistRows ?? []) {
+    const label = toHourLabel(row.scheduled_start);
+    hourCounts.set(label, (hourCounts.get(label) ?? 0) + 1);
+  }
+  const waitlistCounts: WaitlistCount[] = Array.from(hourCounts.entries()).map(
+    ([hour_label, count]) => ({ hour_label, count }),
+  );
+
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
   });
+
+  const totalWaitlist = waitlistRows?.length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -77,10 +105,11 @@ export default async function CheckInPage() {
         </h1>
         <p className="mt-1 text-sm text-text-light">
           {today} · {bookings.length} booking{bookings.length !== 1 ? 's' : ''} today
+          {totalWaitlist > 0 ? ` · ${totalWaitlist} on waitlist` : ''}
         </p>
       </div>
 
-      <CheckInBoard initialBookings={bookings} tenantId={tenantId} />
+      <CheckInBoard initialBookings={bookings} waitlistCounts={waitlistCounts} tenantId={tenantId} />
     </div>
   );
 }

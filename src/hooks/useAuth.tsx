@@ -11,6 +11,7 @@
 
 import type { Session, User } from "@supabase/supabase-js";
 import * as Linking from "expo-linking";
+import * as Notifications from "expo-notifications";
 import {
   createContext,
   useContext,
@@ -126,10 +127,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void handleUrl(url);
     });
 
+    // Push notification tap routing:
+    // When a parent taps a "waitlist_promoted" push, open the claim screen
+    // via the ballpark:// deep link so the navigator picks it up via the
+    // existing linking config (ballpark://me/waitlist-claim/:waitlistId).
+    const notifSub = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data as Record<
+          string,
+          unknown
+        > | null;
+        if (!data) return;
+        if (data.kind === "waitlist_promoted" && typeof data.waitlist_id === "string") {
+          void Linking.openURL(
+            `ballpark://me/waitlist-claim/${data.waitlist_id}`,
+          );
+        }
+      },
+    );
+
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
       linkingSub.remove();
+      notifSub.remove();
     };
   }, []);
 
