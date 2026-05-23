@@ -1,0 +1,194 @@
+// =============================================================================
+// supabase/functions/resume-paused-memberships/index.ts
+// =============================================================================
+// Task #240 — Membership pause flow — nightly auto-resume cron job
+//
+// Auth: service-role ONLY. The caller must supply the SUPABASE_SERVICE_ROLE_KEY
+// as the Bearer token. Any other token is rejected immediately.
+//
+// This function uses a direct service-role DB update (not the resume_membership
+// RPC, which requires an authenticated user JWT). The service-role client already
+// bypasses RLS, and the token gate here provides the authorization boundary.
+//
+// pg_cron setup (run once in Supabase SQL editor after enabling pg_cron):
+//   SELECT cron.schedule(
+//     'resume-paused-memberships-daily',
+//     '0 6 * * *',
+//     $$
+//     SELECT net.http_post(
+//       url     := current_setting('app.settings.supabase_url')
+//                  || '/functions/v1/resume-paused-memberships',
+//       headers := jsonb_build_object(
+//         'Content-Type', 'application/json',
+//         'Authorization', 'Bearer '
+//           || current_setting('app.settings.service_role_key')
+//       ),
+//       body    := '{}'::jsonb
+//     );
+//     $$
+//   );
+//
+// Deploy with:
+//   npx supabase functions deploy resume-paused-memberships
+// =============================================================================
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const STRIPE_API_VERSION = '2024-06-20';
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+  });
+}
+
+async function stripeRemovePause(
+  subscriptionId: string,
+  secretKey: string,
+  stripeAccountId?: string,
+): Promise<void> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${secretKey}`,
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Stripe-Version': STRIPE_API_VERSION,
+  };
+  if (stripeAccountId) headers['Stripe-Account'] = stripeAccountId;
+
+  const res = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+    method: 'POST',
+    headers,
+    body: 'pause_collection=',
+  });
+  const data = await res.json() as Record<string, unknown>;
+  if (!res.ok) {
+    const err = data.error as { message?: string } | undefined;
+    throw new Error(err?.message ?? `Stripe error ${res.status}`);
+  }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+      },
+    });
+  }
+
+  if (req.method !== 'POST') {
+    return json({ error: { code: 'method_not_allowed', message: 'POST only' } }, 405);
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  // ── Service-role gate ─────────────────────────────────────────────────────
+  // This function performs privileged multi-tenant operations.
+  // Only the pg_cron job (which supplies the service-role key as Bearer) is permitted.
+  const authHeader  = req.headers.get('Authorization') ?? '';
+  const callerToken = authHeader.replace(/^Bearer\s+/i, '');
+  if (!callerToken || callerToken !== serviceKey) {
+    return json({ error: { code: 'unauthorized', message: 'Service-role token required' } }, 401);
+  }
+
+  const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
+  if (!stripeKey) {
+    return json({ error: { code: 'config_error', message: 'Stripe not configured' } }, 500);
+  }
+
+  // Service-role client bypasses RLS — authorized by the token gate above.
+  const supabase = createClient(supabaseUrl, serviceKey);
+
+  // ── Find all overdue-paused memberships ───────────────────────────────────
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const { data: toResume, error: queryErr } = await supabase
+    .from('memberships')
+    .select(`
+      id, stripe_subscription_id,
+      families!inner(primary_location_id)
+    `)
+    .eq('status', 'paused')
+    .lte('pause_end', todayStr);
+
+  if (queryErr) {
+    console.error(`[resume-paused-memberships] query error: ${queryErr.message}`);
+    return json({ error: { code: 'db_error', message: queryErr.message } }, 500);
+  }
+
+  if (!toResume || toResume.length === 0) {
+    console.log('[resume-paused-memberships] no memberships to resume');
+    return json({ ok: true, resumed: 0 });
+  }
+
+  console.log(`[resume-paused-memberships] found ${toResume.length} membership(s) to resume`);
+
+  // ── Resolve connected account IDs in bulk ─────────────────────────────────
+  const locationIds = [...new Set(
+    toResume.map(m => (m.families as unknown as { primary_location_id: string }).primary_location_id),
+  )];
+  const { data: locations } = await supabase
+    .from('locations')
+    .select('id, stripe_account_id')
+    .in('id', locationIds);
+
+  const accountByLocation: Record<string, string | null> = {};
+  for (const loc of (locations ?? [])) {
+    accountByLocation[loc.id] = loc.stripe_account_id as string | null;
+  }
+
+  // ── Process each membership ───────────────────────────────────────────────
+  let resumed = 0;
+  const errors: string[] = [];
+
+  for (const mem of toResume) {
+    const fam = mem.families as unknown as { primary_location_id: string };
+    const connectedAccountId = accountByLocation[fam.primary_location_id] ?? undefined;
+
+    try {
+      // Remove Stripe pause
+      if (mem.stripe_subscription_id) {
+        await stripeRemovePause(
+          mem.stripe_subscription_id as string,
+          stripeKey,
+          connectedAccountId,
+        );
+      }
+
+      // Direct service-role DB update (does NOT use the resume_membership RPC,
+      // which requires an authenticated user JWT for auth.jwt() derivation).
+      // The authorization boundary is the service-role token gate at the top.
+      const { error: updateErr } = await supabase
+        .from('memberships')
+        .update({
+          status:      'active',
+          pause_start: null,
+          pause_end:   null,
+          paused_at:   null,
+          updated_at:  new Date().toISOString(),
+        })
+        .eq('id', mem.id)
+        .eq('status', 'paused');  // Idempotency guard
+
+      if (updateErr) {
+        throw new Error(`DB update failed: ${updateErr.message}`);
+      }
+
+      resumed++;
+      console.log(`[resume-paused-memberships] resumed membership=${mem.id}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[resume-paused-memberships] failed membership=${mem.id}: ${msg}`);
+      errors.push(`${mem.id}: ${msg}`);
+    }
+  }
+
+  return json({
+    ok: errors.length === 0,
+    resumed,
+    errors: errors.length > 0 ? errors : undefined,
+  });
+});

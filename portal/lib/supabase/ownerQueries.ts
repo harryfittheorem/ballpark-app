@@ -945,10 +945,16 @@ export type MemberDetail = OwnerMember & {
   timeline: TimelineEvent[];
   recentPayments: RecentPaymentEvent[];
   stripeSubscriptionId: string | null;
-  subscriptionStatus: 'active' | 'past_due' | 'payment_overdue' | 'cancelled' | 'none';
+  subscriptionStatus: 'active' | 'past_due' | 'payment_overdue' | 'cancelled' | 'paused' | 'none';
   nextBillingAt: string | null;
   /** ISO timestamp when a cancel_at_period_end subscription will terminate. Null if not pending cancellation. */
   cancelAt: string | null;
+  /** ISO date (YYYY-MM-DD) when the pause started. Null if not paused. */
+  pauseStart: string | null;
+  /** ISO date (YYYY-MM-DD) when the pause ends / membership auto-resumes. Null if not paused. */
+  pauseEnd: string | null;
+  /** Timestamp when the pause was initiated. Null if not paused. */
+  pausedAt: string | null;
 };
 
 export async function getMemberDetail(
@@ -971,6 +977,9 @@ export async function getMemberDetail(
       stripe_subscription_id,
       next_billing_at,
       cancel_at,
+      pause_start,
+      pause_end,
+      paused_at,
       kids!inner(id, first_name, last_name, age_group, points_balance),
       families!inner(parent_first_name, parent_last_name)
     `)
@@ -1108,15 +1117,21 @@ export async function getMemberDetail(
   const memberStatus = rawStatus === 'active' && risk === 'high' ? 'at-risk'
     : (rawStatus as 'active' | 'paused' | 'cancelled' | 'payment_overdue');
 
-  // Subscription billing fields (Phase 3)
+  // Subscription billing fields (Phase 3 + Task #240 pause)
   const stripeSubscriptionId = (mem.stripe_subscription_id as string | null) ?? null;
   const nextBillingAt = (mem.next_billing_at as string | null) ?? null;
+  const pauseStart = (mem.pause_start as string | null) ?? null;
+  const pauseEnd   = (mem.pause_end   as string | null) ?? null;
+  const pausedAt   = (mem.paused_at   as string | null) ?? null;
   let subscriptionStatus: MemberDetail['subscriptionStatus'] = 'none';
   if (stripeSubscriptionId) {
-    if (rawStatus === 'active') subscriptionStatus = 'active';
+    if (rawStatus === 'paused') subscriptionStatus = 'paused';
+    else if (rawStatus === 'active') subscriptionStatus = 'active';
     else if (rawStatus === 'payment_overdue') subscriptionStatus = 'payment_overdue';
     else if (rawStatus === 'cancelled') subscriptionStatus = 'cancelled';
     else subscriptionStatus = 'active';
+  } else if (rawStatus === 'paused') {
+    subscriptionStatus = 'paused';
   }
 
   const lifetimeRes = await supabase
@@ -1157,6 +1172,9 @@ export async function getMemberDetail(
     subscriptionStatus,
     nextBillingAt,
     cancelAt: (mem.cancel_at as string | null) ?? null,
+    pauseStart,
+    pauseEnd,
+    pausedAt,
   };
 }
 

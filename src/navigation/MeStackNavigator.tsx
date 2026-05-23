@@ -6,6 +6,7 @@ import CancelMembershipScreen from '@/screens/Me/CancelMembershipScreen';
 import ChangeLocationScreen from '@/screens/Me/ChangeLocationScreen';
 import ConnectHitTraxScreen from '@/screens/Me/ConnectHitTraxScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
+import PauseMembershipScreen from '@/screens/Me/PauseMembershipScreen';
 import PaymentMethodScreen from '@/screens/Me/PaymentMethodScreen';
 import ProfileScreen from '@/screens/Me/ProfileScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
@@ -62,6 +63,11 @@ export default function MeStackNavigator() {
         name="CancelMembership"
         component={CancelMembershipScreen}
         options={{ title: 'Cancel Membership' }}
+      />
+      <Stack.Screen
+        name="PauseMembership"
+        component={PauseMembershipScreen}
+        options={{ title: 'Pause Membership' }}
       />
     </Stack.Navigator>
   );

@@ -1,6 +1,6 @@
 import type { MemberDetail, TimelineEvent, RecentPaymentEvent } from '@/lib/supabase/ownerQueries';
 
-export type DemoMemberDetail = Omit<MemberDetail, 'stripeSubscriptionId' | 'subscriptionStatus' | 'nextBillingAt'> & {
+export type DemoMemberDetail = Omit<MemberDetail, 'stripeSubscriptionId' | 'subscriptionStatus' | 'nextBillingAt' | 'pauseStart' | 'pauseEnd' | 'pausedAt'> & {
   memberForMonths: number;
   bestVeloMph: number;
   homeworkScore: number;
@@ -14,6 +14,9 @@ export type DemoMemberDetail = Omit<MemberDetail, 'stripeSubscriptionId' | 'subs
   stripeSubscriptionId?: string | null;
   subscriptionStatus?: MemberDetail['subscriptionStatus'];
   nextBillingAt?: string | null;
+  pauseStart?: string | null;
+  pauseEnd?: string | null;
+  pausedAt?: string | null;
 };
 
 function tl(id: string, kind: 'booking' | 'payment', daysAgo: number, title: string, subtitle: string, status: 'completed' | 'confirmed' | 'pending' | 'cancelled' | 'paid' | 'failed', amount?: number): TimelineEvent {

@@ -131,6 +131,7 @@ export type MeStackParamList = {
   PaymentMethod: undefined;
   ChangeLocation: undefined;
   CancelMembership: undefined;
+  PauseMembership: undefined;
 };
 
 export type MeStackScreenProps<T extends keyof MeStackParamList> = CompositeScreenProps<

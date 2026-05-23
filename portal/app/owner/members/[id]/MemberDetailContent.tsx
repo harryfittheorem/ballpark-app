@@ -3,9 +3,9 @@
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, SectionHeader, OCard, Chip } from '@/components/owner/ui';
 import {
-  Calendar, MessageCircle, Edit2, Activity, Clock,
-  CheckCircle, XCircle, CreditCard, Star, Zap, TrendingUp,
-  AlertCircle,
+  Calendar, MessageCircle, Edit2, Clock,
+  CheckCircle, XCircle, CreditCard,
+  AlertCircle, PauseCircle, PlayCircle,
 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import type { MemberDetail } from '@/lib/supabase/ownerQueries';
@@ -93,6 +93,120 @@ function InfoRow({ label, value, large }: { label: string; value: string; large?
     <div>
       <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: large ? 15 : 13, fontWeight: large ? 700 : 500, color: brand.text }}>{value}</div>
+    </div>
+  );
+}
+
+function formatDateShort(isoDate: string | null): string {
+  if (!isoDate) return '—';
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const d = new Date(isoDate + 'T00:00:00');
+  if (isNaN(d.getTime())) return '—';
+  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+function PauseSection({ member }: { member: MemberDetail }) {
+  const [resuming, setResuming] = useState(false);
+  const [resumeDone, setResumeDone] = useState(false);
+  const [resumeErr, setResumeErr] = useState<string | null>(null);
+
+  const { pauseStart, pauseEnd } = member;
+
+  const handleResumeEarly = useCallback(async () => {
+    if (!confirm('Resume this membership immediately? Billing will restart on the next billing date.')) return;
+
+    setResuming(true);
+    setResumeErr(null);
+    try {
+      const res = await fetch('/api/memberships/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ membership_id: member.id }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setResumeErr(typeof data.error === 'string' ? data.error : `Error ${res.status}`);
+      } else {
+        setResumeDone(true);
+      }
+    } catch (err) {
+      setResumeErr(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setResuming(false);
+    }
+  }, [member.id]);
+
+  if (resumeDone) {
+    return (
+      <div>
+        <SectionHeader title="Membership Pause" />
+        <OCard style={{ padding: 14, borderLeft: `4px solid ${brand.success}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <PlayCircle size={16} color={brand.success} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: brand.success }}>
+              Membership resumed successfully
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 6 }}>
+            Billing will resume on the next billing date.
+          </div>
+        </OCard>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <SectionHeader title="Membership Pause" />
+      <OCard style={{ padding: 14, borderLeft: `4px solid ${brand.warning}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <PauseCircle size={16} color={brand.warning} />
+          <Chip color="warning">Paused</Chip>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: brand.textMuted }}>Paused on</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: brand.text }}>
+              {formatDateShort(pauseStart)}
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: brand.textMuted }}>Auto-resumes</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: brand.text }}>
+              {formatDateShort(pauseEnd)}
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 4, fontStyle: 'italic' }}>
+            No billing charges until the resume date.
+          </div>
+        </div>
+
+        {resumeErr && (
+          <div style={{
+            padding: '8px 10px', background: brand.dangerBg, borderRadius: 6,
+            fontSize: 12, color: brand.danger, marginBottom: 8,
+          }}>
+            {resumeErr}
+          </div>
+        )}
+
+        <button
+          onClick={handleResumeEarly}
+          disabled={resuming}
+          style={{
+            width: '100%', padding: '8px 0', borderRadius: 6,
+            border: `1px solid ${brand.gold}`, background: brand.gold,
+            color: brand.dark, fontSize: 12, fontWeight: 700,
+            cursor: resuming ? 'not-allowed' : 'pointer',
+            opacity: resuming ? 0.6 : 1, letterSpacing: 0.5,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          <PlayCircle size={14} />
+          {resuming ? 'Resuming…' : 'Resume Early'}
+        </button>
+      </OCard>
     </div>
   );
 }
@@ -695,8 +809,13 @@ export function MemberDetailContent({ member: m }: Props) {
             </OCard>
           </div>
 
+          {/* Pause window (Task #240) */}
+          {!demo && (m as MemberDetail).subscriptionStatus === 'paused' && (m as MemberDetail).pauseEnd && (
+            <PauseSection member={m as MemberDetail} />
+          )}
+
           {/* Subscription (Phase 3) */}
-          {!demo && (
+          {!demo && (m as MemberDetail).subscriptionStatus !== 'paused' && (
             <SubscriptionSection member={m as MemberDetail} />
           )}
         </div>

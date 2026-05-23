@@ -10,6 +10,8 @@ import {
   LogOut,
   type LucideProps,
   MapPin,
+  PauseCircle,
+  PlayCircle,
   Ruler,
   Sparkles,
   Star,
@@ -44,6 +46,7 @@ import {
 } from '@/hooks/useAchievements';
 import { useFamily } from '@/hooks/useFamily';
 import { useHitTraxLink } from '@/hooks/useHitTraxLink';
+import { useMembership } from '@/hooks/useMembership';
 import { usePersonalBestsForKid, useSwingsForKid } from '@/hooks/useSwings';
 import type { MeStackScreenProps } from '@/navigation/types';
 import { usePrimaryLocation } from '@/screens/Book/hooks/usePrimaryLocation';
@@ -99,10 +102,17 @@ function fmtPb(v: number, digits: number): string {
   return Number(v).toFixed(digits);
 }
 
+function formatDate(isoDate: string): string {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const d = new Date(isoDate + 'T00:00:00');
+  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
 export default function ProfileScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { family, kids } = useFamily();
   const kid = kids[0] ?? null;
+  const { membership, resume } = useMembership();
 
   const { data: primaryLocation } = usePrimaryLocation();
 
@@ -165,6 +175,27 @@ export default function ProfileScreen({ navigation }: Props) {
     } catch (err) {
       Alert.alert('Sign-out failed', errorMessage(err));
     }
+  };
+
+  const handleResumeEarly = () => {
+    Alert.alert(
+      'Resume Membership?',
+      'Billing will resume immediately. Your next charge will be processed on the next billing date.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Resume Now',
+          style: 'default',
+          onPress: async () => {
+            try {
+              await resume();
+            } catch (err) {
+              Alert.alert('Could not resume', errorMessage(err));
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleDeleteAccount = () => {
@@ -281,6 +312,40 @@ export default function ProfileScreen({ navigation }: Props) {
             );
           })}
         </View>
+
+        {/* Membership status ----------------------------------------------- */}
+        {membership ? (
+          <>
+            <Text style={styles.sectionLabel}>MEMBERSHIP</Text>
+            {membership.status === 'paused' && membership.pause_end ? (
+              <View style={styles.pausedCard}>
+                <View style={styles.pausedHeader}>
+                  <PauseCircle size={18} color={colors.gold} />
+                  <Text style={styles.pausedTitle}>
+                    Paused until {formatDate(membership.pause_end)}
+                  </Text>
+                </View>
+                <Text style={styles.pausedSubtitle}>
+                  No charges during this period. Your membership resumes automatically.
+                </Text>
+                <TouchableOpacity style={styles.resumeBtn} onPress={handleResumeEarly}>
+                  <PlayCircle size={15} color={colors.dark} />
+                  <Text style={styles.resumeBtnText}>Resume Early</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              membership.plan_type === 'eft' && (
+                <Row
+                  icon={PauseCircle}
+                  label="Pause Membership"
+                  subtitle={membership.plan_name}
+                  subtitleTone="muted"
+                  onPress={() => navigation.navigate('PauseMembership')}
+                />
+              )
+            )}
+          </>
+        ) : null}
 
         {/* Settings list -------------------------------------------------- */}
         <Text style={styles.sectionLabel}>SETTINGS</Text>
@@ -575,6 +640,50 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: tracking.wide,
     textTransform: 'uppercase',
+  },
+
+  pausedCard: {
+    backgroundColor: colors.darker,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    borderRadius: radius['2xl'],
+    padding: spacing['2xl'],
+    marginBottom: spacing.lg,
+  },
+  pausedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  pausedTitle: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.lg,
+    color: colors.gold,
+  },
+  pausedSubtitle: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
+    color: colors.textMuted,
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+  resumeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.gold,
+    borderRadius: radius.xl,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing['2xl'],
+    alignSelf: 'flex-start',
+  },
+  resumeBtnText: {
+    fontFamily: fontFamilies.interBold,
+    fontSize: fontSizes.sm,
+    color: colors.dark,
+    textTransform: 'uppercase',
+    letterSpacing: tracking.wide,
   },
 
   signOutBtn: {
