@@ -199,6 +199,106 @@ export type Database = {
           },
         ]
       }
+      booking_waitlist: {
+        Row: {
+          claim_deadline: string | null
+          coach_id: string
+          created_at: string
+          family_id: string
+          id: string
+          kid_id: string
+          location_id: string
+          notified_at: string | null
+          position: number
+          scheduled_end: string
+          scheduled_start: string
+          session_slot_key: string
+          session_type_id: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          claim_deadline?: string | null
+          coach_id: string
+          created_at?: string
+          family_id: string
+          id?: string
+          kid_id: string
+          location_id: string
+          notified_at?: string | null
+          position: number
+          scheduled_end: string
+          scheduled_start: string
+          session_slot_key: string
+          session_type_id: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          claim_deadline?: string | null
+          coach_id?: string
+          created_at?: string
+          family_id?: string
+          id?: string
+          kid_id?: string
+          location_id?: string
+          notified_at?: string | null
+          position?: number
+          scheduled_end?: string
+          scheduled_start?: string
+          session_slot_key?: string
+          session_type_id?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_waitlist_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_waitlist_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_waitlist_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_waitlist_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_waitlist_session_type_id_fkey"
+            columns: ["session_type_id"]
+            isOneToOne: false
+            referencedRelation: "session_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_waitlist_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           attended_at: string | null
@@ -213,6 +313,7 @@ export type Database = {
           notes: string | null
           scheduled_end: string
           scheduled_start: string
+          session_credit_restored: boolean
           session_type_id: string
           status: string
           tenant_id: string
@@ -231,6 +332,7 @@ export type Database = {
           notes?: string | null
           scheduled_end: string
           scheduled_start: string
+          session_credit_restored?: boolean
           session_type_id: string
           status?: string
           tenant_id: string
@@ -249,6 +351,7 @@ export type Database = {
           notes?: string | null
           scheduled_end?: string
           scheduled_start?: string
+          session_credit_restored?: boolean
           session_type_id?: string
           status?: string
           tenant_id?: string
@@ -1000,6 +1103,8 @@ export type Database = {
           paused_at: string | null
           plan_name: string
           plan_type: string
+          sessions_remaining: number | null
+          sessions_total: number | null
           started_at: string
           status: string
           stripe_subscription_id: string | null
@@ -1021,6 +1126,8 @@ export type Database = {
           paused_at?: string | null
           plan_name: string
           plan_type: string
+          sessions_remaining?: number | null
+          sessions_total?: number | null
           started_at?: string
           status?: string
           stripe_subscription_id?: string | null
@@ -1042,6 +1149,8 @@ export type Database = {
           paused_at?: string | null
           plan_name?: string
           plan_type?: string
+          sessions_remaining?: number | null
+          sessions_total?: number | null
           started_at?: string
           status?: string
           stripe_subscription_id?: string | null
@@ -1494,6 +1603,7 @@ export type Database = {
       session_types: {
         Row: {
           base_price_cents: number
+          capacity: number
           created_at: string
           description: string | null
           duration_minutes: number
@@ -1506,6 +1616,7 @@ export type Database = {
         }
         Insert: {
           base_price_cents?: number
+          capacity?: number
           created_at?: string
           description?: string | null
           duration_minutes: number
@@ -1518,6 +1629,7 @@ export type Database = {
         }
         Update: {
           base_price_cents?: number
+          capacity?: number
           created_at?: string
           description?: string | null
           duration_minutes?: number
@@ -2051,6 +2163,11 @@ export type Database = {
         Returns: Json
       }
       check_in_booking: { Args: { p_booking_id: string }; Returns: Json }
+      check_session_credits: {
+        Args: { p_kid_id: string; p_tenant_id: string }
+        Returns: number
+      }
+      claim_waitlist_spot: { Args: { p_waitlist_id: string }; Returns: Json }
       complete_assignment_for_kid: {
         Args: { p_assignment_id: string }
         Returns: {
@@ -2064,6 +2181,8 @@ export type Database = {
         Returns: Json
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      deduct_session_credit: { Args: { p_booking_id: string }; Returns: number }
+      expire_stale_waitlist_entries: { Args: never; Returns: undefined }
       gen_redemption_code: { Args: never; Returns: string }
       get_coach_hours: {
         Args: { p_end_date: string; p_start_date: string; p_tenant_id: string }
@@ -2077,7 +2196,95 @@ export type Database = {
           total_hours: number
         }[]
       }
+      get_day_slot_availability: {
+        Args: {
+          p_end: string
+          p_session_type_id: string
+          p_start: string
+          p_tenant_id: string
+        }
+        Returns: {
+          capacity: number
+          confirmed_count: number
+          session_slot_key: string
+          waitlist_count: number
+        }[]
+      }
       get_kid_weekly_rank_delta: { Args: { p_kid_id: string }; Returns: number }
+      get_public_availability: {
+        Args: {
+          p_date_end: string
+          p_date_start: string
+          p_tenant_slug: string
+        }
+        Returns: {
+          coach_first_name: string
+          coach_id: string
+          coach_last_name: string
+          end_time: string
+          is_available: boolean
+          location_id: string
+          location_name: string
+          slot_date: string
+          start_time: string
+        }[]
+      }
+      get_public_session_types: {
+        Args: { p_tenant_slug: string }
+        Returns: {
+          base_price_cents: number
+          description: string
+          duration_minutes: number
+          id: string
+          name: string
+          type_category: string
+        }[]
+      }
+      get_public_tenant_info: {
+        Args: { p_tenant_slug: string }
+        Returns: {
+          brand_colors: Json
+          brand_logo_url: string
+          id: string
+          name: string
+          slug: string
+        }[]
+      }
+      join_waitlist: {
+        Args: {
+          p_coach_id: string
+          p_location_id: string
+          p_scheduled_end: string
+          p_scheduled_start: string
+          p_session_slot_key: string
+          p_session_type_id: string
+        }
+        Returns: {
+          claim_deadline: string | null
+          coach_id: string
+          created_at: string
+          family_id: string
+          id: string
+          kid_id: string
+          location_id: string
+          notified_at: string | null
+          position: number
+          scheduled_end: string
+          scheduled_start: string
+          session_slot_key: string
+          session_type_id: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "booking_waitlist"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      leave_waitlist: { Args: { p_waitlist_id: string }; Returns: undefined }
       mark_coach_message_viewed: {
         Args: { p_message_id: string }
         Returns: undefined
@@ -2128,6 +2335,10 @@ export type Database = {
       register_device_token: {
         Args: { p_expo_push_token: string; p_platform: string }
         Returns: undefined
+      }
+      restore_session_credit: {
+        Args: { p_booking_id: string }
+        Returns: number
       }
       resume_membership: { Args: { p_membership_id: string }; Returns: Json }
       review_assignment: {
