@@ -40,6 +40,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { deleteAccount } from '@/api/account';
 import { signOut } from '@/api/auth';
+import { useActiveMembership } from '@/hooks/useActiveMembership';
 import { useAuth } from '@/hooks/useAuth';
 import { useDeleteKid } from '@/hooks/useFamily';
 import {
@@ -123,6 +124,8 @@ export default function ProfileScreen({ navigation }: Props) {
         : hittraxLink?.association_status === 'declined'
           ? 'Declined'
           : 'Not connected';
+
+  const { data: activeMembership } = useActiveMembership();
 
   const { data: prs } = usePersonalBestsForKid(kid?.id);
   const { data: swings } = useSwingsForKid(kid?.id);
@@ -423,8 +426,19 @@ export default function ProfileScreen({ navigation }: Props) {
         <Row
           icon={CreditCard}
           label="Payment Method"
-          subtitle="Manage billing card"
-          subtitleTone="muted"
+          subtitle={
+            activeMembership?.plan_type === 'otc' &&
+            activeMembership.sessions_remaining !== null &&
+            activeMembership.sessions_total !== null
+              ? `${activeMembership.sessions_remaining} of ${activeMembership.sessions_total} sessions remaining`
+              : 'Manage billing card'
+          }
+          subtitleTone={
+            activeMembership?.plan_type === 'otc' &&
+            activeMembership.sessions_remaining !== null
+              ? 'gold' as const
+              : 'muted' as const
+          }
           onPress={() => navigation.navigate('PaymentMethod')}
         />
         <Row

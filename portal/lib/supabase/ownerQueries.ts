@@ -970,6 +970,10 @@ export type MemberDetail = OwnerMember & {
   pauseEnd: string | null;
   /** Timestamp when the pause was initiated. Null if not paused. */
   pausedAt: string | null;
+  /** OTC pack members only. Null for EFT unlimited memberships. */
+  sessionsRemaining: number | null;
+  /** OTC pack members only. Null for EFT unlimited memberships. */
+  sessionsTotal: number | null;
 };
 
 export async function getMemberDetail(
@@ -995,6 +999,8 @@ export async function getMemberDetail(
       pause_start,
       pause_end,
       paused_at,
+      sessions_total,
+      sessions_remaining,
       kids!inner(id, first_name, last_name, age_group, points_balance),
       families!inner(parent_first_name, parent_last_name, card_last4, card_brand, card_exp_month, card_exp_year)
     `)
@@ -1198,6 +1204,8 @@ export async function getMemberDetail(
     cardBrand: fam.card_brand ?? null,
     cardExpMonth: fam.card_exp_month ?? null,
     cardExpYear: fam.card_exp_year ?? null,
+    sessionsRemaining: (mem.sessions_remaining as number | null) ?? null,
+    sessionsTotal: (mem.sessions_total as number | null) ?? null,
   };
 }
 

@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui';
 import { useSelectedKid } from '@/hooks/useSelectedKid';
+import { useActiveMembership } from '@/hooks/useActiveMembership';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import type { Tables } from '@/types/database';
 
 import { useCoaches } from '../hooks/useCoaches';
-import { useCreateBooking } from '../hooks/useCreateBooking';
+import { useCreateBooking, isNoSessionCreditsError, type CreateBookingResult } from '../hooks/useCreateBooking';
 import { useActiveLocation } from '../hooks/useActiveLocation';
 import type { SessionType } from '@/api/bookings';
 import type { Slot } from '../utils/slots';
@@ -73,11 +74,17 @@ export default function SummarySection({
   const location = useActiveLocation();
   const coaches = useCoaches();
   const createBooking = useCreateBooking();
+  const { data: membership } = useActiveMembership();
+
   const [errorVisible, setErrorVisible] = useState(false);
+  // Task #242: sibling / kid-picker
   const [kidPickerVisible, setKidPickerVisible] = useState(false);
   const [overrideKidId, setOverrideKidId] = useState<string | null>(null);
+  // Task #237: session credit gating
+  const [noCreditsVisible, setNoCreditsVisible] = useState(false);
+  const [bookingResult, setBookingResult] = useState<CreateBookingResult | null>(null);
 
-  // The kid to book for — parent may override via the picker
+  // The kid to book for — parent may override via the picker (Task #242)
   const activeKid: Kid | null = useMemo(() => {
     if (overrideKidId) {
       return kids.find((k) => k.id === overrideKidId) ?? defaultKid;
@@ -108,9 +115,31 @@ export default function SummarySection({
   const coachName = coach ? `${coach.first_name} ${coach.last_name}`.trim() : null;
   const priceLabel = sessionType ? formatPriceUSD(sessionType.base_price_cents) : null;
 
+  // Session credits for OTC pack holders (Task #237)
+  const isOtcPack =
+    membership?.plan_type === 'otc' &&
+    membership.sessions_remaining !== null &&
+    membership.sessions_total !== null;
+
+  const sessionsRemaining = isOtcPack ? (membership!.sessions_remaining as number) : null;
+  const sessionsTotal     = isOtcPack ? (membership!.sessions_total as number) : null;
+
+  // The balance AFTER this booking (pre-confirmation hint to user)
+  const sessionsAfter =
+    sessionsRemaining !== null ? Math.max(0, sessionsRemaining - 1) : null;
+
+  // Already out of credits — disable confirm proactively
+  const outOfCredits = sessionsRemaining !== null && sessionsRemaining === 0;
+
+  // Stores the formatted when string so the Done button can pass it to onBooked
+  const formattedWhenRef = useRef<string>('');
+
   const handleConfirm = () => {
-    if (!ready || createBooking.isPending || !activeKid) return;
+    // Both guards: kid must be selected (Task #242) AND credits must be available (Task #237)
+    if (!ready || createBooking.isPending || !activeKid || outOfCredits) return;
     setErrorVisible(false);
+    setNoCreditsVisible(false);
+    setBookingResult(null);
 
     const insert = {
       tenant_id: family!.tenant_id,
@@ -123,15 +152,52 @@ export default function SummarySection({
       status: 'confirmed' as const,
     };
 
+    formattedWhenRef.current = `${dateLabel} at ${timeLabel}`;
+
     createBooking.mutate(insert, {
-      onSuccess: () => {
-        onBooked(`${dateLabel} at ${timeLabel}`);
+      onSuccess: (result) => {
+        // Task #237: hold here so the user can see their updated pack balance
+        // before navigating away. The "Done" button calls onBooked.
+        setBookingResult(result);
       },
-      onError: () => {
-        setErrorVisible(true);
+      onError: (err) => {
+        if (isNoSessionCreditsError(err)) {
+          setNoCreditsVisible(true);
+        } else {
+          setErrorVisible(true);
+        }
       },
     });
   };
+
+  const handleDone = () => {
+    onBooked(formattedWhenRef.current);
+  };
+
+  // Task #237: confirmed state — show balance before navigating
+  if (bookingResult !== null) {
+    const balanceAfter = bookingResult.sessionsRemaining;
+    const showBalance  = isOtcPack && balanceAfter >= 0;
+
+    return (
+      <SectionCard title="Summary" locked={false}>
+        <View style={styles.confirmedBlock}>
+          <Text style={styles.confirmedTitle}>Session booked!</Text>
+          <Text style={styles.confirmedWhen}>{formattedWhenRef.current}</Text>
+
+          {showBalance ? (
+            <View style={styles.balanceBox}>
+              <Text style={styles.balanceLabel}>Sessions remaining</Text>
+              <Text style={styles.balanceNumber}>{balanceAfter}</Text>
+              <Text style={styles.balanceOf}>of {sessionsTotal}</Text>
+            </View>
+          ) : null}
+
+          <Button label="Done" onPress={handleDone} variant="primary" />
+        </View>
+      </SectionCard>
+    );
+  }
 
   return (
     <>
@@ -147,7 +213,8 @@ export default function SummarySection({
             <SummaryLine label="Time" value={timeLabel as string} />
             <SummaryLine label="Coach" value={coachName as string} />
             <SummaryLine label="Price" value={priceLabel as string} />
-            {/* Kid selector row — only shown when family has multiple kids */}
+
+            {/* Kid selector row (Task #242) — only shown when family has multiple kids */}
             {multipleKids ? (
               <View style={styles.kidRow}>
                 <Text style={styles.lineLabel}>BOOKING FOR</Text>
@@ -164,6 +231,19 @@ export default function SummarySection({
                 </Pressable>
               </View>
             ) : null}
+
+            {/* Pack balance line (Task #237) */}
+            {isOtcPack && sessionsRemaining !== null && sessionsTotal !== null ? (
+              <SummaryLine
+                label="Pack balance"
+                value={
+                  outOfCredits
+                    ? 'No sessions remaining'
+                    : `${sessionsAfter} of ${sessionsTotal} after booking`
+                }
+                valueStyle={outOfCredits ? styles.lineValueDanger : styles.lineValueGold}
+              />
+            ) : null}
           </View>
         ) : (
           <View style={styles.placeholder}>
@@ -174,14 +254,33 @@ export default function SummarySection({
         )}
 
         <View style={styles.confirmWrap}>
+          {/* Out-of-credits warning (Task #237) — shown proactively before the user taps */}
+          {outOfCredits && ready ? (
+            <View style={styles.errorBlock}>
+              <Text style={styles.errorText}>
+                You&apos;ve used all your sessions. Contact the front desk to add more.
+              </Text>
+            </View>
+          ) : null}
+
           <Button
             label={createBooking.isPending ? 'Booking…' : 'Confirm Booking'}
             onPress={handleConfirm}
             variant="primary"
             loading={createBooking.isPending}
-            disabled={!ready || createBooking.isPending}
+            disabled={!ready || createBooking.isPending || outOfCredits}
           />
 
+          {/* NO_SESSION_CREDITS race-condition error (Task #237) */}
+          {noCreditsVisible ? (
+            <View style={styles.errorBlock}>
+              <Text style={styles.errorText}>
+                You&apos;ve used all your sessions. Contact the front desk to add more.
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Generic error with retry (Task #242/HEAD) */}
           {errorVisible ? (
             <View style={styles.errorBlock}>
               <Text style={styles.errorText}>
@@ -203,7 +302,7 @@ export default function SummarySection({
         </View>
       </SectionCard>
 
-      {/* Kid picker modal ------------------------------------------------- */}
+      {/* Kid picker modal (Task #242) */}
       <Modal
         visible={kidPickerVisible}
         transparent
@@ -258,11 +357,19 @@ export default function SummarySection({
   );
 }
 
-function SummaryLine({ label, value }: { label: string; value: string }) {
+function SummaryLine({
+  label,
+  value,
+  valueStyle,
+}: {
+  label: string;
+  value: string;
+  valueStyle?: object;
+}) {
   return (
     <View style={styles.line}>
       <Text style={styles.lineLabel}>{label}</Text>
-      <Text style={styles.lineValue} numberOfLines={2}>
+      <Text style={[styles.lineValue, valueStyle]} numberOfLines={2}>
         {value}
       </Text>
     </View>
@@ -302,6 +409,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     color: colors.textOnDark,
   },
+  // Task #242: kid-picker
   kidRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -330,6 +438,13 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     textDecorationLine: 'underline',
   },
+  // Task #237: pack balance line colours
+  lineValueGold: {
+    color: colors.gold,
+  },
+  lineValueDanger: {
+    color: colors.danger,
+  },
   confirmWrap: {
     marginTop: spacing['3xl'],
     gap: spacing.lg,
@@ -350,7 +465,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
   },
-
+  // Task #242: kid picker modal
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -414,5 +529,48 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.lg,
     color: colors.gold,
+  },
+  // Task #237: confirmed state (shown after booking succeeds, before navigating)
+  confirmedBlock: {
+    gap: spacing.xl,
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  confirmedTitle: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['2xl'],
+    color: colors.gold,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+  },
+  confirmedWhen: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.base,
+    color: colors.textLight,
+  },
+  balanceBox: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing['3xl'],
+    backgroundColor: colors.darker,
+    borderRadius: 12,
+  },
+  balanceLabel: {
+    fontFamily: fontFamilies.oswaldSemiBold,
+    fontSize: fontSizes.sm,
+    color: colors.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  balanceNumber: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['4xl'],
+    color: colors.gold,
+  },
+  balanceOf: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    color: colors.textMuted,
   },
 });

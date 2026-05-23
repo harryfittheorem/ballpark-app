@@ -3,9 +3,9 @@
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, SectionHeader, OCard, Chip } from '@/components/owner/ui';
 import {
-  Calendar, MessageCircle, Edit2, Clock,
-  CheckCircle, XCircle, CreditCard,
-  AlertCircle, PauseCircle, PlayCircle,
+  Calendar, MessageCircle, Edit2, Activity, Clock,
+  CheckCircle, XCircle, CreditCard, Star, Zap, TrendingUp,
+  AlertCircle, PauseCircle, PlayCircle, Package,
 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import type { MemberDetail } from '@/lib/supabase/ownerQueries';
@@ -206,6 +206,162 @@ function PauseSection({ member }: { member: MemberDetail }) {
           <PlayCircle size={14} />
           {resuming ? 'Resuming…' : 'Resume Early'}
         </button>
+      </OCard>
+    </div>
+  );
+}
+
+function SessionsOverrideSection({ member }: { member: MemberDetail }) {
+  const [editing, setEditing] = useState(false);
+  const [inputValue, setInputValue] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [currentRemaining, setCurrentRemaining] = useState<number | null>(member.sessionsRemaining);
+
+  const sessionsTotal = member.sessionsTotal ?? 0;
+
+  const handleEdit = useCallback(() => {
+    setInputValue(String(currentRemaining ?? 0));
+    setSaveError(null);
+    setEditing(true);
+  }, [currentRemaining]);
+
+  const handleSave = useCallback(async () => {
+    const parsed = parseInt(inputValue, 10);
+    if (isNaN(parsed) || parsed < 0) {
+      setSaveError('Enter a valid non-negative number.');
+      return;
+    }
+    if (parsed > sessionsTotal) {
+      setSaveError(`Cannot exceed total (${sessionsTotal}).`);
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch('/api/memberships/sessions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ membership_id: member.id, sessions_remaining: parsed }),
+      });
+      const data = await res.json() as { ok?: boolean; sessions_remaining?: number; error?: string };
+      if (!res.ok || !data.ok) {
+        setSaveError(data.error ?? `Error ${res.status}`);
+      } else {
+        setCurrentRemaining(data.sessions_remaining ?? parsed);
+        setEditing(false);
+      }
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setSaving(false);
+    }
+  }, [inputValue, member.id, sessionsTotal]);
+
+  // All hooks must be called before any conditional return
+  if (member.planType !== 'otc' || member.sessionsTotal === null) return null;
+
+  return (
+    <div>
+      <SectionHeader title="Session Pack" />
+      <OCard style={{ padding: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <Package size={14} color={brand.gold} />
+          <span style={{ fontSize: 11, color: brand.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+            {member.program}
+          </span>
+        </div>
+
+        {/* Credit bar */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+            <span style={{ fontSize: 24, fontWeight: 800, fontFamily: fonts.display, color: (currentRemaining ?? 0) === 0 ? brand.danger : brand.text }}>
+              {currentRemaining ?? 0}
+            </span>
+            <span style={{ fontSize: 11, color: brand.textMuted }}>of {sessionsTotal} remaining</span>
+          </div>
+          <div style={{ height: 6, background: brand.surfaceAlt, borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: `${sessionsTotal > 0 ? Math.round(((currentRemaining ?? 0) / sessionsTotal) * 100) : 0}%`,
+              background: (currentRemaining ?? 0) === 0 ? brand.danger : brand.success,
+              borderRadius: 4,
+              transition: 'width 0.3s ease',
+            }} />
+          </div>
+        </div>
+
+        {/* Editing UI */}
+        {editing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="number"
+                min={0}
+                max={sessionsTotal}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: `1px solid ${brand.border}`,
+                  background: brand.surfaceAlt,
+                  color: brand.text,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  outline: 'none',
+                }}
+              />
+              <OButton
+                variant="gold"
+                size="sm"
+                onClick={handleSave}
+                disabled={saving}
+                style={{ flexShrink: 0 }}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </OButton>
+              <OButton
+                variant="secondary"
+                size="sm"
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                style={{ flexShrink: 0 }}
+              >
+                Cancel
+              </OButton>
+            </div>
+            {saveError && (
+              <div style={{ fontSize: 11, color: brand.danger }}>{saveError}</div>
+            )}
+            <div style={{ fontSize: 10, color: brand.textMuted }}>
+              Staff override — enter 0–{sessionsTotal}. This updates the credit balance immediately.
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={handleEdit}
+            style={{
+              width: '100%',
+              padding: '7px 0',
+              borderRadius: 6,
+              border: `1px solid ${brand.border}`,
+              background: 'transparent',
+              color: brand.textMuted,
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+              letterSpacing: 0.5,
+            }}
+          >
+            Override sessions remaining
+          </button>
+        )}
+      </OCard>
+    </div>
+  );
+}
       </OCard>
     </div>
   );
@@ -812,6 +968,11 @@ export function MemberDetailContent({ member: m }: Props) {
           {/* Pause window (Task #240) */}
           {!demo && (m as MemberDetail).subscriptionStatus === 'paused' && (m as MemberDetail).pauseEnd && (
             <PauseSection member={m as MemberDetail} />
+          )}
+
+          {/* Session Pack credits — OTC members only (Task #237) */}
+          {!demo && (
+            <SessionsOverrideSection member={m as MemberDetail} />
           )}
 
           {/* Subscription (Phase 3) */}
