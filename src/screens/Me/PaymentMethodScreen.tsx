@@ -1,21 +1,35 @@
 /**
  * PaymentMethodScreen
  *
- * Allows a parent to add or update their saved payment method for
+ * Allows a parent to view, add, or replace the saved payment method for
  * recurring membership subscription billing. Uses the Stripe
  * SetupIntent flow via stripe-react-native's payment sheet.
+ *
+ * States:
+ *   loading    — fetching card-on-file from families table
+ *   no-card    — no card saved; shows "Add a card" CTA
+ *   has-card   — shows brand/last4/expiry; shows "Replace card" CTA
+ *   fetching   — creating SetupIntent before presenting PaymentSheet
+ *   presenting — PaymentSheet is open (nested StripeProvider scope)
+ *   saving     — PaymentSheet confirmed, calling save-payment-method
+ *   success    — card saved/replaced; shown briefly before auto-returning
  *
  * Connect account context:
  * The stripe-setup-intent edge function creates the Customer and SetupIntent
  * on the location's connected Stripe account (via Stripe-Account header) and
  * returns stripe_account_id alongside the client secret. We wrap the payment
  * sheet presentation in a nested StripeProvider with that stripeAccountId so
- * the SDK makes calls against the correct connected account — matching the
- * server-side scoping exactly.
+ * the SDK makes calls against the correct connected account.
  */
 
 import { StripeProvider, useStripe } from '@stripe/stripe-react-native';
-import { CreditCard, CheckCircle2 } from 'lucide-react-native';
+import {
+  CreditCard,
+  CheckCircle2,
+  ShieldCheck,
+  RefreshCw,
+  PlusCircle,
+} from 'lucide-react-native';
 import { useState, useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
@@ -27,22 +41,38 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { createSetupIntent, type SetupIntentResult } from '@/api/stripe';
+import {
+  createSetupIntent,
+  savePaymentMethod,
+  getCardOnFile,
+  type SetupIntentResult,
+  type CardOnFile,
+} from '@/api/stripe';
 import type { MeStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
 
-// Platform publishable key — the same key used at the app root StripeProvider.
-// The nested StripeProvider overrides only stripeAccountId; the publishable key
-// itself remains the platform key (Stripe Connect requirement).
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
 type Props = MeStackScreenProps<'PaymentMethod'>;
 
-// ── Inner presenter component ─────────────────────────────────────────────────
-// Rendered inside a nested StripeProvider so useStripe() is bound to the
-// correct connected account. Auto-initialises and presents the payment sheet
-// on mount, then signals success/error to the parent via callbacks.
+// ── Brand icon label helper ───────────────────────────────────────────────────
+
+const BRAND_SHORT: Record<string, string> = {
+  Visa: 'VISA',
+  Mastercard: 'MC',
+  Amex: 'AMEX',
+  Discover: 'DISC',
+  'Diners Club': 'DC',
+  JCB: 'JCB',
+  UnionPay: 'UP',
+};
+
+function brandLabel(brand: string): string {
+  return BRAND_SHORT[brand] ?? brand.toUpperCase().slice(0, 4);
+}
+
+// ── Inner presenter component (PaymentSheet) ──────────────────────────────────
 
 type PresenterProps = {
   setup: SetupIntentResult;
@@ -102,13 +132,152 @@ function PaymentSheetPresenter({ setup, onSuccess, onCancel, onError }: Presente
   );
 }
 
+// ── Card-on-file display ──────────────────────────────────────────────────────
+
+function CardDisplay({ card }: { card: CardOnFile }) {
+  const exp = `${String(card.expMonth).padStart(2, '0')}/${String(card.expYear).slice(-2)}`;
+  const now = new Date();
+  const isExpiringSoon =
+    card.expYear === now.getFullYear() && card.expMonth - now.getMonth() <= 2
+    || card.expYear < now.getFullYear();
+
+  return (
+    <View style={cardStyles.container}>
+      <View style={cardStyles.header}>
+        <View style={cardStyles.brandBadge}>
+          <Text style={cardStyles.brandText}>{brandLabel(card.brand)}</Text>
+        </View>
+        {isExpiringSoon && (
+          <View style={cardStyles.expiringBadge}>
+            <Text style={cardStyles.expiringText}>Expiring Soon</Text>
+          </View>
+        )}
+      </View>
+      <View style={cardStyles.numberRow}>
+        <Text style={cardStyles.dots}>···· ···· ····</Text>
+        <Text style={cardStyles.last4}>{card.last4}</Text>
+      </View>
+      <View style={cardStyles.footer}>
+        <View>
+          <Text style={cardStyles.footerLabel}>EXPIRES</Text>
+          <Text style={cardStyles.footerValue}>{exp}</Text>
+        </View>
+        <View style={cardStyles.iconRight}>
+          <ShieldCheck size={18} color={colors.success} />
+          <Text style={cardStyles.securedText}>Secured</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const cardStyles = StyleSheet.create({
+  container: {
+    width: '100%',
+    backgroundColor: colors.darker,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius['2xl'],
+    padding: spacing['2xl'],
+    marginBottom: spacing['3xl'],
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing['2xl'],
+  },
+  brandBadge: {
+    backgroundColor: colors.gold,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+  },
+  brandText: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xs,
+    color: colors.dark,
+    letterSpacing: 1,
+  },
+  expiringBadge: {
+    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+    borderWidth: 1,
+    borderColor: '#FFC107',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 3,
+  },
+  expiringText: {
+    fontFamily: fontFamilies.interSemiBold,
+    fontSize: fontSizes.xs,
+    color: '#FFC107',
+  },
+  numberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing['2xl'],
+    gap: 8,
+  },
+  dots: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.xl,
+    color: colors.textMuted,
+    letterSpacing: 3,
+  },
+  last4: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.xl,
+    color: colors.text,
+    letterSpacing: 2,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  footerLabel: {
+    fontFamily: fontFamilies.interSemiBold,
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  footerValue: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.md,
+    color: colors.text,
+  },
+  iconRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  securedText: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.xs,
+    color: colors.success,
+  },
+});
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
+type Phase = 'loading' | 'idle' | 'fetching' | 'presenting' | 'saving' | 'success';
+
 export default function PaymentMethodScreen({ navigation }: Props) {
-  const [phase, setPhase] = useState<'idle' | 'fetching' | 'presenting' | 'success'>('idle');
+  const [phase, setPhase] = useState<Phase>('loading');
+  const [card, setCard] = useState<CardOnFile | null>(null);
   const [setupData, setSetupData] = useState<SetupIntentResult | null>(null);
 
-  const handleAddCard = useCallback(async () => {
+  // Load card on mount
+  useEffect(() => {
+    let mounted = true;
+    getCardOnFile()
+      .then(result => { if (mounted) { setCard(result); setPhase('idle'); } })
+      .catch(() => { if (mounted) setPhase('idle'); });
+    return () => { mounted = false; };
+  }, []);
+
+  const handleAddOrReplace = useCallback(async () => {
     try {
       setPhase('fetching');
       const data = await createSetupIntent();
@@ -120,9 +289,10 @@ export default function PaymentMethodScreen({ navigation }: Props) {
     }
   }, []);
 
-  const handleSuccess = useCallback(() => {
-    setPhase('success');
+  // Called when PaymentSheet confirms successfully
+  const handleSheetSuccess = useCallback(() => {
     setSetupData(null);
+    setPhase('saving');
   }, []);
 
   const handleCancel = useCallback(() => {
@@ -130,13 +300,47 @@ export default function PaymentMethodScreen({ navigation }: Props) {
     setSetupData(null);
   }, []);
 
-  const handleError = useCallback((msg: string) => {
+  const handleSheetError = useCallback((msg: string) => {
     setPhase('idle');
     setSetupData(null);
     Alert.alert('Could not save card', msg);
   }, []);
 
-  // ── Presenting phase: nested StripeProvider with connected account context ──
+  // After sheet closes with success, call save-payment-method to persist + get card details
+  useEffect(() => {
+    if (phase !== 'saving') return;
+    let mounted = true;
+
+    savePaymentMethod()
+      .then(result => {
+        if (!mounted) return;
+        setCard(result);
+        setPhase('success');
+      })
+      .catch(err => {
+        if (!mounted) return;
+        setPhase('idle');
+        Alert.alert(
+          'Card setup issue',
+          `Your card was captured by Stripe but we could not confirm the details: ${errorMessage(err)}. Please contact support if the issue persists.`,
+        );
+      });
+
+    return () => { mounted = false; };
+  }, [phase]);
+
+  // ── Loading ───────────────────────────────────────────────────────────────
+  if (phase === 'loading') {
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator color={colors.gold} size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Presenting PaymentSheet ───────────────────────────────────────────────
   if (phase === 'presenting' && setupData) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -146,30 +350,45 @@ export default function PaymentMethodScreen({ navigation }: Props) {
         >
           <PaymentSheetPresenter
             setup={setupData}
-            onSuccess={handleSuccess}
+            onSuccess={handleSheetSuccess}
             onCancel={handleCancel}
-            onError={handleError}
+            onError={handleSheetError}
           />
         </StripeProvider>
       </SafeAreaView>
     );
   }
 
-  // ── Success state ─────────────────────────────────────────────────────────
-  if (phase === 'success') {
+  // ── Saving (after sheet closed) ───────────────────────────────────────────
+  if (phase === 'saving') {
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator color={colors.gold} size="large" />
+          <Text style={[styles.subtitle, { marginTop: spacing['2xl'] }]}>
+            Saving your card…
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Success ───────────────────────────────────────────────────────────────
+  if (phase === 'success' && card) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
         <View style={styles.container}>
-          <View style={styles.successBlock}>
+          <View style={styles.content}>
             <View style={styles.iconCircle}>
               <CheckCircle2 size={40} color={colors.success} />
             </View>
             <Text style={styles.successTitle}>Card Saved</Text>
-            <Text style={styles.successSubtitle}>
-              Your payment method is saved and will be used for monthly membership billing.
+            <Text style={styles.subtitle}>
+              {card.brand} ending in {card.last4} is now on file for monthly membership billing.
             </Text>
-            <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.goBack()}>
-              <Text style={styles.doneBtnText}>Done</Text>
+            <CardDisplay card={card} />
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.goBack()}>
+              <Text style={styles.primaryBtnText}>Done</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -177,7 +396,48 @@ export default function PaymentMethodScreen({ navigation }: Props) {
     );
   }
 
-  // ── Idle / fetching state ─────────────────────────────────────────────────
+  // ── Idle: card on file ────────────────────────────────────────────────────
+  if (card) {
+    const loading = phase === 'fetching';
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <View style={styles.container}>
+          <View style={styles.content}>
+            <View style={styles.iconCircle}>
+              <CreditCard size={36} color={colors.gold} />
+            </View>
+            <Text style={styles.title}>Payment Method</Text>
+            <Text style={styles.subtitle}>
+              This card is charged automatically on your membership renewal date each month.
+            </Text>
+
+            <CardDisplay card={card} />
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, loading && styles.btnDisabled]}
+              onPress={handleAddOrReplace}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.dark} size="small" />
+              ) : (
+                <View style={styles.btnRow}>
+                  <RefreshCw size={16} color={colors.dark} />
+                  <Text style={styles.primaryBtnText}>Replace Card</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <Text style={styles.secureNote}>
+              Secured by Stripe · Your card details are never stored on our servers
+            </Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Idle: no card on file ─────────────────────────────────────────────────
   const loading = phase === 'fetching';
 
   return (
@@ -207,14 +467,17 @@ export default function PaymentMethodScreen({ navigation }: Props) {
           </View>
 
           <TouchableOpacity
-            style={[styles.addBtn, loading && styles.addBtnDisabled]}
-            onPress={handleAddCard}
+            style={[styles.primaryBtn, loading && styles.btnDisabled]}
+            onPress={handleAddOrReplace}
             disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color={colors.dark} size="small" />
             ) : (
-              <Text style={styles.addBtnText}>Add Card</Text>
+              <View style={styles.btnRow}>
+                <PlusCircle size={16} color={colors.dark} />
+                <Text style={styles.primaryBtnText}>Add Card</Text>
+              </View>
             )}
           </TouchableOpacity>
 
@@ -258,13 +521,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
+  successTitle: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['3xl'],
+    color: colors.success,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
   subtitle: {
     fontFamily: fontFamilies.interMedium,
     fontSize: fontSizes.md,
     color: colors.textLight,
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: spacing['4xl'],
+    marginBottom: spacing['3xl'],
     paddingHorizontal: spacing.lg,
   },
   infoCard: {
@@ -297,7 +567,7 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     lineHeight: 20,
   },
-  addBtn: {
+  primaryBtn: {
     width: '100%',
     backgroundColor: colors.gold,
     borderRadius: radius['2xl'],
@@ -305,10 +575,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
-  addBtnDisabled: {
+  btnDisabled: {
     opacity: 0.7,
   },
-  addBtnText: {
+  btnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  primaryBtnText: {
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.xl,
     color: colors.dark,
@@ -320,38 +595,5 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     color: colors.textMuted,
     textAlign: 'center',
-  },
-  successBlock: {
-    alignItems: 'center',
-  },
-  successTitle: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes['3xl'],
-    color: colors.success,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  successSubtitle: {
-    fontFamily: fontFamilies.interMedium,
-    fontSize: fontSizes.md,
-    color: colors.textLight,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: spacing['4xl'],
-    paddingHorizontal: spacing.lg,
-  },
-  doneBtn: {
-    width: '100%',
-    backgroundColor: colors.gold,
-    borderRadius: radius['2xl'],
-    paddingVertical: spacing['2xl'],
-    alignItems: 'center',
-  },
-  doneBtnText: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.xl,
-    color: colors.dark,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
 });

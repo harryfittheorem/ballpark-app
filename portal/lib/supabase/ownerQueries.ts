@@ -70,6 +70,10 @@ export type OwnerMember = {
   lifetime: number;
   joinedDate: string;
   riskReason?: string;
+  cardLast4: string | null;
+  cardBrand: string | null;
+  cardExpMonth: number | null;
+  cardExpYear: number | null;
 };
 
 export type OwnerCoach = {
@@ -286,7 +290,7 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       kid_id,
       family_id,
       kids!inner(first_name, last_name, age_group),
-      families!inner(parent_first_name, parent_last_name)
+      families!inner(parent_first_name, parent_last_name, card_last4, card_brand, card_exp_month, card_exp_year)
     `)
     .eq('tenant_id', tenantId)
     .order('started_at', { ascending: false });
@@ -322,7 +326,14 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
 
   return rows.map(r => {
     const kid = r.kids as unknown as { first_name: string; last_name: string | null; age_group: string | null };
-    const fam = r.families as unknown as { parent_first_name: string; parent_last_name: string | null };
+    const fam = r.families as unknown as {
+      parent_first_name: string;
+      parent_last_name: string | null;
+      card_last4: string | null;
+      card_brand: string | null;
+      card_exp_month: number | null;
+      card_exp_year: number | null;
+    };
     const lastTs = lastBookingByKid[r.kid_id] ?? null;
     const days = daysSince(lastTs);
     const risk = churnRisk(days);
@@ -351,6 +362,10 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
         : risk === 'medium'
         ? `No session in ${days} days. Send an engagement message.`
         : undefined,
+      cardLast4: fam.card_last4 ?? null,
+      cardBrand: fam.card_brand ?? null,
+      cardExpMonth: fam.card_exp_month ?? null,
+      cardExpYear: fam.card_exp_year ?? null,
     };
   });
 }
@@ -981,7 +996,7 @@ export async function getMemberDetail(
       pause_end,
       paused_at,
       kids!inner(id, first_name, last_name, age_group, points_balance),
-      families!inner(parent_first_name, parent_last_name)
+      families!inner(parent_first_name, parent_last_name, card_last4, card_brand, card_exp_month, card_exp_year)
     `)
     .eq('tenant_id', tenantId)
     .eq('id', membershipId)
@@ -999,6 +1014,10 @@ export async function getMemberDetail(
   const fam = mem.families as unknown as {
     parent_first_name: string;
     parent_last_name: string | null;
+    card_last4: string | null;
+    card_brand: string | null;
+    card_exp_month: number | null;
+    card_exp_year: number | null;
   };
 
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1175,6 +1194,10 @@ export async function getMemberDetail(
     pauseStart,
     pauseEnd,
     pausedAt,
+    cardLast4: fam.card_last4 ?? null,
+    cardBrand: fam.card_brand ?? null,
+    cardExpMonth: fam.card_exp_month ?? null,
+    cardExpYear: fam.card_exp_year ?? null,
   };
 }
 
