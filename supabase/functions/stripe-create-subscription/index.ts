@@ -148,14 +148,14 @@ Deno.serve(async (req) => {
     return json({ error: { code: 'forbidden', message: 'No tenant in token — re-authenticate' } }, 403);
   }
 
-  let body: { membership_id?: string };
+  let body: { membership_id?: string; stripe_promotion_code_id?: string };
   try {
     body = await req.json();
   } catch {
     return json({ error: { code: 'bad_json', message: 'Invalid request body' } }, 400);
   }
 
-  const { membership_id } = body;
+  const { membership_id, stripe_promotion_code_id } = body;
   if (!membership_id) {
     return json({ error: { code: 'missing_param', message: 'membership_id required' } }, 422);
   }
@@ -377,6 +377,12 @@ Deno.serve(async (req) => {
     'metadata[kid_name]': [kid.first_name, kid.last_name].filter(Boolean).join(' '),
     'expand[0]': 'latest_invoice.payment_intent',
   };
+
+  // Apply promotion code if provided (Stripe PromotionCode id, not coupon id).
+  // promotion_code applies the discount to the first billing period.
+  if (stripe_promotion_code_id) {
+    subParams.promotion_code = stripe_promotion_code_id;
+  }
 
   // Set billing_cycle_anchor if we have a billing_anchor_day
   if (mem.billing_anchor_day) {

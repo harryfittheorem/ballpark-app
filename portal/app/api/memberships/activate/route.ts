@@ -5,21 +5,27 @@
  * whether the family has a saved payment method:
  *
  * EFT + has payment method (stripe_connected_customer_id):
- *   1. Try to create the Stripe Subscription FIRST.
- *   2. Only mark membership active AFTER Stripe succeeds.
- *   Returns 502 if Stripe fails — membership stays in its prior status so the
- *   operator can retry once the family has a valid card.
+ *   1. Validate promo code (read-only preview) if provided — get stripe_promotion_code_id.
+ *      Passes plan_name so PLAN_MISMATCH fires if applicable_plan_names is set.
+ *   2. Try to create the Stripe Subscription FIRST (with promotion code if provided).
+ *   3. Only mark membership active AFTER Stripe succeeds.
+ *   4. Atomically consume promo code (consume_promo_code RPC, SELECT FOR UPDATE):
+ *      - On success: redemptions_used incremented, done.
+ *      - On EXHAUSTED: a concurrent activation beat us to the last redemption.
+ *        We immediately cancel the just-created Stripe subscription to compensate
+ *        (prevents over-redemption at the billing level), then return 422.
+ *      - On any other error: non-fatal, log only — subscription is already live.
+ *   Returns 502 if Stripe subscription creation fails (membership unchanged).
  *
- * All other cases (no payment method, not EFT, already has subscription):
- *   - Mark membership active immediately.
- *   - Stripe skipped (stripe_skipped=true in response).
+ * All other cases (no payment method, not EFT):
+ *   - Mark membership active immediately (Stripe skipped).
  *
- * Body: { membership_id: string }
+ * Body: { membership_id: string, promo_code?: string }
  *
  * Returns:
- *   { ok: true, subscription_id?: string, next_billing_at?: string }  — success
- *   { ok: true, stripe_skipped: true, reason: string }                — skipped
- *   { error: string }   with non-2xx status                           — failure
+ *   { ok: true, subscription_id, next_billing_at, subscription_status }  — EFT success
+ *   { ok: true, stripe_skipped: true, reason: string }                   — non-EFT
+ *   { error: string }  with 4xx/5xx                                      — failure
  */
 
 import { type NextRequest, NextResponse } from 'next/server';
@@ -29,8 +35,54 @@ import { readAppRole, readTenantId } from '@/lib/auth';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const STRIPE_VERSION = '2024-06-20';
+
 function err(status: number, message: string) {
   return NextResponse.json({ error: message }, { status });
+}
+
+const PROMO_ERROR_MESSAGES: Record<string, string> = {
+  INVALID: 'This promo code is invalid.',
+  EXPIRED: 'This promo code has expired.',
+  EXHAUSTED: 'This promo code has reached its maximum number of uses.',
+  PLAN_MISMATCH: 'This promo code does not apply to this membership plan.',
+  FORBIDDEN: 'Not authorized to use promo codes.',
+};
+
+/**
+ * Cancel a Stripe subscription immediately (best-effort compensating action).
+ * Used when consume_promo_code returns EXHAUSTED after the subscription was created.
+ */
+async function cancelStripeSubscription(
+  subscriptionId: string,
+  stripeKey: string,
+): Promise<void> {
+  try {
+    const res = await fetch(
+      `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${stripeKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Stripe-Version': STRIPE_VERSION,
+        },
+      },
+    );
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(
+        '[memberships/activate] compensating Stripe cancel failed:',
+        res.status,
+        body,
+      );
+    }
+  } catch (e) {
+    console.error(
+      '[memberships/activate] compensating Stripe cancel threw:',
+      e instanceof Error ? e.message : String(e),
+    );
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -44,20 +96,22 @@ export async function POST(req: NextRequest) {
   const tenantId = readTenantId(session);
   if (!tenantId) return err(401, 'No tenant in session');
 
-  let body: { membership_id?: string };
+  let body: { membership_id?: string; promo_code?: string };
   try {
     body = await req.json();
   } catch {
     return err(400, 'Invalid JSON body');
   }
 
-  const { membership_id } = body;
+  const { membership_id, promo_code } = body;
   if (!membership_id) return err(422, 'membership_id required');
 
-  // ── 1. Load membership (tenant-scoped) ──────────────────────────────────────
+  const trimmedPromoCode = promo_code?.trim() || null;
+
+  // ── 1. Load membership (tenant-scoped, include plan_name for promo plan check) ──
   const { data: mem, error: memErr } = await supabase
     .from('memberships')
-    .select('id, plan_type, status, stripe_subscription_id, family_id, tenant_id, families!inner(stripe_connected_customer_id)')
+    .select('id, plan_name, plan_type, status, stripe_subscription_id, family_id, tenant_id, families!inner(stripe_connected_customer_id)')
     .eq('id', membership_id)
     .eq('tenant_id', tenantId)
     .single();
@@ -66,20 +120,47 @@ export async function POST(req: NextRequest) {
 
   const fam = mem.families as unknown as { stripe_connected_customer_id: string | null };
   const hasPaymentMethod = Boolean(fam.stripe_connected_customer_id);
+  const planName = (mem.plan_name as string | null) ?? null;
 
-  // Determine whether Stripe subscription creation should be attempted.
-  // Conditions: EFT plan + family has a saved connected-account customer.
-  // We do NOT gate on !stripe_subscription_id here because a cancelled/expired
-  // subscription stays on the row but is no longer valid for billing — the
-  // edge function handles idempotency: it checks the live Stripe status and
-  // creates a new subscription if the existing one is no longer usable.
-  const shouldCreateSubscription =
-    mem.plan_type === 'eft' &&
-    hasPaymentMethod;
+  // ── 2. Validate promo code (read-only — get stripe_promotion_code_id) ─────────
+  // Passes plan_name so PLAN_MISMATCH fires when applicable_plan_names is non-empty
+  // and this plan is not in the allowed list.
+  // Actual atomic consumption (with row lock) happens AFTER Stripe succeeds.
+  let stripePromotionCodeId: string | null = null;
+
+  if (trimmedPromoCode) {
+    const { data: promoResult, error: promoErr } = await supabase.rpc(
+      'validate_promo_code',
+      {
+        p_code: trimmedPromoCode,
+        p_plan_name: planName,
+      },
+    );
+
+    if (promoErr) {
+      console.error('[memberships/activate] validate_promo_code error:', promoErr.message);
+      return err(500, `Promo code validation error: ${promoErr.message}`);
+    }
+
+    const result = promoResult as {
+      ok: boolean;
+      error_code?: string;
+      stripe_promotion_code_id?: string;
+    };
+
+    if (!result.ok) {
+      const errorCode = result.error_code ?? 'INVALID';
+      const message = PROMO_ERROR_MESSAGES[errorCode] ?? 'This promo code is invalid.';
+      return err(422, message);
+    }
+
+    stripePromotionCodeId = result.stripe_promotion_code_id ?? null;
+  }
+
+  // ── 3. Determine whether Stripe should be attempted ─────────────────────────
+  const shouldCreateSubscription = mem.plan_type === 'eft' && hasPaymentMethod;
 
   if (!shouldCreateSubscription) {
-    // No Stripe attempt — just activate membership directly.
-    // (No payment method saved yet, or not an EFT plan.)
     if (mem.status !== 'active') {
       const { error: updateErr } = await supabase
         .from('memberships')
@@ -97,28 +178,26 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // ── EFT + has payment method: Stripe first, then mark active ────────────────
-  // We create the Stripe Subscription before marking the membership active.
-  // If Stripe fails, the membership stays in its current status and we return a
-  // 502 error so the operator knows billing was not started. This avoids the
-  // situation where a membership shows "active" but has no billing linked.
+  // ── 4. EFT + payment method: create Stripe subscription ─────────────────────
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!supabaseUrl) {
-    return err(500, 'NEXT_PUBLIC_SUPABASE_URL not configured');
-  }
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!supabaseUrl) return err(500, 'NEXT_PUBLIC_SUPABASE_URL not configured');
 
   let subscriptionId: string;
   let nextBillingAt: string | null;
   let stripeStatus: string | null = null;
 
   try {
+    const fnBody: Record<string, unknown> = { membership_id };
+    if (stripePromotionCodeId) fnBody.stripe_promotion_code_id = stripePromotionCodeId;
+
     const fnRes = await fetch(`${supabaseUrl}/functions/v1/stripe-create-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ membership_id }),
+      body: JSON.stringify(fnBody),
     });
 
     const fnData = await fnRes.json() as {
@@ -133,9 +212,11 @@ export async function POST(req: NextRequest) {
         ? fnData.error?.message
         : String(fnData.error ?? `Edge function error ${fnRes.status}`);
       console.error('[memberships/activate] stripe-create-subscription failed:', msg);
-      // Membership is NOT marked active — operator must resolve billing before retrying.
       return NextResponse.json(
-        { error: `Could not start Stripe billing: ${msg}. Membership was not activated. Please ensure the family has saved a payment card, then try again.` },
+        {
+          error: `Could not start Stripe billing: ${msg}. Membership was not activated. ` +
+            `Please ensure the family has saved a payment card, then try again.`,
+        },
         { status: 502 },
       );
     }
@@ -147,17 +228,14 @@ export async function POST(req: NextRequest) {
     const msg = fetchErr instanceof Error ? fetchErr.message : 'Unknown error';
     console.error('[memberships/activate] fetch error:', msg);
     return NextResponse.json(
-      { error: `Could not reach Stripe billing service: ${msg}. Membership was not activated.` },
+      {
+        error: `Could not reach Stripe billing service: ${msg}. Membership was not activated.`,
+      },
       { status: 502 },
     );
   }
 
-  // Only mark membership active when Stripe confirms the subscription is in a
-  // paying state (active or trialing). If Stripe returned incomplete/past_due,
-  // stripe-create-subscription already set payment_overdue — we must NOT
-  // override that, because doing so would mask a first-invoice payment failure
-  // until the webhook arrives (which may be delayed or missed).
-  // For any other status, we also leave the DB status alone.
+  // ── 5. Mark membership active ────────────────────────────────────────────────
   const stripeConfirmedActive = stripeStatus === 'active' || stripeStatus === 'trialing';
   if (stripeConfirmedActive && mem.status !== 'active') {
     const { error: updateErr } = await supabase
@@ -168,7 +246,50 @@ export async function POST(req: NextRequest) {
 
     if (updateErr) {
       console.error('[memberships/activate] DB activate update failed:', updateErr.message);
-      // Subscription was created — don't fail the request, just log.
+    }
+  }
+
+  // ── 6. Atomically consume promo code (SELECT FOR UPDATE) ──────────────────────
+  // consume_promo_code re-validates the code under a row lock and atomically
+  // increments redemptions_used, preventing concurrent over-redemption.
+  //
+  // Called AFTER Stripe succeeds so redemptions are never counted for failed billings.
+  //
+  // EXHAUSTED edge case: a concurrent activation consumed the last redemption between
+  // our validate (step 2) and here. We cancel the just-created Stripe subscription as
+  // a compensating action to prevent the discount being applied when it shouldn't be.
+  if (trimmedPromoCode) {
+    const { data: consumeResult, error: consumeErr } = await supabase.rpc(
+      'consume_promo_code',
+      {
+        p_code: trimmedPromoCode,
+        p_plan_name: planName,
+      },
+    );
+
+    if (consumeErr) {
+      // Non-fatal: subscription is live, log and continue
+      console.error('[memberships/activate] consume_promo_code RPC error:', consumeErr.message);
+    } else {
+      const result = consumeResult as { ok: boolean; error_code?: string };
+      if (!result.ok && result.error_code === 'EXHAUSTED') {
+        // Compensate: cancel the subscription that was created with the discount
+        if (stripeKey) {
+          await cancelStripeSubscription(subscriptionId, stripeKey);
+        }
+        return err(
+          422,
+          'This promo code was just fully redeemed by another activation. ' +
+            'The subscription has been cancelled. Please try again without a promo code ' +
+            'or contact support.',
+        );
+      } else if (!result.ok) {
+        // Other errors (INVALID, EXPIRED, etc.) after Stripe success — log only
+        console.warn(
+          '[memberships/activate] consume_promo_code non-exhausted failure:',
+          result.error_code,
+        );
+      }
     }
   }
 

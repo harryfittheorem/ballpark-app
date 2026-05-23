@@ -38,6 +38,11 @@ const TILES = [
     title: "Coaches",
     body: "Manage coach location assignments across facilities.",
   },
+  {
+    href: "/admin/promo-codes",
+    title: "Promo Codes",
+    body: "Create and manage discount codes for membership signups. Backed by Stripe Coupons.",
+  },
 ];
 
 export default function AdminPage() {

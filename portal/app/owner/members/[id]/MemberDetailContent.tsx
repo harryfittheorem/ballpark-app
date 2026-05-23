@@ -105,6 +105,60 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
   const [activateDone, setActivateDone] = useState<{ subId: string; nextBilling: string | null } | null>(null);
   const [activateErr, setActivateErr] = useState<string | null>(null);
 
+  // ── Promo code state ───────────────────────────────────────────────────────
+  const [promoInput, setPromoInput] = useState('');
+  const [promoValidating, setPromoValidating] = useState(false);
+  const [promoValid, setPromoValid] = useState<{
+    discountType: 'percent' | 'fixed';
+    discountValue: number;
+    code: string;
+  } | null>(null);
+  const [promoErr, setPromoErr] = useState<string | null>(null);
+
+  const handleValidatePromo = useCallback(async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    setPromoValidating(true);
+    setPromoErr(null);
+    setPromoValid(null);
+    try {
+      const res = await fetch('/api/admin/promo-codes/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, plan_name: member.program }),
+      });
+      const data = await res.json() as {
+        ok?: boolean;
+        error_code?: string;
+        discount_type?: 'percent' | 'fixed';
+        discount_value?: number;
+        code?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setPromoErr(data.error ?? 'Validation failed');
+      } else if (!data.ok) {
+        const msgs: Record<string, string> = {
+          INVALID: 'This code is invalid.',
+          EXPIRED: 'This code has expired.',
+          EXHAUSTED: 'This code has reached its maximum number of uses.',
+          PLAN_MISMATCH: 'This code does not apply to this plan.',
+        };
+        setPromoErr(msgs[data.error_code ?? 'INVALID'] ?? 'This code is invalid.');
+      } else {
+        setPromoValid({
+          discountType: data.discount_type!,
+          discountValue: data.discount_value!,
+          code: data.code!,
+        });
+      }
+    } catch {
+      setPromoErr('Could not validate code. Try again.');
+    } finally {
+      setPromoValidating(false);
+    }
+  }, [promoInput, member.program]);
+
   const handleCancel = useCallback(async () => {
     if (!confirm('Cancel this subscription at the end of the current billing period? The member will keep access until then.')) return;
 
@@ -133,19 +187,26 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
   }, [member.id]);
 
   const handleActivate = useCallback(async () => {
-    if (!confirm('Activate this membership and start automated Stripe billing? If the family has a saved payment card, Stripe will be set up automatically.')) return;
+    const promoLabel = promoValid
+      ? ` with promo code ${promoValid.code}`
+      : '';
+    if (!confirm(`Activate this membership${promoLabel} and start automated Stripe billing? If the family has a saved payment card, Stripe will be set up automatically.`)) return;
 
     setActivating(true);
     setActivateErr(null);
     try {
       // POST /api/memberships/activate — combined endpoint that:
-      //   1. Marks membership active
-      //   2. Automatically creates Stripe Subscription if family has stripe_customer_id
+      //   1. Validates promo code if provided
+      //   2. Marks membership active
+      //   3. Automatically creates Stripe Subscription if family has stripe_customer_id
       // This eliminates the need for a separate manual "link billing" step.
+      const reqBody: Record<string, unknown> = { membership_id: member.id };
+      if (promoValid) reqBody.promo_code = promoValid.code;
+
       const res = await fetch('/api/memberships/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ membership_id: member.id }),
+        body: JSON.stringify(reqBody),
       });
       const data = await res.json() as {
         ok?: boolean;
@@ -173,7 +234,7 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
     } finally {
       setActivating(false);
     }
-  }, [member.id]);
+  }, [member.id, promoValid]);
 
   const { subscriptionStatus, nextBillingAt, stripeSubscriptionId, cancelAt: persistedCancelAt } = member;
 
@@ -190,6 +251,12 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
 
   // ── No subscription yet — offer to activate ──────────────────────────────
   if (subscriptionStatus === 'none' && !activateDone) {
+    const discountLabel = promoValid
+      ? promoValid.discountType === 'percent'
+        ? `${promoValid.discountValue}% off first month`
+        : `$${(promoValid.discountValue / 100).toFixed(2)} off first month`
+      : null;
+
     return (
       <div>
         <SectionHeader title="Subscription" />
@@ -199,6 +266,63 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
             and automatically start recurring billing on Stripe — provided the family has
             saved a payment card in the Ballpark app (Me → Payment Method).
           </div>
+
+          {/* ── Promo code input ───────────────────────────────────────── */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{
+              fontSize: 10, color: brand.textMuted, fontWeight: 700,
+              letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6,
+            }}>
+              Promo Code <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                type="text"
+                value={promoInput}
+                onChange={(e) => {
+                  setPromoInput(e.target.value.toUpperCase());
+                  setPromoValid(null);
+                  setPromoErr(null);
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleValidatePromo(); } }}
+                placeholder="e.g. SUMMER25"
+                maxLength={50}
+                style={{
+                  flex: 1, padding: '6px 10px', borderRadius: 8,
+                  border: `1px solid ${promoValid ? brand.success : promoErr ? brand.danger : brand.border}`,
+                  background: brand.surface, color: brand.text,
+                  fontSize: 13, fontFamily: 'monospace', outline: 'none',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => { void handleValidatePromo(); }}
+                disabled={promoValidating || !promoInput.trim()}
+                style={{
+                  padding: '6px 12px', borderRadius: 8,
+                  border: `1px solid ${brand.border}`,
+                  background: brand.surface, color: brand.text,
+                  fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+                  opacity: promoValidating || !promoInput.trim() ? 0.5 : 1,
+                }}
+              >
+                {promoValidating ? 'Checking…' : 'Apply'}
+              </button>
+            </div>
+            {promoValid && (
+              <div style={{
+                marginTop: 6, padding: '6px 10px', borderRadius: 8,
+                background: `${brand.success}18`, border: `1px solid ${brand.success}40`,
+                fontSize: 12, color: brand.success,
+              }}>
+                ✓ <strong>{promoValid.code}</strong> applied — {discountLabel}
+              </div>
+            )}
+            {promoErr && (
+              <div style={{ marginTop: 6, fontSize: 11, color: brand.danger }}>{promoErr}</div>
+            )}
+          </div>
+
           {activateErr && (
             <div style={{ fontSize: 11, color: brand.danger, marginBottom: 8 }}>{activateErr}</div>
           )}
@@ -210,7 +334,7 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
             disabled={activating}
             style={{ width: '100%', justifyContent: 'center' }}
           >
-            {activating ? 'Activating…' : 'Activate & Start Billing'}
+            {activating ? 'Activating…' : promoValid ? `Activate with ${promoValid.code}` : 'Activate & Start Billing'}
           </OButton>
         </OCard>
       </div>
