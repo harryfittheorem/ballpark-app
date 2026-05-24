@@ -2180,6 +2180,19 @@ export type Database = {
         Args: { p_code: string; p_plan_name?: string }
         Returns: Json
       }
+      create_public_booking: {
+        Args: {
+          p_coach_id: string
+          p_kid_id: string
+          p_location_id: string
+          p_scheduled_start: string
+          p_session_type_id: string
+          p_tenant_slug: string
+        }
+        Returns: {
+          booking_id: string
+        }[]
+      }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       deduct_session_credit: { Args: { p_booking_id: string }; Returns: number }
       expire_stale_waitlist_entries: { Args: never; Returns: undefined }
@@ -2213,8 +2226,9 @@ export type Database = {
       get_kid_weekly_rank_delta: { Args: { p_kid_id: string }; Returns: number }
       get_public_availability: {
         Args: {
-          p_date_end: string
-          p_date_start: string
+          p_date_range_end: string
+          p_date_range_start: string
+          p_duration_minutes?: number
           p_tenant_slug: string
         }
         Returns: {
