@@ -5,6 +5,10 @@ export async function middleware(request: NextRequest) {
   if (request.headers.get("expo-platform")) {
     return NextResponse.next();
   }
+  // Public booking pages require no authentication
+  if (request.nextUrl.pathname.startsWith("/book")) {
+    return NextResponse.next();
+  }
   return await updateSession(request);
 }
 

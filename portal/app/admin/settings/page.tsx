@@ -3,12 +3,15 @@
  *
  * Lets operators view and update per-tenant configuration fields —
  * starting with HitTrax Facility ID — without touching secrets or SQL.
+ * Also provides the shareable public booking link (task #243).
  */
 import { Card, CardSectionLabel } from "@/components/ui/Card";
 import { createClient } from "@/lib/supabase/server";
 import { readAppRole, readTenantId } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { saveFacilityId } from "./actions";
+import { CopyBookingLink } from "./CopyBookingLink";
 
 export default async function AdminSettingsPage({
   searchParams,
@@ -29,12 +32,21 @@ export default async function AdminSettingsPage({
 
   const { data } = await supabase
     .from("tenants")
-    .select("name, hittrax_facility_id")
+    .select("name, slug, hittrax_facility_id")
     .eq("id", tenantId)
     .maybeSingle();
 
   const facilityId = data?.hittrax_facility_id ?? null;
   const tenantName = data?.name ?? null;
+  const tenantSlug = data?.slug ?? null;
+
+  // Build the public booking URL from the current request host
+  const reqHeaders = await headers();
+  const host = reqHeaders.get("host") ?? "localhost:3000";
+  const protocol = host.startsWith("localhost") ? "http" : "https";
+  const bookingUrl = tenantSlug
+    ? `${protocol}://${host}/book/${tenantSlug}`
+    : null;
 
   const sp = await searchParams;
   const errorMsg = sp.error ? decodeURIComponent(sp.error) : null;
@@ -60,6 +72,17 @@ export default async function AdminSettingsPage({
         <div className="rounded-md border border-danger bg-danger-bg px-4 py-3 text-sm text-danger">
           {errorMsg}
         </div>
+      )}
+
+      {bookingUrl && (
+        <Card padding="lg" accent>
+          <CardSectionLabel>Public Booking Link</CardSectionLabel>
+          <p className="mb-4 mt-2 text-sm text-text-light">
+            Share this URL so prospective members can browse availability and
+            book sessions online — no login required.
+          </p>
+          <CopyBookingLink url={bookingUrl} />
+        </Card>
       )}
 
       <Card padding="lg" accent>
