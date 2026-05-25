@@ -6,7 +6,7 @@ import type {
 } from "react";
 
 const FIELD_BASE =
-  "block w-full rounded-xl border border-border-gold bg-darkest/80 px-3.5 py-2.5 text-sm text-cream-light placeholder:text-text-light/60 shadow-inner transition-colors focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/40 disabled:cursor-not-allowed disabled:opacity-50";
+  "block w-full rounded-xl border border-border-gold bg-darkest/80 px-3.5 py-2.5 text-sm text-cream-light placeholder:text-text-light/60 shadow-inner transition-colors focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/40 disabled:cursor-not-allowed disabled:opacity-50 selection:bg-gold/30 selection:text-cream-light";
 
 export function fieldClasses(extra = "") {
   return `${FIELD_BASE} ${extra}`.trim();

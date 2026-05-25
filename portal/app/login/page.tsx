@@ -3,6 +3,7 @@ import { signIn } from "./actions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 const REASON_MESSAGES: Record<string, string> = {
   parent:
@@ -69,10 +70,9 @@ export default async function LoginPage({
               required
               label="Email"
             />
-            <Input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
               autoComplete="current-password"
               required
               label="Password"
