@@ -21,12 +21,12 @@ export default async function AdminLayout({
   const role = readAppRole(session);
 
   if (role === "coach") redirect("/coach/inbox");
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "owner" && role !== "super_admin") {
     redirect("/logout?reason=parent");
   }
 
   return (
-    <PortalShell role="admin" email={user.email ?? null}>
+    <PortalShell role={role === "owner" ? "owner" : "admin"} email={user.email ?? null}>
       <div className="mx-auto max-w-5xl px-6 py-8">{children}</div>
     </PortalShell>
   );

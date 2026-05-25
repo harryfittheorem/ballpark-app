@@ -5,7 +5,7 @@ import { brand, fonts } from '@/lib/ownerBrandTokens';
 import {
   LayoutDashboard, Users, Calendar, CreditCard, TrendingDown, TrendingUp,
   UserCog, Sparkles, AlertCircle, Clock, AlertTriangle, BarChart3,
-  ChevronLeft, ChevronRight, Building2, Dumbbell,
+  ChevronLeft, ChevronRight, Building2, Dumbbell, ClipboardCheck,
 } from 'lucide-react';
 
 interface NavItem {
@@ -24,10 +24,11 @@ const ownerNav: NavSection[] = [
   {
     label: 'Operations',
     items: [
-      { label: 'Dashboard', href: '/owner', icon: LayoutDashboard },
-      { label: 'Members CRM', href: '/owner/members', icon: Users },
-      { label: 'Schedule', href: '/owner/schedule', icon: Calendar },
-      { label: 'Coaches', href: '/owner/coaches', icon: UserCog },
+      { label: 'Dashboard',   href: '/owner',             icon: LayoutDashboard },
+      { label: 'Members CRM', href: '/owner/members',      icon: Users },
+      { label: 'Schedule',    href: '/owner/schedule',     icon: Calendar },
+      { label: 'Check-In',    href: '/admin/check-in',     icon: ClipboardCheck },
+      { label: 'Coaches',     href: '/owner/coaches',      icon: UserCog },
     ],
   },
   {
