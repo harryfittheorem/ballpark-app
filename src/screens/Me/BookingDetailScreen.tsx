@@ -97,14 +97,27 @@ export default function BookingDetailScreen() {
   const [lateSheet, setLateSheet] = useState<LateSheet | null>(null);
 
   useLayoutEffect(() => {
+    const handleBack = () => {
+      // If there is a screen before BookingDetail in the Me stack (e.g. the
+      // user came from BookingsListScreen), go back to it normally.
+      // Otherwise (cross-tab navigation from Home/Book), stay in the Me tab
+      // and land on the main screen instead of jumping to another tab.
+      const state = navigation.getState();
+      if (state && state.index > 0) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('MeHome');
+      }
+    };
+
     navigation.setOptions({
       headerLeft: () => (
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={handleBack}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          style={{ paddingRight: 8 }}
+          style={{ paddingRight: 8, justifyContent: 'center' }}
         >
           <ChevronLeft size={24} color={colors.gold} />
         </Pressable>
