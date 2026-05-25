@@ -5,7 +5,7 @@ import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, OCard, BarChart, DonutChart } from '@/components/owner/ui';
 import { Calendar, Activity, TrendingUp, Clock, Filter, Plus, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { OwnerScheduleData, ScheduleBooking } from '@/lib/supabase/ownerQueries';
-import { createClient } from '@/lib/supabase/client';
+import { fetchScheduleRange, assignCageAction } from './actions';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -182,8 +182,9 @@ export function ScheduleContent({ data, tenantId }: Props) {
     date: toInputDate(new Date()), startHour: '9', cage: 'Cage 1',
   });
 
-  const popoverRef  = useRef<HTMLDivElement>(null);
-  const dateInputRef = useRef<HTMLInputElement>(null);
+  const popoverRef     = useRef<HTMLDivElement>(null);
+  const dateInputRef   = useRef<HTMLInputElement>(null);
+  const isInitialMount = useRef(true);
 
   // ── Sync initial server data ─────────────────────────────────────────────
   useEffect(() => {
@@ -197,6 +198,16 @@ export function ScheduleContent({ data, tenantId }: Props) {
   // ── Live reload when date / view changes ─────────────────────────────────
   useEffect(() => {
     if (!tenantId) return;
+
+    // Skip first render: SSR already fetched today's data server-side.
+    // The browser's cached JWT may lack the custom claims (app_role / tenant_id)
+    // that owner RLS policies require, so a client-side refetch on mount would
+    // return 0 rows and wipe the SSR data. All subsequent navigations hit the
+    // server action which always runs with the freshly-refreshed server JWT.
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
 
     let cancelled = false;
 
@@ -213,57 +224,20 @@ export function ScheduleContent({ data, tenantId }: Props) {
     }
 
     setLoading(true);
-    const supabase = createClient();
     (async () => {
       try {
-        const [bookingRes, waitlistRes] = await Promise.all([
-          supabase
-            .from('bookings')
-            .select(`id, scheduled_start, scheduled_end, cage_number, status,
-                     session_types(name), kids(first_name, last_name), coaches(first_name, last_name)`)
-            .eq('tenant_id', tenantId)
-            .gte('scheduled_start', rangeStart.toISOString())
-            .lte('scheduled_start', rangeEnd.toISOString())
-            .order('scheduled_start'),
-          supabase
-            .from('booking_waitlist')
-            .select('scheduled_start')
-            .eq('tenant_id', tenantId)
-            .in('status', ['waiting', 'notified'])
-            .gte('scheduled_start', rangeStart.toISOString())
-            .lte('scheduled_start', rangeEnd.toISOString()),
-        ]);
+        const result = await fetchScheduleRange(
+          rangeStart.toISOString(),
+          rangeEnd.toISOString(),
+        );
         if (cancelled) return;
-        const { data: raw, error } = bookingRes;
-        if (error) { console.error('[schedule] fetch error:', error.message); return; }
-        if (!raw) return;
-        const mapped: ScheduleBooking[] = raw.map(b => {
-          const kid   = b.kids as unknown as { first_name: string; last_name: string | null } | null;
-          const coach = b.coaches as unknown as { first_name: string; last_name: string | null } | null;
-          const st    = b.session_types as unknown as { name: string } | null;
-          return {
-            id:             b.id,
-            kidName:        kid   ? [kid.first_name, kid.last_name].filter(Boolean).join(' ')     : 'Unknown',
-            coachName:      coach ? [coach.first_name, coach.last_name].filter(Boolean).join(' ') : '—',
-            scheduledStart: b.scheduled_start,
-            scheduledEnd:   b.scheduled_end ?? b.scheduled_start,
-            cage:           b.cage_number ? `Cage ${b.cage_number}` : null,
-            sessionType:    st?.name ?? 'Private',
-            status:         b.status,
-          };
-        });
         setBookings(prev => {
           const local = prev.filter(bk => bk.id.startsWith('local-'));
-          return [...mapped, ...local];
+          return [...result.bookings, ...local];
         });
-
-        // Build waitlist counts by hour label
-        const wMap = new Map<string, number>();
-        for (const row of waitlistRes.data ?? []) {
-          const lbl = localHourLabel(row.scheduled_start);
-          wMap.set(lbl, (wMap.get(lbl) ?? 0) + 1);
-        }
-        setWaitlistByHour(wMap);
+        setWaitlistByHour(new Map(Object.entries(result.waitlistByHour)));
+      } catch (err) {
+        if (!cancelled) console.error('[schedule] fetch error:', err);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -396,9 +370,8 @@ export function ScheduleContent({ data, tenantId }: Props) {
     setSaving(bookingId);
     setErrorMsg(null);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from('bookings').update({ cage_number: cageNum }).eq('id', bookingId);
-      if (error) throw error;
+      const result = await assignCageAction(bookingId, cageNum ?? null);
+      if (result.error) throw new Error(result.error);
     } catch {
       if (previous) setBookings(prev => prev.map(b => b.id === bookingId ? previous : b));
       setErrorMsg('Failed to save cage assignment. Please try again.');
