@@ -416,7 +416,9 @@ export function BookingClient({
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ booking_id: bookingId }),
-        }).catch(() => {});
+        }).catch((err) => {
+          console.warn("booking-confirmation: fire-and-forget failed", err);
+        });
       }
     }
 

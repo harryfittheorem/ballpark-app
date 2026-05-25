@@ -1,7 +1,7 @@
 // =============================================================================
 // supabase/functions/booking-confirmation/index.ts
 // =============================================================================
-// Task #243 — Send a booking confirmation email after a public booking.
+// Task #291 — Send a booking confirmation email after a public booking.
 //
 // Called from the public booking page immediately after a booking is created.
 // Auth model: caller's JWT (the parent who just booked). RLS on the bookings
@@ -77,6 +77,7 @@ async function sendResendEmail(opts: {
   to: string;
   subject: string;
   html: string;
+  text: string;
 }): Promise<void> {
   if (!RESEND_API_KEY) {
     console.log("booking-confirmation: RESEND_API_KEY not configured — skipping email");
@@ -96,6 +97,7 @@ async function sendResendEmail(opts: {
         to: [opts.to],
         subject: opts.subject,
         html: opts.html,
+        text: opts.text,
       }),
       signal: controller.signal,
     });
@@ -202,13 +204,49 @@ function buildConfirmationHtml(opts: {
 </html>`;
 }
 
+function buildConfirmationText(opts: {
+  parentFirstName: string | null;
+  kidFirstName: string;
+  sessionTypeName: string;
+  coachFirstName: string;
+  coachLastName: string;
+  timeLabel: string;
+  locationName: string;
+  tenantName: string;
+  bookingRef: string;
+}): string {
+  const greeting = opts.parentFirstName ? `Hi ${opts.parentFirstName},` : "Hi,";
+  const coachName = `${opts.coachFirstName} ${opts.coachLastName}`.trim();
+  return [
+    `${opts.tenantName}`,
+    ``,
+    greeting,
+    ``,
+    `You're booked!`,
+    ``,
+    `Session:   ${opts.sessionTypeName}`,
+    `Athlete:   ${opts.kidFirstName}`,
+    `Coach:     ${coachName}`,
+    `When:      ${opts.timeLabel}`,
+    `Location:  ${opts.locationName}`,
+    ``,
+    `Confirmation ref: ${opts.bookingRef}`,
+    ``,
+    `Track your progress in the Ballpark app:`,
+    `  App Store:    https://apps.apple.com/app/ballpark`,
+    `  Google Play:  https://play.google.com/store/apps/details?id=com.ballpark`,
+    ``,
+    `Booked via the ${opts.tenantName} online booking page.`,
+  ].join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // CORS
 // ---------------------------------------------------------------------------
 
 // The public booking page is served from the same origin as the portal
 // (REPLIT_DEV_DOMAIN), but browser preflight still fires for custom headers
-// (Authorization). We allow the portal origin and Supabase Studio.
+// (Authorization). We allow all origins since this is a public booking page.
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -259,12 +297,13 @@ serve(async (req) => {
   }
 
   // Caller-scoped client — RLS restricts to the parent's own bookings.
+  // This prevents any user from fetching another family's booking details.
   const callerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
 
-  // Fetch the booking with related data in one round-trip.
+  // Fetch the booking with all related data in one round-trip.
   const { data: raw, error: fetchErr } = await callerClient
     .from("bookings")
     .select(
@@ -305,7 +344,8 @@ serve(async (req) => {
     return addCors(jsonOk({ ok: true, skipped: "no_parent_email" }));
   }
 
-  // Fetch tenant name via service role (tenants RLS blocks anon/fresh JWTs).
+  // Fetch tenant name via service role — tenants RLS blocks anon/fresh JWTs
+  // that don't yet carry the tenant_id claim (common right after signup).
   const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -321,7 +361,7 @@ serve(async (req) => {
     bk.location?.timezone ?? "America/Chicago"
   );
 
-  const html = buildConfirmationHtml({
+  const emailOpts = {
     parentFirstName: bk.kid?.family?.parent_first_name ?? null,
     kidFirstName: bk.kid?.first_name ?? "Athlete",
     sessionTypeName: bk.session_type?.name ?? "Session",
@@ -331,12 +371,13 @@ serve(async (req) => {
     locationName: bk.location?.name ?? "the facility",
     tenantName,
     bookingRef: bk.id.slice(0, 8).toUpperCase(),
-  });
+  };
 
   await sendResendEmail({
     to: parentEmail,
-    subject: `Booking confirmed: ${bk.session_type?.name ?? "Session"} on ${timeLabel}`,
-    html,
+    subject: `Booking confirmed: ${emailOpts.sessionTypeName} on ${timeLabel}`,
+    html: buildConfirmationHtml(emailOpts),
+    text: buildConfirmationText(emailOpts),
   });
 
   return addCors(jsonOk({ ok: true }));
