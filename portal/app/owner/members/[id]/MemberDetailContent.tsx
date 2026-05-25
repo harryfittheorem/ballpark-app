@@ -362,10 +362,6 @@ function SessionsOverrideSection({ member }: { member: MemberDetail }) {
     </div>
   );
 }
-      </OCard>
-    </div>
-  );
-}
 
 function SubscriptionSection({ member }: { member: MemberDetail }) {
   const [cancelling, setCancelling] = useState(false);

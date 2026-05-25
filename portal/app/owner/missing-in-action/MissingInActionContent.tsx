@@ -15,6 +15,7 @@ const mk = (id: string, name: string, age: string, parent: string, program: stri
   id, kidId: id, name, age, parent, program, planType, status: 'active',
   engagementScore: score, churnRisk: score < 40 ? 'high' : 'medium',
   lastSession, nextCharge: mrr > 0 ? 'Jun 5' : '—', mrr, lifetime, joinedDate: joined,
+  cardLast4: null, cardBrand: null, cardExpMonth: null, cardExpYear: null,
 });
 
 const DEMO_GROUPS: MiaGroups = {
