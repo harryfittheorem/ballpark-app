@@ -1,4 +1,5 @@
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -50,6 +51,7 @@ const QUICK_OPTIONS = [
 
 export default function PauseMembershipScreen({ navigation }: Props) {
   const { membership, loading, pause, resume } = useMembership();
+  const [resuming, setResuming] = useState(false);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -162,7 +164,8 @@ export default function PauseMembershipScreen({ navigation }: Props) {
           </View>
 
           <TouchableOpacity
-            style={styles.cta}
+            style={[styles.cta, resuming && styles.ctaDisabled]}
+            disabled={resuming}
             onPress={() => {
               Alert.alert(
                 'Resume Membership?',
@@ -172,11 +175,14 @@ export default function PauseMembershipScreen({ navigation }: Props) {
                   {
                     text: 'Resume Now',
                     onPress: async () => {
+                      setResuming(true);
                       try {
                         await resume();
                         navigation.goBack();
                       } catch (err) {
                         Alert.alert('Could not resume', errorMessage(err));
+                      } finally {
+                        setResuming(false);
                       }
                     },
                   },
@@ -184,7 +190,10 @@ export default function PauseMembershipScreen({ navigation }: Props) {
               );
             }}
           >
-            <Text style={styles.ctaText}>Resume Early</Text>
+            {resuming
+              ? <ActivityIndicator color={colors.dark} />
+              : <Text style={styles.ctaText}>Resume Early</Text>
+            }
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
