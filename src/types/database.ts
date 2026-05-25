@@ -2224,6 +2224,7 @@ export type Database = {
         }[]
       }
       get_kid_weekly_rank_delta: { Args: { p_kid_id: string }; Returns: number }
+      get_my_coach_id: { Args: never; Returns: string }
       get_public_availability: {
         Args: {
           p_date_range_end: string
