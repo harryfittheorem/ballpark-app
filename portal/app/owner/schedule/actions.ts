@@ -23,7 +23,7 @@ export async function fetchScheduleRange(
   const { data: { session } } = await supabase.auth.getSession();
   const tenantId = readTenantId(session) ?? '';
 
-  if (!tenantId) return { bookings: [], waitlistByHour: {} };
+  if (!tenantId) throw new Error('No authenticated session — cannot fetch schedule');
 
   const [bookingRes, waitlistRes] = await Promise.all([
     supabase

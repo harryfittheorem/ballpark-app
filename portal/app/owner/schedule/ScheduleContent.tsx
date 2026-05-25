@@ -184,7 +184,10 @@ export function ScheduleContent({ data, tenantId }: Props) {
 
   const popoverRef     = useRef<HTMLDivElement>(null);
   const dateInputRef   = useRef<HTMLInputElement>(null);
-  const isInitialMount = useRef(true);
+  // skipOnce: true when SSR already gave us data for the initial view.
+  // The cleanup-reset pattern makes this work even under React Strict Mode,
+  // which fires effects twice on mount in development.
+  const skipOnce = useRef(hasLiveData);
 
   // ── Sync initial server data ─────────────────────────────────────────────
   useEffect(() => {
@@ -199,14 +202,14 @@ export function ScheduleContent({ data, tenantId }: Props) {
   useEffect(() => {
     if (!tenantId) return;
 
-    // Skip first render: SSR already fetched today's data server-side.
-    // The browser's cached JWT may lack the custom claims (app_role / tenant_id)
-    // that owner RLS policies require, so a client-side refetch on mount would
-    // return 0 rows and wipe the SSR data. All subsequent navigations hit the
-    // server action which always runs with the freshly-refreshed server JWT.
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
+    // Skip the initial fetch when SSR already provided data.
+    // Return a cleanup that resets the flag so React Strict Mode's
+    // second mount also skips — without this reset, Strict Mode clears
+    // the ref on mount #1 and then fires the fetch on mount #2, wiping
+    // the SSR bookings with an empty result.
+    if (skipOnce.current) {
+      skipOnce.current = false;
+      return () => { skipOnce.current = true; };
     }
 
     let cancelled = false;
