@@ -1098,6 +1098,7 @@ export type Database = {
           family_id: string
           id: string
           kid_id: string
+          next_billing_at: string | null
           pause_end: string | null
           pause_start: string | null
           paused_at: string | null
@@ -1121,6 +1122,7 @@ export type Database = {
           family_id: string
           id?: string
           kid_id: string
+          next_billing_at?: string | null
           pause_end?: string | null
           pause_start?: string | null
           paused_at?: string | null
@@ -1144,6 +1146,7 @@ export type Database = {
           family_id?: string
           id?: string
           kid_id?: string
+          next_billing_at?: string | null
           pause_end?: string | null
           pause_start?: string | null
           paused_at?: string | null
