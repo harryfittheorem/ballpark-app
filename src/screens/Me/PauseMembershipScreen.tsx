@@ -49,7 +49,7 @@ const QUICK_OPTIONS = [
 ];
 
 export default function PauseMembershipScreen({ navigation }: Props) {
-  const { membership, pause } = useMembership();
+  const { membership, loading, pause } = useMembership();
 
   const today = useMemo(() => {
     const d = new Date();
@@ -100,6 +100,16 @@ export default function PauseMembershipScreen({ navigation }: Props) {
       ],
     );
   }, [selectedDate, today, pause, navigation]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>Loading membership…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!membership || membership.plan_type !== 'eft') {
     return (
@@ -352,7 +362,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', minWidth: 80,
   },
   dayNumber: {
-    fontFamily: fontFamilies.oswaldBold, fontSize: 48, color: colors.gold, lineHeight: 52,
+    fontFamily: fontFamilies.oswaldBold, fontSize: 48, color: colors.gold, lineHeight: 60,
   },
   dayLabel: {
     fontFamily: fontFamilies.interMedium, fontSize: fontSizes.sm,
