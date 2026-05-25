@@ -75,7 +75,13 @@ async function stripePost(
     body: encodeFormBody(body),
   });
 
-  const data = await res.json() as Record<string, unknown>;
+  const text = await res.text();
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(`Stripe returned non-JSON (${res.status}): ${text.slice(0, 200)}`);
+  }
   if (!res.ok) {
     const err = data.error as { message?: string } | undefined;
     throw new Error(err?.message ?? `Stripe error ${res.status}`);
@@ -95,7 +101,13 @@ async function stripeGet(
   if (stripeAccountId) headers['Stripe-Account'] = stripeAccountId;
 
   const res = await fetch(`https://api.stripe.com/v1/${path}`, { method: 'GET', headers });
-  const data = await res.json() as Record<string, unknown>;
+  const text = await res.text();
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(`Stripe returned non-JSON (${res.status}): ${text.slice(0, 200)}`);
+  }
   if (!res.ok) {
     const err = data.error as { message?: string } | undefined;
     throw new Error(err?.message ?? `Stripe error ${res.status}`);
@@ -114,6 +126,16 @@ Deno.serve(async (req) => {
     });
   }
 
+  try {
+    return await handleRequest(req);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[stripe-setup-intent] unhandled error:', msg);
+    return json({ error: { code: 'internal_error', message: msg } }, 500);
+  }
+});
+
+async function handleRequest(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return json({ error: { code: 'method_not_allowed', message: 'POST only' } }, 405);
   }
@@ -226,4 +248,4 @@ Deno.serve(async (req) => {
     ephemeral_key_secret: (ephemeralKey.secret as string),
     stripe_account_id: connectedAccountId ?? null,
   });
-});
+}
