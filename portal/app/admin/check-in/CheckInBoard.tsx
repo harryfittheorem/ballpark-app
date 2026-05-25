@@ -210,7 +210,7 @@ export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Prop
       {bookings.length === 0 && (
         <Card padding="lg" className="border-dashed">
           <p className="text-center text-sm text-text-light">
-            No bookings for today. Run the seed script to add demo data.
+            No bookings scheduled for today.
           </p>
         </Card>
       )}

@@ -296,18 +296,18 @@ const membershipRows = [];
 for (let i = 0; i < FAMILY_DEFS.length; i++) {
   const def = FAMILY_DEFS[i];
   const row = {
-    id:                MEMBERSHIP_IDS[i],
-    tenant_id:         TENANT_ID,
-    family_id:         familyIds[i],
-    kid_id:            KID_IDS[i],
-    plan_name:         def.plan,
-    plan_type:         def.planType,
-    status:            def.status,
-    amount_cents:      def.amt,
-    started_at:        monthsAgoDate(def.joined),
+    id:                  MEMBERSHIP_IDS[i],
+    tenant_id:           TENANT_ID,
+    family_id:           familyIds[i],
+    kid_id:              KID_IDS[i],
+    plan_name:           def.plan,
+    plan_type:           def.planType,
+    status:              def.status,
+    amount_cents:        def.amt,
+    started_at:          monthsAgoDate(def.joined),
+    billing_anchor_day:  def.anchor ?? null,
+    cancelled_at:        def.status === 'cancelled' ? daysAgo(30) : null,
   };
-  if (def.anchor) row.billing_anchor_day = def.anchor;
-  if (def.status === 'cancelled') row.cancelled_at = daysAgo(30);
   membershipRows.push(row);
 }
 await restInsert('memberships', membershipRows);
@@ -408,6 +408,7 @@ todaySlots.forEach((slot, idx) => {
     scheduled_end:   todayAtUTC(slot.hour + 1),
     cage_number:     slot.cage,
     status:          slot.hour < 16 ? 'confirmed' : 'pending',
+    attended_at:     null,
   });
 });
 
@@ -446,21 +447,18 @@ console.log(`  ${todaySlots.length} today's bookings + ${bookingRows.length - to
 
 console.log('\n─── PRODUCTS ─────────────────────────────────────────────────────────');
 
-const productRows = PRODUCT_DEFS.map((def, i) => {
-  const row = {
-    id:           PRODUCT_IDS[i],
-    tenant_id:    TENANT_ID,
-    name:         def.name,
-    category:     def.category,
-    points_cost:  def.cost,
-    is_redeemable: true,
-    is_purchasable: false,
-    is_active:    true,
-    sort_order:   i + 1,
-  };
-  if (def.inventory !== null) row.inventory_count = def.inventory;
-  return row;
-});
+const productRows = PRODUCT_DEFS.map((def, i) => ({
+  id:              PRODUCT_IDS[i],
+  tenant_id:       TENANT_ID,
+  name:            def.name,
+  category:        def.category,
+  points_cost:     def.cost,
+  is_redeemable:   true,
+  is_purchasable:  false,
+  is_active:       true,
+  sort_order:      i + 1,
+  inventory_count: def.inventory ?? null,
+}));
 
 await restInsert('products', productRows);
 console.log(`  ${productRows.length} products seeded`);
