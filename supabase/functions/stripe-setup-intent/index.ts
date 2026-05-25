@@ -46,7 +46,11 @@ function encodeFormBody(obj: Record<string, unknown>, prefix = ''): string {
   for (const [k, v] of Object.entries(obj)) {
     if (v === undefined || v === null) continue;
     const key = prefix ? `${prefix}[${k}]` : k;
-    if (typeof v === 'object' && !Array.isArray(v)) {
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        parts.push(`${encodeURIComponent(key)}[]=${encodeURIComponent(String(item))}`);
+      }
+    } else if (typeof v === 'object') {
       const nested = encodeFormBody(v as Record<string, unknown>, key);
       if (nested) parts.push(nested);
     } else {
