@@ -11,7 +11,7 @@
  */
 
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +24,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { FamilyBooking } from '@/api/bookings';
@@ -94,6 +95,22 @@ export default function BookingDetailScreen() {
   const cancelMut = useCancelBookingPolicy();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [lateSheet, setLateSheet] = useState<LateSheet | null>(null);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          style={{ paddingRight: 8 }}
+        >
+          <ChevronLeft size={24} color={colors.gold} />
+        </Pressable>
+      ),
+    });
+  }, [navigation]);
 
   const cancellable = useMemo(() => (booking ? isCancellable(booking) : false), [booking]);
 
