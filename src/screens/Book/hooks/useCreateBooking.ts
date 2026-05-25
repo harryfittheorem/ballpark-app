@@ -48,7 +48,15 @@ export function useCreateBooking() {
   return useMutation<CreateBookingResult, Error, BookingInsert>({
     mutationFn: async (input) => {
       // ── Step 1: Pre-flight credit check (fast UX fail-fast) ──────────────
-      const remaining = await checkSessionCredits(input.kid_id, input.tenant_id);
+      // Treat any RPC error as unlimited (-1) so a cold-start / network
+      // hiccup on the first call doesn't block the booking. The real
+      // race-condition guard is deductSessionCredit (FOR UPDATE in DB).
+      let remaining = -1;
+      try {
+        remaining = await checkSessionCredits(input.kid_id, input.tenant_id);
+      } catch {
+        remaining = -1;
+      }
       if (remaining === 0) {
         throw new NoSessionCreditsError();
       }

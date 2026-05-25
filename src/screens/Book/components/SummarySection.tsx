@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui';
@@ -139,6 +139,15 @@ export default function SummarySection({
 
   // Already out of credits — disable confirm proactively
   const outOfCredits = sessionsRemaining !== null && sessionsRemaining === 0;
+
+  // Clear confirmed state whenever the selection changes (slot, date, session
+  // type, or coach). This handles: navigating away + back, cancelling a booking
+  // then picking a new slot, or changing the date after a successful booking.
+  useEffect(() => {
+    setBookingResult(null);
+    setErrorVisible(false);
+    setNoCreditsVisible(false);
+  }, [slot, date, sessionType?.id, selectedCoachId]);
 
   // Stores the formatted when string so the Done button can pass it to onBooked
   const formattedWhenRef = useRef<string>('');
