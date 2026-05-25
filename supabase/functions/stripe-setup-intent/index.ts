@@ -147,44 +147,43 @@ Deno.serve(async (req) => {
   // Look up the family + location
   const { data: family, error: famErr } = await supabase
     .from('families')
-    .select('id, parent_first_name, parent_last_name, parent_email, stripe_connected_customer_id, primary_location_id')
+    .select('id, parent_first_name, parent_last_name, parent_email, stripe_connected_customer_id, stripe_customer_id, primary_location_id')
     .eq('parent_user_id', user.id)
     .single();
 
   if (famErr || !family) {
+    console.error('[stripe-setup-intent] family lookup failed:', famErr?.message, 'user_id:', user.id);
     return json({ error: { code: 'family_not_found', message: 'Family record not found' } }, 404);
   }
 
-  const { data: location, error: locErr } = await supabase
+  const { data: location } = await supabase
     .from('locations')
     .select('id, stripe_account_id, stripe_onboarding_status')
     .eq('id', family.primary_location_id)
     .single();
 
-  if (locErr || !location || !location.stripe_account_id) {
-    return json({ error: { code: 'location_not_connected', message: 'Location Stripe account not configured' } }, 422);
-  }
+  // Use connected account when fully onboarded; fall back to platform account
+  // for dev/test environments where Stripe Connect hasn't been configured.
+  const useConnected = !!(
+    location?.stripe_account_id &&
+    location?.stripe_onboarding_status === 'connected'
+  );
+  const connectedAccountId: string | undefined = useConnected
+    ? (location!.stripe_account_id as string)
+    : undefined;
 
-  if (location.stripe_onboarding_status !== 'connected') {
-    return json({ error: { code: 'location_not_connected', message: 'Location Stripe account not fully set up' } }, 422);
-  }
-
-  const connectedAccountId = location.stripe_account_id as string;
-
-  // Create or reuse Stripe Customer on the CONNECTED account.
-  // Stored in families.stripe_connected_customer_id (separate from
-  // families.stripe_customer_id which is the PLATFORM-account customer used by
-  // stripe-create-payment-intent for store checkout). Keeping them separate
-  // prevents "No such customer" errors when a connected-account customer ID is
-  // sent without a Stripe-Account header.
-  let customerId = (family as unknown as Record<string, unknown>).stripe_connected_customer_id as string | null ?? null;
+  // Pick the right stored customer ID column
+  const familyAny = family as unknown as Record<string, unknown>;
+  let customerId: string | null = useConnected
+    ? (familyAny.stripe_connected_customer_id as string | null ?? null)
+    : (familyAny.stripe_customer_id as string | null ?? null);
 
   if (customerId) {
-    // Verify the customer still exists on the connected account
+    // Verify the customer still exists on the target account
     try {
       await stripeGet(`customers/${customerId}`, stripeKey, connectedAccountId);
     } catch {
-      customerId = null; // Customer doesn't exist on this account, create fresh
+      customerId = null; // Customer doesn't exist, create fresh
     }
   }
 
@@ -198,10 +197,11 @@ Deno.serve(async (req) => {
 
     customerId = customer.id as string;
 
-    // Persist the connected-account customer ID
+    // Persist to the appropriate column
+    const col = useConnected ? 'stripe_connected_customer_id' : 'stripe_customer_id';
     await supabase
       .from('families')
-      .update({ stripe_connected_customer_id: customerId, updated_at: new Date().toISOString() })
+      .update({ [col]: customerId, updated_at: new Date().toISOString() })
       .eq('id', family.id);
   }
 
@@ -218,12 +218,12 @@ Deno.serve(async (req) => {
     metadata: { family_id: family.id },
   }, connectedAccountId);
 
-  console.log(`[stripe-setup-intent] family=${family.id} customer=${customerId} si=${setupIntent.id}`);
+  console.log(`[stripe-setup-intent] family=${family.id} customer=${customerId} si=${setupIntent.id} connected=${useConnected}`);
 
   return json({
     setup_intent_client_secret: setupIntent.client_secret,
     customer_id: customerId,
     ephemeral_key_secret: (ephemeralKey.secret as string),
-    stripe_account_id: connectedAccountId,
+    stripe_account_id: connectedAccountId ?? null,
   });
 });

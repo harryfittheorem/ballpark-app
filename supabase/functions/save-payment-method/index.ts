@@ -151,31 +151,38 @@ Deno.serve(async (req) => {
   // Load family + primary location
   const { data: family, error: famErr } = await supabase
     .from('families')
-    .select('id, primary_location_id, stripe_connected_customer_id')
+    .select('id, primary_location_id, stripe_connected_customer_id, stripe_customer_id')
     .eq('parent_user_id', user.id)
     .single();
 
   if (famErr || !family) {
+    console.error('[save-payment-method] family lookup failed:', famErr?.message, 'user_id:', user.id);
     return json({ error: { code: 'family_not_found', message: 'Family record not found' } }, 404);
   }
 
-  const customerId = (family as unknown as Record<string, unknown>).stripe_connected_customer_id as string | null;
-  if (!customerId) {
-    return json({ error: { code: 'no_customer', message: 'No Stripe customer on file — complete the card setup first' } }, 422);
-  }
-
-  // Load location to get connected account
-  const { data: location, error: locErr } = await supabase
+  // Load location to determine connected vs platform account
+  const { data: location } = await supabase
     .from('locations')
-    .select('stripe_account_id')
+    .select('stripe_account_id, stripe_onboarding_status')
     .eq('id', family.primary_location_id)
     .single();
 
-  if (locErr || !location?.stripe_account_id) {
-    return json({ error: { code: 'location_not_connected', message: 'Location Stripe account not configured' } }, 422);
-  }
+  const useConnected = !!(
+    location?.stripe_account_id &&
+    location?.stripe_onboarding_status === 'connected'
+  );
+  const connectedAccountId: string | undefined = useConnected
+    ? (location!.stripe_account_id as string)
+    : undefined;
 
-  const connectedAccountId = location.stripe_account_id as string;
+  const familyAny = family as unknown as Record<string, unknown>;
+  const customerId = useConnected
+    ? (familyAny.stripe_connected_customer_id as string | null ?? null)
+    : (familyAny.stripe_customer_id as string | null ?? null);
+
+  if (!customerId) {
+    return json({ error: { code: 'no_customer', message: 'No Stripe customer on file — complete the card setup first' } }, 422);
+  }
 
   // List the customer's cards on the connected account, newest first
   const pmList = await stripeGet(
