@@ -41,7 +41,7 @@ export default function MessagesBody() {
   const { user } = useAuth();
   const { family, kid } = useSelectedKid();
 
-  const { data: coaches } = useTenantCoachesForParent();
+  const { data: coaches, isPending: coachesPending } = useTenantCoachesForParent();
   const { data: inbox } = useParentInbox(kid?.id);
 
   const [coachUserId, setCoachUserId] = useState<string | null>(null);
@@ -222,9 +222,17 @@ export default function MessagesBody() {
       )}
 
       <View style={styles.flex}>
-        {threadPending || !coachUserId ? (
+        {coachesPending || (threadPending && !!coachUserId) ? (
           <View style={styles.centered}>
             <ActivityIndicator color={colors.gold} />
+          </View>
+        ) : !coachUserId ? (
+          <View style={styles.centered}>
+            <MessageCircle size={36} color={colors.goldDeep} />
+            <Text style={styles.emptyTitle}>NO COACH YET</Text>
+            <Text style={styles.muted}>
+              Your facility admin needs to configure a coach before you can start messaging.
+            </Text>
           </View>
         ) : threadError ? (
           <View style={styles.centered}>

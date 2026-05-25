@@ -88,6 +88,7 @@ export default function SwingsBody() {
   if (mode === 'all') {
     return (
       <FlatList
+        key="swings-grid"
         data={swings ?? []}
         keyExtractor={(s) => s.id}
         numColumns={3}
@@ -121,6 +122,7 @@ export default function SwingsBody() {
 
   return (
     <FlatList<Row>
+      key="swings-sessions"
       data={rows}
       keyExtractor={(r) => (r.kind === 'loose' ? 'loose' : r.session.id)}
       contentContainerStyle={styles.listContent}

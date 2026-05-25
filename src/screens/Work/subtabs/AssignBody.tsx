@@ -58,7 +58,7 @@ export default function AssignBody() {
 
   const refreshControl = (
     <RefreshControl
-      refreshing={manualRefreshing || isRefetching}
+      refreshing={manualRefreshing}
       onRefresh={onRefresh}
       tintColor={colors.gold}
       colors={[colors.gold]}

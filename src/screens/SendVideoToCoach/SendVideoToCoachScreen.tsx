@@ -131,6 +131,10 @@ export default function SendVideoToCoachScreen() {
         return;
       }
     } else {
+      // Note: In Expo Go the permission dialog reads "Experience needs permissions"
+      // with the Expo Go app name instead of "Ballpark". This is standard iOS
+      // behaviour — production builds (EAS / App Store) show the real app name.
+      // No code change is needed or possible to fix this in development.
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
         Alert.alert(
@@ -305,9 +309,14 @@ export default function SendVideoToCoachScreen() {
                 {coachesPending ? (
                   <ActivityIndicator color={colors.gold} />
                 ) : !coaches || coaches.length === 0 ? (
-                  <Text style={styles.helperText}>
-                    No coach is configured at your facility yet.
-                  </Text>
+                  <>
+                    <Text style={styles.helperText}>
+                      No coach is configured at your facility yet.
+                    </Text>
+                    <Text style={[styles.helperText, { marginTop: spacing.base }]}>
+                      Ask your facility admin to add a coach before sending a video.
+                    </Text>
+                  </>
                 ) : (
                   <View style={{ gap: spacing.base }}>
                     {coaches.map((c) => (
@@ -354,7 +363,8 @@ export default function SendVideoToCoachScreen() {
                 disabled={!coachId}
                 style={({ pressed }) => [
                   styles.primaryBtn,
-                  (!coachId || pressed) && { opacity: 0.85 },
+                  !coachId && { opacity: 0.4 },
+                  coachId && pressed && { opacity: 0.85 },
                 ]}
               >
                 <Text style={styles.primaryBtnLabel}>NEXT</Text>

@@ -12,6 +12,19 @@ import { queryClient } from '@/lib/queryClient';
 import RootNavigator from '@/navigation/RootNavigator';
 import { colors, useAppFonts } from '@/theme';
 
+// Suppress a spurious forwardRef warning emitted by @stripe/stripe-react-native
+// at startup in Expo Go. The library's internal components use the legacy
+// two-argument forwardRef signature that React 19 flags as a dev warning.
+// This filter is dev-only and has zero production impact.
+if (__DEV__) {
+  const _origError = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    const msg = typeof args[0] === 'string' ? args[0] : '';
+    if (msg.includes('forwardRef render functions accept exactly two parameters')) return;
+    _origError(...args);
+  };
+}
+
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
 export default function App() {
