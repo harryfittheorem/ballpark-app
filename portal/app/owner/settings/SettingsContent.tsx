@@ -103,15 +103,13 @@ export function SettingsContent() {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      const supabase = createClient();
-      const { error } = await (supabase as unknown as import('@supabase/supabase-js').SupabaseClient)
-        .from('tenant_config')
-        .update({
-          booking_cancel_window_hours: policy.booking_cancel_window_hours,
-          booking_cancel_fee_cents: policy.booking_cancel_fee_cents,
-          membership_cancel_notice_days: policy.membership_cancel_notice_days,
-        });
-      if (error) throw error;
+      const res = await fetch('/api/settings/policy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(policy),
+      });
+      const json = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'Save failed');
       setToast({ msg: 'Cancellation policy saved.', kind: 'success' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Save failed';
