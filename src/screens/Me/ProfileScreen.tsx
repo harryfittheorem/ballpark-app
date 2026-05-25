@@ -826,7 +826,7 @@ const styles = StyleSheet.create({
   },
   badge: {
     flexBasis: '22%',
-    flexGrow: 1,
+    flexGrow: 0,
     aspectRatio: 1,
     borderRadius: radius['2xl'],
     alignItems: 'center',
