@@ -12,12 +12,26 @@ const allowedOrigins = [
   ...(replitExpoDevDomain ? [replitExpoDevDomain] : []),
 ];
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
   experimental: {
     serverActions: {
       allowedOrigins,
     },
+  },
+  async headers() {
+    if (!isDev) return [];
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, must-revalidate' },
+          { key: 'Pragma', value: 'no-cache' },
+        ],
+      },
+    ];
   },
   async rewrites() {
     // beforeFiles: run BEFORE Next.js app-router pages so the expo-platform
