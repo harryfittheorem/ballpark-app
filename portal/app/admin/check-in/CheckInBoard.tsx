@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { checkInBookingAction, markNoShowAction, undoCheckInAction } from './actions';
 import { CheckCircle, XCircle, RotateCcw, Clock, UserCircle, Users } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 
@@ -139,30 +140,29 @@ export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Prop
         prev.map((b) => (b.id === bookingId ? { ...b, pending: pendingState } : b)),
       );
 
-      const supabase = createClient();
-      const { data, error } = await supabase.rpc(rpc, { p_booking_id: bookingId });
+      const actionMap = {
+        check_in_booking: checkInBookingAction,
+        mark_no_show: markNoShowAction,
+        undo_check_in: undoCheckInAction,
+      };
+      const result = await actionMap[rpc](bookingId);
 
-      if (error) {
+      if (!result.ok) {
         setBookings((prev) =>
           prev.map((b) => (b.id === bookingId ? { ...b, pending: undefined } : b)),
         );
-        const msg = (error.message ?? '').includes('UNDO_WINDOW_EXPIRED')
-          ? 'Undo window has expired (5 minutes).'
-          : error.message || 'Something went wrong.';
-        showToast(msg, false);
+        showToast(result.message, false);
         return;
       }
 
-      const updated = data as { id: string; status: string; attended_at: string | null; cage_number: string | null } | null;
-      if (updated) {
-        setBookings((prev) =>
-          prev.map((b) =>
-            b.id === bookingId
-              ? { ...b, status: updated.status, attended_at: updated.attended_at, pending: undefined }
-              : b,
-          ),
-        );
-      }
+      const updated = result.data;
+      setBookings((prev) =>
+        prev.map((b) =>
+          b.id === bookingId
+            ? { ...b, status: updated.status, attended_at: updated.attended_at, pending: undefined }
+            : b,
+        ),
+      );
 
       const labels: Record<string, string> = {
         check_in_booking: 'Checked in!',

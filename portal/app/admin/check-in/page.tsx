@@ -8,13 +8,30 @@ export const dynamic = 'force-dynamic';
 export default async function CheckInPage() {
   const supabase = await createClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login?reason=unauthenticated');
+
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session) redirect('/login?reason=unauthenticated');
-  if (readAppRole(session) !== 'admin') redirect('/logout?reason=forbidden');
 
-  const tenantId = readTenantId(session);
+  // Resolve role — JWT claim with app_metadata fallback for production
+  let role = readAppRole(session);
+  if (role === 'parent' && user.app_metadata?.app_role) {
+    role = user.app_metadata.app_role as ReturnType<typeof readAppRole>;
+  }
+  if (role !== 'admin' && role !== 'owner' && role !== 'super_admin') {
+    redirect('/logout?reason=forbidden');
+  }
+
+  // Resolve tenantId — JWT claim with user_metadata fallback for production
+  let tenantId = readTenantId(session);
+  if (!tenantId && user.app_metadata?.tenant_id) {
+    tenantId = user.app_metadata.tenant_id as string;
+  }
+  if (!tenantId && user.user_metadata?.tenant_id) {
+    tenantId = user.user_metadata.tenant_id as string;
+  }
   if (!tenantId) redirect('/logout?reason=no-tenant');
 
   // Today's bookings in the admin's tenant (RLS scopes by staff_locations)
