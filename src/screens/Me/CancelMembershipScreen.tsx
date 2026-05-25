@@ -57,7 +57,7 @@ type Membership = {
   plan_name: string;
   plan_type: string;
   status: string;
-  next_billing_at: string | null;
+  billing_anchor_day: number | null;
   cancel_requested_at: string | null;
   cancel_effective_at: string | null;
 };
@@ -80,7 +80,7 @@ export default function CancelMembershipScreen() {
           (supabase as unknown as import('@supabase/supabase-js').SupabaseClient)
             .from('memberships')
             .select(
-              'id, plan_name, plan_type, status, next_billing_at, cancel_requested_at, cancel_effective_at',
+              'id, plan_name, plan_type, status, billing_anchor_day, cancel_requested_at, cancel_effective_at',
             )
             .eq('status', 'active')
             .maybeSingle(),
@@ -194,7 +194,7 @@ export default function CancelMembershipScreen() {
   // If already requested, use the stored value; otherwise compute it.
   const effectiveDate = alreadyRequested && membership.cancel_effective_at
     ? new Date(membership.cancel_effective_at)
-    : computeEffectiveDate(noticeDays, membership.next_billing_at);
+    : computeEffectiveDate(noticeDays, null);
 
   const effectiveDateStr = formatDate(effectiveDate);
 
@@ -237,9 +237,7 @@ export default function CancelMembershipScreen() {
               <Text style={styles.warningBody}>
                 You&apos;ll be charged until{' '}
                 <Text style={styles.emphasisDanger}>{effectiveDateStr}</Text>
-                {membership.next_billing_at
-                  ? ' — the later of your next billing date and the required notice period.'
-                  : ` — ${noticeDays} days from today.`}
+                {` — ${noticeDays} days from today.`}
                 {'\n\n'}
                 Your access remains active until that date.
               </Text>
