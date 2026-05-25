@@ -280,25 +280,30 @@ export function ScheduleContent({ data, tenantId }: Props) {
   // ── Derived data ─────────────────────────────────────────────────────────
   const isToday = isSameDay(currentDate, todayDate);
 
-  const todayBookingsList = useMemo(
-    () => bookings.filter(b => isSameDay(new Date(b.scheduledStart), todayDate)),
-    [bookings, todayDate],
+  // Bookings for the currently viewed day (or all loaded bookings in week/month mode)
+  const currentViewBookings = useMemo(
+    () => viewMode === 'day'
+      ? bookings.filter(b => isSameDay(new Date(b.scheduledStart), currentDate))
+      : bookings,
+    [bookings, currentDate, viewMode],
   );
 
-  const totalToday   = todayBookingsList.length > 0 ? todayBookingsList.length : (hasLiveData ? data.totalToday : DEMO_BOOKINGS.length);
-  const occupancyPct = hasLiveData ? data.occupancyPct : 78;
   const TOTAL_SLOTS  = 8 * 14;
-  const openSlots    = TOTAL_SLOTS - totalToday;
+  const totalToday   = currentViewBookings.length > 0 ? currentViewBookings.length : (!hasLiveData ? DEMO_BOOKINGS.length : 0);
+  const occupancyPct = currentViewBookings.length > 0
+    ? Math.round((currentViewBookings.length / TOTAL_SLOTS) * 1000) / 10
+    : (!hasLiveData ? 78 : 0);
+  const openSlots    = TOTAL_SLOTS - (currentViewBookings.length > 0 ? currentViewBookings.length : (!hasLiveData ? DEMO_BOOKINGS.length : 0));
 
   const hourCounts: Record<string, number> = {};
-  const hourSource = todayBookingsList.length > 0 ? todayBookingsList : (hasLiveData ? [] : DEMO_BOOKINGS);
+  const hourSource = currentViewBookings.length > 0 ? currentViewBookings : (!hasLiveData ? DEMO_BOOKINGS : []);
   for (const b of hourSource) {
     const lbl = localHourLabel(b.scheduledStart);
     hourCounts[lbl] = (hourCounts[lbl] ?? 0) + 1;
   }
   const peakHour = Object.keys(hourCounts).length > 0
     ? Object.entries(hourCounts).sort(([, a], [, b]) => b - a)[0][0]
-    : hasLiveData ? null : '4 PM';
+    : (!hasLiveData ? '4 PM' : null);
 
   const hourBarData = HOURS.map(h => ({ label: h, value: hourCounts[h] ?? 0, highlight: h === peakHour }));
 
@@ -477,10 +482,10 @@ export function ScheduleContent({ data, tenantId }: Props) {
 
         {/* ── KPI row ───────────────────────────────────────────────────── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-          <KPICard label="Today's Sessions"  value={totalToday}           deltaLabel="booked"       icon={Calendar}   color="gold"    />
-          <KPICard label="Today's Occupancy" value={`${occupancyPct}%`}   icon={Activity}            color="success"                  />
-          <KPICard label="Peak Hour"         value={peakHour ?? '—'}      deltaLabel="busiest slot" icon={TrendingUp} color="warning" />
-          <KPICard label="Open Slots"        value={openSlots}            deltaLabel="today"        icon={Clock}                     />
+          <KPICard label={isToday ? "Today's Sessions" : `${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getDate()} Sessions`} value={totalToday} deltaLabel="booked" icon={Calendar} color="gold" />
+          <KPICard label={isToday ? "Today's Occupancy" : "Day Occupancy"} value={`${occupancyPct}%`} icon={Activity} color="success" />
+          <KPICard label="Peak Hour"  value={peakHour ?? '—'} deltaLabel="busiest slot" icon={TrendingUp} color="warning" />
+          <KPICard label="Open Slots" value={openSlots}       deltaLabel={isToday ? 'today' : 'this day'} icon={Clock} />
         </div>
 
         {/* ── Filter panel ─────────────────────────────────────────────── */}
