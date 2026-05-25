@@ -151,10 +151,12 @@ Deno.serve(async (req) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diffDays = Math.round((pauseEndDate.getTime() - today.getTime()) / 86_400_000);
-  if (diffDays < 7) {
+  // Use 6 days (not 7) to allow 1 day of timezone buffer: clients in UTC-N
+  // send "7 days from local today" which can appear as 6 days on the UTC server.
+  if (diffDays < 6) {
     return json({ error: { code: 'pause_too_short', message: 'Pause end must be at least 7 days from today' } }, 422);
   }
-  if (diffDays > 90) {
+  if (diffDays > 91) {
     return json({ error: { code: 'pause_too_long', message: 'Pause end cannot be more than 90 days from today' } }, 422);
   }
 
@@ -200,10 +202,6 @@ Deno.serve(async (req) => {
   if (mem.status !== 'active') {
     return json({ error: { code: 'not_active', message: 'Only active memberships can be paused' } }, 422);
   }
-  if (!mem.stripe_subscription_id) {
-    return json({ error: { code: 'no_subscription', message: 'No Stripe subscription linked to this membership' } }, 422);
-  }
-
   // ── Pre-flight family-level overlap check (BEFORE Stripe) ────────────────
   const { data: familyPaused } = await supabase
     .from('memberships')
@@ -232,24 +230,28 @@ Deno.serve(async (req) => {
 
   const connectedAccountId = location?.stripe_account_id as string | null;
 
-  // ── Pause Stripe subscription ─────────────────────────────────────────────
-  const resumesAtEpoch = Math.floor(pauseEndDate.getTime() / 1000);
+  // ── Pause Stripe subscription (only when one is linked) ──────────────────
   const pauseEndStr    = pause_end.slice(0, 10);
 
-  try {
-    await stripePost(
-      `subscriptions/${mem.stripe_subscription_id as string}`,
-      stripeKey,
-      {
-        'pause_collection[behavior]': 'void',
-        'pause_collection[resumes_at]': resumesAtEpoch,
-      },
-      connectedAccountId ?? undefined,
-    );
-  } catch (stripeErr) {
-    const msg = stripeErr instanceof Error ? stripeErr.message : 'Unknown Stripe error';
-    console.error(`[pause-membership] Stripe error: ${msg}`);
-    return json({ error: { code: 'stripe_error', message: msg } }, 502);
+  if (mem.stripe_subscription_id) {
+    const resumesAtEpoch = Math.floor(pauseEndDate.getTime() / 1000);
+    try {
+      await stripePost(
+        `subscriptions/${mem.stripe_subscription_id as string}`,
+        stripeKey,
+        {
+          'pause_collection[behavior]': 'void',
+          'pause_collection[resumes_at]': resumesAtEpoch,
+        },
+        connectedAccountId ?? undefined,
+      );
+    } catch (stripeErr) {
+      const msg = stripeErr instanceof Error ? stripeErr.message : 'Unknown Stripe error';
+      console.error(`[pause-membership] Stripe error: ${msg}`);
+      return json({ error: { code: 'stripe_error', message: msg } }, 502);
+    }
+  } else {
+    console.log(`[pause-membership] no stripe_subscription_id — skipping Stripe, updating DB only`);
   }
 
   // ── Update DB via SECURITY DEFINER RPC (JWT-derived auth inside RPC) ─────
