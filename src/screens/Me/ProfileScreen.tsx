@@ -27,7 +27,8 @@ import {
   XCircle,
   UserPlus,
 } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Alert,
   ScrollView,
@@ -110,7 +111,7 @@ function formatDate(isoDate: string): string {
 export default function ProfileScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { family, kid, kids, setSelectedKid } = useSelectedKid();
-  const { membership, resume } = useMembership();
+  const { membership, resume, refresh: refreshMembership } = useMembership();
   const deleteKid = useDeleteKid();
 
   const { data: primaryLocation } = usePrimaryLocation();
@@ -167,6 +168,14 @@ export default function ProfileScreen({ navigation }: Props) {
         .filter(Boolean)
         .join(' · ') || 'Athlete'
     : (user?.email ?? '');
+
+  // Re-fetch membership whenever this screen comes into focus so the pause/
+  // resume state stays in sync after navigating back from PauseMembership.
+  useFocusEffect(
+    useCallback(() => {
+      void refreshMembership();
+    }, [refreshMembership]),
+  );
 
   const handleSignOut = async () => {
     try {

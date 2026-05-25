@@ -49,7 +49,7 @@ const QUICK_OPTIONS = [
 ];
 
 export default function PauseMembershipScreen({ navigation }: Props) {
-  const { membership, loading, pause } = useMembership();
+  const { membership, loading, pause, resume } = useMembership();
 
   const today = useMemo(() => {
     const d = new Date();
@@ -107,6 +107,90 @@ export default function PauseMembershipScreen({ navigation }: Props) {
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>Loading membership…</Text>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (membership?.status === 'paused') {
+    const pauseEnd = membership.pause_end ? formatDateDisplay(membership.pause_end) : '—';
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <View style={styles.iconWrap}>
+              <PauseCircle size={32} color={colors.gold} />
+            </View>
+            <Text style={styles.title}>Membership Paused</Text>
+            <Text style={styles.subtitle}>
+              Your billing is paused. No charges until your membership resumes.
+            </Text>
+          </View>
+
+          <View style={styles.planCard}>
+            <Text style={styles.planLabel}>CURRENT PLAN</Text>
+            <Text style={styles.planName}>{membership.plan_name}</Text>
+            <Text style={styles.planAmount}>
+              ${(membership.amount_cents / 100).toFixed(2)}/mo
+            </Text>
+          </View>
+
+          <View style={styles.rangeCard}>
+            <View style={styles.rangeRow}>
+              <View style={styles.rangeCol}>
+                <Text style={styles.rangeColLabel}>PAUSED ON</Text>
+                <Text style={styles.rangeDate}>
+                  {membership.pause_start ? formatDateDisplay(membership.pause_start) : '—'}
+                </Text>
+              </View>
+              <View style={styles.rangeDivider} />
+              <View style={styles.rangeCol}>
+                <Text style={styles.rangeColLabel}>RESUMES ON</Text>
+                <Text style={[styles.rangeDate, { color: colors.gold }]}>{pauseEnd}</Text>
+                <Text style={styles.rangeNote}>Automatic</Text>
+              </View>
+            </View>
+            <View style={styles.noBillingBanner}>
+              <Text style={styles.noBillingText}>✓ No charges during this period</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>
+              Your membership will automatically resume on {pauseEnd}.{'\n'}
+              You can resume early at any time by tapping the button below.
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.cta}
+            onPress={() => {
+              Alert.alert(
+                'Resume Membership?',
+                'Billing will resume immediately. Your next charge will be on the next billing date.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Resume Now',
+                    onPress: async () => {
+                      try {
+                        await resume();
+                        navigation.goBack();
+                      } catch (err) {
+                        Alert.alert('Could not resume', errorMessage(err));
+                      }
+                    },
+                  },
+                ],
+              );
+            }}
+          >
+            <Text style={styles.ctaText}>Resume Early</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.cancelText}>Back to profile</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </SafeAreaView>
     );
   }
