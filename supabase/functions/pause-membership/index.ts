@@ -127,9 +127,10 @@ Deno.serve(async (req) => {
   const userRole = (user.app_metadata?.app_role as string | undefined)
     ?? (user.user_metadata?.app_role as string | undefined) ?? '';
 
-  if (!['parent', 'owner', 'admin'].includes(userRole)) {
-    return json({ error: { code: 'forbidden', message: 'Insufficient role' } }, 403);
-  }
+  // Accept any authenticated user. If the role claim is absent (Custom Access
+  // Token Hook not running in this environment), we fall back to treating the
+  // caller as a parent and enforce ownership via fam.parent_user_id below.
+  // Owner/admin callers still require an explicit role claim.
 
   // ── Parse body ────────────────────────────────────────────────────────────
   let body: { membership_id?: string; pause_end?: string };
@@ -177,13 +178,15 @@ Deno.serve(async (req) => {
   const fam = mem.families as unknown as { id: string; parent_user_id: string; primary_location_id: string };
   const callerTenant = (user.app_metadata?.tenant_id as string | undefined) ?? null;
 
-  if (userRole === 'parent') {
-    if (fam.parent_user_id !== user.id) {
-      return json({ error: { code: 'forbidden', message: 'Access denied' } }, 403);
-    }
-  } else {
+  const isOwnerAdmin = ['owner', 'admin'].includes(userRole);
+  if (isOwnerAdmin) {
     if (!callerTenant || mem.tenant_id !== callerTenant) {
       return json({ error: { code: 'forbidden', message: 'Access denied — tenant mismatch' } }, 403);
+    }
+  } else {
+    // parent or unauthenticated-role-claim: verify family ownership
+    if (fam.parent_user_id !== user.id) {
+      return json({ error: { code: 'forbidden', message: 'Access denied' } }, 403);
     }
   }
 
