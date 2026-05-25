@@ -55,8 +55,9 @@ for (let memIdx = 0; memIdx < 15; memIdx++) {
   }
 }
 
-// Booking IDs: 20 today + 75 historical = 95 total (IDs 1–95).
-const BOOKING_IDS = Array.from({ length: 95 }, (_, i) => seedId(6, i + 1));
+// Booking IDs: 20 today + 75 historical = 95 base (IDs 1–95)
+// + up to 5 for Coach Mike (IDs 96–100). Over-enumerate; missing rows are no-ops.
+const BOOKING_IDS = Array.from({ length: 100 }, (_, i) => seedId(6, i + 1));
 
 // Points ledger IDs: up to (70 session + 1 top-up) per kid = 71 per kid max.
 const LEDGER_IDS = [];

@@ -357,8 +357,35 @@ const failedCount = paymentRows.filter(r => r.status === 'failed').length;
 console.log(`  ${paidCount} paid + ${failedCount} failed payment events seeded`);
 
 // =============================================================================
+// 4b. Look up Coach Mike (separately provisioned, not a seed account)
+//     Capture his coaches.id so we can assign him today's bookings.
+//     If he hasn't been provisioned yet, we skip gracefully and log a warning.
+// =============================================================================
+
+let coachMikeId = null;
+{
+  const COACH_MIKE_EMAIL = 'coach.mike@infinitehitting.com';
+  const list = await adminRequest('GET', `users?filter=${encodeURIComponent(COACH_MIKE_EMAIL)}`);
+  const mikeUser = (list?.users || []).find(u => u.email === COACH_MIKE_EMAIL);
+  if (mikeUser) {
+    const rows = await restGet(`coaches?user_id=eq.${mikeUser.id}&tenant_id=eq.${TENANT_ID}&select=id`);
+    if (rows.length) {
+      coachMikeId = rows[0].id;
+      console.log(`\n  Coach Mike found: coaches.id=${coachMikeId} — will seed 5 today's bookings for him`);
+    } else {
+      console.warn(`\n  WARN: coach.mike@infinitehitting.com auth user exists but no coaches row found.`);
+      console.warn('        Run scripts/provision-coach-mike.mjs first. Skipping his bookings.');
+    }
+  } else {
+    console.warn(`\n  WARN: coach.mike@infinitehitting.com not provisioned.`);
+    console.warn('        Run scripts/provision-coach-mike.mjs first. Skipping his bookings.');
+  }
+}
+
+// =============================================================================
 // 5. Bookings
 //    20 for today (Schedule cage grid) + 75 historical completed (engagement)
+//    + up to 5 for Coach Mike (IDs 96–100) if he has been provisioned.
 // =============================================================================
 
 console.log('\n─── BOOKINGS ─────────────────────────────────────────────────────────');
@@ -411,6 +438,35 @@ todaySlots.forEach((slot, idx) => {
     attended_at:     null,
   });
 });
+
+// Coach Mike's today bookings (IDs 96–100) — only if his account is provisioned.
+// Uses a spread of session types and kids from different families; hours chosen
+// so they don't collide with the existing 14–17 UTC slots above.
+if (coachMikeId) {
+  const mikeSlots = [
+    { hour:  9, cage: '1', kidIdx:  1, sessionType: ST_PRIVATE_60 },
+    { hour: 10, cage: '3', kidIdx:  4, sessionType: ST_GROUP      },
+    { hour: 11, cage: '5', kidIdx:  7, sessionType: ST_CAGE       },
+    { hour: 13, cage: '2', kidIdx: 10, sessionType: ST_PRIVATE_60 },
+    { hour: 16, cage: '6', kidIdx: 13, sessionType: ST_GROUP      },
+  ];
+  mikeSlots.forEach((slot, i) => {
+    bookingRows.push({
+      id:              bookingId(96 + i),
+      tenant_id:       TENANT_ID,
+      location_id:     LOCATION_ID,
+      kid_id:          KID_IDS[slot.kidIdx],
+      coach_id:        coachMikeId,
+      session_type_id: slot.sessionType,
+      scheduled_start: todayAtUTC(slot.hour),
+      scheduled_end:   todayAtUTC(slot.hour + 1),
+      cage_number:     slot.cage,
+      status:          slot.hour < 16 ? 'confirmed' : 'pending',
+      attended_at:     null,
+    });
+  });
+  console.log(`  + ${mikeSlots.length} today's bookings for Coach Mike (IDs 96–100)`);
+}
 
 // Historical completed bookings (IDs 21–95): 5 per kid, spaced 7d apart
 // starting from lastSession days ago. These drive engagement scores and MIA.
@@ -559,6 +615,8 @@ console.log(`  ${orderRows.length} sample orders seeded`);
 // Done
 // =============================================================================
 
+const mikeBookingCount = coachMikeId ? 5 : 0;
+const historicalCount  = bookingRows.length - todaySlots.length - mikeBookingCount;
 console.log(`
 =============================================================================
 DONE — Portal demo data seeded for Infinite Hitting
@@ -567,10 +625,13 @@ DONE — Portal demo data seeded for Infinite Hitting
   Families + Kids: 15 (10 active, 2 paused, 3 cancelled)
   Memberships:     15 (Private Hitting · Group Classes · Team Training · Cage)
   Payment Events:  ${paidCount} paid + ${failedCount} failed (12-month history)
-  Bookings:        ${todaySlots.length} today + ${bookingRows.length - todaySlots.length} historical
+  Bookings:        ${todaySlots.length} today (4 coaches) + ${mikeBookingCount} today (Coach Mike) + ${historicalCount} historical
   Products:        5 store items
   Points Ledger:   ${ledgerRows.length} entries
   Orders:          5 sample redemptions
+${coachMikeId
+  ? '  Coach Mike:      5 bookings seeded (IDs 96–100) — "My Sessions Today" is now populated.'
+  : '  Coach Mike:      NOT provisioned — run scripts/provision-coach-mike.mjs to enable his bookings.'}
 
   All records use deterministic UUIDs (5eed…).
   Cleanup: node scripts/delete-portal-seed-data.mjs
