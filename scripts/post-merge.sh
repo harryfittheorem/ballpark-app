@@ -37,8 +37,9 @@ if [ -d "supabase/functions" ]; then
     local extra_flags="${2:-}"
     if [ -f "supabase/functions/$fn/index.ts" ]; then
       (
+        # --use-api bundles server-side, bypassing local DNS restrictions
         # shellcheck disable=SC2086
-        npx --yes supabase functions deploy "$fn" $extra_flags >/dev/null 2>&1 \
+        npx --yes supabase functions deploy "$fn" --use-api $extra_flags >/dev/null 2>&1 \
           && echo "[post-merge] deployed $fn" \
           || echo "[post-merge] WARN: deploy $fn failed (env not configured?); continuing"
       ) &
@@ -64,6 +65,10 @@ if [ -d "supabase/functions" ]; then
   deploy_fn stripe-create-subscription
   deploy_fn stripe-cancel-subscription
   deploy_fn save-payment-method
+  deploy_fn pause-membership
+  deploy_fn resume-membership
+  deploy_fn resume-paused-memberships
+  deploy_fn process-membership-cancellations
   deploy_fn promote-waitlist
 
   # --no-verify-jwt: Mux / HitTrax / Stripe authenticate with their own schemes
