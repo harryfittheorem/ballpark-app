@@ -10,7 +10,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --ext .ts,.tsx"
+    "lint": "eslint . --ext .ts,.tsx",
+    "pitch-deck:pdf": "node scripts/export-pitch-deck-pdf.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.2.3",
@@ -42,6 +43,7 @@
     "expo-sharing": "~14.0.8",
     "expo-status-bar": "~3.0.9",
     "lucide-react-native": "^0.469.0",
+    "puppeteer": "^24.43.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.53.2",

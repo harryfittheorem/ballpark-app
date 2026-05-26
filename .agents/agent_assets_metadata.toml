@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "9T3Es1MHr1wGjxOVrjtb3"
+uri = "file://artifacts/pitch-deck/ballpark-pitch-deck.pdf"
+type = "pdf"
+title = "Ballpark Pitch Deck (15 slides)"

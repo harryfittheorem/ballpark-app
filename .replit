@@ -34,10 +34,6 @@ localPort = 3001
 externalPort = 3001
 
 [[ports]]
-localPort = 5000
-externalPort = 80
-
-[[ports]]
 localPort = 5001
 externalPort = 6000
 
@@ -158,10 +154,10 @@ waitForPort = 5000
 name = "Pitch Deck"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd artifacts/pitch-deck && npm run dev -- --port 3001"
-waitForPort = 3001
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd artifacts/pitch-deck && ./node_modules/.bin/vite --config vite.config.ts --host 0.0.0.0 --port 3001"
+waitForPort = 3001
