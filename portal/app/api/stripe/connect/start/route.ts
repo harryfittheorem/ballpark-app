@@ -54,7 +54,8 @@ export async function POST(req: NextRequest) {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) return clientErr(500, 'STRIPE_SECRET_KEY is not configured');
 
-  const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_PORTAL_URL ?? `https://${req.nextUrl.host}`;
+  const host = req.headers.get('host') ?? req.nextUrl.host;
+  const origin = process.env.NEXT_PUBLIC_PORTAL_URL ?? req.headers.get('origin') ?? `https://${host}`;
 
   // Verify the location belongs to the authenticated user's tenant
   const svc = createServiceClient();

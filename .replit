@@ -88,6 +88,9 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_xyXVBy2HN2pvbDTZC15jQQ_et3pskXc"
 EXPO_PUBLIC_TENANT_SLUG = "infinitehitting"
 RESEND_FROM_EMAIL = "onboarding@resend.dev"
 
+[userenv.production]
+NEXT_PUBLIC_PORTAL_URL = "https://ballpark-app.replit.app"
+
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 180000

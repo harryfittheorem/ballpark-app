@@ -41,7 +41,8 @@ function verifyAndParseToken(
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const token = searchParams.get('token');
-  const origin = `${req.nextUrl.protocol}//${req.nextUrl.host}`;
+  const host = req.headers.get('host') ?? req.nextUrl.host;
+  const origin = process.env.NEXT_PUBLIC_PORTAL_URL ?? `https://${host}`;
 
   const fallback = new URL('/owner/payments', origin);
   fallback.searchParams.set('error', encodeURIComponent('Onboarding link expired — please try again'));
