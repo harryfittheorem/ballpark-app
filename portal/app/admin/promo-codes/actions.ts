@@ -147,6 +147,10 @@ export async function createPromoCode(formData: FormData) {
       promoCode = await stripePost("promotion_codes", stripeKey, promoParams);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unknown Stripe error";
+      if (msg.toLowerCase().includes("already exists"))
+        redirect(
+          `/admin/promo-codes?error=${encodeURIComponent(`Code "${code}" already exists in Stripe — choose a different name.`)}`,
+        );
       redirect(
         `/admin/promo-codes?error=${encodeURIComponent("Stripe promo code error: " + msg)}`,
       );
