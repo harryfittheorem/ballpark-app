@@ -1,14 +1,15 @@
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
+import { useFamily } from '@/hooks/useFamily';
+import { getDaySlotAvailability, type SlotAvailability } from '@/api/waitlist';
+import { useQuery } from '@tanstack/react-query';
 
 import { useCoachAvailability } from '../hooks/useCoachAvailability';
-import { useCoaches } from '../hooks/useCoaches';
 import { useDayBookings } from '../hooks/useDayBookings';
 import { useActiveLocation } from '../hooks/useActiveLocation';
-import { formatSlotTime, generateDaySlots, type Slot, type AvailabilityForSlots } from '../utils/slots';
+import { formatSlotTime, generateDaySlots, dayBoundsUtcISO, type Slot, type AvailabilityForSlots } from '../utils/slots';
 import type { SessionType } from '@/api/bookings';
-import type { Coach } from '@/api/bookings';
 
 type Props = {
   sessionType: SessionType | null;
@@ -34,13 +35,48 @@ function getMonthDay(date: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function useDaySlotAvailability(
+  date: string,
+  sessionTypeId: string,
+  timezone: string | null,
+) {
+  const { family } = useFamily();
+  const tenantId = family?.tenant_id ?? null;
+
+  return useQuery<Map<string, SlotAvailability>>({
+    queryKey: ['slot_availability', tenantId, sessionTypeId, date, timezone ?? null],
+    queryFn: async () => {
+      const { startISO, endISO } = dayBoundsUtcISO(date, timezone);
+      return getDaySlotAvailability({
+        tenant_id: tenantId as string,
+        session_type_id: sessionTypeId,
+        start: startISO,
+        end: endISO,
+      });
+    },
+    enabled: !!tenantId && !!date && !!sessionTypeId,
+    staleTime: 30_000,
+  });
+}
+
+function capacityLabel(info: SlotAvailability | undefined): string | null {
+  if (!info) return null;
+  const remaining = info.capacity - info.confirmed_count;
+  if (remaining <= 0) return 'Full';
+  if (info.capacity === 1) return null;
+  return `${remaining} of ${info.capacity}`;
+}
+
+function slotKey(slot: Slot): string {
+  return `${slot.coach_id}_${new Date(slot.start).toISOString().replace(/\.\d{3}Z$/, 'Z')}`;
+}
+
 function DayColumn({
   date,
   dayLabel,
   monthDay,
   sessionType,
   availability,
-  coaches,
   timezone,
   onPickSlot,
 }: {
@@ -49,11 +85,11 @@ function DayColumn({
   monthDay: string;
   sessionType: SessionType;
   availability: AvailabilityForSlots[] | undefined;
-  coaches: Coach[] | undefined;
   timezone: string | null;
   onPickSlot: (slot: Slot) => void;
 }) {
   const bookings = useDayBookings(date, timezone);
+  const slotAvail = useDaySlotAvailability(date, sessionType.id, timezone);
   const isPending = bookings.isPending || !availability;
 
   const slots =
@@ -66,11 +102,6 @@ function DayColumn({
           bookings: bookings.data,
         })
       : [];
-
-  const coachFirstName = (id: string) => {
-    const c = coaches?.find((x) => x.id === id);
-    return c?.first_name ?? 'Coach';
-  };
 
   return (
     <View style={styles.column}>
@@ -90,18 +121,34 @@ function DayColumn({
         </View>
       ) : (
         <View style={styles.chips}>
-          {slots.map((slot) => (
-            <Pressable
-              key={`${slot.coach_id}|${slot.start}`}
-              onPress={() => onPickSlot(slot)}
-              style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
-              accessibilityRole="button"
-              accessibilityLabel={`${formatSlotTime(slot.start, timezone)} with ${coachFirstName(slot.coach_id)}`}
-            >
-              <Text style={styles.chipTime}>{formatSlotTime(slot.start, timezone)}</Text>
-              <Text style={styles.chipCoach}>{coachFirstName(slot.coach_id)}</Text>
-            </Pressable>
-          ))}
+          {slots.map((slot) => {
+            const key = slotKey(slot);
+            const info = slotAvail.data?.get(key);
+            const isFull = !!info && info.confirmed_count >= info.capacity;
+            const capLabel = capacityLabel(info);
+            return (
+              <Pressable
+                key={`${slot.coach_id}|${slot.start}`}
+                onPress={() => onPickSlot(slot)}
+                style={({ pressed }) => [
+                  styles.chip,
+                  isFull && styles.chipFull,
+                  pressed && !isFull && styles.chipPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${formatSlotTime(slot.start, timezone)}${isFull ? ', full' : ''}`}
+              >
+                <Text style={[styles.chipTime, isFull && styles.chipTimeFull]}>
+                  {formatSlotTime(slot.start, timezone)}
+                </Text>
+                {capLabel ? (
+                  <Text style={[styles.chipCapacity, isFull && styles.chipCapacityFull]}>
+                    {capLabel}
+                  </Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
         </View>
       )}
     </View>
@@ -111,7 +158,6 @@ function DayColumn({
 export default function MultiDaySlotList({ sessionType, onPickSlot }: Props) {
   const availability = useCoachAvailability();
   const location = useActiveLocation();
-  const coaches = useCoaches();
 
   const timezone = location.data?.timezone ?? null;
 
@@ -125,7 +171,7 @@ export default function MultiDaySlotList({ sessionType, onPickSlot }: Props) {
     return (
       <View style={styles.noTypeHint}>
         <Text style={styles.noTypeText}>
-          Pick a session type above to see open slots.
+          Loading available slots…
         </Text>
       </View>
     );
@@ -145,7 +191,6 @@ export default function MultiDaySlotList({ sessionType, onPickSlot }: Props) {
           monthDay={getMonthDay(date)}
           sessionType={sessionType}
           availability={availability.data}
-          coaches={coaches.data}
           timezone={timezone}
           onPickSlot={(slot) => onPickSlot(date, slot)}
         />
@@ -234,6 +279,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.base,
     alignItems: 'center',
   },
+  chipFull: {
+    borderColor: colors.border,
+    backgroundColor: 'rgba(155,149,144,0.06)',
+  },
   chipPressed: {
     backgroundColor: 'rgba(241, 229, 173, 0.18)',
   },
@@ -244,11 +293,17 @@ const styles = StyleSheet.create({
     letterSpacing: tracking.tight,
     textAlign: 'center',
   },
-  chipCoach: {
+  chipTimeFull: {
+    color: colors.textMuted,
+  },
+  chipCapacity: {
     color: colors.textLight,
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.xs,
     textAlign: 'center',
     marginTop: 2,
+  },
+  chipCapacityFull: {
+    color: colors.textMuted,
   },
 });

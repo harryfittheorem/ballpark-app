@@ -1,7 +1,7 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { Calendar as CalendarIcon, X } from 'lucide-react-native';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ScrollView as ScrollViewType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,32 +9,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useToast } from '@/components/ui';
 import { useFamilyBookings } from '@/hooks/useFamilyBookings';
 import { useSelectedKid } from '@/hooks/useSelectedKid';
+import { useActiveMembership } from '@/hooks/useActiveMembership';
 import type { MainTabScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
 import BookHeader from './components/BookHeader';
 import DateSection from './components/DateSection';
-import LocationContextPill from './components/LocationContextPill';
 import MultiDaySlotList from './components/MultiDaySlotList';
-import SessionTypeSection from './components/SessionTypeSection';
 import SummarySection from './components/SummarySection';
 import TimeSection from './components/TimeSection';
-import { useLocationContext } from './hooks/useLocationContext';
 import { useSessionTypes } from './hooks/useSessionTypes';
 import { useActiveLocation } from './hooks/useActiveLocation';
 import { useSlotAvailability } from '@/hooks/useSlotAvailability';
 import { styles as flowStyles } from './styles';
 import type { Slot } from './utils/slots';
 import type { SessionType } from '@/api/bookings';
-
-type Category = 'all' | 'private' | 'group' | 'cage';
-
-const CATEGORIES: { key: Category; label: string }[] = [
-  { key: 'all', label: 'ALL' },
-  { key: 'private', label: 'PRIVATE LESSONS' },
-  { key: 'group', label: 'GROUP CLASSES' },
-  { key: 'cage', label: 'CAGE RENTALS' },
-];
 
 function statusLabel(status: string): string {
   if (status === 'confirmed') return 'CONFIRMED';
@@ -80,8 +69,8 @@ export default function BookScreen() {
   const scrollRef = useRef<ScrollViewType>(null);
   const summaryY = useRef<number>(0);
 
-  const [category, setCategory] = useState<Category>('all');
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [cageMode, setCageMode] = useState(false);
 
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -92,19 +81,51 @@ export default function BookScreen() {
   const selectedSessionType: SessionType | null =
     sessionTypes?.find((s) => s.id === selectedSessionTypeId) ?? null;
 
-  const {
-    activeLocation,
-    allowCrossLocation,
-    allLocations,
-    setActiveLocationId,
-  } = useLocationContext();
-
   const { kid } = useSelectedKid();
-
   const activeLocationData = useActiveLocation();
   const timezone = activeLocationData.data?.timezone ?? null;
+  const cageRentalEnabled = (activeLocationData.data as { cage_rental_enabled?: boolean } | null)
+    ?.cage_rental_enabled ?? false;
 
-  // Slot availability (capacity check) — only for group/cage
+  const { data: membership } = useActiveMembership();
+  const sessionsRemaining =
+    membership?.sessions_remaining !== undefined && membership?.sessions_remaining !== null
+      ? membership.sessions_remaining
+      : null;
+
+  // Auto-select the first non-cage session type when types load
+  useEffect(() => {
+    if (!sessionTypes || sessionTypes.length === 0) return;
+    if (selectedSessionTypeId) return;
+    const nonCage = sessionTypes.find((s) => s.type_category !== 'cage');
+    if (nonCage) {
+      setSelectedSessionTypeId(nonCage.id);
+    }
+  }, [sessionTypes, selectedSessionTypeId]);
+
+  // When cage mode toggles, switch to appropriate session type
+  useEffect(() => {
+    if (!sessionTypes) return;
+    if (cageMode) {
+      const cage = sessionTypes.find((s) => s.type_category === 'cage');
+      if (cage) {
+        setSelectedSessionTypeId(cage.id);
+        setSelectedDate(null);
+        setSelectedSlot(null);
+        setSelectedCoachId(null);
+      }
+    } else {
+      const nonCage = sessionTypes.find((s) => s.type_category !== 'cage');
+      if (nonCage) {
+        setSelectedSessionTypeId(nonCage.id);
+        setSelectedDate(null);
+        setSelectedSlot(null);
+        setSelectedCoachId(null);
+      }
+    }
+  }, [cageMode, sessionTypes]);
+
+  // Slot availability for the selected date — used for slotIsFull check and BAF
   const slotAvailability = useSlotAvailability(
     selectedDate,
     selectedSessionTypeId,
@@ -112,8 +133,7 @@ export default function BookScreen() {
     timezone,
   );
 
-  // Determine if the selected slot is at capacity.
-  // Slot key must be canonical ISO-no-ms to match DB `to_char(..., 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`.
+  // Canonical slot key for the selected slot
   const selectedWaitlistSlotKey = selectedSlot
     ? `${selectedSlot.coach_id}_${new Date(selectedSlot.start).toISOString().replace(/\.\d{3}Z$/, 'Z')}`
     : null;
@@ -125,6 +145,11 @@ export default function BookScreen() {
   const slotIsFull =
     !!selectedSlotInfo &&
     selectedSlotInfo.confirmed_count >= selectedSlotInfo.capacity;
+
+  // Remaining spots in the selected slot (used for Bring-a-Friend eligibility)
+  const slotRemainingSpots = selectedSlotInfo
+    ? Math.max(0, selectedSlotInfo.capacity - selectedSlotInfo.confirmed_count)
+    : null;
 
   const { data: bookings } = useFamilyBookings();
   const today = new Date();
@@ -147,26 +172,16 @@ export default function BookScreen() {
       .slice(0, 3);
   }, [bookings, kid]);
 
-  const handleSelectSessionType = useCallback((id: string) => {
-    setSelectedSessionTypeId(id);
-    setSelectedDate(null);
-    setSelectedSlot(null);
-    setSelectedCoachId(null);
-  }, []);
-
   const handleSelectDate = useCallback((d: string) => {
     setSelectedDate(d);
     setSelectedSlot(null);
     setSelectedCoachId(null);
   }, []);
 
-  const handleSelectSlot = useCallback((slot: Slot, eligible: string[]) => {
+  const handleSelectSlot = useCallback((slot: Slot, _eligible: string[]) => {
     setSelectedSlot(slot);
-    if (eligible.length <= 1) {
-      setSelectedCoachId(slot.coach_id);
-    } else {
-      setSelectedCoachId(null);
-    }
+    // Always auto-assign coach — names are not shown to the member
+    setSelectedCoachId(slot.coach_id);
   }, []);
 
   const selectedSlotKey = selectedSlot
@@ -180,7 +195,6 @@ export default function BookScreen() {
   }, []);
 
   const resetSelection = useCallback(() => {
-    setSelectedSessionTypeId(null);
     setSelectedDate(null);
     setSelectedSlot(null);
     setSelectedCoachId(null);
@@ -205,15 +219,11 @@ export default function BookScreen() {
 
   const handleMultiDaySlotPick = useCallback(
     (date: string, slot: Slot) => {
-      if (!selectedSessionTypeId) {
-        showToast('Pick a session type first to see open slots.');
-        return;
-      }
       handleSelectDate(date);
       handleSelectSlot(slot, [slot.coach_id]);
       scrollToSummary();
     },
-    [selectedSessionTypeId, handleSelectDate, handleSelectSlot, scrollToSummary, showToast],
+    [handleSelectDate, handleSelectSlot, scrollToSummary],
   );
 
   const handleCalendarSlotPick = useCallback(
@@ -228,19 +238,14 @@ export default function BookScreen() {
   const summaryLocked =
     !selectedSessionTypeId || !selectedDate || !selectedSlot || !selectedCoachId;
 
+  const creditsLabel =
+    sessionsRemaining !== null
+      ? `${sessionsRemaining} lesson${sessionsRemaining === 1 ? '' : 's'} remaining`
+      : null;
+
   return (
     <SafeAreaView style={flowStyles.safe} edges={['top']}>
       <BookHeader />
-      {activeLocation ? (
-        <View style={shellStyles.locationPillWrap}>
-          <LocationContextPill
-            locationName={activeLocation.name}
-            allowSwitch={allowCrossLocation}
-            allLocations={allLocations}
-            onSelect={setActiveLocationId}
-          />
-        </View>
-      ) : null}
       <ScrollView
         ref={scrollRef}
         style={flowStyles.scroll}
@@ -250,30 +255,6 @@ export default function BookScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Filter pills ---------------------------------------------------- */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={shellStyles.tabBar}
-        >
-          {CATEGORIES.map((c) => {
-            const active = c.key === category;
-            return (
-              <Pressable
-                key={c.key}
-                onPress={() => setCategory(c.key)}
-                style={[shellStyles.pill, active && shellStyles.pillActive]}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-              >
-                <Text style={[shellStyles.pillText, active && shellStyles.pillTextActive]}>
-                  {c.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
         {/* YOUR UPCOMING --------------------------------------------------- */}
         <View style={flowStyles.section}>
           <Text style={shellStyles.sectionLabel}>YOUR UPCOMING</Text>
@@ -289,12 +270,6 @@ export default function BookScreen() {
               const start = new Date(b.scheduled_start);
               const badge = dateBadgeLabel(start, today, tomorrow);
               const sc = statusColors(b.status ?? 'pending');
-              const middle = [
-                b.session_type?.name ?? 'Session',
-                b.coach ? `with ${b.coach.first_name}` : null,
-              ]
-                .filter(Boolean)
-                .join(' · ');
               const locationSub = b.location?.name ?? null;
               return (
                 <Pressable
@@ -316,7 +291,7 @@ export default function BookScreen() {
                   </View>
                   <View style={shellStyles.upcomingMiddle}>
                     <Text style={shellStyles.upcomingTitle} numberOfLines={1}>
-                      {middle}
+                      {b.session_type?.name ?? 'Session'}
                     </Text>
                     {locationSub ? (
                       <Text style={shellStyles.upcomingSub} numberOfLines={1}>
@@ -335,15 +310,38 @@ export default function BookScreen() {
           )}
         </View>
 
-        {/* WHAT ARE YOU BOOKING? ------------------------------------------ */}
-        <View style={flowStyles.section}>
-          <Text style={shellStyles.sectionLabel}>WHAT ARE YOU BOOKING?</Text>
-          <SessionTypeSection
-            selectedSessionTypeId={selectedSessionTypeId}
-            onSelect={handleSelectSessionType}
-            categoryFilter={category}
-          />
-        </View>
+        {/* Credit balance pill --------------------------------------------- */}
+        {creditsLabel ? (
+          <View style={shellStyles.creditsBanner}>
+            <Text style={shellStyles.creditsText}>{creditsLabel}</Text>
+          </View>
+        ) : null}
+
+        {/* Cage mode toggle ------------------------------------------------- */}
+        {cageRentalEnabled ? (
+          <View style={shellStyles.cageToggleRow}>
+            <Pressable
+              onPress={() => setCageMode(false)}
+              style={[shellStyles.cageTab, !cageMode && shellStyles.cageTabActive]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: !cageMode }}
+            >
+              <Text style={[shellStyles.cageTabText, !cageMode && shellStyles.cageTabTextActive]}>
+                HITTING LESSONS
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setCageMode(true)}
+              style={[shellStyles.cageTab, cageMode && shellStyles.cageTabActive]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: cageMode }}
+            >
+              <Text style={[shellStyles.cageTabText, cageMode && shellStyles.cageTabTextActive]}>
+                CAGE RENTALS
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* AVAILABLE SLOTS ------------------------------------------------- */}
         <View style={flowStyles.section}>
@@ -359,7 +357,7 @@ export default function BookScreen() {
           <Pressable
             onPress={() => {
               if (!selectedSessionTypeId) {
-                showToast('Pick a session type first.');
+                showToast('Session types still loading — please wait.');
                 return;
               }
               setCalendarOpen(true);
@@ -390,6 +388,7 @@ export default function BookScreen() {
             slot={selectedSlot}
             selectedCoachId={selectedCoachId}
             slotIsFull={slotIsFull}
+            slotRemainingSpots={slotRemainingSpots}
             onBooked={handleBooked}
             onWaitlistJoined={handleWaitlistJoined}
           />
@@ -404,18 +403,14 @@ export default function BookScreen() {
         onRequestClose={() => setCalendarOpen(false)}
       >
         <View style={shellStyles.modalOverlay}>
-          {/* Backdrop — tap to dismiss */}
           <Pressable
             style={shellStyles.modalBackdrop}
             onPress={() => setCalendarOpen(false)}
           />
 
-          {/* Sheet */}
           <View style={shellStyles.modalSheet}>
-            {/* Drag handle */}
             <View style={shellStyles.modalHandle} />
 
-            {/* Header */}
             <View style={shellStyles.modalHeader}>
               <Text style={shellStyles.modalTitle}>BROWSE DATES</Text>
               <Pressable
@@ -429,7 +424,6 @@ export default function BookScreen() {
               </Pressable>
             </View>
 
-            {/* Scrollable content: calendar + time slots */}
             <ScrollView
               style={shellStyles.modalScroll}
               contentContainerStyle={shellStyles.modalScrollContent}
@@ -447,6 +441,7 @@ export default function BookScreen() {
                   <TimeSection
                     locked={false}
                     date={selectedDate}
+                    sessionTypeId={selectedSessionTypeId}
                     durationMinutes={selectedSessionType?.duration_minutes ?? null}
                     selectedSlotKey={selectedSlotKey}
                     onSelectSlot={handleCalendarSlotPick}
@@ -462,31 +457,6 @@ export default function BookScreen() {
 }
 
 const shellStyles = StyleSheet.create({
-  locationPillWrap: {
-    paddingHorizontal: spacing['3xl'],
-    paddingBottom: spacing.lg,
-  },
-  tabBar: {
-    paddingHorizontal: spacing['3xl'],
-    paddingVertical: spacing.lg,
-    gap: spacing.base,
-  },
-  pill: {
-    paddingHorizontal: spacing['2xl'],
-    paddingVertical: spacing.lg,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.darker,
-  },
-  pillActive: { backgroundColor: colors.gold, borderColor: colors.gold },
-  pillText: {
-    color: colors.textLight,
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes.sm,
-    letterSpacing: tracking.wider,
-  },
-  pillTextActive: { color: colors.dark },
   sectionLabel: {
     color: colors.gold,
     fontFamily: fontFamilies.oswaldBold,
@@ -567,6 +537,50 @@ const shellStyles = StyleSheet.create({
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.xs,
     letterSpacing: tracking.wide,
+  },
+  creditsBanner: {
+    marginHorizontal: spacing['3xl'],
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing['2xl'],
+    paddingVertical: spacing.lg,
+    borderRadius: radius.xl,
+    backgroundColor: 'rgba(241, 229, 173, 0.08)',
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    alignItems: 'center',
+  },
+  creditsText: {
+    color: colors.gold,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.base,
+    letterSpacing: tracking.wide,
+  },
+  cageToggleRow: {
+    flexDirection: 'row',
+    marginHorizontal: spacing['3xl'],
+    marginBottom: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  cageTab: {
+    flex: 1,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    backgroundColor: colors.darker,
+  },
+  cageTabActive: {
+    backgroundColor: colors.gold,
+  },
+  cageTabText: {
+    color: colors.textLight,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.sm,
+    letterSpacing: tracking.wider,
+  },
+  cageTabTextActive: {
+    color: colors.dark,
   },
   browseButton: {
     flexDirection: 'row',

@@ -44,7 +44,6 @@ import {
   useAchievementsCatalog,
   useEarnedAchievements,
 } from '@/hooks/useAchievements';
-import { useFamily } from '@/hooks/useFamily';
 import { usePersonalBestsForKid, useSwingsForKid } from '@/hooks/useSwings';
 import { useSelectedKid } from '@/hooks/useSelectedKid';
 import { useHitTraxLink } from '@/hooks/useHitTraxLink';
@@ -382,13 +381,14 @@ export default function ProfileScreen({ navigation }: Props) {
           }
           onPress={() => navigation.navigate('PaymentMethod')}
         />
-        <Row
-          icon={MapPin}
-          label="My Location"
-          subtitle={primaryLocation?.name ?? (family?.primary_location_id ? 'Loading…' : 'Not set')}
-          subtitleTone="muted"
-          onPress={() => navigation.navigate('ChangeLocation')}
-        />
+        {primaryLocation?.name ? (
+          <Row
+            icon={MapPin}
+            label="My Location"
+            subtitle={primaryLocation.name}
+            subtitleTone="muted"
+          />
+        ) : null}
         <Row
           icon={Activity}
           label="HitTrax"
@@ -478,10 +478,10 @@ function Row({
   label: string;
   subtitle?: string;
   subtitleTone?: 'success' | 'gold' | 'light' | 'muted';
-  onPress: () => void;
+  onPress?: () => void;
 }) {
-  return (
-    <TouchableOpacity onPress={onPress} style={styles.row}>
+  const inner = (
+    <>
       <View style={styles.rowIcon}>
         <Icon size={18} color={colors.gold} />
       </View>
@@ -504,9 +504,17 @@ function Row({
           </Text>
         ) : null}
       </View>
-      <ChevronRight size={18} color={colors.gold} />
-    </TouchableOpacity>
+      {onPress ? <ChevronRight size={18} color={colors.gold} /> : null}
+    </>
   );
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} style={styles.row}>
+        {inner}
+      </TouchableOpacity>
+    );
+  }
+  return <View style={styles.row}>{inner}</View>;
 }
 
 const styles = StyleSheet.create({

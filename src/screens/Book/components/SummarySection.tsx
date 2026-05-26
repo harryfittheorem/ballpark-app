@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui';
 import { useSelectedKid } from '@/hooks/useSelectedKid';
 import { useActiveMembership } from '@/hooks/useActiveMembership';
+import { activeMembershipKey } from '@/hooks/useActiveMembership';
 import { useJoinWaitlist } from '@/hooks/useWaitlistEntries';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import type { Tables } from '@/types/database';
@@ -11,6 +13,7 @@ import type { Tables } from '@/types/database';
 import { useCoaches } from '../hooks/useCoaches';
 import { useCreateBooking, isNoSessionCreditsError, type CreateBookingResult } from '../hooks/useCreateBooking';
 import { useActiveLocation } from '../hooks/useActiveLocation';
+import { bookSessionWithFriend, type BookWithFriendResult } from '@/api/memberships';
 import type { SessionType } from '@/api/bookings';
 import type { Slot } from '../utils/slots';
 import SectionCard from './SectionCard';
@@ -26,6 +29,8 @@ type Props = {
   selectedCoachId: string | null;
   /** When true the slot is at capacity — show "Join Waitlist" instead of "Confirm Booking" */
   slotIsFull?: boolean;
+  /** Number of remaining spots in the selected slot (for Bring-a-Friend eligibility) */
+  slotRemainingSpots?: number | null;
   onBooked: (formattedWhen: string) => void;
   onWaitlistJoined?: (position: number) => void;
 };
@@ -73,6 +78,7 @@ export default function SummarySection({
   slot,
   selectedCoachId,
   slotIsFull = false,
+  slotRemainingSpots = null,
   onBooked,
   onWaitlistJoined,
 }: Props) {
@@ -83,17 +89,25 @@ export default function SummarySection({
   const { data: membership } = useActiveMembership();
   const joinWaitlist = useJoinWaitlist();
 
+  const qc = useQueryClient();
+
   const [errorVisible, setErrorVisible] = useState(false);
-  // Task #242: sibling / kid-picker
   const [kidPickerVisible, setKidPickerVisible] = useState(false);
   const [overrideKidId, setOverrideKidId] = useState<string | null>(null);
-  // Task #237: session credit gating
   const [noCreditsVisible, setNoCreditsVisible] = useState(false);
   const [bookingResult, setBookingResult] = useState<CreateBookingResult | null>(null);
-  // Task #239: waitlist
+  const [bafResult, setBafResult] = useState<BookWithFriendResult | null>(null);
+  const [bafPending, setBafPending] = useState(false);
+  const [bafBookingError, setBafBookingError] = useState<string | null>(null);
   const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
 
-  // The kid to book for — parent may override via the picker (Task #242)
+  // Bring-a-Friend: pre-confirm form state
+  const [bafOptedIn, setBafOptedIn] = useState(false);
+  const [bafName, setBafName] = useState('');
+  const [bafPhone, setBafPhone] = useState('');
+  const [bafEmail, setBafEmail] = useState('');
+  const [bafError, setBafError] = useState<string | null>(null);
+
   const activeKid: Kid | null = useMemo(() => {
     if (overrideKidId) {
       return kids.find((k) => k.id === overrideKidId) ?? defaultKid;
@@ -121,10 +135,8 @@ export default function SummarySection({
 
   const dateLabel = ready ? formatDateLabel(date as string, tz) : null;
   const timeLabel = ready ? formatTimeLabel((slot as Slot).start, tz) : null;
-  const coachName = coach ? `${coach.first_name} ${coach.last_name}`.trim() : null;
   const priceLabel = sessionType ? formatPriceUSD(sessionType.base_price_cents) : null;
 
-  // Session credits for OTC pack holders (Task #237)
   const isOtcPack =
     membership?.plan_type === 'otc' &&
     membership.sessions_remaining !== null &&
@@ -133,49 +145,106 @@ export default function SummarySection({
   const sessionsRemaining = isOtcPack ? (membership!.sessions_remaining as number) : null;
   const sessionsTotal     = isOtcPack ? (membership!.sessions_total as number) : null;
 
-  // The balance AFTER this booking (pre-confirmation hint to user)
-  const sessionsAfter =
-    sessionsRemaining !== null ? Math.max(0, sessionsRemaining - 1) : null;
-
-  // Already out of credits — disable confirm proactively
   const outOfCredits = sessionsRemaining !== null && sessionsRemaining === 0;
 
-  // Clear confirmed state whenever the selection changes (slot, date, session
-  // type, or coach). This handles: navigating away + back, cancelling a booking
-  // then picking a new slot, or changing the date after a successful booking.
+  /**
+   * Bring-a-Friend eligibility (PRE-confirm, uses current balance):
+   * - Member has >= 2 sessions available (or unlimited EFT)
+   * - Slot has >= 2 remaining spots (room for both bookings)
+   */
+  const bafEligible =
+    !slotIsFull &&
+    (slotRemainingSpots === null || slotRemainingSpots >= 2) &&
+    (sessionsRemaining === null || sessionsRemaining >= 2);
+
+  // Credits after booking: -1 (primary) -1 (BAF) if opted in, else -1
+  const creditsAfterPrimary = sessionsRemaining !== null ? Math.max(0, sessionsRemaining - 1) : null;
+  const creditsAfterBaf     = sessionsRemaining !== null ? Math.max(0, sessionsRemaining - 2) : null;
+  const creditsDisplayAfter = bafOptedIn ? creditsAfterBaf : creditsAfterPrimary;
+
+  // Price label changes when BAF is opted in (2 sessions instead of 1)
+  const bafPriceLabel =
+    sessionType ? `${formatPriceUSD(sessionType.base_price_cents)} × 2 sessions` : null;
+
   useEffect(() => {
     setBookingResult(null);
+    setBafResult(null);
+    setBafPending(false);
+    setBafBookingError(null);
     setErrorVisible(false);
     setNoCreditsVisible(false);
+    setBafOptedIn(false);
+    setBafName('');
+    setBafPhone('');
+    setBafEmail('');
+    setBafError(null);
+    setWaitlistPosition(null);
   }, [slot, date, sessionType?.id, selectedCoachId]);
 
-  // Stores the formatted when string so the Done button can pass it to onBooked
   const formattedWhenRef = useRef<string>('');
 
-  const handleConfirm = () => {
-    // Both guards: kid must be selected (Task #242) AND credits must be available (Task #237)
-    if (!ready || createBooking.isPending || !activeKid || outOfCredits) return;
+  const handleConfirm = async () => {
+    if (!ready || createBooking.isPending || bafPending || !activeKid || outOfCredits) return;
+    if (bafOptedIn && !bafName.trim()) {
+      setBafError('Friend\'s name is required to add them.');
+      return;
+    }
     setErrorVisible(false);
     setNoCreditsVisible(false);
     setBookingResult(null);
-
-    const insert = {
-      tenant_id: family!.tenant_id,
-      location_id: location.data!.id,
-      kid_id: activeKid.id,
-      coach_id: coach!.id,
-      session_type_id: sessionType!.id,
-      scheduled_start: (slot as Slot).start,
-      scheduled_end: (slot as Slot).end,
-      status: 'confirmed' as const,
-    };
+    setBafResult(null);
+    setBafBookingError(null);
 
     formattedWhenRef.current = `${dateLabel} at ${timeLabel}`;
 
+    // ── BAF path: atomic RPC (deducts 2 credits, creates both bookings, awards points) ──
+    if (bafOptedIn) {
+      setBafPending(true);
+      try {
+        const result = await bookSessionWithFriend({
+          tenant_id:        family!.tenant_id,
+          location_id:      location.data!.id,
+          kid_id:           activeKid.id,
+          coach_id:         coach!.id,
+          session_type_id:  sessionType!.id,
+          scheduled_start:  (slot as Slot).start,
+          scheduled_end:    (slot as Slot).end,
+          guest_name:       bafName.trim(),
+          guest_phone:      bafPhone.trim() || null,
+          guest_email:      bafEmail.trim() || null,
+        });
+        setBafResult(result);
+        void qc.invalidateQueries({ queryKey: ['day_bookings'] });
+        void qc.invalidateQueries({ queryKey: ['upcoming-session'] });
+        void qc.invalidateQueries({ queryKey: ['family_bookings'] });
+        void qc.invalidateQueries({ queryKey: activeMembershipKey(activeKid.id) });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Something went wrong.';
+        setBafBookingError(
+          msg.includes('no_session_credits')
+            ? 'Not enough credits for Bring-a-Friend (need 2).'
+            : msg,
+        );
+      } finally {
+        setBafPending(false);
+      }
+      return;
+    }
+
+    // ── Normal path: useCreateBooking (deducts 1 credit) ─────────────────────
+    const insert = {
+      tenant_id:       family!.tenant_id,
+      location_id:     location.data!.id,
+      kid_id:          activeKid.id,
+      coach_id:        coach!.id,
+      session_type_id: sessionType!.id,
+      scheduled_start: (slot as Slot).start,
+      scheduled_end:   (slot as Slot).end,
+      status:          'confirmed' as const,
+    };
+
     createBooking.mutate(insert, {
       onSuccess: (result) => {
-        // Task #237: hold here so the user can see their updated pack balance
-        // before navigating away. The "Done" button calls onBooked.
         setBookingResult(result);
       },
       onError: (err) => {
@@ -219,17 +288,21 @@ export default function SummarySection({
     );
   };
 
-  // Task #237: confirmed state — show balance before navigating
-  if (bookingResult !== null) {
-    const balanceAfter = bookingResult.sessionsRemaining;
+  // Post-booking success screen — BAF path
+  if (bafResult !== null) {
+    const balanceAfter = bafResult.sessions_remaining;
     const showBalance  = isOtcPack && balanceAfter >= 0;
-
     return (
       <SectionCard title="Summary" locked={false}>
         <View style={styles.confirmedBlock}>
-          <Text style={styles.confirmedTitle}>Session booked!</Text>
+          <Text style={styles.confirmedTitle}>Sessions booked!</Text>
           <Text style={styles.confirmedWhen}>{formattedWhenRef.current}</Text>
-
+          <Text style={styles.confirmedProvider}>Infinite Hitting</Text>
+          <View style={styles.bafResultBox}>
+            <Text style={[styles.bafResultText, styles.bafResultSuccess]}>
+              ✓ Friend spot reserved · +100 points earned
+            </Text>
+          </View>
           {showBalance ? (
             <View style={styles.balanceBox}>
               <Text style={styles.balanceLabel}>Sessions remaining</Text>
@@ -237,7 +310,29 @@ export default function SummarySection({
               <Text style={styles.balanceOf}>of {sessionsTotal}</Text>
             </View>
           ) : null}
+          <Button label="Done" onPress={handleDone} variant="primary" />
+        </View>
+      </SectionCard>
+    );
+  }
 
+  // Post-booking success screen — normal path
+  if (bookingResult !== null) {
+    const balanceAfter = bookingResult.sessionsRemaining;
+    const showBalance  = isOtcPack && balanceAfter >= 0;
+    return (
+      <SectionCard title="Summary" locked={false}>
+        <View style={styles.confirmedBlock}>
+          <Text style={styles.confirmedTitle}>Session booked!</Text>
+          <Text style={styles.confirmedWhen}>{formattedWhenRef.current}</Text>
+          <Text style={styles.confirmedProvider}>Infinite Hitting</Text>
+          {showBalance ? (
+            <View style={styles.balanceBox}>
+              <Text style={styles.balanceLabel}>Sessions remaining</Text>
+              <Text style={styles.balanceNumber}>{balanceAfter}</Text>
+              <Text style={styles.balanceOf}>of {sessionsTotal}</Text>
+            </View>
+          ) : null}
           <Button label="Done" onPress={handleDone} variant="primary" />
         </View>
       </SectionCard>
@@ -256,14 +351,18 @@ export default function SummarySection({
             <SummaryLine label="Session" value={sessionType!.name} />
             <SummaryLine label="Date" value={dateLabel as string} />
             <SummaryLine label="Time" value={timeLabel as string} />
-            <SummaryLine label="Coach" value={coachName as string} />
+            <SummaryLine label="Provider" value="Infinite Hitting" />
             {!slotIsFull ? (
-              <SummaryLine label="Price" value={priceLabel as string} />
+              <SummaryLine
+                label="Price"
+                value={bafOptedIn ? (bafPriceLabel as string) : (priceLabel as string)}
+                valueStyle={bafOptedIn ? styles.lineValueGold : undefined}
+              />
             ) : (
               <SummaryLine label="Status" value="Session Full — Waitlist" />
             )}
 
-            {/* Kid selector row (Task #242) — only shown when family has multiple kids */}
+            {/* Kid selector row — only shown when family has multiple kids */}
             {multipleKids ? (
               <View style={styles.kidRow}>
                 <Text style={styles.lineLabel}>BOOKING FOR</Text>
@@ -281,17 +380,84 @@ export default function SummarySection({
               </View>
             ) : null}
 
-            {/* Pack balance line (Task #237) — only shown when booking (not waitlisting) */}
+            {/* Pack balance preview — updates based on BAF selection */}
             {!slotIsFull && isOtcPack && sessionsRemaining !== null && sessionsTotal !== null ? (
               <SummaryLine
-                label="Pack balance"
+                label="After booking"
                 value={
                   outOfCredits
                     ? 'No sessions remaining'
-                    : `${sessionsAfter} of ${sessionsTotal} after booking`
+                    : `${creditsDisplayAfter as number} of ${sessionsTotal} remaining`
                 }
                 valueStyle={outOfCredits ? styles.lineValueDanger : styles.lineValueGold}
               />
+            ) : null}
+
+            {/* Bring-a-Friend section — shown pre-confirm when eligible */}
+            {bafEligible && !slotIsFull ? (
+              <View style={styles.bafSection}>
+                <Pressable
+                  onPress={() => {
+                    setBafOptedIn((v) => !v);
+                    setBafError(null);
+                  }}
+                  style={styles.bafToggleRow}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: bafOptedIn }}
+                >
+                  <View style={[styles.bafCheckbox, bafOptedIn && styles.bafCheckboxChecked]}>
+                    {bafOptedIn ? (
+                      <Text style={styles.bafCheckmark}>✓</Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.bafToggleLabelBlock}>
+                    <Text style={styles.bafToggleLabel}>
+                      BRING A FRIEND
+                    </Text>
+                    <Text style={styles.bafToggleSub}>
+                      Uses 2 credits total · You earn +100 pts
+                    </Text>
+                  </View>
+                </Pressable>
+
+                {bafOptedIn ? (
+                  <View style={styles.bafForm}>
+                    <TextInput
+                      style={[styles.bafInput, !bafName.trim() && bafError ? styles.bafInputError : null]}
+                      placeholder="Friend's name *"
+                      placeholderTextColor={colors.textMuted}
+                      value={bafName}
+                      onChangeText={(v) => {
+                        setBafName(v);
+                        if (bafError) setBafError(null);
+                      }}
+                      autoCorrect={false}
+                    />
+                    <TextInput
+                      style={styles.bafInput}
+                      placeholder="Phone (optional)"
+                      placeholderTextColor={colors.textMuted}
+                      value={bafPhone}
+                      onChangeText={setBafPhone}
+                      keyboardType="phone-pad"
+                      autoCorrect={false}
+                    />
+                    <TextInput
+                      style={styles.bafInput}
+                      placeholder="Email (optional)"
+                      placeholderTextColor={colors.textMuted}
+                      value={bafEmail}
+                      onChangeText={setBafEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    {bafError ? (
+                      <Text style={styles.bafErrorText}>{bafError}</Text>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
             ) : null}
           </View>
         ) : (
@@ -302,7 +468,7 @@ export default function SummarySection({
           </View>
         )}
 
-        {/* Waitlist success state (Task #239) */}
+        {/* Waitlist success state */}
         {waitlistPosition !== null ? (
           <View style={styles.waitlistSuccess}>
             <Text style={styles.waitlistSuccessTitle}>
@@ -315,7 +481,6 @@ export default function SummarySection({
         ) : (
           <View style={styles.confirmWrap}>
             {slotIsFull ? (
-              /* Waitlist flow (Task #239) */
               <>
                 <Button
                   label={joinWaitlist.isPending ? 'Joining Waitlist…' : 'Join Waitlist'}
@@ -329,11 +494,6 @@ export default function SummarySection({
                     <Text style={styles.errorText}>
                       Couldn&apos;t join the waitlist — please try again.
                     </Text>
-                    {__DEV__ && joinWaitlist.error ? (
-                      <Text style={styles.errorDevText} numberOfLines={3}>
-                        {joinWaitlist.error.message}
-                      </Text>
-                    ) : null}
                     <Button
                       label="Tap to retry"
                       variant="tertiary"
@@ -344,9 +504,7 @@ export default function SummarySection({
                 ) : null}
               </>
             ) : (
-              /* Normal booking flow (Tasks #237 + #242) */
               <>
-                {/* Out-of-credits warning (Task #237) — shown proactively before the user taps */}
                 {outOfCredits && ready ? (
                   <View style={styles.errorBlock}>
                     <Text style={styles.errorText}>
@@ -356,14 +514,17 @@ export default function SummarySection({
                 ) : null}
 
                 <Button
-                  label={createBooking.isPending ? 'Booking…' : 'Confirm Booking'}
-                  onPress={handleConfirm}
+                  label={
+                    bafPending ? 'Booking…' :
+                    createBooking.isPending ? 'Booking…' :
+                    'Confirm Booking'
+                  }
+                  onPress={() => { void handleConfirm(); }}
                   variant="primary"
-                  loading={createBooking.isPending}
-                  disabled={!ready || createBooking.isPending || outOfCredits}
+                  loading={createBooking.isPending || bafPending}
+                  disabled={!ready || createBooking.isPending || bafPending || outOfCredits}
                 />
 
-                {/* NO_SESSION_CREDITS race-condition error (Task #237) */}
                 {noCreditsVisible ? (
                   <View style={styles.errorBlock}>
                     <Text style={styles.errorText}>
@@ -372,22 +533,28 @@ export default function SummarySection({
                   </View>
                 ) : null}
 
-                {/* Generic booking error with retry */}
+                {bafBookingError ? (
+                  <View style={styles.errorBlock}>
+                    <Text style={styles.errorText}>{bafBookingError}</Text>
+                    <Button
+                      label="Tap to retry"
+                      variant="tertiary"
+                      tone="gold"
+                      onPress={() => { void handleConfirm(); }}
+                    />
+                  </View>
+                ) : null}
+
                 {errorVisible ? (
                   <View style={styles.errorBlock}>
                     <Text style={styles.errorText}>
                       Couldn&apos;t book that session — please try again.
                     </Text>
-                    {__DEV__ && createBooking.error ? (
-                      <Text style={styles.errorDevText} numberOfLines={3}>
-                        {createBooking.error.message}
-                      </Text>
-                    ) : null}
                     <Button
                       label="Tap to retry"
                       variant="tertiary"
                       tone="gold"
-                      onPress={handleConfirm}
+                      onPress={() => { void handleConfirm(); }}
                     />
                   </View>
                 ) : null}
@@ -397,7 +564,7 @@ export default function SummarySection({
         )}
       </SectionCard>
 
-      {/* Kid picker modal (Task #242) */}
+      {/* Kid picker modal */}
       <Modal
         visible={kidPickerVisible}
         transparent
@@ -504,7 +671,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     color: colors.textOnDark,
   },
-  // Task #242: kid-picker
   kidRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -533,18 +699,91 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     textDecorationLine: 'underline',
   },
-  // Task #237: pack balance line colours
   lineValueGold: {
     color: colors.gold,
   },
   lineValueDanger: {
     color: colors.danger,
   },
+  // Bring-a-Friend (pre-confirm)
+  bafSection: {
+    marginTop: spacing.base,
+    borderRadius: radius['2xl'],
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    backgroundColor: 'rgba(241, 229, 173, 0.04)',
+    overflow: 'hidden',
+  },
+  bafToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    padding: spacing['2xl'],
+  },
+  bafCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: colors.borderGold,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  bafCheckboxChecked: {
+    backgroundColor: colors.gold,
+    borderColor: colors.gold,
+  },
+  bafCheckmark: {
+    color: colors.dark,
+    fontFamily: fontFamilies.interBold,
+    fontSize: 12,
+    lineHeight: 14,
+  },
+  bafToggleLabelBlock: {
+    flex: 1,
+  },
+  bafToggleLabel: {
+    color: colors.gold,
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.base,
+    letterSpacing: tracking.wide,
+  },
+  bafToggleSub: {
+    color: colors.textLight,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    marginTop: 1,
+  },
+  bafForm: {
+    paddingHorizontal: spacing['2xl'],
+    paddingBottom: spacing['2xl'],
+    gap: spacing.base,
+  },
+  bafInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing['2xl'],
+    paddingVertical: spacing.lg,
+    color: colors.textOnDark,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.base,
+    backgroundColor: colors.darker,
+  },
+  bafInputError: {
+    borderColor: colors.danger,
+  },
+  bafErrorText: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.base,
+    color: colors.danger,
+  },
   confirmWrap: {
     marginTop: spacing['3xl'],
     gap: spacing.lg,
   },
-  // Task #239: waitlist success
   waitlistSuccess: {
     marginTop: spacing['3xl'],
     padding: spacing['2xl'],
@@ -575,13 +814,76 @@ const styles = StyleSheet.create({
     color: colors.danger,
     textAlign: 'center',
   },
-  errorDevText: {
+  // Post-booking success state
+  confirmedBlock: {
+    gap: spacing.xl,
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  confirmedTitle: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['2xl'],
+    color: colors.gold,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+  },
+  confirmedWhen: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.base,
+    color: colors.textLight,
+  },
+  confirmedProvider: {
     fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.xs,
+    fontSize: fontSizes.sm,
     color: colors.textMuted,
+  },
+  bafResultBox: {
+    width: '100%',
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.darker,
+    alignItems: 'center',
+  },
+  bafResultText: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.base,
+    color: colors.textLight,
     textAlign: 'center',
   },
-  // Task #242: kid picker modal
+  bafResultSuccess: {
+    color: colors.success,
+  },
+  bafResultError: {
+    color: colors.danger,
+  },
+  balanceBox: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing['3xl'],
+    backgroundColor: colors.darker,
+    borderRadius: 12,
+  },
+  balanceLabel: {
+    fontFamily: fontFamilies.oswaldSemiBold,
+    fontSize: fontSizes.sm,
+    color: colors.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  balanceNumber: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['4xl'],
+    color: colors.gold,
+  },
+  balanceOf: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    color: colors.textMuted,
+  },
+  // Kid picker modal
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -645,48 +947,5 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.lg,
     color: colors.gold,
-  },
-  // Task #237: confirmed state (shown after booking succeeds, before navigating)
-  confirmedBlock: {
-    gap: spacing.xl,
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-  },
-  confirmedTitle: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes['2xl'],
-    color: colors.gold,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  confirmedWhen: {
-    fontFamily: fontFamilies.interMedium,
-    fontSize: fontSizes.base,
-    color: colors.textLight,
-  },
-  balanceBox: {
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing['3xl'],
-    backgroundColor: colors.darker,
-    borderRadius: 12,
-  },
-  balanceLabel: {
-    fontFamily: fontFamilies.oswaldSemiBold,
-    fontSize: fontSizes.sm,
-    color: colors.textLight,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  balanceNumber: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes['4xl'],
-    color: colors.gold,
-  },
-  balanceOf: {
-    fontFamily: fontFamilies.interRegular,
-    fontSize: fontSizes.sm,
-    color: colors.textMuted,
   },
 });

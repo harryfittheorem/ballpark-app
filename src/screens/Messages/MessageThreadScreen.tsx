@@ -8,6 +8,8 @@
  * video plays inline via expo-av in a modal-ish overlay (out of scope for
  * v0.7 — currently shows a "still processing" placeholder until we wire
  * the parent-side full-screen player in a follow-up).
+ *
+ * Sender identity is anonymised to "Infinite Hitting" per brand guidelines.
  */
 
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -27,7 +29,6 @@ import type { ThreadMessage } from '@/api/parentMessages';
 import { useAuth } from '@/hooks/useAuth';
 import {
   useMessageThread,
-  useTenantCoachesForParent,
 } from '@/hooks/useParentMessages';
 import type { WorkStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
@@ -37,6 +38,7 @@ type Nav = WorkStackScreenProps<'MessageThread'>['navigation'];
 type Route = WorkStackScreenProps<'MessageThread'>['route'];
 
 const POSTER_WIDTH = 480;
+const SENDER_NAME = 'Infinite Hitting';
 
 function muxPosterUrl(playbackId: string): string {
   return `https://image.mux.com/${playbackId}/thumbnail.jpg?width=${POSTER_WIDTH}`;
@@ -52,12 +54,6 @@ export default function MessageThreadScreen() {
     kidId,
     coachUserId,
   );
-  const { data: coaches } = useTenantCoachesForParent();
-  const coach = coaches?.find((c) => c.userId === coachUserId);
-  const coachName =
-    coach && (coach.firstName || coach.lastName)
-      ? [coach.firstName, coach.lastName].filter(Boolean).join(' ')
-      : 'Your coach';
 
   const data = useMemo(() => messages ?? [], [messages]);
 
@@ -91,7 +87,7 @@ export default function MessageThreadScreen() {
               textAlign: 'center',
             }}
           >
-            {coachName.toUpperCase()}
+            {SENDER_NAME.toUpperCase()}
           </Text>
         </View>
         <Pressable onPress={onComposeNew} hitSlop={12}>
@@ -113,7 +109,7 @@ export default function MessageThreadScreen() {
           </Pressable>
         </View>
       ) : data.length === 0 ? (
-        <EmptyState onCompose={onComposeNew} coachName={coachName} />
+        <EmptyState onCompose={onComposeNew} />
       ) : (
         <FlatList
           data={data}
@@ -134,7 +130,7 @@ export default function MessageThreadScreen() {
   );
 }
 
-function EmptyState({ coachName, onCompose }: { coachName: string; onCompose: () => void }) {
+function EmptyState({ onCompose }: { onCompose: () => void }) {
   return (
     <View
       style={{
@@ -155,7 +151,7 @@ function EmptyState({ coachName, onCompose }: { coachName: string; onCompose: ()
           textAlign: 'center',
         }}
       >
-        SAY HI TO {coachName.toUpperCase()}
+        SEND A CLIP TO {SENDER_NAME.toUpperCase()}
       </Text>
       <Text
         style={{
@@ -217,8 +213,7 @@ function Bubble({
 
   return (
     <View style={{ alignItems: align, maxWidth: '88%', alignSelf: align }}>
-      {/* Side badge (COACH for inbound, YOU for self) — keeps direction
-          unambiguous even when both bubbles are gold-on-dark in dark mode. */}
+      {/* Sender badge */}
       <View
         style={{
           flexDirection: 'row',
@@ -244,142 +239,120 @@ function Bubble({
               color: isSelf ? colors.dark : colors.darkest,
             }}
           >
-            {isSelf ? 'YOU' : 'COACH'}
+            {isSelf ? 'YOU' : SENDER_NAME.toUpperCase()}
           </Text>
         </View>
-        {message.senderDisplay && isSelf ? (
+        {time ? (
           <Text
             style={{
-              fontFamily: fontFamilies.interMedium,
-              fontSize: fontSizes.sm,
-              color: colors.textLight,
+              fontFamily: fontFamilies.interRegular,
+              fontSize: 10,
+              color: colors.textMuted,
             }}
           >
-            From {message.senderDisplay}
+            {time}
           </Text>
         ) : null}
       </View>
-      <View
-        style={{
-          backgroundColor: bg,
-          borderRadius: radius['2xl'],
-          borderTopRightRadius: isSelf ? 4 : radius['2xl'],
-          borderTopLeftRadius: !isSelf ? 4 : radius['2xl'],
-          padding: spacing['2xl'],
-          borderWidth: 1,
-          borderColor,
-          gap: spacing.base,
-        }}
-      >
-        {message.video ? (
-          <VideoBubbleBody
-            video={message.video}
-            isSelf={isSelf}
-            onPlay={() => {
-              if (!isSelf) onPlayCoachVideo(message.id);
-            }}
+
+      {message.video?.muxPlaybackId ? (
+        <Pressable
+          onPress={() => onPlayCoachVideo(message.id)}
+          style={({ pressed }) => [
+            {
+              borderRadius: radius['2xl'],
+              overflow: 'hidden',
+              borderWidth: 1.5,
+              borderColor,
+              width: 240,
+              aspectRatio: 16 / 9,
+            },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Image
+            source={{ uri: muxPosterUrl(message.video.muxPlaybackId) }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
           />
-        ) : null}
-        {message.label ? (
-          <Text
+          <View
             style={{
-              fontFamily: fontFamilies.oswaldBold,
-              fontSize: fontSizes.sm,
-              letterSpacing: tracking.wider,
-              color: isSelf ? colors.dark : colors.gold,
+              ...StyleSheet.absoluteFillObject,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.32)',
             }}
           >
-            {message.label.replace(/_/g, ' ').toUpperCase()}
+            <PlayCircle size={44} color={colors.gold} />
+          </View>
+        </Pressable>
+      ) : message.video ? (
+        <View
+          style={{
+            borderRadius: radius['2xl'],
+            overflow: 'hidden',
+            borderWidth: 1.5,
+            borderColor,
+            width: 240,
+            aspectRatio: 16 / 9,
+            backgroundColor: colors.dark,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: 16,
+          }}
+        >
+          <PlayCircle size={32} color={colors.textMuted} />
+          <Text
+            style={{
+              fontFamily: fontFamilies.interRegular,
+              fontSize: fontSizes.sm,
+              color: colors.textMuted,
+              textAlign: 'center',
+            }}
+          >
+            Still processing…
           </Text>
-        ) : null}
-        {message.messageText ? (
-          <Text style={{ color: fg, fontFamily: fontFamilies.interRegular, fontSize: fontSizes.lg }}>
-            {message.messageText}
+        </View>
+      ) : (
+        <View
+          style={{
+            borderRadius: radius['2xl'],
+            borderWidth: 1.5,
+            borderColor,
+            backgroundColor: bg,
+            paddingHorizontal: spacing['2xl'],
+            paddingVertical: spacing.lg,
+            maxWidth: 280,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: fontFamilies.interRegular,
+              fontSize: fontSizes.base,
+              color: fg,
+              lineHeight: 22,
+            }}
+          >
+            {message.messageText ?? ''}
           </Text>
-        ) : null}
-      </View>
-      <Text
-        style={{
-          color: colors.textLight,
-          fontFamily: fontFamilies.interRegular,
-          fontSize: fontSizes.xs,
-          marginTop: 4,
-          marginHorizontal: 6,
-        }}
-      >
-        Sent {time}
-      </Text>
+        </View>
+      )}
     </View>
   );
 }
 
-function formatSentRelative(d: Date): string {
-  const now = Date.now();
-  const diffMs = now - d.getTime();
-  const oneDay = 24 * 60 * 60 * 1000;
-  const time = d.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-  if (diffMs < oneDay && new Date(now).getDate() === d.getDate()) {
-    return `today at ${time}`;
-  }
-  if (diffMs < 2 * oneDay) {
-    return `yesterday at ${time}`;
-  }
-  if (diffMs < 7 * oneDay) {
-    return d.toLocaleDateString(undefined, { weekday: 'long' }) + ` at ${time}`;
-  }
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ` at ${time}`;
-}
+// Keep StyleSheet import for absoluteFillObject in Bubble
+import { StyleSheet } from 'react-native';
 
-function VideoBubbleBody({
-  video,
-  isSelf,
-  onPlay,
-}: {
-  video: NonNullable<ThreadMessage['video']>;
-  isSelf: boolean;
-  onPlay: () => void;
-}) {
-  const ready = video.status === 'ready' && !!video.muxPlaybackId;
-  return (
-    <Pressable
-      onPress={ready && !isSelf ? onPlay : undefined}
-      disabled={!ready || isSelf}
-      style={{
-        width: 240,
-        aspectRatio: 16 / 9,
-        borderRadius: radius.lg,
-        overflow: 'hidden',
-        backgroundColor: colors.darker,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      {ready ? (
-        <Image
-          source={{ uri: muxPosterUrl(video.muxPlaybackId as string) }}
-          style={{ width: '100%', height: '100%' }}
-          resizeMode="cover"
-        />
-      ) : (
-        <Text style={{ color: colors.textLight, fontFamily: fontFamilies.interMedium }}>
-          {video.status === 'errored' ? 'Upload failed' : 'Processing video…'}
-        </Text>
-      )}
-      {ready ? (
-        <View
-          style={{
-            position: 'absolute',
-            inset: 0,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <PlayCircle size={36} color={colors.white} />
-        </View>
-      ) : null}
-    </Pressable>
-  );
+function formatSentRelative(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60_000);
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }

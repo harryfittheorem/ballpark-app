@@ -1,17 +1,24 @@
 /**
- * Admin tenant settings page (task #185).
+ * Admin tenant settings page.
  *
- * Lets operators view and update per-tenant configuration fields —
- * starting with HitTrax Facility ID — without touching secrets or SQL.
- * Also provides the shareable public booking link (task #243).
+ * Lets operators view and update per-tenant configuration fields:
+ * - HitTrax Facility ID
+ * - Public booking link
+ * - Per-location cage rental toggle
  */
 import { Card, CardSectionLabel } from "@/components/ui/Card";
 import { createClient } from "@/lib/supabase/server";
 import { readAppRole, readTenantId } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { saveFacilityId } from "./actions";
+import { saveFacilityId, toggleCageRental } from "./actions";
 import { CopyBookingLink } from "./CopyBookingLink";
+
+type Location = {
+  id: string;
+  name: string;
+  cage_rental_enabled: boolean;
+};
 
 export default async function AdminSettingsPage({
   searchParams,
@@ -39,6 +46,15 @@ export default async function AdminSettingsPage({
   const facilityId = data?.hittrax_facility_id ?? null;
   const tenantName = data?.name ?? null;
   const tenantSlug = data?.slug ?? null;
+
+  // Fetch all locations for this tenant to show cage rental toggles
+  const { data: locationsRaw } = await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
+    .from("locations")
+    .select("id, name, cage_rental_enabled")
+    .eq("tenant_id", tenantId)
+    .order("name", { ascending: true });
+
+  const locations: Location[] = (locationsRaw ?? []) as Location[];
 
   // Build the public booking URL from the current request host
   const reqHeaders = await headers();
@@ -122,6 +138,53 @@ export default async function AdminSettingsPage({
           </button>
         </form>
       </Card>
+
+      {locations.length > 0 && (
+        <Card padding="lg" accent>
+          <CardSectionLabel>Location Settings</CardSectionLabel>
+          <p className="mb-4 mt-2 text-sm text-text-light">
+            Enable cage rentals per location. When enabled, members see a
+            &ldquo;Cage Rentals&rdquo; tab alongside Hitting Lessons in the app.
+          </p>
+          <div className="space-y-3">
+            {locations.map((loc) => (
+              <div
+                key={loc.id}
+                className="flex items-center justify-between rounded-md border border-border bg-darker px-4 py-3"
+              >
+                <span className="text-sm font-medium text-cream-light">
+                  {loc.name}
+                </span>
+                <form action={toggleCageRental}>
+                  <input type="hidden" name="location_id" value={loc.id} />
+                  <input
+                    type="hidden"
+                    name="enabled"
+                    value={loc.cage_rental_enabled ? "false" : "true"}
+                  />
+                  <button
+                    type="submit"
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      loc.cage_rental_enabled
+                        ? "bg-gold"
+                        : "bg-border"
+                    }`}
+                    role="switch"
+                    aria-checked={loc.cage_rental_enabled}
+                    aria-label={`Cage rentals for ${loc.name}`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-dark shadow ring-0 transition duration-200 ease-in-out ${
+                        loc.cage_rental_enabled ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

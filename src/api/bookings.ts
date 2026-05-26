@@ -177,10 +177,13 @@ const FAMILY_BOOKING_SELECT =
  */
 export async function listFamilyBookings(kidIds: string[]): Promise<FamilyBooking[]> {
   if (kidIds.length === 0) return [];
-  const { data, error } = await supabase
+  const { data, error } = await (
+    supabase as unknown as import('@supabase/supabase-js').SupabaseClient
+  )
     .from('bookings')
     .select(FAMILY_BOOKING_SELECT)
     .in('kid_id', kidIds)
+    .eq('is_guest', false)
     .order('scheduled_start', { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as FamilyBooking[];

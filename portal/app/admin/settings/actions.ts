@@ -1,6 +1,6 @@
 "use server";
 /**
- * Admin server actions for tenant settings (task #185).
+ * Admin server actions for tenant settings.
  *
  * RLS pins tenant_id and restricts writes to app_role IN ('admin','owner').
  * These actions add explicit server-side authz (requireAdmin), input
@@ -37,6 +37,33 @@ export async function saveFacilityId(formData: FormData) {
     .from("tenants")
     .update({ hittrax_facility_id: value || null })
     .eq("id", tenantId);
+
+  if (error) {
+    redirect(
+      `/admin/settings?error=${encodeURIComponent(error.message)}`,
+    );
+  }
+
+  revalidatePath("/admin/settings");
+  redirect("/admin/settings?saved=1");
+}
+
+export async function toggleCageRental(formData: FormData) {
+  const { supabase } = await requireAdmin();
+
+  const locationId = formData.get("location_id");
+  const enabledRaw = formData.get("enabled");
+
+  if (typeof locationId !== "string" || !locationId) {
+    redirect("/admin/settings?error=Invalid+location");
+  }
+
+  const enabled = enabledRaw === "true";
+
+  const { error } = await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
+    .from("locations")
+    .update({ cage_rental_enabled: enabled })
+    .eq("id", locationId);
 
   if (error) {
     redirect(
