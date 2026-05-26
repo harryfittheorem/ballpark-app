@@ -211,12 +211,19 @@ const FAMILY_DEFS = [
 ];
 
 const PRODUCT_DEFS = [
-  { name: 'Infinite Hitting Batting Gloves', category: 'apparel',    cost: 500,  inventory: 20  },
-  { name: 'Facility Water Bottle',           category: 'gear',       cost: 250,  inventory: 50  },
-  { name: '1-Hour Cage Rental',              category: 'sessions',   cost: 750,  inventory: null },
-  { name: 'Infinite Hitting T-Shirt',        category: 'apparel',    cost: 350,  inventory: 30  },
-  { name: 'Extra Lesson w/ Coach',           category: 'experience', cost: 1200, inventory: null },
+  { name: 'Infinite Hitting Batting Gloves', category: 'apparel',    cost: 500,  inventory: 20,   image_url: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=400&q=80' },
+  { name: 'Facility Water Bottle',           category: 'gear',       cost: 250,  inventory: 50,   image_url: 'https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?w=400&q=80' },
+  { name: '1-Hour Cage Rental',              category: 'sessions',   cost: 750,  inventory: null, image_url: 'https://images.unsplash.com/photo-1508344928928-7165b67de128?w=400&q=80' },
+  { name: 'Infinite Hitting T-Shirt',        category: 'apparel',    cost: 350,  inventory: 30,   image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&q=80' },
+  { name: 'Extra Lesson w/ Coach',           category: 'experience', cost: 1200, inventory: null, image_url: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400&q=80' },
 ];
+
+// ── Live DB patch (run once after seeding if image_url is not yet set) ────────
+// UPDATE products SET image_url = 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=400&q=80' WHERE id = '5eed0007-0000-0000-0000-000000000001';
+// UPDATE products SET image_url = 'https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?w=400&q=80' WHERE id = '5eed0007-0000-0000-0000-000000000002';
+// UPDATE products SET image_url = 'https://images.unsplash.com/photo-1508344928928-7165b67de128?w=400&q=80' WHERE id = '5eed0007-0000-0000-0000-000000000003';
+// UPDATE products SET image_url = 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&q=80' WHERE id = '5eed0007-0000-0000-0000-000000000004';
+// UPDATE products SET image_url = 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400&q=80' WHERE id = '5eed0007-0000-0000-0000-000000000005';
 
 // Target points balance per kid (descending for leaderboard visual interest):
 const KID_POINTS = [820, 650, 590, 480, 440, 390, 370, 320, 290, 510, 180, 140, 60, 45, 30];
@@ -514,6 +521,7 @@ const productRows = PRODUCT_DEFS.map((def, i) => ({
   is_active:       true,
   sort_order:      i + 1,
   inventory_count: def.inventory ?? null,
+  image_url:       def.image_url,
 }));
 
 await restInsert('products', productRows);

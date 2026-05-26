@@ -1,5 +1,5 @@
 import { Coins, ShoppingBag } from 'lucide-react-native';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { Product } from '@/api/earn';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
@@ -28,7 +28,13 @@ export default function ProductCard({
       activeOpacity={0.8}
     >
       <View style={styles.thumb}>
-        {showPoints ? (
+        {product.image_url ? (
+          <Image
+            source={{ uri: product.image_url }}
+            style={styles.thumbImage}
+            resizeMode="cover"
+          />
+        ) : showPoints ? (
           <Coins size={28} color={colors.gold} />
         ) : (
           <ShoppingBag size={28} color={colors.gold} />
@@ -79,6 +85,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     borderWidth: 1,
     borderColor: colors.borderGold,
+    overflow: 'hidden',
+  },
+  thumbImage: {
+    width: 56,
+    height: 56,
   },
   name: {
     fontFamily: fontFamilies.oswaldBold,

@@ -680,15 +680,21 @@ console.log('  Completed drill: "Hip Load & Drive" — 4★ reviewed by Coach Mi
 console.log('\n─── PRODUCTS ─────────────────────────────────────────────────────────');
 
 const PRODUCT_DEFS = [
-  { id: PRODUCT_IDS[0], name: 'Infinite Hitting T-Shirt',  category: 'apparel',    cost: 200,  inventory: 30   },
-  { id: PRODUCT_IDS[1], name: 'Batting Gloves',            category: 'gear',       cost: 500,  inventory: 15   },
-  { id: PRODUCT_IDS[2], name: 'Private Lesson Credit',     category: 'experience', cost: 750,  inventory: null },
+  { id: PRODUCT_IDS[0], name: 'Infinite Hitting T-Shirt',  category: 'apparel',    cost: 200,  inventory: 30,   image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&q=80' },
+  { id: PRODUCT_IDS[1], name: 'Batting Gloves',            category: 'gear',       cost: 500,  inventory: 15,   image_url: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=400&q=80' },
+  { id: PRODUCT_IDS[2], name: 'Private Lesson Credit',     category: 'experience', cost: 750,  inventory: null, image_url: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400&q=80' },
 ];
+
+// ── Live DB patch (run once after seeding if image_url is not yet set) ────────
+// UPDATE products SET image_url = 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&q=80' WHERE id = 'de000011-0000-0000-0000-000000000001';
+// UPDATE products SET image_url = 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=400&q=80' WHERE id = 'de000011-0000-0000-0000-000000000002';
+// UPDATE products SET image_url = 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400&q=80' WHERE id = 'de000011-0000-0000-0000-000000000003';
 
 await restInsert('products', PRODUCT_DEFS.map((def, i) => ({
   id: def.id, tenant_id: TENANT_ID, name: def.name, category: def.category,
   points_cost: def.cost, is_redeemable: true, is_purchasable: false,
   is_active: true, sort_order: i + 1, inventory_count: def.inventory ?? null,
+  image_url: def.image_url,
 })));
 console.log('  3 store products: T-Shirt 200 pts | Batting Gloves 500 pts | Lesson Credit 750 pts');
 

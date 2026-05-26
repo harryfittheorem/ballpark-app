@@ -11,6 +11,16 @@ import type { PointsRewardsData, PointsProduct } from '@/lib/supabase/ownerQueri
 
 type Rule = { id: number; action: string; points: number; active: boolean };
 
+type RewardForm = {
+  name: string;
+  category: string;
+  image_url: string;
+  cost: string;
+  dollar_price: string;
+  inventory: string;
+  is_active: boolean;
+};
+
 // ── Initial rules ──────────────────────────────────────────────────────────
 
 const INITIAL_RULES: Rule[] = [
@@ -25,11 +35,11 @@ const INITIAL_RULES: Rule[] = [
 // ── Demo rewards catalog ───────────────────────────────────────────────────
 
 const DEMO_PRODUCTS: PointsProduct[] = [
-  { id: 'p1', name: 'Free Cage Hour',              category: 'Sessions',  cost: 500,  inventory: null, fulfilled: 24, pending: 3 },
-  { id: 'p2', name: 'Infinite Hitting Cap',        category: 'Apparel',   cost: 1200, inventory: 40,   fulfilled: 18, pending: 2 },
-  { id: 'p3', name: 'Free Private Lesson (30min)', category: 'Sessions',  cost: 800,  inventory: null, fulfilled: 11, pending: 1 },
-  { id: 'p4', name: 'Batting Gloves',              category: 'Equipment', cost: 1500, inventory: 20,   fulfilled: 7,  pending: 2 },
-  { id: 'p5', name: 'Water Bottle + Drawstring',   category: 'Apparel',   cost: 400,  inventory: 60,   fulfilled: 31, pending: 4 },
+  { id: 'p1', name: 'Free Cage Hour',              category: 'Sessions',  cost: 500,  inventory: null, fulfilled: 24, pending: 3, image_url: 'https://images.unsplash.com/photo-1508344928928-7165b67de128?w=400&q=80' },
+  { id: 'p2', name: 'Infinite Hitting Cap',         category: 'Apparel',   cost: 1200, inventory: 40,   fulfilled: 18, pending: 2, image_url: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400&q=80' },
+  { id: 'p3', name: 'Free Private Lesson (30min)', category: 'Sessions',  cost: 800,  inventory: null, fulfilled: 11, pending: 1, image_url: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400&q=80' },
+  { id: 'p4', name: 'Batting Gloves',              category: 'Equipment', cost: 1500, inventory: 20,   fulfilled: 7,  pending: 2, image_url: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=400&q=80' },
+  { id: 'p5', name: 'Water Bottle + Drawstring',   category: 'Apparel',   cost: 400,  inventory: 60,   fulfilled: 31, pending: 4, image_url: 'https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?w=400&q=80' },
 ];
 
 const DEMO_TOP_EARNERS = [
@@ -37,27 +47,6 @@ const DEMO_TOP_EARNERS = [
   { name: 'Aiden T.',  points: 2210 },
   { name: 'Jake M.',   points: 1980 },
   { name: 'Logan S.',  points: 1640 },
-];
-
-// ── Table columns ──────────────────────────────────────────────────────────
-
-const rewardColumns: TableColumn<PointsProduct & Record<string, unknown>>[] = [
-  {
-    label: 'Reward', key: 'name',
-    render: (r) => (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 8, background: `${brand.gold}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Sparkles size={16} color={brand.goldDeep} />
-        </div>
-        <div style={{ fontWeight: 700 }}>{r.name as string}</div>
-      </div>
-    ),
-  },
-  { label: 'Category', key: 'category', render: (r) => <Chip color="gold">{r.category as string}</Chip> },
-  { label: 'Cost',      key: 'cost',      align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, fontWeight: 700, color: brand.goldDeep }}>{r.cost as number} pts</span> },
-  { label: 'Inventory', key: 'inventory', align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono }}>{r.inventory !== null ? String(r.inventory) : '∞'}</span> },
-  { label: 'Fulfilled', key: 'fulfilled', align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, color: brand.success, fontWeight: 700 }}>{r.fulfilled as number}</span> },
-  { label: 'Pending',   key: 'pending',   align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, color: (r.pending as number) > 0 ? brand.warning : brand.textMuted, fontWeight: 700 }}>{r.pending as number}</span> },
 ];
 
 // ── Style helpers ──────────────────────────────────────────────────────────
@@ -83,7 +72,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ width: 440, background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)', overflow: 'hidden' }}
+        style={{ width: 480, background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)', overflow: 'hidden' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: `1px solid ${brand.border}` }}>
           <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>{title}</div>
@@ -111,9 +100,41 @@ function Toggle({ active, onToggle }: { active: boolean; onToggle: () => void })
   );
 }
 
+// ── Product thumbnail helper ───────────────────────────────────────────────
+
+function ProductThumb({ imageUrl, name }: { imageUrl?: string | null; name: string }) {
+  return (
+    <div style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', background: `${brand.gold}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: `1px solid ${brand.border}` }}>
+      {imageUrl ? (
+        <img src={imageUrl} alt={name} style={{ width: 40, height: 40, objectFit: 'cover' }} />
+      ) : (
+        <Sparkles size={16} color={brand.goldDeep} />
+      )}
+    </div>
+  );
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────
 
 type Props = { data: PointsRewardsData };
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+const EMPTY_REWARD_FORM: RewardForm = {
+  name: '', category: '', image_url: '', cost: '', dollar_price: '', inventory: '', is_active: true,
+};
+
+function productToForm(p: PointsProduct): RewardForm {
+  return {
+    name: p.name,
+    category: p.category,
+    image_url: p.image_url ?? '',
+    cost: String(p.cost),
+    dollar_price: '',
+    inventory: p.inventory !== null ? String(p.inventory) : '',
+    is_active: true,
+  };
+}
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -129,18 +150,24 @@ export function PointsRewardsContent({ data }: Props) {
   const [hoveredEditId, setHoveredEditId] = useState<number | null>(null);
 
   const hasLiveData       = data.totalPointsIssued > 0 || data.products.length > 0 || data.topEarners.length > 0;
-  const products          = hasLiveData ? data.products    : DEMO_PRODUCTS;
+  const initialProducts   = hasLiveData ? data.products : DEMO_PRODUCTS;
   const totalPointsIssued = hasLiveData ? data.totalPointsIssued : 18_450;
   const topEarners        = hasLiveData ? data.topEarners  : DEMO_TOP_EARNERS;
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
+  const [localProducts, setLocalProducts] = useState<PointsProduct[]>(initialProducts);
 
-  const openEdit = (rule: Rule) => {
+  // ── Reward modal state ────────────────────────────────────────────────────
+  const [editingProduct, setEditingProduct] = useState<PointsProduct | null | 'new'>(null);
+  const [rewardForm, setRewardForm] = useState<RewardForm>(EMPTY_REWARD_FORM);
+
+  // ── Rule handlers ─────────────────────────────────────────────────────────
+
+  const openEditRule = (rule: Rule) => {
     setEditForm({ action: rule.action, points: String(rule.points) });
     setEditingRule(rule);
   };
 
-  const saveEdit = (e: React.FormEvent) => {
+  const saveEditRule = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingRule) return;
     const pts = parseInt(editForm.points, 10);
@@ -149,12 +176,12 @@ export function PointsRewardsContent({ data }: Props) {
     setEditingRule(null);
   };
 
-  const openAdd = () => {
+  const openAddRule = () => {
     setAddForm({ action: '', points: '' });
     setShowAddRule(true);
   };
 
-  const saveAdd = (e: React.FormEvent) => {
+  const saveAddRule = (e: React.FormEvent) => {
     e.preventDefault();
     const pts = parseInt(addForm.points, 10);
     if (!addForm.action.trim() || isNaN(pts) || pts < 1) return;
@@ -167,6 +194,68 @@ export function PointsRewardsContent({ data }: Props) {
     setRules(prev => prev.map(r => r.id === id ? { ...r, active: !r.active } : r));
   };
 
+  // ── Reward handlers ───────────────────────────────────────────────────────
+
+  const openAddReward = () => {
+    setRewardForm(EMPTY_REWARD_FORM);
+    setEditingProduct('new');
+  };
+
+  const openEditReward = (product: PointsProduct) => {
+    setRewardForm(productToForm(product));
+    setEditingProduct(product);
+  };
+
+  const closeRewardModal = () => setEditingProduct(null);
+
+  const saveReward = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cost = parseInt(rewardForm.cost, 10);
+    if (!rewardForm.name.trim() || isNaN(cost) || cost < 1) return;
+
+    const inv = rewardForm.inventory.trim() !== '' ? parseInt(rewardForm.inventory, 10) : null;
+
+    if (editingProduct === 'new') {
+      const newProduct: PointsProduct = {
+        id: `local-${Date.now()}`,
+        name: rewardForm.name.trim(),
+        category: rewardForm.category.trim() || 'General',
+        cost,
+        inventory: inv,
+        fulfilled: 0,
+        pending: 0,
+        image_url: rewardForm.image_url.trim() || null,
+      };
+      setLocalProducts(prev => [...prev, newProduct]);
+    } else if (editingProduct !== null) {
+      setLocalProducts(prev => prev.map(p =>
+        p.id === editingProduct.id
+          ? { ...p, name: rewardForm.name.trim(), category: rewardForm.category.trim() || 'General', cost, inventory: inv, image_url: rewardForm.image_url.trim() || null }
+          : p
+      ));
+    }
+    closeRewardModal();
+  };
+
+  // ── Table columns ─────────────────────────────────────────────────────────
+
+  const rewardColumns: TableColumn<PointsProduct & Record<string, unknown>>[] = [
+    {
+      label: 'Reward', key: 'name',
+      render: (r) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <ProductThumb imageUrl={r.image_url as string | null | undefined} name={r.name as string} />
+          <div style={{ fontWeight: 700 }}>{r.name as string}</div>
+        </div>
+      ),
+    },
+    { label: 'Category', key: 'category', render: (r) => <Chip color="gold">{r.category as string}</Chip> },
+    { label: 'Cost',      key: 'cost',      align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, fontWeight: 700, color: brand.goldDeep }}>{r.cost as number} pts</span> },
+    { label: 'Inventory', key: 'inventory', align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono }}>{r.inventory !== null ? String(r.inventory) : '∞'}</span> },
+    { label: 'Fulfilled', key: 'fulfilled', align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, color: brand.success, fontWeight: 700 }}>{r.fulfilled as number}</span> },
+    { label: 'Pending',   key: 'pending',   align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, color: (r.pending as number) > 0 ? brand.warning : brand.textMuted, fontWeight: 700 }}>{r.pending as number}</span> },
+  ];
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -178,8 +267,7 @@ export function PointsRewardsContent({ data }: Props) {
           <OButton
             variant="gold"
             icon={Plus}
-            onClick={tab === 'rules' ? openAdd : undefined}
-            disabled={tab === 'rewards'}
+            onClick={tab === 'rules' ? openAddRule : openAddReward}
           >
             {tab === 'rules' ? 'Add Rule' : 'Add Reward'}
           </OButton>
@@ -190,7 +278,7 @@ export function PointsRewardsContent({ data }: Props) {
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
           {[
             { id: 'rules'   as const, label: 'Earning Rules',   count: rules.length },
-            { id: 'rewards' as const, label: 'Rewards Catalog', count: products.length },
+            { id: 'rewards' as const, label: 'Rewards Catalog', count: localProducts.length },
           ].map(t => (
             <div
               key={t.id}
@@ -234,7 +322,7 @@ export function PointsRewardsContent({ data }: Props) {
                   <Toggle active={r.active} onToggle={() => toggleRule(r.id)} />
                   <button
                     type="button"
-                    onClick={() => openEdit(r)}
+                    onClick={() => openEditRule(r)}
                     title="Edit rule"
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', flexShrink: 0 }}
                     onMouseEnter={() => setHoveredEditId(r.id)}
@@ -279,7 +367,8 @@ export function PointsRewardsContent({ data }: Props) {
         {tab === 'rewards' && (
           <OTable
             columns={rewardColumns as TableColumn<Record<string, unknown>>[]}
-            rows={products as unknown as Record<string, unknown>[]}
+            rows={localProducts as unknown as Record<string, unknown>[]}
+            onRowClick={(row) => openEditReward(row as unknown as PointsProduct)}
           />
         )}
       </div>
@@ -287,7 +376,7 @@ export function PointsRewardsContent({ data }: Props) {
       {/* ── Edit Rule modal ─────────────────────────────────────────────── */}
       {editingRule && (
         <Modal title="Edit Rule" onClose={() => setEditingRule(null)}>
-          <form onSubmit={saveEdit} style={{ padding: 24 }}>
+          <form onSubmit={saveEditRule} style={{ padding: 24 }}>
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Action</label>
               <input
@@ -322,7 +411,7 @@ export function PointsRewardsContent({ data }: Props) {
       {/* ── Add Rule modal ──────────────────────────────────────────────── */}
       {showAddRule && (
         <Modal title="Add Rule" onClose={() => setShowAddRule(false)}>
-          <form onSubmit={saveAdd} style={{ padding: 24 }}>
+          <form onSubmit={saveAddRule} style={{ padding: 24 }}>
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Action</label>
               <input
@@ -350,6 +439,103 @@ export function PointsRewardsContent({ data }: Props) {
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <OButton type="button" variant="secondary" onClick={() => setShowAddRule(false)}>Cancel</OButton>
               <OButton type="submit" variant="gold" icon={Plus}>Add Rule</OButton>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Add / Edit Reward modal ─────────────────────────────────────── */}
+      {editingProduct !== null && (
+        <Modal
+          title={editingProduct === 'new' ? 'Add Reward' : 'Edit Reward'}
+          onClose={closeRewardModal}
+        >
+          <form onSubmit={saveReward} style={{ padding: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Name</label>
+                <input
+                  required
+                  autoFocus
+                  style={inputStyle}
+                  value={rewardForm.name}
+                  onChange={e => setRewardForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Batting Gloves"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Category</label>
+                <input
+                  style={inputStyle}
+                  value={rewardForm.category}
+                  onChange={e => setRewardForm(f => ({ ...f, category: e.target.value }))}
+                  placeholder="e.g. Apparel"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Points Cost</label>
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  step={1}
+                  style={inputStyle}
+                  value={rewardForm.cost}
+                  onChange={e => setRewardForm(f => ({ ...f, cost: e.target.value }))}
+                  placeholder="e.g. 500"
+                />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Image URL</label>
+                <input
+                  style={inputStyle}
+                  value={rewardForm.image_url}
+                  onChange={e => setRewardForm(f => ({ ...f, image_url: e.target.value }))}
+                  placeholder="https://…"
+                />
+                {rewardForm.image_url && (
+                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <img
+                      src={rewardForm.image_url}
+                      alt="preview"
+                      style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8, border: `1px solid ${brand.border}` }}
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <span style={{ fontSize: 11, color: brand.textMuted }}>Image preview</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={labelStyle}>Dollar Price (optional)</label>
+                <input
+                  style={inputStyle}
+                  value={rewardForm.dollar_price}
+                  onChange={e => setRewardForm(f => ({ ...f, dollar_price: e.target.value }))}
+                  placeholder="e.g. 9.99"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Inventory (blank = unlimited)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  style={inputStyle}
+                  value={rewardForm.inventory}
+                  onChange={e => setRewardForm(f => ({ ...f, inventory: e.target.value }))}
+                  placeholder="e.g. 20"
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Toggle active={rewardForm.is_active} onToggle={() => setRewardForm(f => ({ ...f, is_active: !f.is_active }))} />
+                <span style={{ fontSize: 13, color: brand.text }}>{rewardForm.is_active ? 'Active' : 'Inactive'}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+              <OButton type="button" variant="secondary" onClick={closeRewardModal}>Cancel</OButton>
+              <OButton type="submit" variant="gold" icon={editingProduct === 'new' ? Plus : undefined}>
+                {editingProduct === 'new' ? 'Add Reward' : 'Save Changes'}
+              </OButton>
             </div>
           </form>
         </Modal>

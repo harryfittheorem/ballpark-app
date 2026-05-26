@@ -150,6 +150,7 @@ export type PointsProduct = {
   inventory: number | null;
   fulfilled: number;
   pending: number;
+  image_url?: string | null;
 };
 
 export type OwnerDashboardData = {
@@ -906,7 +907,7 @@ export type PointsRewardsData = {
 export async function getPointsRewardsData(supabase: SupabaseClient, tenantId: string): Promise<PointsRewardsData> {
   const { data: products } = await supabase
     .from('products')
-    .select('id, name, category, points_cost, inventory_count, is_active')
+    .select('id, name, category, points_cost, inventory_count, is_active, image_url')
     .eq('tenant_id', tenantId)
     .eq('is_active', true)
     .eq('is_redeemable', true)
@@ -956,6 +957,7 @@ export async function getPointsRewardsData(supabase: SupabaseClient, tenantId: s
       inventory: p.inventory_count,
       fulfilled: fulfilledByProduct[p.id] ?? 0,
       pending: pendingByProduct[p.id] ?? 0,
+      image_url: (p as unknown as { image_url?: string | null }).image_url ?? null,
     })),
     totalPointsIssued,
     topEarners,
