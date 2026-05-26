@@ -74,6 +74,9 @@ export type OwnerMember = {
   cardBrand: string | null;
   cardExpMonth: number | null;
   cardExpYear: number | null;
+  expiresAt?: string | null;
+  sessionsRemaining?: number | null;
+  sessionsTotal?: number | null;
 };
 
 export type OwnerCoach = {
@@ -291,6 +294,9 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       started_at,
       kid_id,
       family_id,
+      expires_at,
+      sessions_remaining,
+      sessions_total,
       kids!inner(first_name, last_name, age_group),
       families!inner(parent_first_name, parent_last_name, card_last4, card_brand, card_exp_month, card_exp_year)
     `)
@@ -368,6 +374,9 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       cardBrand: fam.card_brand ?? null,
       cardExpMonth: fam.card_exp_month ?? null,
       cardExpYear: fam.card_exp_year ?? null,
+      expiresAt: (r as unknown as { expires_at?: string | null }).expires_at ?? null,
+      sessionsRemaining: (r as unknown as { sessions_remaining?: number | null }).sessions_remaining ?? null,
+      sessionsTotal: (r as unknown as { sessions_total?: number | null }).sessions_total ?? null,
     };
   });
 }
@@ -1681,4 +1690,204 @@ export async function getTodayAtAGlanceData(
     todayBookings,
     upcomingBookings,
   };
+}
+
+// ─── Cancelled Memberships ───────────────────────────────────────────────────
+
+export type CancelledMembership = {
+  id: string;
+  kidName: string;
+  parentName: string;
+  parentEmail: string;
+  parentPhone: string | null;
+  planName: string;
+  planType: 'eft' | 'otc';
+  cancelledAt: string;
+  cancelledAtLabel: string;
+  sessionsUnused: number | null;
+  amountCents: number;
+};
+
+export async function getCancelledMemberships(
+  supabase: SupabaseClient,
+  tenantId: string,
+  since: Date,
+): Promise<CancelledMembership[]> {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const { data, error } = await supabase
+    .from('memberships')
+    .select(`
+      id, plan_name, plan_type, amount_cents, cancelled_at, sessions_remaining,
+      kids!inner(first_name, last_name),
+      families!inner(parent_first_name, parent_last_name, parent_email, parent_phone)
+    `)
+    .eq('tenant_id', tenantId)
+    .eq('status', 'cancelled')
+    .gte('cancelled_at', since.toISOString())
+    .order('cancelled_at', { ascending: false });
+
+  if (error || !data) return [];
+
+  return data.map(r => {
+    const kid = r.kids as unknown as { first_name: string; last_name: string | null };
+    const fam = r.families as unknown as { parent_first_name: string; parent_last_name: string | null; parent_email: string; parent_phone: string | null };
+    const d = r.cancelled_at ? new Date(r.cancelled_at) : new Date();
+    return {
+      id: r.id,
+      kidName: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
+      parentName: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),
+      parentEmail: fam.parent_email,
+      parentPhone: fam.parent_phone ?? null,
+      planName: r.plan_name,
+      planType: r.plan_type as 'eft' | 'otc',
+      cancelledAt: r.cancelled_at ?? '',
+      cancelledAtLabel: `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`,
+      sessionsUnused: r.plan_type === 'otc' ? (r.sessions_remaining ?? null) : null,
+      amountCents: r.amount_cents ?? 0,
+    };
+  });
+}
+
+// ─── Expiring Packs ──────────────────────────────────────────────────────────
+
+export type ExpiringPack = {
+  id: string;
+  kidName: string;
+  parentName: string;
+  parentEmail: string;
+  parentPhone: string | null;
+  planName: string;
+  sessionsRemaining: number | null;
+  expiresAt: string;
+  expiresAtLabel: string;
+  isExpired: boolean;
+  daysUntilExpiry: number;
+  hasUnusedSessions: boolean;
+};
+
+export async function getExpiringPacks(
+  supabase: SupabaseClient,
+  tenantId: string,
+): Promise<ExpiringPack[]> {
+  const now = new Date();
+  const lookback  = new Date(now.getTime() - 30 * 86_400_000);
+  const lookahead = new Date(now.getTime() + 60 * 86_400_000);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const { data, error } = await supabase
+    .from('memberships')
+    .select(`
+      id, plan_name, sessions_remaining, expires_at, status,
+      kids!inner(first_name, last_name),
+      families!inner(parent_first_name, parent_last_name, parent_email, parent_phone)
+    `)
+    .eq('tenant_id', tenantId)
+    .eq('plan_type', 'otc')
+    .not('expires_at', 'is', null)
+    .gte('expires_at', lookback.toISOString())
+    .lte('expires_at', lookahead.toISOString())
+    .order('expires_at', { ascending: true });
+
+  if (error || !data) return [];
+
+  return data.map(r => {
+    const kid = r.kids as unknown as { first_name: string; last_name: string | null };
+    const fam = r.families as unknown as { parent_first_name: string; parent_last_name: string | null; parent_email: string; parent_phone: string | null };
+    const d = new Date(r.expires_at!);
+    const msUntil = d.getTime() - now.getTime();
+    const daysUntilExpiry = Math.ceil(msUntil / 86_400_000);
+    const sessionsRemaining = r.sessions_remaining ?? null;
+    return {
+      id: r.id,
+      kidName: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
+      parentName: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),
+      parentEmail: fam.parent_email,
+      parentPhone: fam.parent_phone ?? null,
+      planName: r.plan_name,
+      sessionsRemaining,
+      expiresAt: r.expires_at!,
+      expiresAtLabel: `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`,
+      isExpired: daysUntilExpiry < 0,
+      daysUntilExpiry,
+      hasUnusedSessions: (sessionsRemaining ?? 0) > 0,
+    };
+  });
+}
+
+// ─── Low Balance Packs ───────────────────────────────────────────────────────
+
+export type LowBalancePack = {
+  id: string;
+  kidName: string;
+  parentName: string;
+  parentEmail: string;
+  parentPhone: string | null;
+  planName: string;
+  sessionsRemaining: number;
+  sessionsTotal: number;
+  lastSessionDate: string | null;
+  lastSessionLabel: string;
+};
+
+export async function getLowBalancePacks(
+  supabase: SupabaseClient,
+  tenantId: string,
+): Promise<LowBalancePack[]> {
+  const { data, error } = await supabase
+    .from('memberships')
+    .select(`
+      id, plan_name, sessions_remaining, sessions_total, kid_id,
+      kids!inner(first_name, last_name),
+      families!inner(parent_first_name, parent_last_name, parent_email, parent_phone)
+    `)
+    .eq('tenant_id', tenantId)
+    .eq('plan_type', 'otc')
+    .eq('status', 'active')
+    .not('sessions_remaining', 'is', null)
+    .not('sessions_total', 'is', null)
+    .order('sessions_remaining', { ascending: true });
+
+  if (error || !data) return [];
+
+  const lowBalance = data.filter(r => {
+    const rem = r.sessions_remaining ?? 0;
+    const tot = r.sessions_total ?? 1;
+    const threshold = Math.max(5, Math.floor(tot * 0.2));
+    return rem <= threshold;
+  });
+
+  if (lowBalance.length === 0) return [];
+
+  const kidIds = lowBalance.map(r => r.kid_id);
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('kid_id, scheduled_start')
+    .eq('tenant_id', tenantId)
+    .eq('status', 'completed')
+    .in('kid_id', kidIds)
+    .order('scheduled_start', { ascending: false });
+
+  const lastByKid: Record<string, string> = {};
+  for (const b of (bookings ?? [])) {
+    if (!lastByKid[b.kid_id]) lastByKid[b.kid_id] = b.scheduled_start;
+  }
+
+  return lowBalance.map(r => {
+    const kid = r.kids as unknown as { first_name: string; last_name: string | null };
+    const fam = r.families as unknown as { parent_first_name: string; parent_last_name: string | null; parent_email: string; parent_phone: string | null };
+    const lastTs = lastByKid[r.kid_id] ?? null;
+    return {
+      id: r.id,
+      kidName: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
+      parentName: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),
+      parentEmail: fam.parent_email,
+      parentPhone: fam.parent_phone ?? null,
+      planName: r.plan_name,
+      sessionsRemaining: r.sessions_remaining ?? 0,
+      sessionsTotal: r.sessions_total ?? 0,
+      lastSessionDate: lastTs,
+      lastSessionLabel: relativeTime(lastTs),
+    };
+  });
 }

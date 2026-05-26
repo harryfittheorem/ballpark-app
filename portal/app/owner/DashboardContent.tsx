@@ -8,7 +8,7 @@ import {
 } from '@/components/owner/ui';
 import {
   DollarSign, Users, TrendingUp, AlertTriangle, AlertCircle,
-  Download, Plus, Calendar, CheckCircle2, XCircle, CreditCard, X,
+  Download, Plus, Calendar, CheckCircle2, XCircle, CreditCard, X, Clock, Battery,
 } from 'lucide-react';
 import { exportCsv } from '@/lib/exportCsv';
 import type { OwnerKPIs, OwnerMember, RevenueMonth, MembershipPackage } from '@/lib/supabase/ownerQueries';
@@ -334,6 +334,40 @@ export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMo
                 ))}
               </div>
             </OCard>
+
+            {/* ── Pack lifecycle quick links ── */}
+            <div style={{ marginTop: 24 }}>
+              <SectionHeader title="Pack Lifecycle" subtitle="OTC membership health" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { Icon: XCircle,  label: 'Cancellations',     sub: 'Recent cancellations & lost MRR',       href: '/owner/cancellations',     color: brand.danger },
+                  { Icon: Clock,    label: 'Expiring Packs',    sub: 'Packs expiring in the next 60 days',     href: '/owner/expiring-packs',    color: brand.warning },
+                  { Icon: Battery,  label: 'Low Balance Packs', sub: 'Packs running low — renewal opps',       href: '/owner/low-balance-packs', color: brand.goldDeep },
+                ].map(({ Icon, label, sub, href, color }) => (
+                  <div
+                    key={href}
+                    onClick={() => router.push(href)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: 12, background: brand.surfaceAlt,
+                      borderRadius: 10, border: `1px solid ${brand.border}`,
+                      cursor: 'pointer', transition: 'border-color 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = brand.borderStrong)}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = brand.border)}
+                  >
+                    <div style={{ width: 34, height: 34, borderRadius: 8, background: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={16} color={color} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: brand.text }}>{label}</div>
+                      <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 1 }}>{sub}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: brand.goldDeep, fontWeight: 700 }}>→</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>

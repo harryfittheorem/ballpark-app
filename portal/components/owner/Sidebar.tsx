@@ -6,6 +6,7 @@ import {
   LayoutDashboard, Users, Calendar, CreditCard, TrendingDown, TrendingUp,
   UserCog, Sparkles, AlertCircle, Clock, AlertTriangle, BarChart3,
   ChevronLeft, ChevronRight, Building2, Dumbbell, ClipboardCheck,
+  XCircle, Battery,
 } from 'lucide-react';
 
 interface NavItem {
@@ -42,10 +43,13 @@ const ownerNav: NavSection[] = [
   {
     label: 'Retention',
     items: [
-      { label: 'Retention', href: '/owner/retention', icon: TrendingUp },
+      { label: 'Retention',         href: '/owner/retention',         icon: TrendingUp },
       { label: 'Missing in Action', href: '/owner/missing-in-action', icon: Clock },
-      { label: 'At-Risk', href: '/owner/at-risk', icon: AlertTriangle },
-      { label: 'Churn Analysis', href: '/owner/churn-analysis', icon: TrendingDown },
+      { label: 'At-Risk',           href: '/owner/at-risk',           icon: AlertTriangle },
+      { label: 'Churn Analysis',    href: '/owner/churn-analysis',    icon: TrendingDown },
+      { label: 'Cancellations',     href: '/owner/cancellations',     icon: XCircle },
+      { label: 'Expiring Packs',    href: '/owner/expiring-packs',    icon: Clock },
+      { label: 'Low Balance Packs', href: '/owner/low-balance-packs', icon: Battery },
     ],
   },
   {
