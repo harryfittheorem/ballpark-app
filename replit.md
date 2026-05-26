@@ -30,6 +30,8 @@ node scripts/delete-portal-seed-data.mjs  # remove every seeded record by its de
 
 **CEO demo scenario (Marcus Rivera end-to-end story):**
 
+Full demo script and leave-behind doc: `docs/DEMO_SCRIPT.md` · `docs/DEMO_LEAVE_BEHIND.md`
+
 ```bash
 node scripts/seed-demo-scenario.mjs       # Seed a scripted hero story: Marcus Rivera (14U, 847 pts,
                                            # rank #3), Coach Mike message, pending + reviewed drills,
