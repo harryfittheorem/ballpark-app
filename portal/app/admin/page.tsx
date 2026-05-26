@@ -43,6 +43,11 @@ const TILES = [
     title: "Promo Codes",
     body: "Create and manage discount codes for membership signups. Backed by Stripe Coupons.",
   },
+  {
+    href: "/admin/memberships/plans",
+    title: "Membership Plans",
+    body: "Add, edit, and hide the upgrade plan tiers shown to parents on the Upgrade Plan screen.",
+  },
 ];
 
 export default function AdminPage() {
