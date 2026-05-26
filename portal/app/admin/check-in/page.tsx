@@ -15,10 +15,14 @@ export default async function CheckInPage() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  // Resolve role — JWT claim with app_metadata fallback for production
+  // Resolve role — JWT claim with app_metadata fallback, then user_metadata
+  // fallback for owner accounts (raw_user_meta_data → user_metadata in JS SDK)
   let role = readAppRole(session);
   if (role === 'parent' && user.app_metadata?.app_role) {
     role = user.app_metadata.app_role as ReturnType<typeof readAppRole>;
+  }
+  if (role === 'parent' && user.user_metadata?.app_role) {
+    role = user.user_metadata.app_role as ReturnType<typeof readAppRole>;
   }
   if (role !== 'admin' && role !== 'owner' && role !== 'super_admin') {
     redirect('/logout?reason=forbidden');

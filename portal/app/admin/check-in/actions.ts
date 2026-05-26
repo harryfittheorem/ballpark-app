@@ -19,6 +19,9 @@ async function resolvedRole() {
   if (role === 'parent' && user.app_metadata?.app_role) {
     role = user.app_metadata.app_role as typeof role;
   }
+  if (role === 'parent' && user.user_metadata?.app_role) {
+    role = user.user_metadata.app_role as typeof role;
+  }
   return role;
 }
 
