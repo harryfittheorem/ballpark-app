@@ -28,6 +28,26 @@ node scripts/delete-portal-seed-data.mjs  # remove every seeded record by its de
                                            # Run before going to production.
 ```
 
+**CEO demo scenario (Marcus Rivera end-to-end story):**
+
+```bash
+node scripts/seed-demo-scenario.mjs       # Seed a scripted hero story: Marcus Rivera (14U, 847 pts,
+                                           # rank #3), Coach Mike message, pending + reviewed drills,
+                                           # upcoming Friday lesson, today's HitTrax session (88.4 mph),
+                                           # personal best, 2 achievements, 8-kid leaderboard, 3 store
+                                           # products, 1 past order, 12 dashboard bookings across 3
+                                           # coaches. Requires provision-coach-mike.mjs for coach-specific
+                                           # rows. Uses de00… UUID namespace — safe to combine with
+                                           # seed-portal-demo-data.mjs (5eed… namespace). Idempotent.
+
+node scripts/delete-demo-scenario.mjs     # Remove every record seeded by seed-demo-scenario.mjs.
+                                           # Deletes in reverse FK order: orders → kid_achievements →
+                                           # points_ledger → assignments → coach_messages → bookings →
+                                           # sessions → personal_bests → memberships → kids → products →
+                                           # family/peer auth users → demo coach auth users.
+                                           # Coach Mike is NOT deleted (provisioned separately).
+```
+
 **Environment Variables:**
 
 - `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_TENANT_SLUG=infinitehitting`
