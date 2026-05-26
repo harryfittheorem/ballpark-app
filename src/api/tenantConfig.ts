@@ -17,7 +17,6 @@ const sb: SupabaseClient = supabase as unknown as SupabaseClient;
 export type TenantConfig = {
   id: string;
   tenant_id: string;
-  allow_cross_location_booking: boolean;
   booking_cancel_window_hours: number;
   booking_cancel_fee_cents: number;
   membership_cancel_notice_days: number;
@@ -31,7 +30,7 @@ export async function getTenantConfig(): Promise<TenantConfig | null> {
   const { data, error } = await sb
     .from('tenant_config')
     .select(
-      'id, tenant_id, allow_cross_location_booking, booking_cancel_window_hours, booking_cancel_fee_cents, membership_cancel_notice_days',
+      'id, tenant_id, booking_cancel_window_hours, booking_cancel_fee_cents, membership_cancel_notice_days',
     )
     .maybeSingle();
 
