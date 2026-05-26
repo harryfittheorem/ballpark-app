@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, SectionHeader, OCard } from '@/components/owner/ui';
-import { Download, FileText, CreditCard, DollarSign, ArrowUpRight } from 'lucide-react';
+import { Download, FileText, CreditCard, DollarSign } from 'lucide-react';
 import type { RevenueReportsData, RevenueTransaction } from '@/lib/supabase/ownerQueries';
 import { exportCsv } from '@/lib/exportCsv';
 
@@ -17,61 +17,7 @@ type Props = {
   defaultEnd: string;
 };
 
-// ── Demo data (shown when live DB has no revenue records yet) ──────────────
-
-const DEMO_EFT = { total: 57500, count: 190, pct: 71.5, mom: 6.2 };
-const DEMO_OTC = { total: 22900, count: 87, pct: 28.5, mom: 14.3 };
-
-const DEMO_SIX_MONTH = [
-  { month: 'May', eft: 52000, otc: 22000, total: 74000 },
-  { month: 'Jun', eft: 51000, otc: 22000, total: 73000 },
-  { month: 'Jul', eft: 52500, otc: 21500, total: 74000 },
-  { month: 'Aug', eft: 54000, otc: 22000, total: 76000 },
-  { month: 'Sep', eft: 52000, otc: 22000, total: 74000 },
-  { month: 'Oct', eft: 57500, otc: 22900, total: 80400 },
-];
-
-const DEMO_PROGRAMS = [
-  { name: 'Private Hitting Lessons', revenue: 48200 },
-  { name: 'Cage Rental',             revenue: 12400 },
-  { name: 'Group Classes',           revenue: 9800  },
-  { name: 'Team Training',           revenue: 5400  },
-  { name: 'Assessments',             revenue: 2800  },
-  { name: 'Merch & Retail',          revenue: 1800  },
-];
-const DEMO_TOTAL_REVENUE = DEMO_PROGRAMS.reduce((s, p) => s + p.revenue, 0);
-
-const DEMO_LTV = [
-  { name: 'Team Training',       ltv: 5480 },
-  { name: 'Unlimited Monthly',   ltv: 3368 },
-  { name: 'Cage Rental Monthly', ltv: 1440 },
-  { name: '8-Pack Lessons',      ltv: 968  },
-  { name: '4-Pack Lessons',      ltv: 548  },
-  { name: 'Camps & Clinics',     ltv: 390  },
-];
-
-const DEMO_TWELVE_MONTH = [
-  { month: 'Nov', value: 62 },
-  { month: 'Dec', value: 64 },
-  { month: 'Jan', value: 66 },
-  { month: 'Feb', value: 71 },
-  { month: 'Mar', value: 69 },
-  { month: 'Apr', value: 72 },
-  { month: 'May', value: 74 },
-  { month: 'Jun', value: 71 },
-  { month: 'Jul', value: 73 },
-  { month: 'Aug', value: 76 },
-  { month: 'Sep', value: 74 },
-  { month: 'Oct', value: 80 },
-];
-
-const DEMO_PKG_TABLE = [
-  { name: 'Team Training',       price: 450, active: 12,  mrr: 5400,  pct: 6.7,  ltv: 5480 },
-  { name: 'Unlimited Monthly',   price: 280, active: 147, mrr: 41160, pct: 51.2, ltv: 3368 },
-  { name: 'Cage Rental Monthly', price: 120, active: 31,  mrr: 3720,  pct: 4.6,  ltv: 1440 },
-  { name: '8-Pack Lessons',      price: 320, active: 42,  mrr: 13440, pct: 16.7, ltv: 968  },
-  { name: '4-Pack Lessons',      price: 180, active: 38,  mrr: 6840,  pct: 8.5,  ltv: 548  },
-];
+// ── Helpers ──────────────────────────────────────────────────────────────
 
 const PROGRAM_COLORS = [
   brand.goldDeep, brand.gold, brand.info, brand.success, brand.warning, brand.textMuted,
@@ -82,7 +28,7 @@ function fmtK(n: number) {
   return `$${n}`;
 }
 
-function ProgramDonut({ programs, total }: { programs: typeof DEMO_PROGRAMS; total: number }) {
+function ProgramDonut({ programs, total }: { programs: Array<{ name: string; count: number }>; total: number }) {
   const size = 160;
   const radius = 62;
   const circ = 2 * Math.PI * radius;
@@ -91,7 +37,7 @@ function ProgramDonut({ programs, total }: { programs: typeof DEMO_PROGRAMS; tot
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
       <circle cx={80} cy={80} r={radius} fill="none" stroke={brand.border} strokeWidth={12} />
       {programs.map((p, i) => {
-        const pct = p.revenue / total;
+        const pct = p.count / total;
         const dash = `${pct * circ} ${circ}`;
         const offset = -cumulative * circ;
         cumulative += pct;
@@ -104,11 +50,11 @@ function ProgramDonut({ programs, total }: { programs: typeof DEMO_PROGRAMS; tot
       })}
       <text x={80} y={74} textAnchor="middle" fontSize={18} fontWeight={700}
         fontFamily={fonts.display} fill={brand.text}>
-        {fmtK(total)}
+        {total}
       </text>
       <text x={80} y={90} textAnchor="middle" fontSize={9} fontWeight={700}
         fontFamily={fonts.display} fill={brand.textMuted} letterSpacing={1}>
-        OCTOBER
+        SESSIONS
       </text>
     </svg>
   );
@@ -135,8 +81,10 @@ const inputStyle: React.CSSProperties = {
 export function RevenueReportsContent({ data, transactions, startDate, endDate, defaultStart, defaultEnd }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const { eftVsOtc, monthly, cohortRetention } = data;
-  const [toast, setToast] = useState<string | null>(null);
+  const { eftVsOtc, monthly, packages, programBreakdown, cohortRetention } = data;
+  const [toast, setToast]       = useState<string | null>(null);
+  const [toastError, setToastError] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [start, setStart] = useState(startDate);
   const [end, setEnd]     = useState(endDate);
 
@@ -146,28 +94,63 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
     });
   }
 
-  function showToast(msg: string) {
+  function showToast(msg: string, isError = false) {
     setToast(msg);
-    setTimeout(() => setToast(null), 3500);
+    setToastError(isError);
+    setTimeout(() => setToast(null), 4000);
   }
 
-  // Use live data when available, fall back to demo
+  async function handleSendReport() {
+    if (isSending) return;
+    setIsSending(true);
+    try {
+      const res = await fetch('/api/owner/send-revenue-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eftTotal:         eftVsOtc.eftTotal,
+          otcTotal:         eftVsOtc.otcTotal,
+          transactionCount: transactions.length,
+          startDate:        startDate,
+          endDate:          endDate,
+        }),
+      });
+      const json = await res.json() as { success?: boolean; skipped?: boolean; sentTo?: string; error?: string };
+      if (json.skipped) {
+        showToast('Email not configured — set RESEND_API_KEY to enable delivery', true);
+      } else if (!res.ok || json.error) {
+        showToast(json.error ?? 'Failed to send report', true);
+      } else {
+        showToast(`Report sent to ${json.sentTo ?? 'your email'} ✓`);
+      }
+    } catch {
+      showToast('Network error — could not send report', true);
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  // Detect whether the DB has revenue records to show
   const hasLiveData = eftVsOtc.eftTotal + eftVsOtc.otcTotal > 0;
-  const totalRevenue = hasLiveData ? eftVsOtc.eftTotal + eftVsOtc.otcTotal : DEMO_EFT.total + DEMO_OTC.total;
-  const eftTotal    = hasLiveData ? eftVsOtc.eftTotal  : DEMO_EFT.total;
-  const otcTotal    = hasLiveData ? eftVsOtc.otcTotal  : DEMO_OTC.total;
-  const eftCount    = hasLiveData ? eftVsOtc.eftCount  : DEMO_EFT.count;
-  const otcCount    = hasLiveData ? eftVsOtc.otcCount  : DEMO_OTC.count;
-  const eftPct      = hasLiveData ? Math.round((eftTotal / totalRevenue) * 100) : DEMO_EFT.pct;
-  const otcPct      = hasLiveData ? 100 - eftPct : DEMO_OTC.pct;
 
-  const sixMonth  = monthly.length >= 2 ? monthly.slice(-6) : DEMO_SIX_MONTH;
-  const sixMax    = Math.max(...sixMonth.map(m => ('total' in m ? (m as typeof DEMO_SIX_MONTH[0]).total : 0)), 1);
+  const totalRevenue = eftVsOtc.eftTotal + eftVsOtc.otcTotal;
+  const eftTotal     = eftVsOtc.eftTotal;
+  const otcTotal     = eftVsOtc.otcTotal;
+  const eftCount     = eftVsOtc.eftCount;
+  const otcCount     = eftVsOtc.otcCount;
+  const eftPct       = totalRevenue > 0 ? Math.round((eftTotal / totalRevenue) * 100) : 0;
+  const otcPct       = 100 - eftPct;
 
-  const twelveMonth = monthly.length >= 6
-    ? monthly.slice(-12).map(m => ({ month: m.month, value: Math.round(m.total / 1000) }))
-    : DEMO_TWELVE_MONTH;
-  const twelveMax = Math.max(...twelveMonth.map(d => d.value), 1);
+  const sixMonth  = monthly.slice(-6);
+  const sixMax    = Math.max(...sixMonth.map(m => m.total), 1);
+
+  const twelveMonth = monthly.slice(-12).map(m => ({ month: m.month, value: Math.round(m.total / 1000) }));
+  const twelveMax   = Math.max(...twelveMonth.map(d => d.value), 1);
+
+  const ltvPackages = [...packages].sort((a, b) => b.ltv - a.ltv);
+  const maxLtv      = ltvPackages[0]?.ltv ?? 1;
+
+  const totalSessions = programBreakdown.reduce((s, p) => s + p.count, 0);
 
   function handleExportTransactions() {
     if (transactions.length === 0) return;
@@ -196,7 +179,7 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
   }
 
   const isDefaultRange = startDate === defaultStart && endDate === defaultEnd;
-  const rangeLabel = isDefaultRange ? 'Current Month' : `${startDate} – ${endDate}`;
+  const rangeLabel = isDefaultRange ? 'Last 12 Months' : `${startDate} – ${endDate}`;
 
   return (
     <>
@@ -207,13 +190,26 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
         actions={
           <>
             <OButton variant="secondary" icon={Download} onClick={handleExportTransactions} disabled={transactions.length === 0}>Export CSV</OButton>
-            <OButton variant="gold" icon={FileText} onClick={() => showToast('Monthly report scheduled — you\'ll receive it by email on the 1st')}>Schedule</OButton>
+            <OButton variant="gold" icon={FileText} onClick={handleSendReport} disabled={isSending}>
+              {isSending ? 'Sending…' : 'Email Report'}
+            </OButton>
           </>
         }
       />
 
       <div style={{ padding: 24 }}>
 
+        {/* ── Revenue KPI sections (only shown when live data exists) ── */}
+        {!hasLiveData ? (
+          <OCard style={{ marginBottom: 24, textAlign: 'center', padding: '48px 24px' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: brand.text, marginBottom: 8, fontFamily: fonts.display }}>No revenue data yet</div>
+            <div style={{ fontSize: 13, color: brand.textMuted, maxWidth: 400, margin: '0 auto' }}>
+              Revenue charts and KPIs will appear once payment events have been recorded. Run the portal demo seed to populate sample data.
+            </div>
+          </OCard>
+        ) : (
+          <>
         {/* ── Row 1: EFT card | OTC card | 6-Month Trend ── */}
         <SectionHeader
           title="EFT vs OTC"
@@ -236,9 +232,6 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
               ${(eftTotal / 1000).toFixed(1)}K
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 12, fontWeight: 700, color: brand.success }}>
-                <ArrowUpRight size={13} />{DEMO_EFT.mom}% MoM
-              </span>
               <span style={{ fontSize: 12, color: brand.textMuted }}>{eftPct}% of total</span>
             </div>
             <div style={{ marginTop: 12, padding: 10, background: brand.surface, borderRadius: 6, fontSize: 11, color: brand.textMuted, lineHeight: 1.5 }}>
@@ -261,9 +254,6 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
               ${(otcTotal / 1000).toFixed(1)}K
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 12, fontWeight: 700, color: brand.success }}>
-                <ArrowUpRight size={13} />{DEMO_OTC.mom}% MoM
-              </span>
               <span style={{ fontSize: 12, color: brand.textMuted }}>{otcPct}% of total</span>
             </div>
             <div style={{ marginTop: 12, padding: 10, background: brand.surface, borderRadius: 6, fontSize: 11, color: brand.textMuted, lineHeight: 1.5 }}>
@@ -277,19 +267,20 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
               6-Month Trend
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 130, paddingBottom: 22, position: 'relative' }}>
-              {sixMonth.map((m, i) => {
-                const mo = m as typeof DEMO_SIX_MONTH[0];
-                const heightPct = (mo.total / sixMax) * 100;
-                const eftH = (mo.eft / Math.max(mo.total, 1)) * 100;
+              {sixMonth.length === 0 ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: brand.textMuted, fontSize: 12 }}>No data yet</div>
+            ) : sixMonth.map((m, i) => {
+                const heightPct = (m.total / sixMax) * 100;
+                const eftH = (m.eft / Math.max(m.total, 1)) * 100;
                 const isLast = i === sixMonth.length - 1;
                 return (
                   <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', gap: 3 }}>
-                    <div style={{ fontSize: 8, color: brand.textMuted, fontWeight: 700 }}>{fmtK(mo.total)}</div>
+                    <div style={{ fontSize: 8, color: brand.textMuted, fontWeight: 700 }}>{fmtK(m.total)}</div>
                     <div style={{ width: '100%', height: `${heightPct}%`, borderRadius: '3px 3px 0 0', overflow: 'hidden', display: 'flex', flexDirection: 'column-reverse', minHeight: 4, opacity: isLast ? 1 : 0.82 }}>
                       <div style={{ height: `${eftH}%`, background: brand.success, minHeight: 2 }} />
                       <div style={{ flex: 1, background: brand.warning, minHeight: 2 }} />
                     </div>
-                    <div style={{ fontSize: 8, color: brand.textMuted, fontWeight: 600, position: 'absolute', bottom: 0 }}>{mo.month}</div>
+                    <div style={{ fontSize: 8, color: brand.textMuted, fontWeight: 600, position: 'absolute', bottom: 0 }}>{m.month}</div>
                   </div>
                 );
               })}
@@ -310,31 +301,36 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
         {/* ── Row 2: Revenue by Program | Package Performance LTV ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
 
-          {/* Revenue by Program */}
+          {/* Sessions by Program */}
           <OCard>
-            <SectionHeader title="Revenue by Program" />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-              <ProgramDonut programs={DEMO_PROGRAMS} total={DEMO_TOTAL_REVENUE} />
-              <div style={{ flex: 1 }}>
-                {DEMO_PROGRAMS.map((p, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', fontSize: 12 }}>
-                    <div style={{ width: 9, height: 9, borderRadius: 2, background: PROGRAM_COLORS[i % PROGRAM_COLORS.length], flexShrink: 0 }} />
-                    <div style={{ flex: 1, color: brand.text }}>{p.name}</div>
-                    <div style={{ fontFamily: fonts.mono, fontWeight: 700, color: brand.text }}>{fmtK(p.revenue)}</div>
-                  </div>
-                ))}
+            <SectionHeader title="Sessions by Program" subtitle="Bookings in the last 12 months" />
+            {totalSessions === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px 0', color: brand.textMuted, fontSize: 12 }}>No booking data yet</div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                <ProgramDonut programs={programBreakdown} total={totalSessions} />
+                <div style={{ flex: 1 }}>
+                  {programBreakdown.map((p, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', fontSize: 12 }}>
+                      <div style={{ width: 9, height: 9, borderRadius: 2, background: PROGRAM_COLORS[i % PROGRAM_COLORS.length], flexShrink: 0 }} />
+                      <div style={{ flex: 1, color: brand.text }}>{p.name}</div>
+                      <div style={{ fontFamily: fonts.mono, fontWeight: 700, color: brand.text }}>{p.count} sessions</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </OCard>
 
           {/* Package Performance — LTV */}
           <OCard>
             <SectionHeader title="Package Performance — LTV" />
-            {DEMO_LTV.map((p, i) => {
-              const maxLtv = DEMO_LTV[0].ltv;
+            {ltvPackages.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px 0', color: brand.textMuted, fontSize: 12 }}>No package data yet</div>
+            ) : ltvPackages.map((p, i) => {
               const barW = Math.round((p.ltv / maxLtv) * 100);
               return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i < DEMO_LTV.length - 1 ? `1px solid ${brand.border}` : 'none' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i < ltvPackages.length - 1 ? `1px solid ${brand.border}` : 'none' }}>
                   <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: brand.text }}>{p.name}</div>
                   <div style={{ width: 100, height: 6, background: brand.border, borderRadius: 3, overflow: 'hidden', flexShrink: 0 }}>
                     <div style={{ width: `${barW}%`, height: '100%', background: brand.goldDeep, borderRadius: 3 }} />
@@ -389,19 +385,25 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
               </tr>
             </thead>
             <tbody>
-              {DEMO_PKG_TABLE.map((row, i) => (
-                <tr key={i} style={{ borderBottom: i < DEMO_PKG_TABLE.length - 1 ? `1px solid ${brand.border}` : 'none' }}>
+              {packages.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: brand.textMuted, fontSize: 12 }}>No package data yet</td>
+                </tr>
+              ) : packages.map((row, i) => (
+                <tr key={i} style={{ borderBottom: i < packages.length - 1 ? `1px solid ${brand.border}` : 'none' }}>
                   <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 700, color: brand.text }}>{row.name}</td>
-                  <td style={{ padding: '14px 16px', fontSize: 13, fontFamily: fonts.mono, fontWeight: 600, color: brand.text, textAlign: 'right' }}>${row.price}</td>
-                  <td style={{ padding: '14px 16px', fontSize: 13, fontFamily: fonts.mono, fontWeight: 600, color: brand.text, textAlign: 'right' }}>{row.active}</td>
+                  <td style={{ padding: '14px 16px', fontSize: 13, fontFamily: fonts.mono, fontWeight: 600, color: brand.text, textAlign: 'right' }}>${row.price.toFixed(0)}</td>
+                  <td style={{ padding: '14px 16px', fontSize: 13, fontFamily: fonts.mono, fontWeight: 600, color: brand.text, textAlign: 'right' }}>{row.activeCount}</td>
                   <td style={{ padding: '14px 16px', fontSize: 13, fontFamily: fonts.mono, fontWeight: 700, color: brand.text, textAlign: 'right' }}>{fmtK(row.mrr)}</td>
-                  <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 700, color: brand.text, textAlign: 'right' }}>{row.pct}%</td>
+                  <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 700, color: brand.text, textAlign: 'right' }}>{row.pctRevenue}%</td>
                   <td style={{ padding: '14px 16px', fontSize: 13, fontFamily: fonts.mono, fontWeight: 700, color: brand.goldDeep, textAlign: 'right' }}>${row.ltv.toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+          </>
+        )}
 
         {/* ── Row 5: Transaction List (real data) ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -529,7 +531,7 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
     </div>
 
     {toast && (
-      <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 500, background: brand.dark, color: brand.gold, padding: '12px 20px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.24)', fontSize: 13, fontWeight: 600, maxWidth: 380 }}>
+      <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 500, background: toastError ? brand.danger : brand.dark, color: toastError ? '#fff' : brand.gold, padding: '12px 20px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.24)', fontSize: 13, fontWeight: 600, maxWidth: 380 }}>
         {toast}
       </div>
     )}

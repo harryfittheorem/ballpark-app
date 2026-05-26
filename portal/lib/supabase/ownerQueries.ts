@@ -596,7 +596,7 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
 export async function getMonthlyRevenue(supabase: SupabaseClient, tenantId: string): Promise<RevenueMonth[]> {
   const { data, error } = await supabase
     .from('payment_events')
-    .select('amount_cents, payment_method, status, created_at')
+    .select('amount_cents, status, created_at, memberships(plan_type)')
     .eq('tenant_id', tenantId)
     .eq('status', 'paid')
     .gte('created_at', new Date(Date.now() - 365 * 86_400_000).toISOString())
@@ -614,7 +614,9 @@ export async function getMonthlyRevenue(supabase: SupabaseClient, tenantId: stri
       byMonth[key] = { month: monthLabels[d.getMonth()], eft: 0, otc: 0, total: 0 };
     }
     const cents = e.amount_cents / 100;
-    if (e.payment_method === 'eft') byMonth[key].eft += cents;
+    const mem = e.memberships as unknown as { plan_type: string } | null;
+    const planType = mem?.plan_type ?? 'otc';
+    if (planType === 'eft') byMonth[key].eft += cents;
     else byMonth[key].otc += cents;
     byMonth[key].total += cents;
   }
@@ -627,31 +629,47 @@ export async function getMonthlyRevenue(supabase: SupabaseClient, tenantId: stri
 // ─── Membership Packages ─────────────────────────────────────────────────────
 
 export async function getMembershipPackages(supabase: SupabaseClient, tenantId: string): Promise<MembershipPackage[]> {
-  const { data, error } = await supabase
-    .from('memberships')
-    .select('plan_name, plan_type, amount_cents, status, started_at')
-    .eq('tenant_id', tenantId);
+  const [membershipsRes, paymentsRes] = await Promise.all([
+    supabase
+      .from('memberships')
+      .select('id, plan_name, plan_type, amount_cents, status, started_at')
+      .eq('tenant_id', tenantId),
+    supabase
+      .from('payment_events')
+      .select('membership_id, amount_cents')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'paid'),
+  ]);
 
-  if (error || !data) return [];
+  if (membershipsRes.error || !membershipsRes.data) return [];
 
-  const byPlan: Record<string, { planType: string; price: number; activeCount: number; totalCents: number; startDates: string[] }> = {};
+  const memberships = membershipsRes.data;
+  const payments = paymentsRes.data ?? [];
 
-  for (const m of data) {
-    if (!byPlan[m.plan_name]) {
-      byPlan[m.plan_name] = { planType: m.plan_type, price: m.amount_cents / 100, activeCount: 0, totalCents: 0, startDates: [] };
+  // Actual collected revenue per membership (from real payment_events rows)
+  const collectedByMembership: Record<string, number> = {};
+  for (const p of payments) {
+    if (p.membership_id) {
+      collectedByMembership[p.membership_id] = (collectedByMembership[p.membership_id] ?? 0) + p.amount_cents;
     }
-    if (m.status === 'active') byPlan[m.plan_name].activeCount += 1;
-    byPlan[m.plan_name].totalCents += m.amount_cents;
-    byPlan[m.plan_name].startDates.push(m.started_at);
   }
 
-  const totalMrr = Object.values(byPlan).reduce(
-    (s, p) => s + (p.planType === 'eft' ? p.price * p.activeCount : 0), 0
-  );
+  const byPlan: Record<string, { planType: string; price: number; activeCount: number; collectedCents: number }> = {};
+
+  for (const m of memberships) {
+    if (!byPlan[m.plan_name]) {
+      byPlan[m.plan_name] = { planType: m.plan_type, price: m.amount_cents / 100, activeCount: 0, collectedCents: 0 };
+    }
+    if (m.status === 'active') byPlan[m.plan_name].activeCount += 1;
+    byPlan[m.plan_name].collectedCents += collectedByMembership[m.id] ?? 0;
+  }
+
+  const totalCollected = Object.values(byPlan).reduce((s, p) => s + p.collectedCents, 0);
 
   return Object.entries(byPlan).map(([name, p]) => {
-    const mrr = p.planType === 'eft' ? p.price * p.activeCount : p.totalCents / 100;
-    const pctRevenue = totalMrr > 0 ? Math.round((mrr / totalMrr) * 1000) / 10 : 0;
+    // MRR: for EFT use active count × monthly price; for OTC use total collected
+    const mrr = p.planType === 'eft' ? p.price * p.activeCount : p.collectedCents / 100;
+    const pctRevenue = totalCollected > 0 ? Math.round((p.collectedCents / totalCollected) * 1000) / 10 : 0;
     const avgTenureMonths = 6;
     return {
       name,
@@ -773,13 +791,30 @@ export type RevenueReportsData = {
   eftVsOtc: { eftTotal: number; otcTotal: number; eftCount: number; otcCount: number };
   monthly: RevenueMonth[];
   packages: MembershipPackage[];
+  programBreakdown: Array<{ name: string; count: number }>;
   cohortRetention: Array<{ cohort: string; size: number; retention: number[] }>;
 };
 
 export async function getRevenueReportsData(supabase: SupabaseClient, tenantId: string): Promise<RevenueReportsData> {
-  const [monthly, packages] = await Promise.all([
+  const TYPE_LABEL: Record<string, string> = {
+    private: 'Private Lessons',
+    group:   'Group Classes',
+    cage:    'Cage Rental',
+  };
+
+  const [monthly, packages, bookingsRes, membershipsRes] = await Promise.all([
     getMonthlyRevenue(supabase, tenantId),
     getMembershipPackages(supabase, tenantId),
+    supabase
+      .from('bookings')
+      .select('type_category')
+      .eq('tenant_id', tenantId)
+      .gte('scheduled_start', new Date(Date.now() - 365 * 86_400_000).toISOString()),
+    supabase
+      .from('memberships')
+      .select('started_at, status')
+      .eq('tenant_id', tenantId)
+      .order('started_at'),
   ]);
 
   const eftTotal = monthly.reduce((s, m) => s + m.eft, 0);
@@ -787,16 +822,19 @@ export async function getRevenueReportsData(supabase: SupabaseClient, tenantId: 
   const eftCount = packages.filter(p => p.planType === 'eft').reduce((s, p) => s + p.activeCount, 0);
   const otcCount = packages.filter(p => p.planType === 'otc').reduce((s, p) => s + p.activeCount, 0);
 
-  const { data: memberships } = await supabase
-    .from('memberships')
-    .select('started_at, status')
-    .eq('tenant_id', tenantId)
-    .order('started_at');
+  const countByType: Record<string, number> = {};
+  for (const b of (bookingsRes.data ?? [])) {
+    const label = TYPE_LABEL[b.type_category as string] ?? b.type_category ?? 'Other';
+    countByType[label] = (countByType[label] ?? 0) + 1;
+  }
+  const programBreakdown = Object.entries(countByType)
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, count]) => ({ name, count }));
 
   const cohortMap: Record<string, { total: number; active: number }> = {};
   const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  for (const m of (memberships ?? [])) {
+  for (const m of (membershipsRes.data ?? [])) {
     const d = new Date(m.started_at);
     const key = `${monthLabels[d.getMonth()]} ${d.getFullYear()}`;
     if (!cohortMap[key]) cohortMap[key] = { total: 0, active: 0 };
@@ -814,6 +852,7 @@ export async function getRevenueReportsData(supabase: SupabaseClient, tenantId: 
     eftVsOtc: { eftTotal, otcTotal, eftCount, otcCount },
     monthly,
     packages,
+    programBreakdown,
     cohortRetention,
   };
 }
