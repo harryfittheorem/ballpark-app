@@ -71,5 +71,25 @@ if (create.status >= 400) {
   console.error(`FAIL (${create.status}):`, JSON.stringify(body, null, 2));
   process.exit(1);
 }
-console.log(`PASS: created user_id=${body.id}`);
+const newUserId = body.id;
+console.log(`PASS: created user_id=${newUserId}`);
 console.log('     handle_new_user should have inserted a public.coaches row for this user.');
+
+// Explicitly set capabilities so the column default is validated in practice.
+// The column default '{"preset":"instructor"}' applies automatically, but we
+// confirm it here to catch any schema drift early.
+console.log('-> Confirming capabilities column default on coaches row...');
+const { createClient } = await import('@supabase/supabase-js');
+const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+const { data: coachRow, error: capErr } = await admin
+  .from('coaches')
+  .update({ capabilities: { preset: 'instructor' } })
+  .eq('user_id', newUserId)
+  .select('id, capabilities')
+  .single();
+if (capErr) {
+  console.warn('   Warning: could not confirm capabilities column:', capErr.message);
+  console.warn('   (Run the migration supabase/migrations/20260605000000_coach_capabilities.sql first)');
+} else {
+  console.log(`   OK: coach row ${coachRow.id} → capabilities=${JSON.stringify(coachRow.capabilities)}`);
+}

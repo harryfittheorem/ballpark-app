@@ -88,6 +88,7 @@ export type OwnerCoach = {
   revenue: number;
   weeklyHours: number;
   joinedDate: string;
+  preset: "instructor" | "staff";
 };
 
 export type FailedPayment = {
@@ -375,7 +376,7 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
 export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string): Promise<OwnerCoach[]> {
   const { data: coaches, error } = await supabase
     .from('coaches')
-    .select('id, user_id, first_name, last_name, is_active, created_at')
+    .select('id, user_id, first_name, last_name, is_active, created_at, capabilities')
     .eq('tenant_id', tenantId)
     .eq('is_active', true);
 
@@ -404,9 +405,12 @@ export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string
     const weeklyHours = Math.round((sessions / 13) * 1.5);
     const utilization = Math.min(100, Math.round((sessions / Math.max(sessions + 5, 40)) * 100));
 
+    const raw = c as unknown as { user_id: string | null; capabilities?: { preset?: string } };
+    const preset =
+      raw.capabilities?.preset === 'staff' ? 'staff' : 'instructor';
     return {
       id: c.id,
-      userId: (c as unknown as { user_id: string | null }).user_id ?? null,
+      userId: raw.user_id ?? null,
       name: `${c.first_name} ${c.last_name}`,
       specialty: 'Hitting Coach',
       students,
@@ -416,8 +420,85 @@ export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string
       revenue: 0,
       weeklyHours,
       joinedDate: formatJoinDate(c.created_at ?? new Date().toISOString()),
+      preset: preset as 'instructor' | 'staff',
     };
   });
+}
+
+// ─── Staff Family Directory (contact-only, no financial fields) ─────────────
+
+/**
+ * Contact fields that staff coaches are permitted to see.
+ * Deliberately excludes all financial / billing data:
+ *   card_last4, card_brand, card_exp_*, stripe_customer_id,
+ *   amount_cents, payment_events, memberships (plan / billing columns).
+ */
+export type StaffFamilyContact = {
+  familyId: string;
+  parentFirstName: string;
+  parentLastName: string;
+  parentPhone: string | null;
+  parentEmail: string;
+  kids: Array<{ id: string; firstName: string; lastName: string; ageGroup: string | null }>;
+  lastSessionDate: string | null;
+};
+
+export async function getStaffFamilyDirectory(
+  supabase: SupabaseClient,
+  tenantId: string,
+): Promise<StaffFamilyContact[]> {
+  const { data: families, error } = await supabase
+    .from('families')
+    .select('id, parent_first_name, parent_last_name, parent_phone, parent_email')
+    .eq('tenant_id', tenantId)
+    .order('parent_last_name');
+
+  if (error || !families) return [];
+
+  const familyIds = families.map(f => f.id);
+
+  const { data: kids } = await supabase
+    .from('kids')
+    .select('id, family_id, first_name, last_name, age_group')
+    .in('family_id', familyIds)
+    .order('first_name');
+
+  const { data: recentBookings } = await supabase
+    .from('bookings')
+    .select('kid_id, scheduled_start, kids!inner(family_id)')
+    .eq('tenant_id', tenantId)
+    .eq('status', 'completed')
+    .order('scheduled_start', { ascending: false })
+    .limit(500);
+
+  const lastSessionByFamily: Record<string, string> = {};
+  for (const b of (recentBookings ?? []) as unknown as { kid_id: string; scheduled_start: string; kids: { family_id: string } }[]) {
+    const fid = b.kids?.family_id;
+    if (fid && !lastSessionByFamily[fid]) {
+      lastSessionByFamily[fid] = b.scheduled_start;
+    }
+  }
+
+  const kidsByFamily: Record<string, StaffFamilyContact['kids']> = {};
+  for (const k of (kids ?? []) as unknown as { id: string; family_id: string; first_name: string; last_name: string | null; age_group: string | null }[]) {
+    if (!kidsByFamily[k.family_id]) kidsByFamily[k.family_id] = [];
+    kidsByFamily[k.family_id].push({
+      id: k.id,
+      firstName: k.first_name,
+      lastName: k.last_name ?? '',
+      ageGroup: k.age_group,
+    });
+  }
+
+  return families.map(f => ({
+    familyId: f.id,
+    parentFirstName: f.parent_first_name,
+    parentLastName: f.parent_last_name,
+    parentPhone: f.parent_phone ?? null,
+    parentEmail: f.parent_email,
+    kids: kidsByFamily[f.id] ?? [],
+    lastSessionDate: lastSessionByFamily[f.id] ?? null,
+  }));
 }
 
 // ─── Failed Payments ────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { Session } from "@supabase/supabase-js";
+import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
 export type AppRole = "coach" | "admin" | "owner" | "parent" | "super_admin";
 
@@ -58,4 +58,48 @@ export function readTenantId(session: Session | null): string | null {
   const payload = decodeJwtPayload(session.access_token);
   const claim = payload?.tenant_id;
   return typeof claim === "string" && claim.length > 0 ? claim : null;
+}
+
+export type CoachPreset = "instructor" | "staff";
+
+export interface CoachCapabilities {
+  preset: CoachPreset;
+  [key: string]: unknown;
+}
+
+/**
+ * Fetch the `capabilities` JSONB for the coach who owns the given user_id.
+ * Returns `{ preset: "instructor" }` as the safe default when no row is found
+ * or the column is missing/malformed — matching the DB column default.
+ *
+ * Call server-side only (requires an authenticated Supabase client).
+ */
+export async function getCoachCapabilities(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<CoachCapabilities> {
+  const fallback: CoachCapabilities = { preset: "instructor" };
+  try {
+    const { data, error } = await supabase
+      .from("coaches")
+      .select("capabilities")
+      .eq("user_id", userId)
+      .single();
+    if (error || !data) return fallback;
+    const caps = data.capabilities as Record<string, unknown> | null;
+    if (!caps || typeof caps !== "object") return fallback;
+    const preset = caps.preset;
+    if (preset !== "instructor" && preset !== "staff") return fallback;
+    return { ...caps, preset } as CoachCapabilities;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Convenience check: returns true when the coach has the "staff" preset,
+ * granting access to operational portal sections.
+ */
+export function isStaffPreset(caps: CoachCapabilities): boolean {
+  return caps.preset === "staff";
 }

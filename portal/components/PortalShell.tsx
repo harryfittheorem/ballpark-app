@@ -23,15 +23,27 @@ interface NavSection {
   items: NavItem[];
 }
 
-const COACH_NAV: NavSection[] = [
-  {
-    items: [
-      { label: 'Inbox', href: '/coach/inbox', icon: MessageSquare },
-      { label: 'My Sessions', href: '/coach/sessions', icon: ClipboardCheck },
-      { label: 'Assignments', href: '/coach/assignments', icon: BookOpen },
-    ],
-  },
-];
+const COACH_BASE_NAV: NavSection = {
+  items: [
+    { label: 'Inbox', href: '/coach/inbox', icon: MessageSquare },
+    { label: 'My Sessions', href: '/coach/sessions', icon: ClipboardCheck },
+    { label: 'Assignments', href: '/coach/assignments', icon: BookOpen },
+  ],
+};
+
+const COACH_STAFF_EXTRA: NavSection = {
+  label: 'Operations',
+  items: [
+    { label: 'Schedule',    href: '/coach/schedule',    icon: Calendar },
+    { label: 'Check-In',   href: '/coach/check-in',    icon: ClipboardCheck },
+    { label: 'Families',   href: '/coach/families',    icon: Users },
+    { label: 'Redemptions', href: '/coach/redemptions', icon: Sparkles },
+  ],
+};
+
+function buildCoachNav(isStaff: boolean): NavSection[] {
+  return isStaff ? [COACH_BASE_NAV, COACH_STAFF_EXTRA] : [COACH_BASE_NAV];
+}
 
 const ADMIN_NAV: NavSection[] = [
   {
@@ -112,6 +124,7 @@ interface PortalShellProps {
   email?: string | null;
   userName?: string;
   locationName?: string;
+  isStaff?: boolean;
 }
 
 export function PortalShell({
@@ -120,6 +133,7 @@ export function PortalShell({
   email,
   userName,
   locationName,
+  isStaff = false,
 }: PortalShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -139,7 +153,7 @@ export function PortalShell({
         ? FRANCHISOR_NAV
         : OWNER_NAV
       : role === 'coach'
-        ? COACH_NAV
+        ? buildCoachNav(isStaff)
         : ADMIN_NAV;
 
   const homeHref =

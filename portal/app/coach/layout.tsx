@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { readAppRole } from "@/lib/auth";
+import { readAppRole, getCoachCapabilities, isStaffPreset } from "@/lib/auth";
 import { PortalShell } from "@/components/PortalShell";
 
 export default async function CoachLayout({
@@ -25,8 +25,11 @@ export default async function CoachLayout({
     redirect("/logout?reason=parent");
   }
 
+  const caps = await getCoachCapabilities(supabase, user.id);
+  const isStaff = isStaffPreset(caps);
+
   return (
-    <PortalShell role="coach" email={user.email ?? null}>
+    <PortalShell role="coach" email={user.email ?? null} isStaff={isStaff}>
       <div className="mx-auto max-w-5xl px-6 py-8">{children}</div>
     </PortalShell>
   );
