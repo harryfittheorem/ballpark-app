@@ -68,11 +68,28 @@ const ALL_MEMBERSHIP_IDS = [
 const SESSION_ID       = demoId(4, 1);
 const PERSONAL_BEST_ID = demoId(5, 1);
 
-// Bookings: 1 upcoming + 6 historical + 12 dashboard = 19 total
+// Peer personal bests (exit_velocity indices 2–8, distance indices 9–15, Marcus distance index 16)
+const ALL_PERSONAL_BEST_IDS = [
+  PERSONAL_BEST_ID,
+  ...Array.from({ length: 7  }, (_, i) => demoId(5, i + 2)),   // peer exit_velocity
+  ...Array.from({ length: 7  }, (_, i) => demoId(5, i + 9)),   // peer distance_ft
+  demoId(5, 16),                                                 // Marcus distance_ft
+];
+
+// Peer lesson-count booking counts (mirrors PEER_DEFS.lessons in seed script)
+const PEER_LESSON_COUNTS = [14, 11, 8, 6, 5, 3, 2];
+let _peerBookingOffset = 22;
+const PEER_COMPLETED_BOOKING_IDS = [];
+for (const count of PEER_LESSON_COUNTS) {
+  for (let j = 0; j < count; j++) PEER_COMPLETED_BOOKING_IDS.push(demoId(6, _peerBookingOffset++));
+}
+
+// Bookings: 1 upcoming + 6 historical + 12 dashboard + 49 peer completed
 const ALL_BOOKING_IDS = [
   demoId(6, 1),
   ...Array.from({ length: 6  }, (_, i) => demoId(6, i + 2)),
   ...Array.from({ length: 12 }, (_, i) => demoId(6, i + 10)),
+  ...PEER_COMPLETED_BOOKING_IDS,
 ];
 
 const COACH_MSG_ID       = demoId(7, 1);
@@ -196,9 +213,9 @@ console.log('\n─── SESSIONS ───────────────�
 const sessionDel = await deleteByIds('sessions', [SESSION_ID]);
 console.log(`  sessions deleted: ${sessionDel}`);
 
-// 9. Personal bests
+// 9. Personal bests (Marcus exit_velocity + Marcus distance + 7 peer exit_velocity + 7 peer distance)
 console.log('\n─── PERSONAL BESTS ───────────────────────────────────────────────────');
-const prDel = await deleteByIds('personal_bests', [PERSONAL_BEST_ID]);
+const prDel = await deleteByIds('personal_bests', ALL_PERSONAL_BEST_IDS);
 console.log(`  personal_bests deleted: ${prDel}`);
 
 // 10. Memberships

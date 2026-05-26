@@ -111,6 +111,9 @@ const MARCUS_MEMBERSHIP_ID   = demoId(3, 1);
 const PEER_MEMBERSHIP_IDS    = Array.from({ length: 7 }, (_, i) => demoId(3, i + 2));
 const SESSION_ID             = demoId(4, 1);
 const PERSONAL_BEST_ID       = demoId(5, 1);
+// Peer personal bests: indices 2–8 exit_velocity, 9–15 distance
+const PEER_PB_EV_IDS   = Array.from({ length: 7 }, (_, i) => demoId(5, i + 2));
+const PEER_PB_DIST_IDS = Array.from({ length: 7 }, (_, i) => demoId(5, i + 9));
 const UPCOMING_BOOKING_ID    = demoId(6, 1);
 const HIST_BOOKING_IDS       = Array.from({ length: 6  }, (_, i) => demoId(6, i + 2));
 const TODAY_BOOKING_IDS      = Array.from({ length: 12 }, (_, i) => demoId(6, i + 10));
@@ -382,13 +385,13 @@ console.log('  Active "Private Hitting Lessons" membership seeded');
 console.log('\n─── LEADERBOARD PEERS ────────────────────────────────────────────────');
 
 const PEER_DEFS = [
-  { pFirst: 'Darius',  pLast: 'Carter',   kFirst: 'Jaylen', kLast: 'Carter',   pts: 1240, email: 'demo.peer.01@ballpark.test' },
-  { pFirst: 'Rosa',    pLast: 'Martinez', kFirst: 'Sofia',  kLast: 'Martinez', pts: 1050, email: 'demo.peer.02@ballpark.test' },
-  { pFirst: 'David',   pLast: 'Williams', kFirst: 'Ethan',  kLast: 'Williams', pts:  720, email: 'demo.peer.03@ballpark.test' },
-  { pFirst: 'Priya',   pLast: 'Patel',    kFirst: 'Aria',   kLast: 'Patel',    pts:  610, email: 'demo.peer.04@ballpark.test' },
-  { pFirst: 'Mike',    pLast: 'Thompson', kFirst: 'Noah',   kLast: 'Thompson', pts:  480, email: 'demo.peer.05@ballpark.test' },
-  { pFirst: 'Ana',     pLast: 'Garcia',   kFirst: 'Emma',   kLast: 'Garcia',   pts:  350, email: 'demo.peer.06@ballpark.test' },
-  { pFirst: 'Wei',     pLast: 'Chen',     kFirst: 'Tyler',  kLast: 'Chen',     pts:  220, email: 'demo.peer.07@ballpark.test' },
+  { pFirst: 'Darius',  pLast: 'Carter',   kFirst: 'Jaylen', kLast: 'Carter',   pts: 1240, email: 'demo.peer.01@ballpark.test', ageGroup: '14U', ev: 92.1, dist: 405, lessons: 14 },
+  { pFirst: 'Rosa',    pLast: 'Martinez', kFirst: 'Sofia',  kLast: 'Martinez', pts: 1050, email: 'demo.peer.02@ballpark.test', ageGroup: '14U', ev: 87.6, dist: 371, lessons: 11 },
+  { pFirst: 'David',   pLast: 'Williams', kFirst: 'Ethan',  kLast: 'Williams', pts:  720, email: 'demo.peer.03@ballpark.test', ageGroup: '12U', ev: 85.3, dist: 358, lessons:  8 },
+  { pFirst: 'Priya',   pLast: 'Patel',    kFirst: 'Aria',   kLast: 'Patel',    pts:  610, email: 'demo.peer.04@ballpark.test', ageGroup: '12U', ev: 83.8, dist: 340, lessons:  6 },
+  { pFirst: 'Mike',    pLast: 'Thompson', kFirst: 'Noah',   kLast: 'Thompson', pts:  480, email: 'demo.peer.05@ballpark.test', ageGroup: '10U', ev: 78.2, dist: 295, lessons:  5 },
+  { pFirst: 'Ana',     pLast: 'Garcia',   kFirst: 'Emma',   kLast: 'Garcia',   pts:  350, email: 'demo.peer.06@ballpark.test', ageGroup: '10U', ev: 76.5, dist: 280, lessons:  3 },
+  { pFirst: 'Wei',     pLast: 'Chen',     kFirst: 'Tyler',  kLast: 'Chen',     pts:  220, email: 'demo.peer.07@ballpark.test', ageGroup: '12U', ev: 74.1, dist: 262, lessons:  2 },
 ];
 
 const peerFamilyIds = [];
@@ -408,7 +411,7 @@ for (let i = 0; i < PEER_DEFS.length; i++) {
   await restInsert('kids', {
     id: PEER_KID_IDS[i], family_id: pFamRows[0].id,
     first_name: def.kFirst, last_name: def.kLast,
-    age_group: '12U', primary_position: 'OF', points_balance: 0,
+    age_group: def.ageGroup, primary_position: 'OF', points_balance: 0,
   });
 }
 
@@ -464,6 +467,58 @@ await restInsert('personal_bests', {
 });
 console.log('  Personal best seeded: exit_velocity_mph = 88.4 mph');
 console.log('  → Trigger auto-granted "First Personal Best" achievement (+25 pts)');
+
+// =============================================================================
+// Step 6b — Peer personal bests (for HitTrax leaderboard demo)
+//
+// Inserts exit_velocity_mph and distance_ft personal bests for all 7 peer kids
+// so the Performance leaderboard is non-empty on first demo run.
+// Uses deterministic IDs (de000005, indices 2–15).
+// No achievement trigger fires here because the personal_bests rows are for
+// peer kids, and the first_pr trigger only matters for Marcus's kid_achievements.
+// (Triggers still fire but will just create auto-gen kid_achievements rows for
+//  peers — those are cleaned up when peer kids are deleted via auth user cascade.)
+// =============================================================================
+
+console.log('\n─── PEER PERSONAL BESTS ──────────────────────────────────────────────');
+
+const peerPBRows = [];
+for (let i = 0; i < PEER_DEFS.length; i++) {
+  const def = PEER_DEFS[i];
+  peerPBRows.push({
+    id:          PEER_PB_EV_IDS[i],
+    tenant_id:   TENANT_ID,
+    kid_id:      PEER_KID_IDS[i],
+    metric:      'exit_velocity_mph',
+    value:       def.ev,
+    swing_id:    null,
+    achieved_at: daysAgo(Math.floor(Math.random() * 30) + 1),
+  });
+  peerPBRows.push({
+    id:          PEER_PB_DIST_IDS[i],
+    tenant_id:   TENANT_ID,
+    kid_id:      PEER_KID_IDS[i],
+    metric:      'distance_ft',
+    value:       def.dist,
+    swing_id:    null,
+    achieved_at: daysAgo(Math.floor(Math.random() * 30) + 1),
+  });
+}
+// Also add Marcus's distance_ft personal best (distinct from PERSONAL_BEST_ID which is exit_velocity).
+const MARCUS_PB_DIST_ID = demoId(5, 16);
+await restInsert('personal_bests', {
+  id:          MARCUS_PB_DIST_ID,
+  tenant_id:   TENANT_ID,
+  kid_id:      MARCUS_KID_ID,
+  metric:      'distance_ft',
+  value:       382,
+  swing_id:    null,
+  achieved_at: todayAtUTC(14),
+});
+await restInsert('personal_bests', peerPBRows);
+console.log(`  ${peerPBRows.length} peer personal best rows seeded (${PEER_DEFS.length} exit_velocity + ${PEER_DEFS.length} distance)`);
+console.log('  Marcus distance_ft personal best: 382 ft');
+console.log('  HitTrax Performance leaderboard will be non-empty on first demo run');
 
 // =============================================================================
 // Step 7 — Placeholder videos (ready status + fake Mux IDs so app renders
@@ -589,6 +644,42 @@ todaySlots.forEach((slot, idx) => {
 await restInsert('bookings', bookingRows);
 console.log(`  Dashboard: ${todaySlots.length} today's bookings (3 coaches, cages 1–6)`);
 console.log(`  Total bookings: ${bookingRows.length}`);
+
+// =============================================================================
+// Step 8b — Peer completed bookings (for Lesson Count leaderboard)
+//
+// Each peer def carries a `lessons` count — we seed that many completed
+// historical booking rows so the lesson leaderboard is non-empty.
+// IDs start at demoId(6, 22) to avoid collision with the 21 IDs above.
+// coach_id defaults to coachMikeTableId; location_id = LOCATION_ID.
+// =============================================================================
+
+console.log('\n─── PEER COMPLETED BOOKINGS (LESSON BOARD) ───────────────────────────');
+
+const peerCompletedBookings = [];
+let peerBookingOffset = 22;
+for (let i = 0; i < PEER_DEFS.length; i++) {
+  const def = PEER_DEFS[i];
+  for (let j = 0; j < def.lessons; j++) {
+    const weeksBack = def.lessons - j;
+    peerCompletedBookings.push({
+      id:              demoId(6, peerBookingOffset++),
+      tenant_id:       TENANT_ID,
+      location_id:     LOCATION_ID,
+      kid_id:          PEER_KID_IDS[i],
+      coach_id:        coachMikeTableId,
+      session_type_id: ST_PRIVATE_60,
+      scheduled_start: daysAgoAtUTC(weeksBack * 7, 18),
+      scheduled_end:   daysAgoAtUTC(weeksBack * 7, 19),
+      cage_number:     '3',
+      status:          'completed',
+      attended_at:     daysAgoAtUTC(weeksBack * 7, 18),
+    });
+  }
+}
+await restInsert('bookings', peerCompletedBookings);
+console.log(`  ${peerCompletedBookings.length} peer completed bookings seeded`);
+console.log('  Lesson Count leaderboard will be non-empty');
 
 // =============================================================================
 // Step 9 — Coach message (Coach Mike → Marcus, with placeholder video)
