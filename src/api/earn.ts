@@ -97,7 +97,7 @@ export async function listLeaderboard(): Promise<LeaderboardEntry[]> {
       kidId: row.id,
       firstName: row.first_name,
       lastName: row.last_name,
-      pointsBalance: row.points_balance,
+      pointsBalance: row.points_balance ?? 0,
       rank,
     };
   });

@@ -52,7 +52,7 @@ export default function AssignmentRow({ assignment, onPress }: Props) {
             <Text style={styles.meta}>{assignment.duration_estimate_minutes} min</Text>
           ) : null}
           {due ? <Text style={styles.meta}>{due}</Text> : null}
-          <Text style={styles.meta}>+{assignment.point_reward} pts</Text>
+          <Text style={styles.meta}>+{assignment.point_reward ?? 0} pts</Text>
         </View>
       </View>
       {status === 'reviewed' && assignment.rating != null ? (

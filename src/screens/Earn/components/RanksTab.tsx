@@ -53,7 +53,7 @@ export default function RanksTab({ ownKidIds }: { ownKidIds: string[] }) {
                 {mine ? ' · YOU' : ''}
               </Text>
             </View>
-            <Text style={styles.points}>{item.pointsBalance.toLocaleString()}</Text>
+            <Text style={styles.points}>{(item.pointsBalance ?? 0).toLocaleString()}</Text>
           </View>
         );
       }}

@@ -134,7 +134,12 @@ async function fanOutCoachVideoNotifications(videoId: string): Promise<void> {
             user_ids: [parentUserId],
             title: `Coach ${coachFirst} sent ${kidFirst} a new video`,
             body: "Tap to watch in Ballpark",
-            data: { kind: "coach_message", video_id: videoId },
+            data: {
+              kind: "coach_message",
+              video_id: videoId,
+              kid_id: msg.recipient_kid_id,
+              coach_user_id: msg.sender_user_id,
+            },
           }),
         }).then(async (r) => {
           if (!r.ok) {

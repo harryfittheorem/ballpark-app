@@ -27,9 +27,12 @@ import MainTabNavigator from './MainTabNavigator';
 // Maps inbound URLs (custom scheme + HTTPS universal links) to screens.
 //
 // Supported deep links:
-//   ballpark://me/payment-method          → Me tab → PaymentMethod screen
-//   ballpark://me/waitlist-claim/:id      → Me tab → WaitlistClaim screen
-//   ballpark://auth/callback              → Auth callback (handled by Supabase PKCE)
+//   ballpark://me/payment-method                      → Me tab → PaymentMethod screen
+//   ballpark://me/waitlist-claim/:id                  → Me tab → WaitlistClaim screen
+//   ballpark://work/?initialSubTab=messages           → Work tab → WorkHome (Messages sub-tab, fallback)
+//   ballpark://work/thread/:kidId/:coachUserId        → Work tab → MessageThread
+//   ballpark://work/assignment/:assignmentId          → Work tab → AssignmentDetail
+//   ballpark://auth/callback                          → Auth callback (handled by Supabase PKCE)
 //
 // The `ballpark` scheme is registered in app.json.
 // HTTPS universal links (when EXPO_PUBLIC_AUTH_REDIRECT_HOST is set) use the
@@ -49,6 +52,14 @@ const linking: LinkingOptions<MainTabParamList> = {
           MeHome: '',
           PaymentMethod: 'payment-method',
           WaitlistClaim: 'waitlist-claim/:waitlistId',
+        },
+      },
+      Work: {
+        path: 'work',
+        screens: {
+          WorkHome: '',
+          AssignmentDetail: 'assignment/:assignmentId',
+          MessageThread: 'thread/:kidId/:coachUserId',
         },
       },
     },

@@ -246,7 +246,7 @@ export default function ProfileScreen({ navigation }: Props) {
             <View style={styles.pointsRow}>
               <Trophy size={14} color={colors.gold} />
               <Text style={styles.pointsText}>
-                {kid.points_balance.toLocaleString()} pts
+                {(kid.points_balance ?? 0).toLocaleString()} pts
               </Text>
             </View>
           ) : null}
@@ -520,7 +520,7 @@ function KidCard({
       <View style={{ flex: 1 }}>
         <Text style={[styles.kidName, isSelected && styles.kidNameSelected]}>{fullName}</Text>
         {meta ? <Text style={styles.kidMeta}>{meta}</Text> : null}
-        <Text style={styles.kidPoints}>{kid.points_balance.toLocaleString()} pts</Text>
+        <Text style={styles.kidPoints}>{(kid.points_balance ?? 0).toLocaleString()} pts</Text>
         <View style={styles.kidActions}>
           <TouchableOpacity onPress={onEdit} style={styles.kidActionBtn} accessibilityRole="button">
             <Text style={styles.kidActionText}>Edit</Text>

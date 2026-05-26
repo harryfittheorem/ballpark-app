@@ -128,9 +128,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Push notification tap routing:
-    // When a parent taps a "waitlist_promoted" push, open the claim screen
-    // via the ballpark:// deep link so the navigator picks it up via the
-    // existing linking config (ballpark://me/waitlist-claim/:waitlistId).
+    // Each push kind maps to a ballpark:// deep link that the NavigationContainer
+    // linking config resolves to the correct screen.
+    //
+    //   coach_message       → Work tab, WorkHome initialSubTab=messages
+    //                         (payload has only video_id; kidId+coachUserId are
+    //                         unavailable so we can't jump to MessageThread directly)
+    //   parent_to_coach     → coach-side; no parent route needed
+    //   assignment_reviewed → Work tab → AssignmentDetail (has assignment_id)
+    //   waitlist_promoted   → Me tab → WaitlistClaim
     const notifSub = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const data = response.notification.request.content.data as Record<
@@ -138,7 +144,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           unknown
         > | null;
         if (!data) return;
-        if (data.kind === "waitlist_promoted" && typeof data.waitlist_id === "string") {
+
+        if (data.kind === "coach_message") {
+          // Prefer direct MessageThread navigation when the payload carries both
+          // IDs (payloads from mux-webhook v2+). Fall back to the WorkHome
+          // Messages sub-tab for older payloads that omit them.
+          if (
+            typeof data.kid_id === "string" &&
+            typeof data.coach_user_id === "string"
+          ) {
+            void Linking.openURL(
+              `ballpark://work/thread/${data.kid_id}/${data.coach_user_id}`,
+            );
+          } else {
+            void Linking.openURL("ballpark://work/?initialSubTab=messages");
+          }
+        } else if (
+          data.kind === "assignment_reviewed" &&
+          typeof data.assignment_id === "string"
+        ) {
+          void Linking.openURL(
+            `ballpark://work/assignment/${data.assignment_id}`,
+          );
+        } else if (
+          data.kind === "waitlist_promoted" &&
+          typeof data.waitlist_id === "string"
+        ) {
           void Linking.openURL(
             `ballpark://me/waitlist-claim/${data.waitlist_id}`,
           );
