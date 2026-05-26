@@ -31,7 +31,7 @@ export default function HomeStackNavigator() {
           // True full-screen player: no header. The screen renders its own
           // top-left close button overlaid on the video. Modal presentation
           // hides the tab bar underneath on iOS.
-          presentation: 'modal',
+          presentation: 'fullScreenModal',
           headerShown: false,
         }}
       />
