@@ -12,7 +12,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import {
   associateHitTrax,
@@ -29,6 +29,12 @@ export function hittraxLinkKey(kidId: string) {
 
 export function useHitTraxLink(kidId: string | undefined) {
   const qc = useQueryClient();
+  // Stable per-instance suffix so that two components mounting this hook
+  // with the same kidId get distinct channel names. Supabase Realtime
+  // rejects a second `.on()` call on an already-subscribed channel, which
+  // causes a crash when e.g. ProfileScreen and ConnectHitTraxScreen are
+  // both mounted with the same kidId.
+  const instanceId = useRef(`${Math.random().toString(36).slice(2, 8)}`);
 
   // Realtime subscription on the kid_capture_links row for this kid. Any
   // INSERT/UPDATE/DELETE invalidates the query so the UI re-reads via the
@@ -37,7 +43,7 @@ export function useHitTraxLink(kidId: string | undefined) {
   useEffect(() => {
     if (!kidId) return;
     const channel = supabase
-      .channel(`hittrax-link-${kidId}`)
+      .channel(`hittrax-link-${kidId}-${instanceId.current}`)
       .on(
         // postgres_changes is typed with `any` upstream; cast keeps strict mode happy.
         'postgres_changes' as never,
