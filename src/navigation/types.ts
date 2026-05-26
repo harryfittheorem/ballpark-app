@@ -130,7 +130,6 @@ export type MeStackParamList = {
   Orders: undefined;
   ConnectHitTrax: undefined;
   PaymentMethod: undefined;
-  ChangeLocation: undefined;
   MembershipDetails: undefined;
   AddKid: { fromMe: true };
   EditKid: { kidId: string };

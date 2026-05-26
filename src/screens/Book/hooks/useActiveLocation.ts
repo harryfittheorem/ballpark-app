@@ -1,10 +1,8 @@
 /**
  * useActiveLocation — resolves the location for the current booking session.
  *
- * Always uses the family's primary location (set at signup / by admin).
- * Location switching is an admin-only operation — the Bring-a-Friend pill
- * and LocationContextPill have been removed from the member-facing booking
- * flow per v1 Infinite Hitting product decision.
+ * Always returns the family's primary_location_id (set at signup / by admin).
+ * Location is fixed per family — in-app switching has been removed.
  */
 
 import { useQuery } from '@tanstack/react-query';

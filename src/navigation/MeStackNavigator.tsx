@@ -4,7 +4,6 @@ import AddKidScreen from '@/screens/Auth/AddKidScreen';
 import BookingDetailScreen from '@/screens/Me/BookingDetailScreen';
 import EditKidScreen from '@/screens/Me/EditKidScreen';
 import BookingsListScreen from '@/screens/Me/BookingsListScreen';
-import ChangeLocationScreen from '@/screens/Me/ChangeLocationScreen';
 import ConnectHitTraxScreen from '@/screens/Me/ConnectHitTraxScreen';
 import MembershipDetailsScreen from '@/screens/Me/MembershipDetailsScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
@@ -60,11 +59,6 @@ export default function MeStackNavigator() {
         name="PaymentMethod"
         component={PaymentMethodScreen}
         options={{ title: 'Payment Method' }}
-      />
-      <Stack.Screen
-        name="ChangeLocation"
-        component={ChangeLocationScreen}
-        options={{ title: 'My Location' }}
       />
       <Stack.Screen
         name="MembershipDetails"
