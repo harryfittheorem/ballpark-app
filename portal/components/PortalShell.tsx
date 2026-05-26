@@ -49,7 +49,7 @@ const OWNER_NAV: NavSection[] = [
   {
     label: 'Operations',
     items: [
-      { label: 'Dashboard', href: '/owner',            icon: LayoutDashboard },
+      { label: 'Today',     href: '/owner/dashboard',  icon: LayoutDashboard },
       { label: 'Members',   href: '/owner/members',    icon: Users },
       { label: 'Schedule',  href: '/owner/schedule',   icon: Calendar },
       { label: 'Check-In',  href: '/admin/check-in',   icon: ClipboardCheck },

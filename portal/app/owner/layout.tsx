@@ -1,8 +1,9 @@
+import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { PortalShell } from '@/components/PortalShell';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
-import { readTenantId } from '@/lib/auth';
+import { readTenantId, readAppRole, type AppRole } from '@/lib/auth';
 import { getTenantName, getTenantNameBySlug } from '@/lib/supabase/ownerQueries';
 
 export const metadata = {
@@ -11,8 +12,23 @@ export const metadata = {
 
 export default async function OwnerLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login?reason=unauthenticated');
+
+  const { data: { session } } = await supabase.auth.getSession();
+
+  // Decode JWT role; fall back to app_metadata for tokens that predate the
+  // Custom Access Token Hook (same pattern used in admin/layout.tsx).
+  let role = readAppRole(session);
+  if (role === 'parent' && user.app_metadata?.app_role) {
+    const meta = user.app_metadata.app_role as string;
+    const known: AppRole[] = ['owner', 'admin', 'super_admin', 'coach', 'parent'];
+    if (known.includes(meta as AppRole)) role = meta as AppRole;
+  }
+
+  if (role === 'coach') redirect('/coach/inbox');
+  if (role === 'admin' || role === 'super_admin') redirect('/admin');
+  if (role !== 'owner') redirect('/login?reason=unauthenticated');
 
   const tenantId = readTenantId(session);
 

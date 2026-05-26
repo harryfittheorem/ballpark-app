@@ -32,7 +32,7 @@ export async function signIn(formData: FormData) {
   }
 
   if (role === "admin") redirect("/admin");
-  if (role === "owner") redirect("/owner");
+  if (role === "owner") redirect("/owner/dashboard");
   redirect("/coach/inbox");
 }
 

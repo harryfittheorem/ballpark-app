@@ -1379,3 +1379,146 @@ export async function getLocationStripeStatus(
   const all = await getLocationsStripeStatus(supabase, tenantId);
   return all[0] ?? null;
 }
+
+// ─── Today at a Glance ───────────────────────────────────────────────────────
+
+export type TodayBooking = {
+  id: string;
+  kidName: string;
+  coachId: string | null;
+  coachName: string;
+  sessionType: string;
+  basePriceCents: number;
+  status: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  cage: string | null;
+};
+
+export type UpcomingBooking = TodayBooking & {
+  dateLabel: string;
+};
+
+export type TodayStats = {
+  sessionsToday: number;
+  revenueToday: number;
+  activeMembers: number;
+  coachesToday: number;
+};
+
+export type TodayAtAGlanceData = {
+  stats: TodayStats;
+  todayBookings: TodayBooking[];
+  upcomingBookings: UpcomingBooking[];
+};
+
+export async function getTodayAtAGlanceData(
+  supabase: SupabaseClient,
+  tenantId: string,
+): Promise<TodayAtAGlanceData> {
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+  const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+  const next48hEnd = new Date(todayEnd.getTime() + 48 * 3_600_000);
+
+  const BOOKING_SELECT = `
+    id, scheduled_start, scheduled_end, cage_number, status, coach_id,
+    session_types(name, base_price_cents),
+    kids(first_name, last_name),
+    coaches(first_name, last_name)
+  `;
+
+  const [bookingsTodayRes, upcomingRes, membershipsRes] = await Promise.all([
+    supabase
+      .from('bookings')
+      .select(BOOKING_SELECT)
+      .eq('tenant_id', tenantId)
+      .gte('scheduled_start', todayStart.toISOString())
+      .lte('scheduled_start', todayEnd.toISOString())
+      .order('scheduled_start'),
+
+    supabase
+      .from('bookings')
+      .select(BOOKING_SELECT)
+      .eq('tenant_id', tenantId)
+      .gt('scheduled_start', todayEnd.toISOString())
+      .lte('scheduled_start', next48hEnd.toISOString())
+      .order('scheduled_start'),
+
+    supabase
+      .from('memberships')
+      .select('family_id')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active'),
+  ]);
+
+  type RawBookingRow = {
+    id: string;
+    scheduled_start: string;
+    scheduled_end: string | null;
+    cage_number: string | number | null;
+    status: string;
+    coach_id: string | null;
+    session_types: unknown;
+    kids: unknown;
+    coaches: unknown;
+  };
+
+  function mapBooking(b: RawBookingRow): TodayBooking {
+    const kid   = b.kids    as { first_name: string; last_name: string | null } | null;
+    const coach = b.coaches as { first_name: string; last_name: string | null } | null;
+    const st    = b.session_types as { name: string; base_price_cents: number } | null;
+    return {
+      id:             b.id,
+      kidName:        kid   ? [kid.first_name,   kid.last_name  ].filter(Boolean).join(' ') : 'Unknown',
+      coachId:        b.coach_id ?? null,
+      coachName:      coach ? [coach.first_name, coach.last_name].filter(Boolean).join(' ') : '—',
+      sessionType:    st?.name ?? 'Private',
+      basePriceCents: st?.base_price_cents ?? 0,
+      status:         b.status,
+      scheduledStart: b.scheduled_start,
+      scheduledEnd:   b.scheduled_end ?? b.scheduled_start,
+      cage:           b.cage_number ? `Cage ${b.cage_number}` : null,
+    };
+  }
+
+  const todayBookings = ((bookingsTodayRes.data ?? []) as RawBookingRow[]).map(mapBooking);
+
+  const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DAY_LABELS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const tomorrow     = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0, 0, 0, 0);
+  const tomorrowEnd  = new Date(tomorrow); tomorrowEnd.setHours(23, 59, 59, 999);
+
+  const upcomingBookings: UpcomingBooking[] = ((upcomingRes.data ?? []) as RawBookingRow[]).map(b => {
+    const booking = mapBooking(b);
+    const d = new Date(b.scheduled_start);
+    const isTomorrow = d >= tomorrow && d <= tomorrowEnd;
+    const dateLabel = isTomorrow
+      ? `Tomorrow · ${MONTH_LABELS[d.getMonth()]} ${d.getDate()}`
+      : `${DAY_LABELS[d.getDay()]} · ${MONTH_LABELS[d.getMonth()]} ${d.getDate()}`;
+    return { ...booking, dateLabel };
+  });
+
+  // Count distinct families (not raw membership rows) to avoid overcounting multi-kid families
+  const activeMembers = new Set((membershipsRes.data ?? []).map((m: { family_id: string }) => m.family_id)).size;
+
+  // Revenue = sum of base_price_cents for confirmed + completed bookings today
+  // (excludes cancelled/no_show so operators see billable session value)
+  const revenueToday = todayBookings
+    .filter(b => b.status === 'confirmed' || b.status === 'completed')
+    .reduce((s, b) => s + b.basePriceCents, 0) / 100;
+
+  // Count distinct coaches by ID (not name string) to avoid duplicate-name false negatives
+  const coachesToday = new Set(todayBookings.map(b => b.coachId).filter(Boolean)).size;
+
+  return {
+    stats: {
+      sessionsToday: todayBookings.length,
+      revenueToday,
+      activeMembers,
+      coachesToday,
+    },
+    todayBookings,
+    upcomingBookings,
+  };
+}
