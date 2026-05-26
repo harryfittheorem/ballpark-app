@@ -84,9 +84,9 @@ function Inner() {
   if (authLoading) return <Splash />;
   if (!session) return <AuthNavigator />;
 
-  // Coaches don't have a family record — `useFamily` is only mounted under
-  // MainTabNavigator (parent surface), so coaches never trigger that fetch.
-  if (appRole === 'coach') return <CoachTabNavigator />;
+  // Coaches and admins don't have a family record — `useFamily` is only mounted
+  // under MainTabNavigator (parent surface), so staff never trigger that fetch.
+  if (appRole === 'coach' || appRole === 'admin') return <CoachTabNavigator />;
 
   // While checking the waiver status, show the splash so there's no
   // unprotected flash of the main tabs.

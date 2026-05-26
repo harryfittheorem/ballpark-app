@@ -25,7 +25,7 @@ import { supabase } from "@/lib/supabase";
 import { registerForPushNotifications } from "@/services/notifications";
 import { parseAuthCallbackCode } from "@/utils/authRedirect";
 
-export type AppRole = "coach" | "parent";
+export type AppRole = "coach" | "admin" | "parent";
 
 type AuthContextValue = {
   session: Session | null;
@@ -61,6 +61,7 @@ function readAppRole(session: Session | null): AppRole | null {
   const payload = decodeJwtPayload(session.access_token);
   const claim = payload?.app_role;
   if (claim === "coach") return "coach";
+  if (claim === "admin" || claim === "owner" || claim === "super_admin") return "admin";
   // Treat anything else (missing, 'parent', unknown) as parent so existing
   // users without the claim continue to land in the parent flow.
   return "parent";

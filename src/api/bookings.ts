@@ -313,3 +313,222 @@ export async function getLocationById(id: string): Promise<Location | null> {
   if (error) throw error;
   return data;
 }
+
+// ─── Staff check-in API ───────────────────────────────────────────────────────
+
+/**
+ * A booking row enriched with kid/coach/session_type names, membership status,
+ * and pending assignment count for the staff check-in board.
+ */
+export type StaffBooking = {
+  id: string;
+  coach_id: string | null;
+  kid_id: string | null;
+  scheduled_start: string;
+  scheduled_end: string;
+  cage_number: string | null;
+  status: string;
+  attended_at: string | null;
+  kid_first_name: string | null;
+  kid_last_name: string | null;
+  coach_first_name: string | null;
+  coach_last_name: string | null;
+  session_type_name: string | null;
+  membership_status: string | null;
+  pending_assignment_count: number;
+};
+
+const STAFF_BOOKING_SELECT =
+  'id, coach_id, kid_id, scheduled_start, scheduled_end, cage_number, status, attended_at, ' +
+  'kid:kids(first_name, last_name, memberships(status, plan_name)), ' +
+  'coach:coaches(first_name, last_name), ' +
+  'session_type:session_types(name)';
+
+/**
+ * Derive the most relevant membership status label from a kid's memberships
+ * array (as returned by PostgREST nested select). Returns the status of the
+ * first active/paused membership found, or the first any-status membership,
+ * or null when no memberships exist.
+ */
+function deriveMembershipStatus(
+  memberships: Array<{ status: string | null; plan_name: string | null }> | null,
+): string | null {
+  if (!memberships || memberships.length === 0) return null;
+  const active = memberships.find((m) => m.status === 'active' || m.status === 'paused');
+  return (active ?? memberships[0]).status;
+}
+
+/**
+ * Fetch today's bookings for the staff check-in board, enriched with
+ * membership status. Pending assignment counts are fetched separately and
+ * merged in `getTodayStaffBookingsWithAssignments`.
+ *
+ * - When `coachId` is provided (instructor coach), only that coach's bookings
+ *   are returned.
+ * - When omitted (admin or staff coach), the full tenant board is returned —
+ *   RLS + the `check_in_booking` RPC handle the server-side authority check.
+ *
+ * Cancelled rows are excluded. Sorted by `scheduled_start` ascending.
+ */
+export async function getTodayStaffBookings(coachId?: string | null): Promise<StaffBooking[]> {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  let bookingQuery = (supabase as unknown as import('@supabase/supabase-js').SupabaseClient)
+    .from('bookings')
+    .select(STAFF_BOOKING_SELECT)
+    .gte('scheduled_start', todayStart.toISOString())
+    .lte('scheduled_start', todayEnd.toISOString())
+    .not('status', 'in', '("cancelled")')
+    .order('scheduled_start', { ascending: true });
+
+  if (coachId) {
+    bookingQuery = bookingQuery.eq('coach_id', coachId);
+  }
+
+  const { data: bookingData, error: bookingError } = await bookingQuery;
+  if (bookingError) throw bookingError;
+
+  type RawRow = {
+    id: string;
+    coach_id: string | null;
+    kid_id: string | null;
+    scheduled_start: string;
+    scheduled_end: string;
+    cage_number: string | null;
+    status: string;
+    attended_at: string | null;
+    kid: {
+      first_name: string | null;
+      last_name: string | null;
+      memberships: Array<{ status: string | null; plan_name: string | null }> | null;
+    } | null;
+    coach: { first_name: string | null; last_name: string | null } | null;
+    session_type: { name: string | null } | null;
+  };
+
+  const rows = (bookingData ?? []) as unknown as RawRow[];
+
+  // Fetch pending assignment counts for all kid_ids in one round-trip.
+  const kidIds = [...new Set(rows.map((r) => r.kid_id).filter(Boolean) as string[])];
+  const pendingCountByKid = await getPendingAssignmentCounts(kidIds);
+
+  return rows.map((r) => ({
+    id: r.id,
+    coach_id: r.coach_id,
+    kid_id: r.kid_id,
+    scheduled_start: r.scheduled_start,
+    scheduled_end: r.scheduled_end,
+    cage_number: r.cage_number,
+    status: r.status,
+    attended_at: r.attended_at,
+    kid_first_name: r.kid?.first_name ?? null,
+    kid_last_name: r.kid?.last_name ?? null,
+    coach_first_name: r.coach?.first_name ?? null,
+    coach_last_name: r.coach?.last_name ?? null,
+    session_type_name: r.session_type?.name ?? null,
+    membership_status: deriveMembershipStatus(r.kid?.memberships ?? null),
+    pending_assignment_count: r.kid_id ? (pendingCountByKid.get(r.kid_id) ?? 0) : 0,
+  }));
+}
+
+/**
+ * Fetch pending assignment counts grouped by kid_id for the given kid UUIDs.
+ * Returns a Map<kid_id, count>. Empty list → empty map (no DB call).
+ */
+async function getPendingAssignmentCounts(kidIds: string[]): Promise<Map<string, number>> {
+  if (kidIds.length === 0) return new Map();
+  const { data, error } = await (
+    supabase as unknown as import('@supabase/supabase-js').SupabaseClient
+  )
+    .from('assignments')
+    .select('kid_id')
+    .in('kid_id', kidIds)
+    .eq('status', 'pending');
+  if (error) {
+    console.warn('[staff-sessions] pending assignment count error:', error.message);
+    return new Map();
+  }
+  const counts = new Map<string, number>();
+  for (const row of (data ?? []) as { kid_id: string }[]) {
+    counts.set(row.kid_id, (counts.get(row.kid_id) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Mark a booking as completed (attended). Calls the `check_in_booking`
+ * SECURITY DEFINER RPC which handles idempotency, points grant, and sessions
+ * row creation. Returns the updated booking row as JSON.
+ */
+/** Shape returned by the check-in/no-show/undo RPCs (booking row, no joins). */
+type RpcBookingRow = {
+  id: string;
+  coach_id: string | null;
+  kid_id: string | null;
+  scheduled_start: string;
+  scheduled_end: string;
+  cage_number: string | null;
+  status: string;
+  attended_at: string | null;
+};
+
+function rpcRowToStaffBooking(row: RpcBookingRow): Omit<StaffBooking, 'kid_first_name' | 'kid_last_name' | 'coach_first_name' | 'coach_last_name' | 'session_type_name' | 'membership_status' | 'pending_assignment_count'> & Pick<StaffBooking, 'kid_first_name' | 'kid_last_name' | 'coach_first_name' | 'coach_last_name' | 'session_type_name' | 'membership_status' | 'pending_assignment_count'> {
+  return {
+    id: row.id,
+    coach_id: row.coach_id,
+    kid_id: row.kid_id,
+    scheduled_start: row.scheduled_start,
+    scheduled_end: row.scheduled_end,
+    cage_number: row.cage_number ?? null,
+    status: row.status,
+    attended_at: row.attended_at ?? null,
+    // Display names/counts not returned by RPC — the hook merges these from
+    // the cached query row so the UI doesn't lose them after a write.
+    kid_first_name: null,
+    kid_last_name: null,
+    coach_first_name: null,
+    coach_last_name: null,
+    session_type_name: null,
+    membership_status: null,
+    pending_assignment_count: 0,
+  };
+}
+
+/**
+ * Mark a booking as completed (attended). Calls the `check_in_booking`
+ * SECURITY DEFINER RPC which handles idempotency, points grant, and sessions
+ * row creation. Returns the updated booking row as JSON.
+ */
+export async function checkInBookingRpc(bookingId: string): Promise<StaffBooking> {
+  const { data, error } = await (
+    supabase as unknown as import('@supabase/supabase-js').SupabaseClient
+  ).rpc('check_in_booking', { p_booking_id: bookingId });
+  if (error) throw error;
+  return rpcRowToStaffBooking(data as RpcBookingRow);
+}
+
+/**
+ * Mark a booking as no-show. Calls the `mark_no_show` SECURITY DEFINER RPC.
+ */
+export async function markNoShowRpc(bookingId: string): Promise<StaffBooking> {
+  const { data, error } = await (
+    supabase as unknown as import('@supabase/supabase-js').SupabaseClient
+  ).rpc('mark_no_show', { p_booking_id: bookingId });
+  if (error) throw error;
+  return rpcRowToStaffBooking(data as RpcBookingRow);
+}
+
+/**
+ * Undo a check-in within the 5-minute window. Calls the `undo_check_in`
+ * SECURITY DEFINER RPC which reverts points and deletes the sessions row.
+ */
+export async function undoCheckInRpc(bookingId: string): Promise<StaffBooking> {
+  const { data, error } = await (
+    supabase as unknown as import('@supabase/supabase-js').SupabaseClient
+  ).rpc('undo_check_in', { p_booking_id: bookingId });
+  if (error) throw error;
+  return rpcRowToStaffBooking(data as RpcBookingRow);
+}
