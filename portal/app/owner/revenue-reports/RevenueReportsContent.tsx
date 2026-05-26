@@ -28,6 +28,29 @@ function fmtK(n: number) {
   return `$${n}`;
 }
 
+function MomBadge({ pct }: { pct: number | null }) {
+  if (pct === null) return null;
+  const positive = pct >= 0;
+  const label = `${positive ? '+' : ''}${pct.toFixed(1)}% MoM`;
+  return (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      fontSize: 11,
+      fontWeight: 700,
+      fontFamily: fonts.display,
+      color: positive ? brand.success : brand.danger,
+      background: positive ? `${brand.success}18` : `${brand.danger}18`,
+      border: `1px solid ${positive ? brand.success : brand.danger}33`,
+      borderRadius: 5,
+      padding: '2px 7px',
+      letterSpacing: 0.2,
+    }}>
+      {label}
+    </span>
+  );
+}
+
 function ProgramDonut({ programs, total }: { programs: Array<{ name: string; count: number }>; total: number }) {
   const size = 160;
   const radius = 62;
@@ -138,6 +161,8 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
   const otcTotal     = eftVsOtc.otcTotal;
   const eftCount     = eftVsOtc.eftCount;
   const otcCount     = eftVsOtc.otcCount;
+  const eftMomPct    = eftVsOtc.eftMomPct ?? null;
+  const otcMomPct    = eftVsOtc.otcMomPct ?? null;
   const eftPct       = totalRevenue > 0 ? Math.round((eftTotal / totalRevenue) * 100) : 0;
   const otcPct       = 100 - eftPct;
 
@@ -233,6 +258,7 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
               <span style={{ fontSize: 12, color: brand.textMuted }}>{eftPct}% of total</span>
+              <MomBadge pct={eftMomPct} />
             </div>
             <div style={{ marginTop: 12, padding: 10, background: brand.surface, borderRadius: 6, fontSize: 11, color: brand.textMuted, lineHeight: 1.5 }}>
               The healthy foundation — predictable recurring revenue. {eftCount} active EFT members.
@@ -255,6 +281,7 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
               <span style={{ fontSize: 12, color: brand.textMuted }}>{otcPct}% of total</span>
+              <MomBadge pct={otcMomPct} />
             </div>
             <div style={{ marginTop: 12, padding: 10, background: brand.surface, borderRadius: 6, fontSize: 11, color: brand.textMuted, lineHeight: 1.5 }}>
               New business, packages, camps, and drop-ins. {otcCount} OTC transactions this month.

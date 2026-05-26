@@ -788,7 +788,14 @@ export async function getBillingData(supabase: SupabaseClient, tenantId: string)
 // ─── Revenue Reports ─────────────────────────────────────────────────────────
 
 export type RevenueReportsData = {
-  eftVsOtc: { eftTotal: number; otcTotal: number; eftCount: number; otcCount: number };
+  eftVsOtc: {
+    eftTotal: number;
+    otcTotal: number;
+    eftCount: number;
+    otcCount: number;
+    eftMomPct: number | null;
+    otcMomPct: number | null;
+  };
   monthly: RevenueMonth[];
   packages: MembershipPackage[];
   programBreakdown: Array<{ name: string; count: number }>;
@@ -802,7 +809,11 @@ export async function getRevenueReportsData(supabase: SupabaseClient, tenantId: 
     cage:    'Cage Rental',
   };
 
-  const [monthly, packages, bookingsRes, membershipsRes] = await Promise.all([
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const prevMonthStart    = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+  const [monthly, packages, bookingsRes, membershipsRes, momRes] = await Promise.all([
     getMonthlyRevenue(supabase, tenantId),
     getMembershipPackages(supabase, tenantId),
     supabase
@@ -815,7 +826,34 @@ export async function getRevenueReportsData(supabase: SupabaseClient, tenantId: 
       .select('started_at, status')
       .eq('tenant_id', tenantId)
       .order('started_at'),
+    supabase
+      .from('payment_events')
+      .select('amount_cents, created_at, memberships(plan_type)')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'paid')
+      .gte('created_at', prevMonthStart.toISOString()),
   ]);
+
+  // Compute month-over-month deltas for EFT and OTC
+  let eftCurrent = 0, otcCurrent = 0, eftPrior = 0, otcPrior = 0;
+  for (const e of (momRes.data ?? [])) {
+    const d = new Date(e.created_at);
+    const planType = (e.memberships as unknown as { plan_type: string } | null)?.plan_type ?? 'otc';
+    const dollars = e.amount_cents / 100;
+    if (d >= currentMonthStart) {
+      if (planType === 'eft') eftCurrent += dollars;
+      else otcCurrent += dollars;
+    } else {
+      if (planType === 'eft') eftPrior += dollars;
+      else otcPrior += dollars;
+    }
+  }
+  const eftMomPct = eftPrior > 0
+    ? Math.round(((eftCurrent - eftPrior) / eftPrior) * 1000) / 10
+    : null;
+  const otcMomPct = otcPrior > 0
+    ? Math.round(((otcCurrent - otcPrior) / otcPrior) * 1000) / 10
+    : null;
 
   const eftTotal = monthly.reduce((s, m) => s + m.eft, 0);
   const otcTotal = monthly.reduce((s, m) => s + m.otc, 0);
@@ -849,7 +887,7 @@ export async function getRevenueReportsData(supabase: SupabaseClient, tenantId: 
   }));
 
   return {
-    eftVsOtc: { eftTotal, otcTotal, eftCount, otcCount },
+    eftVsOtc: { eftTotal, otcTotal, eftCount, otcCount, eftMomPct, otcMomPct },
     monthly,
     packages,
     programBreakdown,
