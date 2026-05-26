@@ -579,6 +579,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
+          capabilities: Json
           created_at: string
           first_name: string
           id: string
@@ -593,6 +594,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           bio?: string | null
+          capabilities?: Json
           created_at?: string
           first_name: string
           id?: string
@@ -607,6 +609,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           bio?: string | null
+          capabilities?: Json
           created_at?: string
           first_name?: string
           id?: string
@@ -2231,6 +2234,7 @@ export type Database = {
       }
       get_kid_weekly_rank_delta: { Args: { p_kid_id: string }; Returns: number }
       get_my_coach_id: { Args: never; Returns: string }
+      get_my_coach_preset: { Args: never; Returns: string }
       get_public_availability: {
         Args: {
           p_date_range_end: string
@@ -2312,6 +2316,32 @@ export type Database = {
       }
       mark_no_show: { Args: { p_booking_id: string }; Returns: Json }
       mark_redemption_fulfilled: {
+        Args: { p_code: string }
+        Returns: {
+          amount_paid_cents: number | null
+          amount_paid_points: number | null
+          created_at: string
+          family_id: string
+          fulfilled_at: string | null
+          fulfilled_by_user_id: string | null
+          id: string
+          kid_id: string
+          payment_method: string
+          product_id: string
+          redemption_code: string
+          status: string
+          stripe_payment_intent_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      mark_redemption_fulfilled_staff: {
         Args: { p_code: string }
         Returns: {
           amount_paid_cents: number | null
