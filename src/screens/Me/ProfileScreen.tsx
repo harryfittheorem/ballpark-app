@@ -10,8 +10,6 @@ import {
   LogOut,
   type LucideProps,
   MapPin,
-  PauseCircle,
-  PlayCircle,
   Ruler,
   Sparkles,
   Star,
@@ -24,11 +22,9 @@ import {
   GraduationCap,
   BookCheck,
   Activity,
-  XCircle,
   UserPlus,
 } from 'lucide-react-native';
-import { useCallback, useMemo } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useMemo } from 'react';
 import {
   Alert,
   ScrollView,
@@ -49,7 +45,6 @@ import {
   useEarnedAchievements,
 } from '@/hooks/useAchievements';
 import { useFamily } from '@/hooks/useFamily';
-import { useMembership } from '@/hooks/useMembership';
 import { usePersonalBestsForKid, useSwingsForKid } from '@/hooks/useSwings';
 import { useSelectedKid } from '@/hooks/useSelectedKid';
 import { useHitTraxLink } from '@/hooks/useHitTraxLink';
@@ -102,16 +97,9 @@ function fmtPb(v: number, digits: number): string {
   return Number(v).toFixed(digits);
 }
 
-function formatDate(isoDate: string): string {
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const d = new Date(isoDate + 'T00:00:00');
-  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-}
-
 export default function ProfileScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { family, kid, kids, setSelectedKid } = useSelectedKid();
-  const { membership, resume, refresh: refreshMembership } = useMembership();
   const deleteKid = useDeleteKid();
 
   const { data: primaryLocation } = usePrimaryLocation();
@@ -169,41 +157,12 @@ export default function ProfileScreen({ navigation }: Props) {
         .join(' · ') || 'Athlete'
     : (user?.email ?? '');
 
-  // Re-fetch membership whenever this screen comes into focus so the pause/
-  // resume state stays in sync after navigating back from PauseMembership.
-  useFocusEffect(
-    useCallback(() => {
-      void refreshMembership();
-    }, [refreshMembership]),
-  );
-
   const handleSignOut = async () => {
     try {
       await signOut();
     } catch (err) {
       Alert.alert('Sign-out failed', errorMessage(err));
     }
-  };
-
-  const handleResumeEarly = () => {
-    Alert.alert(
-      'Resume Membership?',
-      'Billing will resume immediately. Your next charge will be processed on the next billing date.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Resume Now',
-          style: 'default',
-          onPress: async () => {
-            try {
-              await resume();
-            } catch (err) {
-              Alert.alert('Could not resume', errorMessage(err));
-            }
-          },
-        },
-      ],
-    );
   };
 
   const handleDeleteAccount = () => {
@@ -381,40 +340,6 @@ export default function ProfileScreen({ navigation }: Props) {
           })}
         </View>
 
-        {/* Membership status ----------------------------------------------- */}
-        {membership ? (
-          <>
-            <Text style={styles.sectionLabel}>MEMBERSHIP</Text>
-            {membership.status === 'paused' && membership.pause_end ? (
-              <View style={styles.pausedCard}>
-                <View style={styles.pausedHeader}>
-                  <PauseCircle size={18} color={colors.gold} />
-                  <Text style={styles.pausedTitle}>
-                    Paused until {formatDate(membership.pause_end)}
-                  </Text>
-                </View>
-                <Text style={styles.pausedSubtitle}>
-                  No charges during this period. Your membership resumes automatically.
-                </Text>
-                <TouchableOpacity style={styles.resumeBtn} onPress={handleResumeEarly}>
-                  <PlayCircle size={15} color={colors.dark} />
-                  <Text style={styles.resumeBtnText}>Resume Early</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              membership.plan_type === 'eft' && (
-                <Row
-                  icon={PauseCircle}
-                  label="Pause Membership"
-                  subtitle={membership.plan_name}
-                  subtitleTone="muted"
-                  onPress={() => navigation.navigate('PauseMembership')}
-                />
-              )
-            )}
-          </>
-        ) : null}
-
         {/* Settings list -------------------------------------------------- */}
         <Text style={styles.sectionLabel}>SETTINGS</Text>
         <Row
@@ -431,6 +356,13 @@ export default function ProfileScreen({ navigation }: Props) {
           icon={Gift}
           label="Orders"
           onPress={() => navigation.navigate('Orders')}
+        />
+        <Row
+          icon={Star}
+          label="Membership"
+          subtitle="Plan details"
+          subtitleTone="muted"
+          onPress={() => navigation.navigate('MembershipDetails')}
         />
         <Row
           icon={CreditCard}
@@ -471,14 +403,6 @@ export default function ProfileScreen({ navigation }: Props) {
                   : 'muted'
           }
           onPress={() => navigation.navigate('ConnectHitTrax')}
-        />
-
-        <Row
-          icon={XCircle}
-          label="Cancel Membership"
-          subtitle="Manage recurring plan"
-          subtitleTone="muted"
-          onPress={() => navigation.navigate('CancelMembership')}
         />
 
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>

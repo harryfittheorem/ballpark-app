@@ -4,11 +4,10 @@ import AddKidScreen from '@/screens/Auth/AddKidScreen';
 import BookingDetailScreen from '@/screens/Me/BookingDetailScreen';
 import EditKidScreen from '@/screens/Me/EditKidScreen';
 import BookingsListScreen from '@/screens/Me/BookingsListScreen';
-import CancelMembershipScreen from '@/screens/Me/CancelMembershipScreen';
 import ChangeLocationScreen from '@/screens/Me/ChangeLocationScreen';
 import ConnectHitTraxScreen from '@/screens/Me/ConnectHitTraxScreen';
+import MembershipDetailsScreen from '@/screens/Me/MembershipDetailsScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
-import PauseMembershipScreen from '@/screens/Me/PauseMembershipScreen';
 import PaymentMethodScreen from '@/screens/Me/PaymentMethodScreen';
 import ProfileScreen from '@/screens/Me/ProfileScreen';
 import WaitlistClaimScreen from '@/screens/Me/WaitlistClaimScreen';
@@ -68,14 +67,9 @@ export default function MeStackNavigator() {
         options={{ title: 'My Location' }}
       />
       <Stack.Screen
-        name="CancelMembership"
-        component={CancelMembershipScreen}
-        options={{ title: 'Cancel Membership' }}
-      />
-      <Stack.Screen
-        name="PauseMembership"
-        component={PauseMembershipScreen}
-        options={{ title: 'Pause Membership' }}
+        name="MembershipDetails"
+        component={MembershipDetailsScreen}
+        options={{ title: 'Membership' }}
       />
       <Stack.Screen
         name="AddKid"
