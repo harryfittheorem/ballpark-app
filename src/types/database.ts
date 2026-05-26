@@ -2232,7 +2232,33 @@ export type Database = {
           waitlist_count: number
         }[]
       }
+      get_hittrax_leaderboard: {
+        Args: {
+          p_age_group?: string
+          p_location_id?: string
+          p_metric: string
+          p_scope?: string
+        }
+        Returns: {
+          age_group: string
+          first_name: string
+          kid_id: string
+          last_name: string
+          rank: number
+          value: number
+        }[]
+      }
       get_kid_weekly_rank_delta: { Args: { p_kid_id: string }; Returns: number }
+      get_lesson_count_leaderboard: {
+        Args: { p_location_id?: string }
+        Returns: {
+          first_name: string
+          kid_id: string
+          last_name: string
+          lesson_count: number
+          rank: number
+        }[]
+      }
       get_my_coach_id: { Args: never; Returns: string }
       get_my_coach_preset: { Args: never; Returns: string }
       get_public_availability: {
