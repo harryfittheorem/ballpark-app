@@ -131,6 +131,7 @@ export type MeStackParamList = {
   ConnectHitTrax: undefined;
   PaymentMethod: undefined;
   MembershipDetails: undefined;
+  UpgradeMembership: undefined;
   AddKid: { fromMe: true };
   EditKid: { kidId: string };
 };

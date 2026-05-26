@@ -1,15 +1,25 @@
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Info, Star } from 'lucide-react-native';
+import { ExternalLink, Info, Star } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useMembership } from '@/hooks/useMembership';
+import { useFamily } from '@/hooks/useFamily';
+import { fetchUpgradePlans } from '@/api/membership';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
+import type { MeStackParamList } from '@/navigation/types';
+
+const FACILITY_EMAIL = 'info@infinitehitting.com';
 
 function formatDate(isoDate: string): string {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -28,6 +38,20 @@ function nextBillingDate(anchorDay: number | null): string {
 
 export default function MembershipDetailsScreen() {
   const { membership, loading } = useMembership();
+  const { family } = useFamily();
+  const navigation = useNavigation<NativeStackNavigationProp<MeStackParamList>>();
+
+  const [hasUpgradePlans, setHasUpgradePlans] = useState(false);
+
+  useEffect(() => {
+    if (!membership || membership.status !== 'active' || membership.plan_type !== 'eft' || !family?.tenant_id) {
+      setHasUpgradePlans(false);
+      return;
+    }
+    void fetchUpgradePlans(family.tenant_id as string, membership.amount_cents)
+      .then(plans => setHasUpgradePlans(plans.length > 0))
+      .catch(() => setHasUpgradePlans(false));
+  }, [membership, family?.tenant_id]);
 
   if (loading) {
     return (
@@ -89,6 +113,17 @@ export default function MembershipDetailsScreen() {
           />
         </View>
 
+        {membership.contract_url ? (
+          <TouchableOpacity
+            style={styles.contractLink}
+            onPress={() => Linking.openURL(membership.contract_url!)}
+            activeOpacity={0.7}
+          >
+            <ExternalLink size={14} color={colors.gold} />
+            <Text style={styles.contractLinkText}>View Contract</Text>
+          </TouchableOpacity>
+        ) : null}
+
         {isPaused && membership.pause_end ? (
           <View style={styles.pauseNotice}>
             <Text style={styles.pauseNoticeText}>
@@ -103,13 +138,30 @@ export default function MembershipDetailsScreen() {
             <Text style={styles.infoBoxTitle}>Making changes?</Text>
           </View>
           <Text style={styles.infoBoxBody}>
-            To pause or cancel your membership, please visit us in person or give us a call — we're happy to help!
+            To pause or cancel your membership, please{' '}
+            <Text
+              style={styles.emailLink}
+              onPress={() => Linking.openURL(`mailto:${FACILITY_EMAIL}`)}
+            >
+              email us
+            </Text>
+            {' '}— we're happy to help!
           </Text>
           <Text style={styles.infoBoxContact}>
             📍 Infinite Hitting{'\n'}
-            📞 (555) 000-0000
+            ✉️ {FACILITY_EMAIL}
           </Text>
         </View>
+
+        {hasUpgradePlans ? (
+          <TouchableOpacity
+            style={styles.upgradeButton}
+            onPress={() => navigation.navigate('UpgradeMembership')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.upgradeButtonText}>Upgrade Plan</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -188,7 +240,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius['2xl'],
-    marginBottom: spacing['3xl'],
+    marginBottom: spacing.lg,
     overflow: 'hidden',
   },
   detailRow: {
@@ -216,6 +268,21 @@ const styles = StyleSheet.create({
     color: colors.textOnDark,
   },
 
+  contractLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    alignSelf: 'flex-start',
+    marginBottom: spacing['2xl'],
+    paddingVertical: spacing.xs,
+  },
+  contractLinkText: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
+    color: colors.gold,
+    textDecorationLine: 'underline',
+  },
+
   pauseNotice: {
     backgroundColor: `${colors.gold}18`,
     borderWidth: 1,
@@ -237,6 +304,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius['2xl'],
     padding: spacing['2xl'],
+    marginBottom: spacing['3xl'],
   },
   infoBoxHeader: {
     flexDirection: 'row',
@@ -256,10 +324,29 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: spacing.lg,
   },
+  emailLink: {
+    color: colors.gold,
+    textDecorationLine: 'underline',
+  },
   infoBoxContact: {
     fontFamily: fontFamilies.interMedium,
     fontSize: fontSizes.sm,
     color: colors.textMuted,
     lineHeight: 22,
+  },
+
+  upgradeButton: {
+    borderWidth: 1.5,
+    borderColor: colors.gold,
+    borderRadius: radius['2xl'],
+    paddingVertical: spacing['2xl'],
+    alignItems: 'center',
+  },
+  upgradeButtonText: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.md,
+    color: colors.gold,
+    letterSpacing: tracking.wide,
+    textTransform: 'uppercase',
   },
 });

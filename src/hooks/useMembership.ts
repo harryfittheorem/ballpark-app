@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useFamily } from '@/hooks/useFamily';
-import { fetchActiveMembership, pauseMembership, resumeMembership, type MembershipRow } from '@/api/membership';
+import {
+  fetchActiveMembership,
+  pauseMembership,
+  resumeMembership,
+  requestUpgrade,
+  type MembershipRow,
+} from '@/api/membership';
 import { errorMessage } from '@/utils/error';
 
 export type UseMembershipResult = {
@@ -10,6 +16,7 @@ export type UseMembershipResult = {
   refresh: () => Promise<void>;
   pause: (pauseEnd: string) => Promise<void>;
   resume: () => Promise<void>;
+  upgrade: (planId: string) => Promise<void>;
 };
 
 export function useMembership(): UseMembershipResult {
@@ -48,5 +55,10 @@ export function useMembership(): UseMembershipResult {
     await load();
   }, [membership, load]);
 
-  return { membership, loading, error, refresh: load, pause, resume };
+  const upgrade = useCallback(async (planId: string) => {
+    if (!membership) throw new Error('No active membership');
+    await requestUpgrade(membership.id, planId);
+  }, [membership]);
+
+  return { membership, loading, error, refresh: load, pause, resume, upgrade };
 }
