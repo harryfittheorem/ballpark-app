@@ -64,9 +64,10 @@ export function PaymentsContent({ locations }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ location_id: locationId }),
       });
-      const data = await res.json() as { url?: string; error?: string };
+      const data = await res.json() as { url?: string; error?: { message?: string } | string };
       if (!res.ok || !data.url) {
-        setFlash({ type: 'error', text: data.error ?? 'Failed to start Stripe connection.' });
+        const msg = typeof data.error === 'string' ? data.error : (data.error?.message ?? 'Failed to start Stripe connection.');
+        setFlash({ type: 'error', text: msg });
         setConnecting(prev => ({ ...prev, [locationId]: false }));
         return;
       }
