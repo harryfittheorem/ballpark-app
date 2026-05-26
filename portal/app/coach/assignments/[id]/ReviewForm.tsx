@@ -6,19 +6,17 @@ import {
   reviewAssignment,
   type ReviewFormState,
 } from "./review-actions";
+import { fieldClasses } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 
 const INITIAL: ReviewFormState = { error: null };
 
 function SubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={disabled || pending}
-      className="inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-    >
+    <Button type="submit" disabled={disabled || pending}>
       {pending ? "Saving…" : "Submit review"}
-    </button>
+    </Button>
   );
 }
 
@@ -35,7 +33,7 @@ export function ReviewForm({ assignmentId }: { assignmentId: string }) {
       <input type="hidden" name="rating" value={rating} />
 
       <div className="space-y-2">
-        <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+        <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-gold-deep">
           Rating
         </label>
         <div className="flex items-center gap-1" role="radiogroup" aria-label="Rating">
@@ -50,24 +48,24 @@ export function ReviewForm({ assignmentId }: { assignmentId: string }) {
                 onClick={() => setRating(n)}
                 className={`flex h-10 w-10 items-center justify-center rounded-md border text-2xl leading-none transition-colors ${
                   active
-                    ? "border-amber-400 bg-amber-50 text-amber-500"
-                    : "border-slate-200 bg-white text-slate-300 hover:border-slate-300"
+                    ? "border-gold bg-gold/10 text-gold"
+                    : "border-border-gold bg-surface text-text-light/40 hover:border-gold/60"
                 }`}
               >
                 {active ? "★" : "☆"}
               </button>
             );
           })}
-          <span className="ml-3 text-sm text-slate-500">
+          <span className="ml-3 text-sm text-text-light">
             {rating > 0 ? `${rating} / 5` : "Select a rating"}
           </span>
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <label
           htmlFor="feedback"
-          className="block text-xs font-medium uppercase tracking-wide text-slate-500"
+          className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-gold-deep"
         >
           Feedback
         </label>
@@ -80,16 +78,16 @@ export function ReviewForm({ assignmentId }: { assignmentId: string }) {
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
           placeholder="What did they do well? What should they work on next?"
-          className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+          className={fieldClasses()}
           required
         />
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-text-light">
           {feedback.trim().length} characters (min 10)
         </p>
       </div>
 
       {state.error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div className="rounded-md border border-danger/40 bg-danger-bg p-3 text-sm text-danger">
           {state.error}
         </div>
       ) : null}
