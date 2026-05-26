@@ -11,13 +11,17 @@
   },
   "dependencies": {
     "@mux/mux-player-react": "^3.13.0",
+    "@stripe/react-stripe-js": "^6.4.0",
+    "@stripe/stripe-js": "^9.7.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.46.1",
+    "@types/react-signature-canvas": "^1.0.7",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.14.0",
     "next": "^15.5.18",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-signature-canvas": "^1.1.0-alpha.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",

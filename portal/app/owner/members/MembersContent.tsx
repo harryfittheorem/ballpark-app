@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, OTable, Chip } from '@/components/owner/ui';
 import type { TableColumn } from '@/components/owner/ui';
-import { Download, Plus, Filter, X, CreditCard, AlertTriangle } from 'lucide-react';
+import { Download, Plus, Filter, X, CreditCard, AlertTriangle, UserPlus } from 'lucide-react';
 import type { OwnerMember } from '@/lib/supabase/ownerQueries';
 import { exportCsv } from '@/lib/exportCsv';
 
@@ -262,7 +262,8 @@ export function MembersContent({ members }: Props) {
         actions={
           <>
             <OButton variant="secondary" icon={Download} onClick={handleExport}>Export</OButton>
-            <OButton variant="gold" icon={Plus} onClick={() => setShowAddModal(true)}>Add Member</OButton>
+            <OButton variant="secondary" icon={Plus} onClick={() => setShowAddModal(true)}>Invite Member</OButton>
+            <OButton variant="gold" icon={UserPlus} onClick={() => router.push('/owner/enroll')}>Enroll New Member</OButton>
           </>
         }
       />
