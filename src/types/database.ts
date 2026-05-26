@@ -691,6 +691,7 @@ export type Database = {
           parent_user_id: string
           primary_location_id: string | null
           role: string
+          stripe_connected_customer_id: string | null
           stripe_customer_id: string | null
           tenant_id: string
           updated_at: string
@@ -709,6 +710,7 @@ export type Database = {
           parent_user_id: string
           primary_location_id?: string | null
           role?: string
+          stripe_connected_customer_id?: string | null
           stripe_customer_id?: string | null
           tenant_id: string
           updated_at?: string
@@ -727,6 +729,7 @@ export type Database = {
           parent_user_id?: string
           primary_location_id?: string | null
           role?: string
+          stripe_connected_customer_id?: string | null
           stripe_customer_id?: string | null
           tenant_id?: string
           updated_at?: string
