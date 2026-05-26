@@ -4,23 +4,17 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, SectionHeader, OCard } from '@/components/owner/ui';
-import { Download, Clock } from 'lucide-react';
+import { Download, Clock, AlertCircle } from 'lucide-react';
 import type { CoachHoursRow } from '@/lib/supabase/ownerQueries';
 import { exportCsv } from '@/lib/exportCsv';
 
 type Props = {
-  rows: CoachHoursRow[];
+  rows: CoachHoursRow[] | null;
   startDate: string;
   endDate: string;
   defaultStart: string;
   defaultEnd: string;
 };
-
-function monthLabel(iso: string): string {
-  const d = new Date(iso + 'T00:00:00');
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  return `${months[d.getMonth()]} ${d.getFullYear()}`;
-}
 
 export function CoachHoursContent({ rows, startDate, endDate, defaultStart, defaultEnd }: Props) {
   const router = useRouter();
@@ -28,20 +22,26 @@ export function CoachHoursContent({ rows, startDate, endDate, defaultStart, defa
   const [start, setStart] = useState(startDate);
   const [end, setEnd] = useState(endDate);
   const [toast, setToast] = useState<string | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
 
   const isDefaultRange = start === defaultStart && end === defaultEnd;
   const heading = isDefaultRange
-    ? monthLabel(defaultStart)
+    ? 'Last 12 months'
     : `${start} – ${end}`;
 
   function applyFilter() {
+    if (end < start) {
+      setDateError('End date must be on or after the start date.');
+      return;
+    }
+    setDateError(null);
     startTransition(() => {
       router.push(`/owner/coach-hours?start=${start}&end=${end}`);
     });
   }
 
   function handleExport() {
-    if (rows.length === 0) return;
+    if (!rows || rows.length === 0) return;
     exportCsv(
       `coach-hours-${start}-to-${end}.csv`,
       rows as unknown as Record<string, unknown>[],
@@ -58,8 +58,9 @@ export function CoachHoursContent({ rows, startDate, endDate, defaultStart, defa
     setTimeout(() => setToast(null), 3500);
   }
 
-  const totalHours     = rows.reduce((s, r) => s + r.total_hours, 0);
-  const totalCompleted = rows.reduce((s, r) => s + r.completed_count, 0);
+  const safeRows      = rows ?? [];
+  const totalHours     = safeRows.reduce((s, r) => s + r.total_hours, 0);
+  const totalCompleted = safeRows.reduce((s, r) => s + r.completed_count, 0);
 
   return (
     <div>
@@ -67,7 +68,7 @@ export function CoachHoursContent({ rows, startDate, endDate, defaultStart, defa
         title="Coach Hours Report"
         subtitle={`Sessions and logged hours by coach — ${heading}`}
         actions={
-          <OButton variant="secondary" icon={Download} onClick={handleExport} disabled={rows.length === 0}>
+          <OButton variant="secondary" icon={Download} onClick={handleExport} disabled={!rows || rows.length === 0}>
             Export CSV
           </OButton>
         }
@@ -96,12 +97,32 @@ export function CoachHoursContent({ rows, startDate, endDate, defaultStart, defa
             />
             <OButton variant="gold" size="sm" onClick={applyFilter}>Apply</OButton>
           </div>
+          {dateError && (
+            <div style={{ marginTop: 8, fontSize: 12, color: brand.warning, fontWeight: 600 }}>
+              {dateError}
+            </div>
+          )}
         </OCard>
 
+        {/* ── RPC error banner ── */}
+        {rows === null && (
+          <OCard style={{ marginBottom: 24, borderColor: brand.warning }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: brand.warning }}>
+              <AlertCircle size={20} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>Coach Hours data unavailable</div>
+                <div style={{ fontSize: 12, color: brand.textMuted }}>
+                  The <code>get_coach_hours</code> database function may not be deployed yet. Run the pending migration and try again.
+                </div>
+              </div>
+            </div>
+          </OCard>
+        )}
+
         {/* ── Summary KPIs ── */}
-        {rows.length > 0 && (
+        {safeRows.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
-            <SummaryCard label="Total Coaches" value={String(rows.length)} />
+            <SummaryCard label="Total Coaches" value={String(safeRows.length)} />
             <SummaryCard label="Completed Sessions" value={String(totalCompleted)} />
             <SummaryCard label="Total Hours" value={`${totalHours.toFixed(2)} hrs`} />
           </div>
@@ -110,12 +131,18 @@ export function CoachHoursContent({ rows, startDate, endDate, defaultStart, defa
         {/* ── Table ── */}
         <SectionHeader title="Hours by Coach" />
 
-        {rows.length === 0 ? (
+        {safeRows.length === 0 ? (
           <OCard>
             <div style={{ textAlign: 'center', padding: '40px 0', color: brand.textMuted }}>
               <Clock size={32} color={brand.border} style={{ marginBottom: 12 }} />
-              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>No sessions in this period</div>
-              <div style={{ fontSize: 12 }}>Try a different date range where bookings exist.</div>
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+                {rows === null ? 'Report unavailable' : 'No sessions in this period'}
+              </div>
+              <div style={{ fontSize: 12 }}>
+                {rows === null
+                  ? 'Check that the get_coach_hours function is deployed.'
+                  : 'Try a different date range where bookings exist.'}
+              </div>
             </div>
           </OCard>
         ) : (
@@ -144,10 +171,10 @@ export function CoachHoursContent({ rows, startDate, endDate, defaultStart, defa
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, i) => (
+                {safeRows.map((row, i) => (
                   <tr
                     key={row.coach_id}
-                    style={{ borderBottom: i < rows.length - 1 ? `1px solid ${brand.border}` : 'none' }}
+                    style={{ borderBottom: i < safeRows.length - 1 ? `1px solid ${brand.border}` : 'none' }}
                   >
                     <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 700, color: brand.text }}>
                       {row.coach_name}

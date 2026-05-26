@@ -1307,7 +1307,7 @@ export async function getCoachHours(
   tenantId: string,
   startDate: string,
   endDate: string,
-): Promise<CoachHoursRow[]> {
+): Promise<CoachHoursRow[] | null> {
   const { data, error } = await supabase
     .rpc('get_coach_hours', {
       p_tenant_id:  tenantId,
@@ -1317,7 +1317,7 @@ export async function getCoachHours(
 
   if (error) {
     console.error('[getCoachHours]', error.message);
-    return [];
+    return null;
   }
 
   return (data ?? []).map((r: Record<string, unknown>) => ({
