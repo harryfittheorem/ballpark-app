@@ -1,0 +1,122 @@
+[
+  {
+    "id": "bp01-title-4000-8000-000000000001",
+    "position": 1,
+    "filepath": "src/pages/slides/Slide01Title.tsx",
+    "title": "Title",
+    "description": "The Operating System for Youth Sports",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp02-probl-4000-8000-000000000002",
+    "position": 2,
+    "filepath": "src/pages/slides/Slide02Problem.tsx",
+    "title": "The Problem",
+    "description": "Youth sports facilities running on tools built for yoga studios",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp03-marcu-4000-8000-000000000003",
+    "position": 3,
+    "filepath": "src/pages/slides/Slide03MarcusRivera.tsx",
+    "title": "Meet Marcus Rivera",
+    "description": "One athlete, one day, six capabilities",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp04-hitrx-4000-8000-000000000004",
+    "position": 4,
+    "filepath": "src/pages/slides/Slide04HitTrax.tsx",
+    "title": "HitTrax Auto-Import",
+    "description": "Automated performance data pipeline, 2-minute lag",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp05-video-4000-8000-000000000005",
+    "position": 5,
+    "filepath": "src/pages/slides/Slide05VideoMessaging.tsx",
+    "title": "Two-Way Video Messaging",
+    "description": "Coach sends breakdowns, family replies — Mux HLS pipeline",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp06-drill-4000-8000-000000000006",
+    "position": 6,
+    "filepath": "src/pages/slides/Slide06DrillAssignments.tsx",
+    "title": "Drill Assignments",
+    "description": "Coaching loop closes between sessions with points rewards",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp07-gamif-4000-8000-000000000007",
+    "position": 7,
+    "filepath": "src/pages/slides/Slide07Gamification.tsx",
+    "title": "Gamification Engine",
+    "description": "Points economy, live leaderboard, redemption codes + QR",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp08-diffr-4000-8000-000000000008",
+    "position": 8,
+    "filepath": "src/pages/slides/Slide08Differentiators.tsx",
+    "title": "Key Differentiators",
+    "description": "MindBody vs. Ballpark comparison table",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp09-stack-4000-8000-000000000009",
+    "position": 9,
+    "filepath": "src/pages/slides/Slide09TechStack.tsx",
+    "title": "Tech Stack",
+    "description": "React Native / Expo → Supabase → HitTrax / Mux / Stripe / Resend",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp10-tenan-4000-8000-000000000010",
+    "position": 10,
+    "filepath": "src/pages/slides/Slide10MultiTenant.tsx",
+    "title": "Multi-Tenant Franchise OS",
+    "description": "Every record has tenant_id, new franchise live in 30 days",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp11-pilot-4000-8000-000000000011",
+    "position": 11,
+    "filepath": "src/pages/slides/Slide11PilotPlan.tsx",
+    "title": "June Pilot Plan",
+    "description": "4-week timeline: soft launch to full location",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp12-metri-4000-8000-000000000012",
+    "position": 12,
+    "filepath": "src/pages/slides/Slide12PilotMetrics.tsx",
+    "title": "Pilot Success Metrics",
+    "description": "7 metrics with targets and measurement methods",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp13-roadm-4000-8000-000000000013",
+    "position": 13,
+    "filepath": "src/pages/slides/Slide13Roadmap.tsx",
+    "title": "What We Build Next",
+    "description": "Near-term and medium-term roadmap",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp14-thesk-4000-8000-000000000014",
+    "position": 14,
+    "filepath": "src/pages/slides/Slide14TheAsk.tsx",
+    "title": "The Ask",
+    "description": "Investors, franchise partners, new franchise tenants",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bp15-close-4000-8000-000000000015",
+    "position": 15,
+    "filepath": "src/pages/slides/Slide15Closing.tsx",
+    "title": "The Flywheel",
+    "description": "Closing slide — the compounding flywheel",
+    "speakerNotes": ""
+  }
+]
