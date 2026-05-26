@@ -505,6 +505,22 @@ await restInsert('bookings', bookingRows);
 console.log(`  ${todaySlots.length} today's bookings + ${bookingRows.length - todaySlots.length} historical completed`);
 
 // =============================================================================
+// 5b. Tenant settings — bring_a_friend_points
+// =============================================================================
+// Ensures the operator-configurable Bring-a-Friend bonus is present.
+// The migration seeds this row with ON CONFLICT DO NOTHING, but re-asserting
+// here keeps the seed script self-contained for environments where the
+// migration was applied before this script was updated.
+
+console.log('\n─── TENANT SETTINGS ──────────────────────────────────────────────────');
+await restInsert('tenant_settings', {
+  tenant_id: TENANT_ID,
+  key:       'bring_a_friend_points',
+  value:     '100',
+});
+console.log('  bring_a_friend_points = 100 (idempotent)');
+
+// =============================================================================
 // 6. Products (5 store items)
 // =============================================================================
 
@@ -537,20 +553,24 @@ const ledgerRows = [];
 
 for (let i = 0; i < FAMILY_DEFS.length; i++) {
   const target = KID_POINTS[i];
-  const sessionCredits = Math.floor(target * 0.7 / 10); // 10 pts per session
+  // Weekly visit bonus tiers: 2 pts (1st), 3 pts (2nd), 5 pts (3rd+).
+  // Average over a realistic mix ≈ ~3.3 pts/visit. For seed purposes we use
+  // weekly_visit_bonus reason to reflect the new trigger, with a simplified
+  // +3 per entry so ledger totals are in plausible range.
+  const sessionCredits = Math.floor(target * 0.7 / 3);
   let balance = 0;
 
   for (let j = 0; j < sessionCredits; j++) {
-    balance += 10;
+    balance += 3;
     ledgerRows.push({
       id:             ledgerId(i, j + 1),
       tenant_id:      TENANT_ID,
       kid_id:         KID_IDS[i],
-      delta:          10,
-      reason:         'session_attended',
+      delta:          3,
+      reason:         'weekly_visit_bonus',
       reference_type: 'manual',
       balance_after:  balance,
-      note:           'Portal seed: session credit',
+      note:           'Portal seed: weekly visit bonus',
       created_at:     daysAgo(sessionCredits - j + 1),
     });
   }

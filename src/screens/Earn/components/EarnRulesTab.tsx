@@ -5,17 +5,24 @@ import { usePointsLedger } from '@/hooks/usePointsLedger';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
 const RULES: { label: string; points: string; detail: string }[] = [
-  { label: 'Attend a session', points: '+10', detail: 'Awarded when your coach marks the booking complete.' },
-  { label: 'Complete an assignment', points: '+25', detail: 'Coming soon — finish drills assigned by your coach.' },
-  { label: 'Hit a personal record', points: '+50', detail: 'Coming soon — bat speed, exit velo, and more.' },
+  { label: '1st visit this week',   points: '+2',  detail: 'Awarded when your coach marks the booking complete.' },
+  { label: '2nd visit this week',   points: '+3',  detail: 'Come back a second time — total 5 pts for the week.' },
+  { label: '3rd+ visit this week',  points: '+5',  detail: 'Every extra visit this week earns 5 pts.' },
+  { label: 'Complete an assignment', points: '+25', detail: 'Finish drills assigned by your coach.' },
+  { label: 'Hit a personal record',  points: '+15', detail: 'Beat your best exit velo, distance, or pitch speed.' },
+  { label: 'Bring a Friend',         points: '+varies', detail: 'Bring a guest to a session and earn bonus points.' },
 ];
 
 const REASON_LABEL: Record<string, string> = {
-  session_attended: 'Session attended',
+  session_attended:     'Session attended',
+  weekly_visit_bonus:   'Weekly visit bonus',
   assignment_completed: 'Assignment',
-  pr_hit: 'Personal record',
-  redemption: 'Reward redeemed',
-  manual_adjustment: 'Adjustment',
+  pr_hit:               'Personal record',
+  redemption:           'Reward redeemed',
+  bring_a_friend:       'Brought a friend',
+  manual_adjustment:    'Adjustment',
+  achievement_bonus:    'Achievement',
+  booking_cancelled:    'Booking cancelled',
 };
 
 function formatDate(iso: string): string {

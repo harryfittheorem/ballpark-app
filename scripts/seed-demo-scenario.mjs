@@ -765,6 +765,20 @@ await restInsert('assignments', {
 console.log('  Completed drill: "Hip Load & Drive" — 4★ reviewed by Coach Mike');
 
 // =============================================================================
+// Step 10b — Tenant settings — bring_a_friend_points
+// =============================================================================
+// Ensures the operator-configurable Bring-a-Friend bonus is present.
+// Idempotent: ON CONFLICT DO NOTHING via restInsert.
+
+console.log('\n─── TENANT SETTINGS ──────────────────────────────────────────────────');
+await restInsert('tenant_settings', {
+  tenant_id: TENANT_ID,
+  key:       'bring_a_friend_points',
+  value:     '100',
+});
+console.log('  bring_a_friend_points = 100 (idempotent)');
+
+// =============================================================================
 // Step 11 — Products (3 store items for the Earn tab)
 // =============================================================================
 
