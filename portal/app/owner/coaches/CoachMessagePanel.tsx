@@ -364,7 +364,7 @@ const selectStyle: React.CSSProperties = {
 function btnStyle(variant: 'gold' | 'secondary' | 'primary'): React.CSSProperties {
   const variants = {
     gold: { background: brand.gold, color: brand.dark, border: `1px solid ${brand.gold}` },
-    secondary: { background: brand.white, color: brand.text, border: `1px solid ${brand.borderStrong}` },
+    secondary: { background: brand.white, color: brand.darker, border: `1px solid ${brand.borderStrong}` },
     primary: { background: brand.dark, color: brand.gold, border: `1px solid ${brand.dark}` },
   };
   return {

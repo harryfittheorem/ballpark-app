@@ -198,7 +198,7 @@ export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMo
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                     <div>
                       <div style={{ fontSize: 10, color: brand.success, fontWeight: 800, letterSpacing: 1.5, fontFamily: fonts.display }}>THIS MONTH · COLLECTED</div>
-                      <div style={{ fontSize: 32, fontWeight: 700, fontFamily: fonts.display, marginTop: 6, letterSpacing: -0.5 }}>${kpis.collectedMtd.toLocaleString()}</div>
+                      <div style={{ fontSize: 32, fontWeight: 700, fontFamily: fonts.display, marginTop: 6, letterSpacing: -0.5, color: brand.darker }}>${kpis.collectedMtd.toLocaleString()}</div>
                       <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 2 }}>Net collected so far</div>
                     </div>
                     <Chip color="success">{months[now.getMonth()].toUpperCase()}</Chip>
@@ -226,7 +226,7 @@ export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMo
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                     <div>
                       <div style={{ fontSize: 10, color: brand.info, fontWeight: 800, letterSpacing: 1.5, fontFamily: fonts.display }}>NEXT MONTH · FORECAST</div>
-                      <div style={{ fontSize: 32, fontWeight: 700, fontFamily: fonts.display, marginTop: 6, letterSpacing: -0.5 }}>${Math.round(totalMrr * 1.02).toLocaleString()}</div>
+                      <div style={{ fontSize: 32, fontWeight: 700, fontFamily: fonts.display, marginTop: 6, letterSpacing: -0.5, color: brand.darker }}>${Math.round(totalMrr * 1.02).toLocaleString()}</div>
                       <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 2 }}>Based on current MRR</div>
                     </div>
                     <Chip color="info">FORECAST</Chip>

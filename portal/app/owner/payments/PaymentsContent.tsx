@@ -308,7 +308,7 @@ export function PaymentsContent({ locations }: Props) {
                 >
                   <div style={{
                     width: 28, height: 28, borderRadius: 14,
-                    background: brand.goldDeep, color: brand.white,
+                    background: brand.goldDeep, color: brand.dark,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 12, fontWeight: 800, flexShrink: 0, marginTop: 2,
                     fontFamily: fonts.display,

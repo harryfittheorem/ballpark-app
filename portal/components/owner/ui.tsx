@@ -188,7 +188,7 @@ export function SectionHeader({ title, subtitle, action }: { title: string; subt
 
 export function OCard({ children, padding = 20, style = {} }: { children: ReactNode; padding?: number; style?: CSSProperties }) {
   return (
-    <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, padding, ...style }}>
+    <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, padding, color: brand.text, ...style }}>
       {children}
     </div>
   );

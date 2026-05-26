@@ -253,7 +253,7 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
                 <CreditCard size={17} color={brand.success} />
               </div>
             </div>
-            <div style={{ fontSize: 34, fontWeight: 700, fontFamily: fonts.display, letterSpacing: -0.5, lineHeight: 1 }}>
+            <div style={{ fontSize: 34, fontWeight: 700, fontFamily: fonts.display, letterSpacing: -0.5, lineHeight: 1, color: brand.darker }}>
               ${(eftTotal / 1000).toFixed(1)}K
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
@@ -276,7 +276,7 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
                 <DollarSign size={17} color={brand.warning} />
               </div>
             </div>
-            <div style={{ fontSize: 34, fontWeight: 700, fontFamily: fonts.display, letterSpacing: -0.5, lineHeight: 1 }}>
+            <div style={{ fontSize: 34, fontWeight: 700, fontFamily: fonts.display, letterSpacing: -0.5, lineHeight: 1, color: brand.darker }}>
               ${(otcTotal / 1000).toFixed(1)}K
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>

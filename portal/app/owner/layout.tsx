@@ -56,7 +56,9 @@ export default async function OwnerLayout({ children }: { children: ReactNode })
       userName={userName}
       locationName={locationName}
     >
-      {children}
+      <div style={{ color: '#FAF6E8' }}>
+        {children}
+      </div>
     </PortalShell>
   );
 }
