@@ -146,7 +146,8 @@ export function useStaffSessions(coachId: CoachIdState, isCoach = false) {
         else if (action === 'noshow') updated = await markNoShowRpc(bookingId);
         else updated = await undoCheckInRpc(bookingId);
 
-        // Merge the RPC result back into the *current* cache key (via ref).
+        // Optimistic patch: immediately flip status in cache so the row
+        // re-renders without waiting for the network round-trip.
         qc.setQueryData<StaffBooking[]>(keyRef.current, (prev) => {
           if (!prev) return prev;
           return prev.map((b) =>
@@ -155,6 +156,11 @@ export function useStaffSessions(coachId: CoachIdState, isCoach = false) {
               : b,
           );
         });
+
+        // Guaranteed sync: invalidate so TanStack Query immediately refetches
+        // from Supabase, ensuring the UI reflects the true DB state even if
+        // the optimistic patch above didn't trigger a re-render.
+        void qc.invalidateQueries({ queryKey: keyRef.current });
 
         setPending((p) => {
           const next = { ...p };

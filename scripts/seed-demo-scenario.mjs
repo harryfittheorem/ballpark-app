@@ -645,6 +645,25 @@ await restInsert('bookings', bookingRows);
 console.log(`  Dashboard: ${todaySlots.length} today's bookings (3 coaches, cages 1–6)`);
 console.log(`  Total bookings: ${bookingRows.length}`);
 
+// Refresh today's booking dates on idempotent re-runs.
+// ON CONFLICT (id) DO NOTHING skips the INSERT → the stored scheduled_start/end
+// stay at whatever date the seed was first run. PATCH every today-slot row so
+// the Sessions tab always shows TODAY regardless of when the seed was originally run.
+for (let idx = 0; idx < todaySlots.length; idx++) {
+  const slot = todaySlots[idx];
+  await restPatch(
+    'bookings',
+    `id=eq.${TODAY_BOOKING_IDS[idx]}`,
+    {
+      scheduled_start: todayAtUTC(slot.hour),
+      scheduled_end:   todayAtUTC(slot.hour + 1),
+      status:          slot.hour < 14 ? 'confirmed' : 'pending',
+      attended_at:     null,
+    },
+  );
+}
+console.log(`  Today's booking dates refreshed → ${new Date().toISOString().split('T')[0]}`);
+
 // =============================================================================
 // Step 8b — Peer completed bookings (for Lesson Count leaderboard)
 //
@@ -771,11 +790,23 @@ console.log('  Completed drill: "Hip Load & Drive" — 4★ reviewed by Coach Mi
 // Idempotent: ON CONFLICT DO NOTHING via restInsert.
 
 console.log('\n─── TENANT SETTINGS ──────────────────────────────────────────────────');
-await restInsert('tenant_settings', {
-  tenant_id: TENANT_ID,
-  key:       'bring_a_friend_points',
-  value:     '100',
-});
+// tenant_settings has a unique constraint on (tenant_id, key) that is distinct
+// from its primary key, so PostgREST's resolution=ignore-duplicates header may
+// not suppress the 409. Fall back to PATCH when the row already exists.
+try {
+  await restInsert('tenant_settings', {
+    tenant_id: TENANT_ID,
+    key:       'bring_a_friend_points',
+    value:     '100',
+  });
+} catch (e) {
+  if (!e.message.includes('409')) throw e;
+  await restPatch(
+    'tenant_settings',
+    `tenant_id=eq.${TENANT_ID}&key=eq.bring_a_friend_points`,
+    { value: '100' },
+  );
+}
 console.log('  bring_a_friend_points = 100 (idempotent)');
 
 // =============================================================================

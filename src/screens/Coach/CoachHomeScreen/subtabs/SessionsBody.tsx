@@ -131,105 +131,106 @@ function RosterRow({ booking: b, onAction }: RosterRowProps) {
 
   return (
     <View style={rosterStyles.row}>
-      {/* Avatar */}
-      <View style={rosterStyles.avatar}>
-        <UserCircle size={18} color={colors.gold} strokeWidth={1.5} />
-      </View>
-
-      {/* Kid info */}
-      <View style={rosterStyles.info}>
-        <View style={rosterStyles.nameRow}>
-          <Text style={rosterStyles.name} numberOfLines={1}>{kidName}</Text>
-          <MembershipBadge status={b.membership_status} />
+      {/* Top: avatar + name + status */}
+      <View style={rosterStyles.topRow}>
+        <View style={rosterStyles.avatar}>
+          <UserCircle size={18} color={colors.gold} strokeWidth={1.5} />
         </View>
-        {b.pending_assignment_count > 0 && (
-          <Text style={rosterStyles.assignBadge}>
-            {b.pending_assignment_count} pending drill{b.pending_assignment_count !== 1 ? 's' : ''}
-          </Text>
-        )}
-      </View>
+        <View style={rosterStyles.info}>
+          <View style={rosterStyles.nameRow}>
+            <Text style={rosterStyles.name} numberOfLines={1}>{kidName}</Text>
+            <MembershipBadge status={b.membership_status} />
+          </View>
+          {b.pending_assignment_count > 0 && (
+            <Text style={rosterStyles.assignBadge}>
+              {b.pending_assignment_count} pending drill{b.pending_assignment_count !== 1 ? 's' : ''}
+            </Text>
+          )}
+        </View>
 
-      {/* Check-in controls */}
-      <View style={rosterStyles.actions}>
-        {/* Not yet checked in: show Check In + No Show buttons */}
-        {isActionable && (
-          <>
-            <Pressable
-              style={[rosterStyles.btn, rosterStyles.btnGreen]}
-              disabled={isPending}
-              onPress={() => onAction('checkin', b.id)}
-              accessibilityLabel={`Check in ${kidName}`}
-              accessibilityRole="button"
-            >
-              {b.pending === 'checkin'
-                ? <ActivityIndicator size="small" color="#34D399" />
-                : <><CheckCircle size={11} color="#34D399" /><Text style={[rosterStyles.btnTxt, rosterStyles.txtGreen]}>In</Text></>}
-            </Pressable>
-            <Pressable
-              style={[rosterStyles.btn, rosterStyles.btnRed]}
-              disabled={isPending}
-              onPress={() => onAction('noshow', b.id)}
-              accessibilityLabel={`Mark ${kidName} no-show`}
-              accessibilityRole="button"
-            >
-              {b.pending === 'noshow'
-                ? <ActivityIndicator size="small" color="#F87171" />
-                : <><XCircle size={11} color="#F87171" /><Text style={[rosterStyles.btnTxt, rosterStyles.txtRed]}>NS</Text></>}
-            </Pressable>
-          </>
-        )}
-
-        {/* Completed: timestamp is primary; undo is secondary when window open */}
+        {/* Inline status for completed / no-show */}
         {b.status === 'completed' && b.attended_at && (
-          <View style={rosterStyles.completedGroup}>
-            <View style={rosterStyles.arrivedRow}>
-              <CheckCircle size={11} color="#34D399" />
-              <Text style={rosterStyles.arrivedTime}>{formatTime(b.attended_at)}</Text>
-            </View>
-            {canUndo && (
-              <Pressable
-                style={[rosterStyles.btn, rosterStyles.btnUndo]}
-                disabled={isPending}
-                onPress={() => onAction('undo', b.id)}
-                accessibilityLabel={`Undo check-in for ${kidName}`}
-                accessibilityRole="button"
-              >
-                {b.pending === 'undo'
-                  ? <ActivityIndicator size="small" color={colors.textLight} />
-                  : <><RotateCcw size={10} color={colors.textLight} /><Text style={[rosterStyles.btnTxt, rosterStyles.txtUndo]}>Undo</Text></>}
-              </Pressable>
-            )}
+          <View style={rosterStyles.arrivedRow}>
+            <CheckCircle size={12} color="#34D399" />
+            <Text style={rosterStyles.arrivedTime}>{formatTime(b.attended_at)}</Text>
           </View>
         )}
-
         {b.status === 'no_show' && (
           <Text style={rosterStyles.noShowLbl}>No show</Text>
         )}
       </View>
+
+      {/* Bottom: full-width action buttons */}
+      {isActionable && (
+        <View style={rosterStyles.actionRow}>
+          <Pressable
+            style={[rosterStyles.actionBtn, rosterStyles.btnGreen]}
+            disabled={isPending}
+            onPress={() => onAction('checkin', b.id)}
+            accessibilityLabel={`Check in ${kidName}`}
+            accessibilityRole="button"
+          >
+            {b.pending === 'checkin'
+              ? <ActivityIndicator size="small" color="#34D399" />
+              : <><CheckCircle size={13} color="#34D399" /><Text style={[rosterStyles.actionBtnTxt, rosterStyles.txtGreen]}>Check In</Text></>}
+          </Pressable>
+          <Pressable
+            style={[rosterStyles.actionBtn, rosterStyles.btnRed]}
+            disabled={isPending}
+            onPress={() => onAction('noshow', b.id)}
+            accessibilityLabel={`Mark ${kidName} no-show`}
+            accessibilityRole="button"
+          >
+            {b.pending === 'noshow'
+              ? <ActivityIndicator size="small" color="#F87171" />
+              : <><XCircle size={13} color="#F87171" /><Text style={[rosterStyles.actionBtnTxt, rosterStyles.txtRed]}>No Show</Text></>}
+          </Pressable>
+        </View>
+      )}
+
+      {/* Undo row for completed bookings within 5-min window */}
+      {b.status === 'completed' && canUndo && (
+        <View style={rosterStyles.undoRow}>
+          <Pressable
+            style={[rosterStyles.actionBtn, rosterStyles.btnUndo]}
+            disabled={isPending}
+            onPress={() => onAction('undo', b.id)}
+            accessibilityLabel={`Undo check-in for ${kidName}`}
+            accessibilityRole="button"
+          >
+            {b.pending === 'undo'
+              ? <ActivityIndicator size="small" color={colors.textLight} />
+              : <><RotateCcw size={12} color={colors.textLight} /><Text style={[rosterStyles.actionBtnTxt, rosterStyles.txtUndo]}>Undo Check-In</Text></>}
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
 
 const rosterStyles = StyleSheet.create({
   row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.lg,
+    flexDirection: 'column',
     paddingVertical: spacing['2xl'],
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    gap: spacing.lg,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.darkest,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    marginTop: 2,
   },
   info: { flex: 1, minWidth: 0, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
@@ -243,27 +244,34 @@ const rosterStyles = StyleSheet.create({
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.xs,
   },
-  actions: { alignItems: 'flex-end', gap: spacing.xs, flexShrink: 0 },
-  btn: {
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  undoRow: {
+    flexDirection: 'row',
+  },
+  actionBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 5,
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 10,
     borderRadius: radius.md,
     borderWidth: 1,
-    minWidth: 38,
-    justifyContent: 'center',
+  },
+  actionBtnTxt: {
+    fontFamily: fontFamilies.interBold,
+    fontSize: fontSizes.sm,
   },
   btnGreen: { borderColor: '#065f46', backgroundColor: 'rgba(6,78,59,0.3)' },
   btnRed: { borderColor: '#7f1d1d', backgroundColor: 'rgba(127,29,29,0.2)' },
   btnUndo: { borderColor: colors.border, backgroundColor: colors.darkest },
-  btnTxt: { fontFamily: fontFamilies.interBold, fontSize: fontSizes.xs },
   txtGreen: { color: '#34D399' },
   txtRed: { color: '#F87171' },
   txtUndo: { color: colors.textLight },
-  completedGroup: { alignItems: 'flex-end', gap: spacing.xs },
-  arrivedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  arrivedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
   arrivedTime: {
     color: '#34D399',
     fontFamily: fontFamilies.interBold,
@@ -274,6 +282,7 @@ const rosterStyles = StyleSheet.create({
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.xs,
     fontStyle: 'italic',
+    flexShrink: 0,
   },
 });
 
