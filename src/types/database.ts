@@ -772,6 +772,7 @@ export type Database = {
           family_id: string
           id: string
           ip_address: string | null
+          signature_image_path: string | null
           signed_at: string
           waiver_id: string
         }
@@ -780,6 +781,7 @@ export type Database = {
           family_id: string
           id?: string
           ip_address?: string | null
+          signature_image_path?: string | null
           signed_at?: string
           waiver_id: string
         }
@@ -788,6 +790,7 @@ export type Database = {
           family_id?: string
           id?: string
           ip_address?: string | null
+          signature_image_path?: string | null
           signed_at?: string
           waiver_id?: string
         }
@@ -1108,6 +1111,112 @@ export type Database = {
           },
         ]
       }
+      membership_plans: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          plan_type: string
+          sort_order: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          plan_type: string
+          sort_order?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          plan_type?: string
+          sort_order?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_plans_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership_upgrade_requests: {
+        Row: {
+          created_at: string
+          family_id: string
+          id: string
+          membership_id: string
+          requested_plan_id: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          family_id: string
+          id?: string
+          membership_id: string
+          requested_plan_id: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          family_id?: string
+          id?: string
+          membership_id?: string
+          requested_plan_id?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_upgrade_requests_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_upgrade_requests_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_upgrade_requests_requested_plan_id_fkey"
+            columns: ["requested_plan_id"]
+            isOneToOne: false
+            referencedRelation: "membership_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_upgrade_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       memberships: {
         Row: {
           amount_cents: number
@@ -1115,6 +1224,7 @@ export type Database = {
           cancel_effective_at: string | null
           cancel_requested_at: string | null
           cancelled_at: string | null
+          contract_url: string | null
           created_at: string
           family_id: string
           id: string
@@ -1139,6 +1249,7 @@ export type Database = {
           cancel_effective_at?: string | null
           cancel_requested_at?: string | null
           cancelled_at?: string | null
+          contract_url?: string | null
           created_at?: string
           family_id: string
           id?: string
@@ -1163,6 +1274,7 @@ export type Database = {
           cancel_effective_at?: string | null
           cancel_requested_at?: string | null
           cancelled_at?: string | null
+          contract_url?: string | null
           created_at?: string
           family_id?: string
           id?: string
@@ -1925,10 +2037,46 @@ export type Database = {
           },
         ]
       }
+      tenant_settings: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          tenant_id: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          tenant_id: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          tenant_id?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           brand_colors: Json
           brand_logo_url: string | null
+          contact_email: string | null
           created_at: string
           id: string
           name: string
@@ -1940,6 +2088,7 @@ export type Database = {
         Insert: {
           brand_colors?: Json
           brand_logo_url?: string | null
+          contact_email?: string | null
           created_at?: string
           id?: string
           name: string
@@ -1951,6 +2100,7 @@ export type Database = {
         Update: {
           brand_colors?: Json
           brand_logo_url?: string | null
+          contact_email?: string | null
           created_at?: string
           id?: string
           name?: string
