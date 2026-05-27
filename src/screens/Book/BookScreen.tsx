@@ -258,7 +258,7 @@ export default function BookScreen() {
     <SafeAreaView style={flowStyles.safe} edges={['top']}>
       <BookHeader />
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={shellStyles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
@@ -269,6 +269,7 @@ export default function BookScreen() {
           flowStyles.scrollContent,
           { paddingBottom: tabBarHeight + spacing['4xl'] },
         ]}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -408,6 +409,7 @@ export default function BookScreen() {
             slotRemainingSpots={slotRemainingSpots}
             onBooked={handleBooked}
             onWaitlistJoined={handleWaitlistJoined}
+            onBafError={scrollToSummary}
           />
         </View>
       </ScrollView>
@@ -475,6 +477,9 @@ export default function BookScreen() {
 }
 
 const shellStyles = StyleSheet.create({
+  keyboardAvoid: {
+    flex: 1,
+  },
   sectionLabel: {
     color: colors.gold,
     fontFamily: fontFamilies.oswaldBold,

@@ -33,7 +33,39 @@ type Props = {
   slotRemainingSpots?: number | null;
   onBooked: (formattedWhen: string) => void;
   onWaitlistJoined?: (position: number) => void;
+  /** Called after a BAF booking error so the parent can scroll the error into view */
+  onBafError?: () => void;
 };
+
+/** Extract a human-readable message from any thrown value (Error, PostgrestError, plain object, string, etc.)
+ *
+ * Supabase returns errors as plain objects {code, message, details, hint} — not always PostgrestError
+ * instances. Some PostgREST error codes set `message` to "" and put the real text in `details`.
+ * We drain all fields in order: message → details → hint → code → fallback.
+ */
+function extractMessage(err: unknown): string {
+  if (err === null || err === undefined) return 'Something went wrong.';
+  if (typeof err === 'string') return err.trim() || 'Something went wrong.';
+  if (typeof err === 'object') {
+    // Log the full error so Metro console shows exactly what Supabase returned
+    console.error('[BAF] bookSessionWithFriend error:', JSON.stringify(err));
+    const o = err as Record<string, unknown>;
+    const pick = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+    return pick(o.message) || pick(o.details) || pick(o.hint) || pick(o.code) || 'Something went wrong.';
+  }
+  return 'Something went wrong.';
+}
+
+const BAF_TIMEOUT_MS = 15_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMsg: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(timeoutMsg)), ms),
+    ),
+  ]);
+}
 
 function formatPriceUSD(cents: number): string {
   if (cents === 0) return 'Free';
@@ -81,6 +113,7 @@ export default function SummarySection({
   slotRemainingSpots = null,
   onBooked,
   onWaitlistJoined,
+  onBafError,
 }: Props) {
   const { family, kid: defaultKid, kids } = useSelectedKid();
   const location = useActiveLocation();
@@ -201,31 +234,37 @@ export default function SummarySection({
     if (bafOptedIn) {
       setBafPending(true);
       try {
-        const result = await bookSessionWithFriend({
-          tenant_id:        family!.tenant_id,
-          location_id:      location.data!.id,
-          kid_id:           activeKid.id,
-          coach_id:         coach!.id,
-          session_type_id:  sessionType!.id,
-          scheduled_start:  (slot as Slot).start,
-          scheduled_end:    (slot as Slot).end,
-          guest_name:       bafName.trim(),
-          guest_phone:      bafPhone.trim() || null,
-          guest_email:      bafEmail.trim() || null,
-        });
+        const result = await withTimeout(
+          bookSessionWithFriend({
+            tenant_id:        family!.tenant_id,
+            location_id:      location.data!.id,
+            kid_id:           activeKid.id,
+            coach_id:         coach!.id,
+            session_type_id:  sessionType!.id,
+            scheduled_start:  (slot as Slot).start,
+            scheduled_end:    (slot as Slot).end,
+            guest_name:       bafName.trim(),
+            guest_phone:      bafPhone.trim() || null,
+            guest_email:      bafEmail.trim() || null,
+          }),
+          BAF_TIMEOUT_MS,
+          'Unable to complete booking — please try again.',
+        );
         setBafResult(result);
         void qc.invalidateQueries({ queryKey: ['day_bookings'] });
         void qc.invalidateQueries({ queryKey: ['upcoming-session'] });
         void qc.invalidateQueries({ queryKey: ['family_bookings'] });
         void qc.invalidateQueries({ queryKey: activeMembershipKey(activeKid.id) });
         void qc.invalidateQueries({ queryKey: ['family'] });
+        void qc.invalidateQueries({ queryKey: ['points_ledger'] });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Something went wrong.';
+        const msg = extractMessage(err);
         setBafBookingError(
           msg.includes('no_session_credits')
             ? 'Not enough credits for Bring-a-Friend (need 2).'
             : msg,
         );
+        onBafError?.();
       } finally {
         setBafPending(false);
       }
