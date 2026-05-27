@@ -106,6 +106,7 @@ export type CoachInboxStackParamList = {
   ReviewQueue: undefined;
   ReviewAssignment: { assignmentId: string };
   CoachVideoPlayback: { playbackId: string };
+  ScanRedemption: undefined;
 };
 
 export type CoachInboxStackScreenProps<T extends keyof CoachInboxStackParamList> =

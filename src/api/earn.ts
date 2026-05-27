@@ -116,6 +116,41 @@ export type RedeemResult = {
  * inactive product, or wrong tenant — the API layer just forwards the
  * Postgres error message up.
  */
+/**
+ * Look up a single order by its 8-char redemption code (upper-cased before
+ * querying). RLS allows coaches and admins to SELECT any order in their
+ * tenant, so this works for the coach-side scanner without needing a
+ * special RPC.
+ */
+export async function lookupOrderByRedemptionCode(
+  code: string,
+): Promise<OrderWithProduct | null> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(
+      'id, tenant_id, family_id, kid_id, product_id, payment_method, amount_paid_points, amount_paid_cents, stripe_payment_intent_id, status, redemption_code, fulfilled_at, created_at, updated_at, product:products(id, name, category, image_url), kid:kids(id, first_name, last_name)',
+    )
+    .eq('redemption_code', code.toUpperCase().trim())
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as unknown as OrderWithProduct | null;
+}
+
+/**
+ * Calls the `mark_redemption_fulfilled` SECURITY DEFINER RPC. Requires the
+ * caller to have app_role = 'admin' or 'coach'. Returns the updated order.
+ * Idempotent — calling again on an already-fulfilled order returns it as-is.
+ */
+export async function fulfillRedemption(code: string): Promise<Order> {
+  const { data, error } = await supabase.rpc('mark_redemption_fulfilled', {
+    p_code: code,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error('fulfillRedemption returned no row');
+  return row as unknown as Order;
+}
+
 export async function redeemReward(input: {
   kidId: string;
   productId: string;

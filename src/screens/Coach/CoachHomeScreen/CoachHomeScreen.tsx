@@ -11,7 +11,7 @@
 
 import { useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, Dumbbell, Inbox, Send, Video } from 'lucide-react-native';
+import { ClipboardCheck, Dumbbell, Inbox, QrCode, Send, Video } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
@@ -175,6 +175,12 @@ export default function CoachHomeScreen() {
               subtitle="Read messages and video clips from families."
               icon={Inbox}
               onPress={() => navigation.navigate('CoachInboxHome')}
+            />
+            <CoachActionCard
+              title="Scan Redemption"
+              subtitle="Scan a family's QR code to mark their reward as picked up."
+              icon={QrCode}
+              onPress={() => navigation.navigate('ScanRedemption')}
             />
           </View>
           <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>

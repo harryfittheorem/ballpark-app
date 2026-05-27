@@ -15,6 +15,7 @@ import RecipientPickerScreen from '@/screens/Coach/RecipientPicker/RecipientPick
 import RecordVideoScreen from '@/screens/Coach/RecordVideo/RecordVideoScreen';
 import ReviewAssignmentScreen from '@/screens/Coach/ReviewAssignment/ReviewAssignmentScreen';
 import ReviewQueueScreen from '@/screens/Coach/ReviewQueue/ReviewQueueScreen';
+import ScanRedemptionScreen from '@/screens/Coach/ScanRedemption/ScanRedemptionScreen';
 import SendConfirmationScreen from '@/screens/Coach/SendConfirmation/SendConfirmationScreen';
 import SentVideosScreen from '@/screens/Coach/SentVideos/SentVideosScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
@@ -90,6 +91,11 @@ export default function CoachInboxStackNavigator() {
         name="CoachVideoPlayback"
         component={CoachVideoPlaybackScreen}
         options={{ headerShown: false, presentation: 'fullScreenModal' }}
+      />
+      <Stack.Screen
+        name="ScanRedemption"
+        component={ScanRedemptionScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
