@@ -1,7 +1,4 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Inbox } from 'lucide-react-native';
-
-import { colors, fontFamilies, fontSizes } from '@/theme';
 
 import CoachInboxStackNavigator from './CoachInboxStackNavigator';
 import type { CoachTabParamList } from './types';
@@ -13,25 +10,12 @@ export default function CoachTabNavigator() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.gold,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: colors.darker,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-        },
-        tabBarLabelStyle: {
-          fontFamily: fontFamilies.interMedium,
-          fontSize: fontSizes.xs,
-          textTransform: 'uppercase',
-          letterSpacing: 1,
-        },
+        tabBarStyle: { display: 'none' },
       }}
     >
       <Tab.Screen
         name="Inbox"
         component={CoachInboxStackNavigator}
-        options={{ tabBarIcon: ({ color, size }) => <Inbox color={color} size={size} /> }}
       />
     </Tab.Navigator>
   );

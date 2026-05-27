@@ -287,6 +287,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
+    zIndex: 999,
+    elevation: 999,
   },
   closeButton: {
     margin: spacing.md,

@@ -8,6 +8,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import CoachHomeScreen from '@/screens/Coach/CoachHomeScreen/CoachHomeScreen';
 import CoachVideoPlaybackScreen from '@/screens/Coach/CoachVideoPlayback/CoachVideoPlaybackScreen';
+import CoachInboxScreen from '@/screens/Coach/CoachInbox/CoachInboxScreen';
+import CoachMessageThreadScreen from '@/screens/Coach/CoachInbox/CoachMessageThreadScreen';
 import CreateAssignmentScreen from '@/screens/Coach/CreateAssignment/CreateAssignmentScreen';
 import RecipientPickerScreen from '@/screens/Coach/RecipientPicker/RecipientPickerScreen';
 import RecordVideoScreen from '@/screens/Coach/RecordVideo/RecordVideoScreen';
@@ -37,6 +39,16 @@ export default function CoachInboxStackNavigator() {
       <Stack.Screen
         name="InboxHome"
         component={CoachHomeScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="CoachInboxHome"
+        component={CoachInboxScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="CoachMessageThread"
+        component={CoachMessageThreadScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

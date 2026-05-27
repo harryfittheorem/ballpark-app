@@ -11,7 +11,7 @@
 
 import { useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, Dumbbell, Send, Video } from 'lucide-react-native';
+import { ClipboardCheck, Dumbbell, Inbox, Send, Video } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
@@ -170,6 +170,12 @@ export default function CoachHomeScreen() {
                 />
               </>
             )}
+            <CoachActionCard
+              title="Inbox"
+              subtitle="Read messages and video clips from families."
+              icon={Inbox}
+              onPress={() => navigation.navigate('CoachInboxHome')}
+            />
           </View>
           <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
             <Text style={styles.signOutText}>Sign out</Text>

@@ -92,7 +92,7 @@ export default function CoachVideoPlaybackScreen() {
           onPress={goBack}
           accessibilityRole="button"
           accessibilityLabel="Close video"
-          hitSlop={12}
+          hitSlop={16}
           style={({ pressed }) => [styles.closeButton, pressed && styles.closePressed]}
         >
           <X size={22} color={colors.gold} />
@@ -145,6 +145,8 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
+    zIndex: 999,
+    elevation: 999,
   },
   closeButton: {
     margin: spacing.md,
