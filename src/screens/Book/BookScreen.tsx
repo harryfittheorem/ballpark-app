@@ -271,7 +271,6 @@ export default function BookScreen() {
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
       >
         {/* YOUR UPCOMING --------------------------------------------------- */}
         <View style={flowStyles.section}>
