@@ -2,7 +2,7 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { Calendar as CalendarIcon, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ScrollView as ScrollViewType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -194,6 +194,17 @@ export default function BookScreen() {
     }, 80);
   }, []);
 
+  // When the keyboard opens (user tapped a field in the BAF form), scroll
+  // to the end so the Confirm button stays visible above the keyboard.
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+    return () => sub.remove();
+  }, []);
+
   const resetSelection = useCallback(() => {
     setSelectedDate(null);
     setSelectedSlot(null);
@@ -246,6 +257,11 @@ export default function BookScreen() {
   return (
     <SafeAreaView style={flowStyles.safe} edges={['top']}>
       <BookHeader />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
       <ScrollView
         ref={scrollRef}
         style={flowStyles.scroll}
@@ -254,6 +270,7 @@ export default function BookScreen() {
           { paddingBottom: tabBarHeight + spacing['4xl'] },
         ]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* YOUR UPCOMING --------------------------------------------------- */}
         <View style={flowStyles.section}>
@@ -394,6 +411,7 @@ export default function BookScreen() {
           />
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Browse other dates — bottom-sheet modal -------------------------- */}
       <Modal

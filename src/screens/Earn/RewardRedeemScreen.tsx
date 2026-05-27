@@ -78,6 +78,7 @@ export default function RewardRedeemScreen({ route, navigation }: Props) {
   };
 
   const handleViewOrders = () => {
+    navigation.navigate('Me');
     navigation.navigate('Me', { screen: 'Orders' });
   };
 

@@ -218,6 +218,7 @@ export default function SummarySection({
         void qc.invalidateQueries({ queryKey: ['upcoming-session'] });
         void qc.invalidateQueries({ queryKey: ['family_bookings'] });
         void qc.invalidateQueries({ queryKey: activeMembershipKey(activeKid.id) });
+        void qc.invalidateQueries({ queryKey: ['family'] });
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Something went wrong.';
         setBafBookingError(
