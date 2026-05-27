@@ -2,21 +2,25 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { Send } from "lucide-react";
 import {
   reviewAssignment,
   type ReviewFormState,
 } from "./review-actions";
-import { fieldClasses } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
 
 const INITIAL: ReviewFormState = { error: null };
 
 function SubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={disabled || pending}>
+    <button
+      type="submit"
+      disabled={disabled || pending}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-gold bg-gold/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-gold transition-colors hover:bg-gold/20 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <Send size={11} />
       {pending ? "Saving…" : "Submit review"}
-    </Button>
+    </button>
   );
 }
 
@@ -49,7 +53,7 @@ export function ReviewForm({ assignmentId }: { assignmentId: string }) {
                 className={`flex h-10 w-10 items-center justify-center rounded-md border text-2xl leading-none transition-colors ${
                   active
                     ? "border-gold bg-gold/10 text-gold"
-                    : "border-border-gold bg-surface text-text-light/40 hover:border-gold/60"
+                    : "border-border-gold-strong bg-surface text-text-light/40 hover:border-gold/60"
                 }`}
               >
                 {active ? "★" : "☆"}
@@ -78,7 +82,8 @@ export function ReviewForm({ assignmentId }: { assignmentId: string }) {
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
           placeholder="What did they do well? What should they work on next?"
-          className={fieldClasses()}
+          className="w-full resize-none rounded-lg border border-gold/30 bg-darkest px-3.5 py-2.5 text-sm text-cream-light placeholder:text-text-light/50 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/40"
+          style={{ color: "#fdfbf2" }}
           required
         />
         <p className="text-xs text-text-light">
