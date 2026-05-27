@@ -12,7 +12,7 @@ type Props = { groups: MiaGroups };
 // ── Demo data ──────────────────────────────────────────────────────────────
 
 const mk = (id: string, name: string, age: string, parent: string, program: string, planType: 'eft' | 'otc', mrr: number, lifetime: number, lastSession: string, joined: string, score: number): OwnerMember => ({
-  id, kidId: id, name, age, parent, program, planType, status: 'active',
+  id, kidId: id, name, age, parent, parentEmail: '', parentPhone: null, program, planType, status: 'active',
   engagementScore: score, churnRisk: score < 40 ? 'high' : 'medium',
   lastSession, nextCharge: mrr > 0 ? 'Jun 5' : '—', mrr, lifetime, joinedDate: joined,
   cardLast4: null, cardBrand: null, cardExpMonth: null, cardExpYear: null,

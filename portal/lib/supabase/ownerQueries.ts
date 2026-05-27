@@ -59,6 +59,8 @@ export type OwnerMember = {
   name: string;
   age: string;
   parent: string;
+  parentEmail: string;
+  parentPhone: string | null;
   program: string;
   planType: 'eft' | 'otc';
   status: 'active' | 'at-risk' | 'paused' | 'cancelled' | 'payment_overdue';
@@ -173,14 +175,14 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
   const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(now); dayEnd.setHours(23, 59, 59, 999);
 
-  const [membershipsRes, failedRes, eventsRes, bookingsTodayRes, newSignupsRes, churnedMtdRes] = await Promise.all([
+  const [membershipsRes, failedRes, eventsRes, bookingsTodayRes, newSignupsRes, churnedMtdRes, lastBookingsRes] = await Promise.all([
     supabase
       .from('memberships')
       .select('id, status, amount_cents, kid_id, billing_anchor_day')
       .eq('tenant_id', tenantId),
     supabase
       .from('payment_events')
-      .select('id, amount_cents')
+      .select('id, amount_cents, membership_id')
       .eq('tenant_id', tenantId)
       .eq('status', 'failed')
       .gte('created_at', new Date(Date.now() - 30 * 86_400_000).toISOString()),
@@ -205,6 +207,13 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
       .eq('tenant_id', tenantId)
       .eq('status', 'cancelled')
       .gte('cancelled_at', monthStart.toISOString()),
+    supabase
+      .from('bookings')
+      .select('kid_id, scheduled_start')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'completed')
+      .order('scheduled_start', { ascending: false })
+      .limit(1000),
   ]);
 
   const memberships = membershipsRes.data ?? [];
@@ -258,12 +267,29 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
   const churnedMtd = churnedRows.length;
   const churnedMrrImpact = churnedRows.reduce((s, m) => s + (m.amount_cents ?? 0), 0) / 100;
 
+  // At-risk count: active/paused memberships where last completed booking > 21 days ago
+  // OR a payment failed in the last 30 days
+  const lastBookingByKidKpi: Record<string, string> = {};
+  for (const b of ((lastBookingsRes.data ?? []) as { kid_id: string; scheduled_start: string }[])) {
+    if (!lastBookingByKidKpi[b.kid_id]) lastBookingByKidKpi[b.kid_id] = b.scheduled_start;
+  }
+  const failedMembershipIds = new Set(
+    ((failedRes.data ?? []) as { membership_id: string | null }[])
+      .map(f => f.membership_id)
+      .filter(Boolean) as string[],
+  );
+  const atRiskMemberships = memberships.filter(m => m.status === 'active' || m.status === 'paused');
+  const atRiskCount = atRiskMemberships.filter(m => {
+    const days = daysSince(lastBookingByKidKpi[m.kid_id] ?? null);
+    return days > 21 || failedMembershipIds.has(m.id);
+  }).length;
+
   return {
     mrr,
     activeMembers,
     totalMembers,
     failedPaymentsCount: failedRes.data?.length ?? 0,
-    atRiskCount: 0,
+    atRiskCount,
     collectedMtd,
     autoPayRate,
     pastDue: failedMtd,
@@ -298,7 +324,7 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       sessions_remaining,
       sessions_total,
       kids!inner(first_name, last_name, age_group),
-      families!inner(parent_first_name, parent_last_name, card_last4, card_brand, card_exp_month, card_exp_year)
+      families!inner(parent_first_name, parent_last_name, parent_email, parent_phone, card_last4, card_brand, card_exp_month, card_exp_year)
     `)
     .eq('tenant_id', tenantId)
     .order('started_at', { ascending: false });
@@ -306,20 +332,29 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
   if (error || !rows) return [];
 
   const kidIds = [...new Set(rows.map(r => r.kid_id))];
+  const membershipIds = rows.map(r => r.id);
 
-  const { data: bookings } = await supabase
-    .from('bookings')
-    .select('kid_id, scheduled_start')
-    .eq('tenant_id', tenantId)
-    .eq('status', 'completed')
-    .in('kid_id', kidIds)
-    .order('scheduled_start', { ascending: false });
-
-  const { data: payments } = await supabase
-    .from('payment_events')
-    .select('membership_id, amount_cents, status')
-    .eq('tenant_id', tenantId)
-    .eq('status', 'paid');
+  const [{ data: bookings }, { data: payments }, { data: recentFailed }] = await Promise.all([
+    supabase
+      .from('bookings')
+      .select('kid_id, scheduled_start')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'completed')
+      .in('kid_id', kidIds)
+      .order('scheduled_start', { ascending: false }),
+    supabase
+      .from('payment_events')
+      .select('membership_id, amount_cents, status')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'paid'),
+    supabase
+      .from('payment_events')
+      .select('membership_id')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'failed')
+      .in('membership_id', membershipIds)
+      .gte('created_at', new Date(Date.now() - 30 * 86_400_000).toISOString()),
+  ]);
 
   const lastBookingByKid: Record<string, string> = {};
   for (const b of (bookings ?? [])) {
@@ -331,12 +366,15 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       lifetimeByMembership[p.membership_id] = (lifetimeByMembership[p.membership_id] ?? 0) + p.amount_cents;
     }
   }
+  const failedMembershipSet = new Set((recentFailed ?? []).map(f => f.membership_id).filter(Boolean));
 
   return rows.map(r => {
     const kid = r.kids as unknown as { first_name: string; last_name: string | null; age_group: string | null };
     const fam = r.families as unknown as {
       parent_first_name: string;
       parent_last_name: string | null;
+      parent_email: string;
+      parent_phone: string | null;
       card_last4: string | null;
       card_brand: string | null;
       card_exp_month: number | null;
@@ -344,10 +382,23 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
     };
     const lastTs = lastBookingByKid[r.kid_id] ?? null;
     const days = daysSince(lastTs);
-    const risk = churnRisk(days);
+    const hasFailedPayment = failedMembershipSet.has(r.id);
+    // Compute risk from session gap; also flag as high if payment failed regardless of session gap
+    const sessionRisk = churnRisk(days);
+    const risk: 'low' | 'medium' | 'high' = hasFailedPayment && sessionRisk !== 'high' ? 'high' : sessionRisk;
     const planType = r.plan_type as 'eft' | 'otc';
     const memberStatus = r.status === 'active' && risk === 'high' ? 'at-risk'
       : (r.status as 'active' | 'paused' | 'cancelled');
+
+    let riskReason: string | undefined;
+    if (risk === 'high' || risk === 'medium') {
+      const parts: string[] = [];
+      if (days < 9999) parts.push(`No session in ${days} day${days !== 1 ? 's' : ''}`);
+      if (hasFailedPayment) parts.push('last payment failed');
+      if (parts.length > 0) {
+        riskReason = parts.join(' · ') + (risk === 'high' ? '. Call within 48 hours.' : '. Send an engagement message.');
+      }
+    }
 
     return {
       id: r.id,
@@ -355,6 +406,8 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       name: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
       age: kid.age_group ?? '—',
       parent: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),
+      parentEmail: fam.parent_email ?? '',
+      parentPhone: fam.parent_phone ?? null,
       program: r.plan_name,
       planType,
       status: memberStatus,
@@ -365,11 +418,7 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       mrr: r.amount_cents / 100,
       lifetime: (lifetimeByMembership[r.id] ?? 0) / 100,
       joinedDate: formatJoinDate(r.started_at),
-      riskReason: risk === 'high'
-        ? `No session in ${days} days. Outreach recommended within 48 hours.`
-        : risk === 'medium'
-        ? `No session in ${days} days. Send an engagement message.`
-        : undefined,
+      riskReason,
       cardLast4: fam.card_last4 ?? null,
       cardBrand: fam.card_brand ?? null,
       cardExpMonth: fam.card_exp_month ?? null,
@@ -1221,7 +1270,7 @@ export async function getMemberDetail(
       weekly_sessions_used,
       weekly_period_start,
       kids!inner(id, first_name, last_name, age_group, points_balance),
-      families!inner(parent_first_name, parent_last_name, card_last4, card_brand, card_exp_month, card_exp_year)
+      families!inner(parent_first_name, parent_last_name, parent_email, parent_phone, card_last4, card_brand, card_exp_month, card_exp_year)
     `)
     .eq('tenant_id', tenantId)
     .eq('id', membershipId)
@@ -1239,6 +1288,8 @@ export async function getMemberDetail(
   const fam = mem.families as unknown as {
     parent_first_name: string;
     parent_last_name: string | null;
+    parent_email: string;
+    parent_phone: string | null;
     card_last4: string | null;
     card_brand: string | null;
     card_exp_month: number | null;
@@ -1392,6 +1443,8 @@ export async function getMemberDetail(
     name: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
     age: kid.age_group ?? '—',
     parent: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),
+    parentEmail: fam.parent_email ?? '',
+    parentPhone: fam.parent_phone ?? null,
     program: mem.plan_name,
     planType,
     status: memberStatus,

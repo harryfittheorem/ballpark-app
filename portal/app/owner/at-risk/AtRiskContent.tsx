@@ -6,20 +6,8 @@ import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, OCard, Chip } from '@/components/owner/ui';
 import { Send, Phone, Mail, Gift, Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
 import type { OwnerMember } from '@/lib/supabase/ownerQueries';
-import { DEMO_MEMBER_DETAILS } from '../members/[id]/demoMemberDetails';
 
 type Props = { members: OwnerMember[] };
-
-// ── Demo data ──────────────────────────────────────────────────────────────
-
-const DEMO_AT_RISK: OwnerMember[] = [
-  { id: 'd00', kidId: 'k00', name: 'Alex Owner Jr.',  age: '12U', parent: 'Owner Demo',      program: 'Unlimited Monthly',   planType: 'eft', status: 'active', engagementScore: 38, churnRisk: 'high',   lastSession: '31d ago', nextCharge: 'Overdue', mrr: 280, lifetime: 2240, joinedDate: 'May 2024', riskReason: '31 days without a session and one failed payment. This is your owner test account — use it to verify email delivery.',   cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
-  { id: 'd03', kidId: 'k03', name: 'Marcus Williams', age: '10U', parent: 'Darius Williams',  program: 'Unlimited Monthly',   planType: 'eft', status: 'active', engagementScore: 41, churnRisk: 'high',   lastSession: '28d ago', nextCharge: 'Overdue', mrr: 280, lifetime: 1680, joinedDate: 'Sep 2024', riskReason: '28 days without a session plus one failed payment. Historical data shows 88% churn probability at this stage.',            cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
-  { id: 'd02', kidId: 'k02', name: 'Tyler Johnson',   age: '14U', parent: 'Brad Johnson',      program: 'Team Training',        planType: 'eft', status: 'active', engagementScore: 60, churnRisk: 'high',   lastSession: '23d ago', nextCharge: 'Jun 5',   mrr: 450, lifetime: 5480, joinedDate: 'Mar 2024', riskReason: '23 days since last session. Members in Team Training who miss 3+ consecutive weeks churn 72% of the time.',             cardLast4: '5555', cardBrand: 'Mastercard', cardExpMonth: 6,    cardExpYear: 2028 },
-  { id: 'd11', kidId: 'k11', name: 'Owen Murphy',     age: '15U', parent: 'Patrick Murphy',    program: 'Team Training',        planType: 'eft', status: 'paused', engagementScore: 30, churnRisk: 'high',   lastSession: '35d ago', nextCharge: '—',       mrr: 0,   lifetime: 2250, joinedDate: 'May 2024', riskReason: '35 days inactive — critical window. Contact required today.',                                                               cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
-  { id: 'd05', kidId: 'k05', name: 'Ethan Brooks',    age: '13U', parent: 'Kevin Brooks',      program: 'Cage Rental Monthly',  planType: 'eft', status: 'active', engagementScore: 63, churnRisk: 'medium', lastSession: '16d ago', nextCharge: 'Jun 3',   mrr: 120, lifetime: 960,  joinedDate: 'Jul 2024', riskReason: 'Attendance dropped significantly compared to prior months. Targeted messaging recommended.',                               cardLast4: '4444', cardBrand: 'Mastercard', cardExpMonth: 8,    cardExpYear: 2027 },
-  { id: 'd06', kidId: 'k06', name: 'Noah Patel',      age: '11U', parent: 'Raj Patel',         program: 'Unlimited Monthly',   planType: 'eft', status: 'active', engagementScore: 55, churnRisk: 'medium', lastSession: '15d ago', nextCharge: 'Jun 8',   mrr: 280, lifetime: 2240, joinedDate: 'Jun 2024', riskReason: 'Missed last 3 scheduled sessions without notice. Progress highlights may help re-engage.',                               cardLast4: '1234', cardBrand: 'Visa',       cardExpMonth: 11,   cardExpYear: 2026 },
-];
 
 type LoadingKey = `${string}-email` | `${string}-free_session`;
 
@@ -34,10 +22,11 @@ export function AtRiskContent({ members: rawMembers }: Props) {
     if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }
   }, [toast]);
 
-  const hasLiveData = rawMembers.length > 0;
-  const source      = hasLiveData ? rawMembers : DEMO_AT_RISK;
-  const atRisk      = source.filter(m => (m.status === 'active' || m.status === 'paused') && (m.churnRisk === 'high' || m.churnRisk === 'medium'));
-  const totalMrr    = atRisk.reduce((s, m) => s + m.mrr, 0);
+  const atRisk = rawMembers.filter(
+    m => (m.status === 'active' || m.status === 'at-risk' || m.status === 'paused') &&
+         (m.churnRisk === 'high' || m.churnRisk === 'medium'),
+  );
+  const totalMrr = atRisk.reduce((s, m) => s + m.mrr, 0);
 
   const handleCampaign = () => {
     setToast(`Re-engagement campaign queued for ${atRisk.length} at-risk member${atRisk.length !== 1 ? 's' : ''} — emails will send within the hour`);
@@ -45,14 +34,11 @@ export function AtRiskContent({ members: rawMembers }: Props) {
 
   async function sendReengagement(m: OwnerMember, type: 'email' | 'free_session') {
     const key: LoadingKey = `${m.id}-${type}`;
-    const demoDetail = DEMO_MEMBER_DETAILS[m.id];
-    const parentEmail = demoDetail?.parentEmail ?? '';
+    const parentEmail = m.parentEmail;
     const kidName = m.name;
 
     if (!parentEmail) {
-      setToast(type === 'email'
-        ? `Re-engagement email not available for live members yet — contact ${m.parent} directly`
-        : `Free session offer not available for live members yet — contact ${m.parent} directly`);
+      setToast(`No email on file — contact ${m.parent} directly`);
       return;
     }
 
@@ -82,6 +68,14 @@ export function AtRiskContent({ members: rawMembers }: Props) {
     }
   }
 
+  function handleCallParent(m: OwnerMember) {
+    if (m.parentPhone) {
+      setToast(`${m.parent} · ${m.parentPhone}`);
+    } else {
+      setToast(`No phone on file for ${m.parent} — send an email instead`);
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -94,8 +88,8 @@ export function AtRiskContent({ members: rawMembers }: Props) {
         {atRisk.length === 0 ? (
           <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, padding: 40, textAlign: 'center' }}>
             <CheckCircle2 size={48} color={brand.success} style={{ margin: '0 auto 12px' }} />
-            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>All members are engaged</div>
-            <div style={{ fontSize: 12, color: brand.textMuted, marginTop: 4 }}>No members flagged as at-risk right now.</div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>No at-risk members — keep it up!</div>
+            <div style={{ fontSize: 12, color: brand.textMuted, marginTop: 4 }}>Every active member has engaged within the last 21 days and has no failed payments.</div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -136,13 +130,13 @@ export function AtRiskContent({ members: rawMembers }: Props) {
                         </div>
                         <div style={{ fontSize: 12, lineHeight: 1.5 }}>
                           {m.churnRisk === 'high'
-                            ? 'Personal call from coach within 48 hours. Offer a free comeback session. History shows 72% recovery rate when coach calls within 2 weeks of last session.'
-                            : 'Send targeted message with progress highlights. Members in this state respond to specific achievement reminders and personalised check-ins.'}
+                            ? 'Personal call from coach within 48 hours. Offer a free comeback session to get them back on the field.'
+                            : 'Send a targeted message with progress highlights. A personalised check-in now can prevent escalation.'}
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <OButton variant="gold"      size="sm" icon={Phone}  onClick={() => setToast(`Calling ${m.parent}… number copied to clipboard`)}>Call Parent</OButton>
+                        <OButton variant="gold" size="sm" icon={Phone} onClick={() => handleCallParent(m)}>Call Parent</OButton>
                         <OButton
                           variant="secondary" size="sm"
                           icon={emailLoading ? Loader2 : Mail}
@@ -159,7 +153,7 @@ export function AtRiskContent({ members: rawMembers }: Props) {
                         >
                           {freeLoading ? 'Sending…' : 'Offer Free Session'}
                         </OButton>
-                        <OButton variant="ghost"     size="sm"               onClick={() => router.push(`/owner/members/${m.id}`)}>View Profile →</OButton>
+                        <OButton variant="ghost" size="sm" onClick={() => router.push(`/owner/members/${m.id}`)}>View Profile →</OButton>
                       </div>
                     </div>
                   </div>
