@@ -30,7 +30,7 @@ const TABS: { key: SubTab; label: string }[] = [
   { key: 'rewards', label: 'Rewards' },
   { key: 'store', label: 'Store' },
   { key: 'ranks', label: 'Ranks' },
-  { key: 'rules', label: 'Earn' },
+  { key: 'rules', label: 'Rules' },
 ];
 
 export default function EarnScreen() {

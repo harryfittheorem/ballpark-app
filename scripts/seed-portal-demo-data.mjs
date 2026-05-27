@@ -189,25 +189,25 @@ const COACH_DEFS = [
 const FAMILY_DEFS = [
   // idx 0-2: Private Hitting Lessons, active, low-churn (recent session 2d ago)
   { pFirst: 'Carlos',  pLast: 'Rivera',   kFirst: 'Marcus',   kLast: 'Rivera',   age: '12U', pos: 'SS',   plan: 'Private Hitting Lessons', planType: 'eft', amt: 14900, status: 'active',    anchor: 1,  joined: 14, lastSession: 2  },
-  { pFirst: 'Rachel',  pLast: 'Lee',      kFirst: 'Jordan',   kLast: 'Lee',      age: '11U', pos: 'CF',   plan: 'Private Hitting Lessons', planType: 'eft', amt: 14900, status: 'active',    anchor: 4,  joined: 11, lastSession: 2  },
-  { pFirst: 'Wei',     pLast: 'Chen',     kFirst: 'Tyler',    kLast: 'Chen',     age: '13U', pos: '1B',   plan: 'Private Hitting Lessons', planType: 'eft', amt: 14900, status: 'active',    anchor: 7,  joined: 9,  lastSession: 2  },
+  { pFirst: 'Rachel',  pLast: 'Lee',      kFirst: 'Jordan',   kLast: 'Lee',      age: '10U', pos: 'CF',   plan: 'Private Hitting Lessons', planType: 'eft', amt: 14900, status: 'active',    anchor: 4,  joined: 11, lastSession: 2  },
+  { pFirst: 'Wei',     pLast: 'Chen',     kFirst: 'Tyler',    kLast: 'Chen',     age: '12U', pos: '1B',   plan: 'Private Hitting Lessons', planType: 'eft', amt: 14900, status: 'active',    anchor: 7,  joined: 9,  lastSession: 2  },
   // idx 3-5: Group Classes, active, medium-churn (10d ago)
   { pFirst: 'Priya',   pLast: 'Patel',    kFirst: 'Aria',     kLast: 'Patel',    age: '10U', pos: '2B',   plan: 'Group Classes',           planType: 'eft', amt:  7900, status: 'active',    anchor: 10, joined: 7,  lastSession: 10 },
   { pFirst: 'Mike',    pLast: 'Thompson', kFirst: 'Noah',     kLast: 'Thompson', age: '14U', pos: '3B',   plan: 'Group Classes',           planType: 'eft', amt:  7900, status: 'active',    anchor: 14, joined: 8,  lastSession: 10 },
-  { pFirst: 'Ana',     pLast: 'Garcia',   kFirst: 'Emma',     kLast: 'Garcia',   age: '9U',  pos: 'OF',   plan: 'Group Classes',           planType: 'eft', amt:  7900, status: 'active',    anchor: 18, joined: 5,  lastSession: 10 },
+  { pFirst: 'Ana',     pLast: 'Garcia',   kFirst: 'Emma',     kLast: 'Garcia',   age: '8U',  pos: 'OF',   plan: 'Group Classes',           planType: 'eft', amt:  7900, status: 'active',    anchor: 18, joined: 5,  lastSession: 10 },
   // idx 6-8: Team Training, active, high-churn (25d ago → at-risk)
-  { pFirst: 'David',   pLast: 'Johnson',  kFirst: 'Liam',     kLast: 'Johnson',  age: '15U+',pos: 'P',    plan: 'Team Training',           planType: 'eft', amt: 11900, status: 'active',    anchor: 20, joined: 18, lastSession: 25 },
-  { pFirst: 'Rosa',    pLast: 'Martinez', kFirst: 'Sofia',    kLast: 'Martinez', age: '11U', pos: 'C',    plan: 'Team Training',           planType: 'eft', amt: 11900, status: 'active',    anchor: 22, joined: 12, lastSession: 25 },
+  { pFirst: 'David',   pLast: 'Johnson',  kFirst: 'Liam',     kLast: 'Johnson',  age: 'HS',  pos: 'P',    plan: 'Team Training',           planType: 'eft', amt: 11900, status: 'active',    anchor: 20, joined: 18, lastSession: 25 },
+  { pFirst: 'Rosa',    pLast: 'Martinez', kFirst: 'Sofia',    kLast: 'Martinez', age: '10U', pos: 'C',    plan: 'Team Training',           planType: 'eft', amt: 11900, status: 'active',    anchor: 22, joined: 12, lastSession: 25 },
   { pFirst: 'James',   pLast: 'Williams', kFirst: 'Ethan',    kLast: 'Williams', age: '12U', pos: 'P',    plan: 'Team Training',           planType: 'eft', amt: 11900, status: 'active',    anchor: 25, joined: 10, lastSession: 25 },
   // idx 9: Cage Rental, OTC, active (3d ago)
   { pFirst: 'Lisa',    pLast: 'Brown',    kFirst: 'Olivia',   kLast: 'Brown',    age: '10U', pos: 'OF',   plan: 'Cage Rental',             planType: 'otc', amt:  4500, status: 'active',    anchor: null, joined: 6,  lastSession: 3  },
   // idx 10-11: Private Hitting, paused
-  { pFirst: 'Marcus',  pLast: 'Davis',    kFirst: 'Aiden',    kLast: 'Davis',    age: '13U', pos: 'SS',   plan: 'Private Hitting Lessons', planType: 'eft', amt: 14900, status: 'paused',    anchor: 28, joined: 15, lastSession: 45 },
+  { pFirst: 'Marcus',  pLast: 'Davis',    kFirst: 'Aiden',    kLast: 'Davis',    age: '12U', pos: 'SS',   plan: 'Private Hitting Lessons', planType: 'eft', amt: 14900, status: 'paused',    anchor: 28, joined: 15, lastSession: 45 },
   { pFirst: 'Diana',   pLast: 'Wilson',   kFirst: 'Isabella', kLast: 'Wilson',   age: '14U', pos: 'C',    plan: 'Private Hitting Lessons', planType: 'eft', amt: 14900, status: 'paused',    anchor: 6,  joined: 8,  lastSession: 45 },
   // idx 12-14: Cage Rental, cancelled
-  { pFirst: 'Robert',  pLast: 'Moore',    kFirst: 'Lucas',    kLast: 'Moore',    age: '11U', pos: '2B',   plan: 'Cage Rental',             planType: 'otc', amt:  4500, status: 'cancelled', anchor: null, joined: 20, lastSession: 90 },
+  { pFirst: 'Robert',  pLast: 'Moore',    kFirst: 'Lucas',    kLast: 'Moore',    age: '10U', pos: '2B',   plan: 'Cage Rental',             planType: 'otc', amt:  4500, status: 'cancelled', anchor: null, joined: 20, lastSession: 90 },
   { pFirst: 'Sandra',  pLast: 'Taylor',   kFirst: 'Mia',      kLast: 'Taylor',   age: '10U', pos: 'OF',   plan: 'Cage Rental',             planType: 'otc', amt:  4500, status: 'cancelled', anchor: null, joined: 4,  lastSession: 90 },
-  { pFirst: 'Kevin',   pLast: 'Anderson', kFirst: 'Logan',    kLast: 'Anderson', age: '15U+',pos: '1B',   plan: 'Cage Rental',             planType: 'otc', amt:  4500, status: 'cancelled', anchor: null, joined: 22, lastSession: 90 },
+  { pFirst: 'Kevin',   pLast: 'Anderson', kFirst: 'Logan',    kLast: 'Anderson', age: '14U', pos: '1B',   plan: 'Cage Rental',             planType: 'otc', amt:  4500, status: 'cancelled', anchor: null, joined: 22, lastSession: 90 },
 ];
 
 const PRODUCT_DEFS = [
@@ -513,12 +513,17 @@ console.log(`  ${todaySlots.length} today's bookings + ${bookingRows.length - to
 // migration was applied before this script was updated.
 
 console.log('\n─── TENANT SETTINGS ──────────────────────────────────────────────────');
-await restInsert('tenant_settings', {
-  tenant_id: TENANT_ID,
-  key:       'bring_a_friend_points',
-  value:     '100',
-});
-console.log('  bring_a_friend_points = 100 (idempotent)');
+try {
+  await restInsert('tenant_settings', {
+    tenant_id: TENANT_ID,
+    key:       'bring_a_friend_points',
+    value:     '100',
+  });
+  console.log('  bring_a_friend_points = 100 (idempotent)');
+} catch (e) {
+  console.warn(`  WARN: tenant_settings upsert skipped — ${e.message}`);
+  console.warn('        (table may not be in schema cache yet; safe to ignore)');
+}
 
 // =============================================================================
 // 6. Products (5 store items)
@@ -553,10 +558,8 @@ const ledgerRows = [];
 
 for (let i = 0; i < FAMILY_DEFS.length; i++) {
   const target = KID_POINTS[i];
-  // Weekly visit bonus tiers: 2 pts (1st), 3 pts (2nd), 5 pts (3rd+).
-  // Average over a realistic mix ≈ ~3.3 pts/visit. For seed purposes we use
-  // weekly_visit_bonus reason to reflect the new trigger, with a simplified
-  // +3 per entry so ledger totals are in plausible range.
+  // Use session_attended for visit credits (universally accepted reason since v0.5).
+  // Average ~3 pts/visit gives plausible ledger totals.
   const sessionCredits = Math.floor(target * 0.7 / 3);
   let balance = 0;
 
@@ -567,10 +570,10 @@ for (let i = 0; i < FAMILY_DEFS.length; i++) {
       tenant_id:      TENANT_ID,
       kid_id:         KID_IDS[i],
       delta:          3,
-      reason:         'weekly_visit_bonus',
-      reference_type: 'manual',
+      reason:         'session_attended',
+      reference_type: 'booking',
       balance_after:  balance,
-      note:           'Portal seed: weekly visit bonus',
+      note:           'Portal seed: session credit',
       created_at:     daysAgo(sessionCredits - j + 1),
     });
   }
