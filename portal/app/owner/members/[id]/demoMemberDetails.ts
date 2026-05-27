@@ -4,7 +4,8 @@ export type DemoMemberDetail = Omit<MemberDetail,
   'stripeSubscriptionId' | 'subscriptionStatus' | 'nextBillingAt' |
   'pauseStart' | 'pauseEnd' | 'pausedAt' |
   'cardLast4' | 'cardBrand' | 'cardExpMonth' | 'cardExpYear' |
-  'sessionsRemaining' | 'sessionsTotal'
+  'sessionsRemaining' | 'sessionsTotal' |
+  'weeklySessionsUsed' | 'weeklyTotal' | 'weeklyPeriodStart'
 > & {
   memberForMonths: number;
   bestVeloMph: number;
@@ -28,6 +29,9 @@ export type DemoMemberDetail = Omit<MemberDetail,
   cardExpYear?: number | null;
   sessionsRemaining?: number | null;
   sessionsTotal?: number | null;
+  weeklySessionsUsed?: number | null;
+  weeklyTotal?: number | null;
+  weeklyPeriodStart?: string | null;
 };
 
 function tl(id: string, kind: 'booking' | 'payment', daysAgo: number, title: string, subtitle: string, status: 'completed' | 'confirmed' | 'pending' | 'cancelled' | 'paid' | 'failed', amount?: number): TimelineEvent {

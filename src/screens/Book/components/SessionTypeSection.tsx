@@ -9,12 +9,19 @@ type Props = {
   selectedSessionTypeId: string | null;
   onSelect: (id: string) => void;
   categoryFilter?: 'all' | 'private' | 'group' | 'cage';
+  /**
+   * When provided, replaces the dollar-price display on every non-free
+   * session type card. Pass "1 credit" for OTC/EFT limited members,
+   * "Included" for EFT unlimited members, or null for non-members.
+   */
+  memberCreditLabel?: string | null;
 };
 
 export default function SessionTypeSection({
   selectedSessionTypeId,
   onSelect,
   categoryFilter = 'all',
+  memberCreditLabel,
 }: Props) {
   const { data: raw, isPending, isError, refetch, isRefetching } = useSessionTypes();
   const data =
@@ -66,6 +73,7 @@ export default function SessionTypeSection({
           basePriceCents={s.base_price_cents}
           typeCategory={s.type_category ?? 'private'}
           selected={selectedSessionTypeId === s.id}
+          priceOverride={memberCreditLabel}
           onPress={() => onSelect(s.id)}
         />
       ))}

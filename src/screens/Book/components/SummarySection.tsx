@@ -37,17 +37,11 @@ type Props = {
   onBafError?: () => void;
 };
 
-/** Extract a human-readable message from any thrown value (Error, PostgrestError, plain object, string, etc.)
- *
- * Supabase returns errors as plain objects {code, message, details, hint} — not always PostgrestError
- * instances. Some PostgREST error codes set `message` to "" and put the real text in `details`.
- * We drain all fields in order: message → details → hint → code → fallback.
- */
+/** Extract a human-readable message from any thrown value */
 function extractMessage(err: unknown): string {
   if (err === null || err === undefined) return 'Something went wrong.';
   if (typeof err === 'string') return err.trim() || 'Something went wrong.';
   if (typeof err === 'object') {
-    // Log the full error so Metro console shows exactly what Supabase returned
     console.error('[BAF] bookSessionWithFriend error:', JSON.stringify(err));
     const o = err as Record<string, unknown>;
     const pick = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
@@ -119,7 +113,7 @@ export default function SummarySection({
   const location = useActiveLocation();
   const coaches = useCoaches();
   const createBooking = useCreateBooking();
-  const { data: membership } = useActiveMembership();
+  const { data: membership, weeklyRemaining, weeklyTotal } = useActiveMembership();
   const joinWaitlist = useJoinWaitlist();
 
   const qc = useQueryClient();
@@ -168,36 +162,68 @@ export default function SummarySection({
 
   const dateLabel = ready ? formatDateLabel(date as string, tz) : null;
   const timeLabel = ready ? formatTimeLabel((slot as Slot).start, tz) : null;
-  const priceLabel = sessionType ? formatPriceUSD(sessionType.base_price_cents) : null;
 
+  // ── Membership-aware credit state ─────────────────────────────────────────
+  const hasMembership = !!membership;
+  const isFreeSession = sessionType?.base_price_cents === 0;
+
+  // OTC pack
   const isOtcPack =
     membership?.plan_type === 'otc' &&
     membership.sessions_remaining !== null &&
     membership.sessions_total !== null;
+  const otcRemaining = isOtcPack ? (membership!.sessions_remaining as number) : null;
+  const otcTotal     = isOtcPack ? (membership!.sessions_total as number) : null;
 
-  const sessionsRemaining = isOtcPack ? (membership!.sessions_remaining as number) : null;
-  const sessionsTotal     = isOtcPack ? (membership!.sessions_total as number) : null;
+  // EFT limited (has sessions_per_week)
+  const isEftLimited = membership?.plan_type === 'eft' && weeklyTotal !== null;
 
-  const outOfCredits = sessionsRemaining !== null && sessionsRemaining === 0;
+  // Out of credits check — covers both OTC and EFT limited
+  const outOfCredits =
+    (otcRemaining !== null && otcRemaining === 0) ||
+    (isEftLimited && weeklyRemaining !== null && weeklyRemaining === 0);
+
+  // Price label for solo booking
+  const priceLabel = useMemo((): string | null => {
+    if (!sessionType) return null;
+    if (isFreeSession) return 'Free';
+    // Members: show credit label instead of dollar
+    if (hasMembership) return '1 credit';
+    return formatPriceUSD(sessionType.base_price_cents);
+  }, [sessionType, hasMembership, isFreeSession]);
+
+  // Price label when BAF is opted in
+  const bafPriceLabel = useMemo((): string | null => {
+    if (!sessionType) return null;
+    if (isFreeSession) return 'Free';
+    if (hasMembership) return '2 credits';
+    return `${formatPriceUSD(sessionType.base_price_cents)} × 2 sessions`;
+  }, [sessionType, hasMembership, isFreeSession]);
 
   /**
-   * Bring-a-Friend eligibility (PRE-confirm, uses current balance):
+   * Bring-a-Friend eligibility:
    * - Member has >= 2 sessions available (or unlimited EFT)
-   * - Slot has >= 2 remaining spots (room for both bookings)
+   * - Slot has >= 2 remaining spots
    */
-  const bafEligible =
-    !slotIsFull &&
-    (slotRemainingSpots === null || slotRemainingSpots >= 2) &&
-    (sessionsRemaining === null || sessionsRemaining >= 2);
+  const bafEligible = useMemo((): boolean => {
+    if (slotIsFull) return false;
+    if (slotRemainingSpots !== null && slotRemainingSpots < 2) return false;
+    // OTC: need >= 2 remaining
+    if (otcRemaining !== null && otcRemaining < 2) return false;
+    // EFT limited: need >= 2 weekly remaining
+    if (isEftLimited && weeklyRemaining !== null && weeklyRemaining < 2) return false;
+    return true;
+  }, [slotIsFull, slotRemainingSpots, otcRemaining, isEftLimited, weeklyRemaining]);
 
-  // Credits after booking: -1 (primary) -1 (BAF) if opted in, else -1
-  const creditsAfterPrimary = sessionsRemaining !== null ? Math.max(0, sessionsRemaining - 1) : null;
-  const creditsAfterBaf     = sessionsRemaining !== null ? Math.max(0, sessionsRemaining - 2) : null;
+  // Credits preview after booking (used in OTC "After booking" row)
+  const creditsAfterPrimary = otcRemaining !== null ? Math.max(0, otcRemaining - 1) : null;
+  const creditsAfterBaf     = otcRemaining !== null ? Math.max(0, otcRemaining - 2) : null;
   const creditsDisplayAfter = bafOptedIn ? creditsAfterBaf : creditsAfterPrimary;
 
-  // Price label changes when BAF is opted in (2 sessions instead of 1)
-  const bafPriceLabel =
-    sessionType ? `${formatPriceUSD(sessionType.base_price_cents)} × 2 sessions` : null;
+  // Weekly credits after booking (EFT limited preview)
+  const weeklyAfterPrimary = weeklyRemaining !== null ? Math.max(0, weeklyRemaining - 1) : null;
+  const weeklyAfterBaf     = weeklyRemaining !== null ? Math.max(0, weeklyRemaining - 2) : null;
+  const weeklyDisplayAfter = bafOptedIn ? weeklyAfterBaf : weeklyAfterPrimary;
 
   useEffect(() => {
     setBookingResult(null);
@@ -230,7 +256,7 @@ export default function SummarySection({
 
     formattedWhenRef.current = `${dateLabel} at ${timeLabel}`;
 
-    // ── BAF path: atomic RPC (deducts 2 credits, creates both bookings, awards points) ──
+    // ── BAF path ─────────────────────────────────────────────────────────────
     if (bafOptedIn) {
       setBafPending(true);
       try {
@@ -271,7 +297,7 @@ export default function SummarySection({
       return;
     }
 
-    // ── Normal path: useCreateBooking (deducts 1 credit) ─────────────────────
+    // ── Normal path ──────────────────────────────────────────────────────────
     const insert = {
       tenant_id:       family!.tenant_id,
       location_id:     location.data!.id,
@@ -328,10 +354,12 @@ export default function SummarySection({
     );
   };
 
-  // Post-booking success screen — BAF path
+  // Post-booking success — BAF path
   if (bafResult !== null) {
-    const balanceAfter = bafResult.sessions_remaining;
-    const showBalance  = isOtcPack && balanceAfter >= 0;
+    const otcBalanceAfter = bafResult.sessions_remaining;
+    const weeklyBalanceAfter = bafResult.weekly_sessions_remaining;
+    const showOtcBalance  = isOtcPack && otcBalanceAfter >= 0;
+    const showEftBalance  = isEftLimited && weeklyBalanceAfter >= 0 && weeklyTotal !== null;
     return (
       <SectionCard title="Summary" locked={false}>
         <View style={styles.confirmedBlock}>
@@ -343,11 +371,18 @@ export default function SummarySection({
               ✓ Friend spot reserved · +100 points earned
             </Text>
           </View>
-          {showBalance ? (
+          {showOtcBalance ? (
             <View style={styles.balanceBox}>
-              <Text style={styles.balanceLabel}>Sessions remaining</Text>
-              <Text style={styles.balanceNumber}>{balanceAfter}</Text>
-              <Text style={styles.balanceOf}>of {sessionsTotal}</Text>
+              <Text style={styles.balanceLabel}>Credits remaining</Text>
+              <Text style={styles.balanceNumber}>{otcBalanceAfter}</Text>
+              <Text style={styles.balanceOf}>of {otcTotal}</Text>
+            </View>
+          ) : null}
+          {showEftBalance ? (
+            <View style={styles.balanceBox}>
+              <Text style={styles.balanceLabel}>Credits this week</Text>
+              <Text style={styles.balanceNumber}>{weeklyBalanceAfter}</Text>
+              <Text style={styles.balanceOf}>of {weeklyTotal} remaining</Text>
             </View>
           ) : null}
           <Button label="Done" onPress={handleDone} variant="primary" />
@@ -356,21 +391,31 @@ export default function SummarySection({
     );
   }
 
-  // Post-booking success screen — normal path
+  // Post-booking success — normal path
   if (bookingResult !== null) {
-    const balanceAfter = bookingResult.sessionsRemaining;
-    const showBalance  = isOtcPack && balanceAfter >= 0;
+    const otcBalanceAfter    = bookingResult.sessionsRemaining;
+    const showOtcBalance     = isOtcPack && otcBalanceAfter >= 0;
+    // weeklyRemaining from the hook already reflects the latest DB state after
+    // invalidation; show it if this is an EFT limited membership.
+    const showEftBalance     = isEftLimited && weeklyTotal !== null;
     return (
       <SectionCard title="Summary" locked={false}>
         <View style={styles.confirmedBlock}>
           <Text style={styles.confirmedTitle}>Session booked!</Text>
           <Text style={styles.confirmedWhen}>{formattedWhenRef.current}</Text>
           <Text style={styles.confirmedProvider}>Infinite Hitting</Text>
-          {showBalance ? (
+          {showOtcBalance ? (
             <View style={styles.balanceBox}>
-              <Text style={styles.balanceLabel}>Sessions remaining</Text>
-              <Text style={styles.balanceNumber}>{balanceAfter}</Text>
-              <Text style={styles.balanceOf}>of {sessionsTotal}</Text>
+              <Text style={styles.balanceLabel}>Credits remaining</Text>
+              <Text style={styles.balanceNumber}>{otcBalanceAfter}</Text>
+              <Text style={styles.balanceOf}>of {otcTotal}</Text>
+            </View>
+          ) : null}
+          {showEftBalance ? (
+            <View style={styles.balanceBox}>
+              <Text style={styles.balanceLabel}>Credits this week</Text>
+              <Text style={styles.balanceNumber}>{weeklyRemaining ?? '—'}</Text>
+              <Text style={styles.balanceOf}>of {weeklyTotal} remaining</Text>
             </View>
           ) : null}
           <Button label="Done" onPress={handleDone} variant="primary" />
@@ -396,13 +441,13 @@ export default function SummarySection({
               <SummaryLine
                 label="Price"
                 value={bafOptedIn ? (bafPriceLabel as string) : (priceLabel as string)}
-                valueStyle={bafOptedIn ? styles.lineValueGold : undefined}
+                valueStyle={hasMembership && !isFreeSession ? styles.lineValueGold : undefined}
               />
             ) : (
               <SummaryLine label="Status" value="Session Full — Waitlist" />
             )}
 
-            {/* Kid selector row — only shown when family has multiple kids */}
+            {/* Kid selector — only shown when family has multiple kids */}
             {multipleKids ? (
               <View style={styles.kidRow}>
                 <Text style={styles.lineLabel}>BOOKING FOR</Text>
@@ -420,20 +465,33 @@ export default function SummarySection({
               </View>
             ) : null}
 
-            {/* Pack balance preview — updates based on BAF selection */}
-            {!slotIsFull && isOtcPack && sessionsRemaining !== null && sessionsTotal !== null ? (
+            {/* OTC pack balance preview */}
+            {!slotIsFull && isOtcPack && otcRemaining !== null && otcTotal !== null ? (
               <SummaryLine
                 label="After booking"
                 value={
                   outOfCredits
-                    ? 'No sessions remaining'
-                    : `${creditsDisplayAfter as number} of ${sessionsTotal} remaining`
+                    ? 'No credits remaining'
+                    : `${creditsDisplayAfter as number} of ${otcTotal} remaining`
                 }
                 valueStyle={outOfCredits ? styles.lineValueDanger : styles.lineValueGold}
               />
             ) : null}
 
-            {/* Bring-a-Friend section — shown pre-confirm when eligible */}
+            {/* EFT limited: weekly credit indicator */}
+            {!slotIsFull && isEftLimited && weeklyRemaining !== null && weeklyTotal !== null ? (
+              <SummaryLine
+                label="This week"
+                value={
+                  outOfCredits
+                    ? 'No credits remaining this week'
+                    : `${weeklyDisplayAfter as number} of ${weeklyTotal} remaining${bafOptedIn ? ' after' : ''}`
+                }
+                valueStyle={outOfCredits ? styles.lineValueDanger : styles.lineValueGold}
+              />
+            ) : null}
+
+            {/* Bring-a-Friend */}
             {bafEligible && !slotIsFull ? (
               <View style={styles.bafSection}>
                 <Pressable
@@ -548,7 +606,9 @@ export default function SummarySection({
                 {outOfCredits && ready ? (
                   <View style={styles.errorBlock}>
                     <Text style={styles.errorText}>
-                      You&apos;ve used all your sessions. Contact the front desk to add more.
+                      {isEftLimited
+                        ? 'You\'ve used all your credits for this week. Come back Monday!'
+                        : 'You\'ve used all your session credits. Contact the front desk to add more.'}
                     </Text>
                   </View>
                 ) : null}
@@ -568,7 +628,9 @@ export default function SummarySection({
                 {noCreditsVisible ? (
                   <View style={styles.errorBlock}>
                     <Text style={styles.errorText}>
-                      You&apos;ve used all your sessions. Contact the front desk to add more.
+                      {isEftLimited
+                        ? 'You\'ve used all your credits for this week. Come back Monday!'
+                        : 'You\'ve used all your session credits. Contact the front desk to add more.'}
                     </Text>
                   </View>
                 ) : null}
@@ -745,7 +807,6 @@ const styles = StyleSheet.create({
   lineValueDanger: {
     color: colors.danger,
   },
-  // Bring-a-Friend (pre-confirm)
   bafSection: {
     marginTop: spacing.base,
     borderRadius: radius['2xl'],
@@ -854,7 +915,6 @@ const styles = StyleSheet.create({
     color: colors.danger,
     textAlign: 'center',
   },
-  // Post-booking success state
   confirmedBlock: {
     gap: spacing.xl,
     alignItems: 'center',
@@ -923,7 +983,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     color: colors.textMuted,
   },
-  // Kid picker modal
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',

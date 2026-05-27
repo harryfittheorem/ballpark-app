@@ -363,6 +363,65 @@ function SessionsOverrideSection({ member }: { member: MemberDetail }) {
   );
 }
 
+function EftWeeklyCreditsSection({ member }: { member: MemberDetail }) {
+  if (
+    member.planType !== 'eft' ||
+    member.weeklyTotal === null ||
+    member.weeklySessionsUsed === null
+  ) return null;
+
+  const used    = member.weeklySessionsUsed;
+  const total   = member.weeklyTotal;
+  const remaining = Math.max(0, total - used);
+  const pct     = total > 0 ? Math.round((remaining / total) * 100) : 0;
+  const monday  = member.weeklyPeriodStart;
+
+  return (
+    <div>
+      <SectionHeader title="Weekly Credits" />
+      <OCard style={{ padding: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <Package size={14} color={brand.gold} />
+          <span style={{ fontSize: 11, color: brand.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+            {member.program}
+          </span>
+        </div>
+
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+            <span style={{
+              fontSize: 24,
+              fontWeight: 800,
+              fontFamily: fonts.display,
+              color: remaining === 0 ? brand.danger : brand.text,
+            }}>
+              {remaining}
+            </span>
+            <span style={{ fontSize: 11, color: brand.textMuted }}>
+              of {total} remaining this week
+            </span>
+          </div>
+          <div style={{ height: 6, background: brand.surfaceAlt, borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: `${pct}%`,
+              background: remaining === 0 ? brand.danger : brand.success,
+              borderRadius: 4,
+              transition: 'width 0.3s ease',
+            }} />
+          </div>
+        </div>
+
+        {monday && (
+          <div style={{ fontSize: 10, color: brand.textMuted, marginTop: 8 }}>
+            Week starting {monday} · Resets every Monday.
+          </div>
+        )}
+      </OCard>
+    </div>
+  );
+}
+
 function SubscriptionSection({ member }: { member: MemberDetail }) {
   const [cancelling, setCancelling] = useState(false);
   const [cancelDone, setCancelDone] = useState<string | null>(null);
@@ -969,6 +1028,11 @@ export function MemberDetailContent({ member: m }: Props) {
           {/* Session Pack credits — OTC members only (Task #237) */}
           {!demo && (
             <SessionsOverrideSection member={m as MemberDetail} />
+          )}
+
+          {/* Weekly credit usage — EFT limited members only */}
+          {!demo && (
+            <EftWeeklyCreditsSection member={m as MemberDetail} />
           )}
 
           {/* Subscription (Phase 3) */}

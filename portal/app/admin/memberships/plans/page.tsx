@@ -23,6 +23,7 @@ type PlanRow = {
   description: string | null;
   sort_order: number;
   is_active: boolean;
+  sessions_per_week: number | null;
   created_at: string;
 };
 
@@ -30,8 +31,10 @@ function fmtPrice(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-function fmtPlanType(type: "eft" | "otc"): string {
-  return type === "eft" ? "EFT (Recurring)" : "OTC (Pack)";
+function fmtPlanType(row: PlanRow): string {
+  if (row.plan_type === "otc") return "OTC (Pack)";
+  if (row.sessions_per_week) return `EFT · ${row.sessions_per_week} sessions/week`;
+  return "EFT (Unlimited)";
 }
 
 export default async function MembershipPlansPage({
@@ -53,7 +56,7 @@ export default async function MembershipPlansPage({
 
   const { data, error } = await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
     .from("membership_plans")
-    .select("id, name, plan_type, amount_cents, description, sort_order, is_active, created_at")
+    .select("id, name, plan_type, amount_cents, description, sort_order, is_active, sessions_per_week, created_at")
     .eq("tenant_id", tenantId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
@@ -141,6 +144,16 @@ export default async function MembershipPlansPage({
               defaultValue={10}
               required
               helper="Lower numbers appear first. Use 10, 20, 30… to leave room."
+            />
+            <Input
+              id="sessions_per_week"
+              name="sessions_per_week"
+              label="Sessions / Week (EFT only)"
+              type="number"
+              min={1}
+              step={1}
+              placeholder="e.g. 2"
+              helper="Leave blank for unlimited. Only applies to EFT plans — ignored for OTC."
             />
           </div>
           <div>
@@ -242,7 +255,7 @@ function PlanCard({ row }: { row: PlanRow }) {
           <p className="text-sm text-gold">
             {fmtPrice(row.amount_cents)}{" "}
             <span className="text-text-light">·</span>{" "}
-            {fmtPlanType(row.plan_type)}{" "}
+            {fmtPlanType(row)}{" "}
             <span className="text-text-light">· Sort {row.sort_order}</span>
           </p>
           {row.description && (

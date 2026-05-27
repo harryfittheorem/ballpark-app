@@ -1139,10 +1139,16 @@ export type MemberDetail = OwnerMember & {
   pauseEnd: string | null;
   /** Timestamp when the pause was initiated. Null if not paused. */
   pausedAt: string | null;
-  /** OTC pack members only. Null for EFT unlimited memberships. */
+  /** OTC pack members only. Null for EFT memberships. */
   sessionsRemaining: number | null;
-  /** OTC pack members only. Null for EFT unlimited memberships. */
+  /** OTC pack members only. Null for EFT memberships. */
   sessionsTotal: number | null;
+  /** EFT limited: credits used in the current weekly period. Null for OTC or unlimited EFT. */
+  weeklySessionsUsed: number | null;
+  /** EFT limited: sessions_per_week allowance for the plan. Null for OTC or unlimited EFT. */
+  weeklyTotal: number | null;
+  /** EFT limited: Monday (YYYY-MM-DD) that starts the current weekly period. Null otherwise. */
+  weeklyPeriodStart: string | null;
 };
 
 export async function getMemberDetail(
@@ -1170,6 +1176,9 @@ export async function getMemberDetail(
       paused_at,
       sessions_total,
       sessions_remaining,
+      sessions_per_week,
+      weekly_sessions_used,
+      weekly_period_start,
       kids!inner(id, first_name, last_name, age_group, points_balance),
       families!inner(parent_first_name, parent_last_name, card_last4, card_brand, card_exp_month, card_exp_year)
     `)
@@ -1373,8 +1382,15 @@ export async function getMemberDetail(
     cardBrand: fam.card_brand ?? null,
     cardExpMonth: fam.card_exp_month ?? null,
     cardExpYear: fam.card_exp_year ?? null,
-    sessionsRemaining: (mem.sessions_remaining as number | null) ?? null,
-    sessionsTotal: (mem.sessions_total as number | null) ?? null,
+    sessionsRemaining:   (mem.sessions_remaining   as number | null) ?? null,
+    sessionsTotal:       (mem.sessions_total        as number | null) ?? null,
+    weeklySessionsUsed:  mem.plan_type === 'eft' && (mem.sessions_per_week as number | null)
+      ? ((mem.weekly_sessions_used as number | null) ?? 0)
+      : null,
+    weeklyTotal:         (mem.sessions_per_week as number | null) ?? null,
+    weeklyPeriodStart:   mem.plan_type === 'eft'
+      ? ((mem.weekly_period_start as string | null) ?? null)
+      : null,
   };
 }
 

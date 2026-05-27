@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       .single(),
     serviceClient
       .from('membership_plans')
-      .select('id, name, plan_type, amount_cents')
+      .select('id, name, plan_type, amount_cents, sessions_per_week')
       .eq('id', plan_id)
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
@@ -266,16 +266,31 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 9. Create membership row ──────────────────────────────────────────
+    const typedPlan = plan as { name: string; plan_type: string; amount_cents: number; sessions_per_week: number | null };
+    const isEft = typedPlan.plan_type === 'eft';
+    const currentMonday = (() => {
+      const d = new Date();
+      const day = d.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      d.setDate(d.getDate() + diff);
+      return d.toISOString().slice(0, 10);
+    })();
+
     const { data: newMembership, error: memErr } = await serviceClient
       .from('memberships')
       .insert({
         family_id: familyId,
         kid_id: kidId,
         tenant_id: tenantId,
-        plan_name: (plan as { name: string }).name,
-        plan_type: (plan as { plan_type: string }).plan_type,
+        plan_name: typedPlan.name,
+        plan_type: typedPlan.plan_type,
         status: 'pending',
-        amount_cents: (plan as { amount_cents: number }).amount_cents,
+        amount_cents: typedPlan.amount_cents,
+        ...(isEft && typedPlan.sessions_per_week != null ? {
+          sessions_per_week: typedPlan.sessions_per_week,
+          weekly_period_start: currentMonday,
+          weekly_sessions_used: 0,
+        } : {}),
       })
       .select('id')
       .single();

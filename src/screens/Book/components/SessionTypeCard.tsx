@@ -18,6 +18,12 @@ type Props = {
   basePriceCents: number;
   selected: boolean;
   typeCategory?: TypeCategory;
+  /**
+   * When provided, replaces the dollar-price display.
+   * Pass "1 credit", "Included", etc. for members.
+   * Non-members receive null/undefined and see the dollar amount.
+   */
+  priceOverride?: string | null;
   onPress: () => void;
 };
 
@@ -55,8 +61,15 @@ export default function SessionTypeCard({
   basePriceCents,
   selected,
   typeCategory = 'private',
+  priceOverride,
   onPress,
 }: Props) {
+  // Free sessions always show "Free" regardless of membership status
+  const isFree = basePriceCents === 0;
+  const displayPrice = isFree
+    ? 'Free'
+    : (priceOverride ?? formatPrice(basePriceCents));
+
   return (
     <Pressable
       onPress={onPress}
@@ -67,7 +80,7 @@ export default function SessionTypeCard({
       ]}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${name}, ${formatDuration(durationMinutes)}, ${formatPrice(basePriceCents)}`}
+      accessibilityLabel={`${name}, ${formatDuration(durationMinutes)}, ${displayPrice}`}
     >
       <View style={styles.iconWrap}>
         <CategoryIcon typeCategory={typeCategory} selected={selected} />
@@ -79,7 +92,7 @@ export default function SessionTypeCard({
         {formatDuration(durationMinutes)}
       </Text>
       <Text style={[styles.price, selected && styles.priceSelected]}>
-        {formatPrice(basePriceCents)}
+        {displayPrice}
       </Text>
     </Pressable>
   );

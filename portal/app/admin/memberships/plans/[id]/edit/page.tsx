@@ -1,8 +1,9 @@
 /**
  * /admin/memberships/plans/[id]/edit — Edit an existing membership plan.
  *
- * Lets staff update the name, plan type, price, description, and sort order
- * of any plan in their tenant. Active/inactive toggle stays on the list page.
+ * Lets staff update the name, plan type, price, description, sort order,
+ * and sessions-per-week allowance. Active/inactive toggle stays on the
+ * list page.
  */
 
 import Link from "next/link";
@@ -22,6 +23,7 @@ type PlanRow = {
   description: string | null;
   sort_order: number;
   is_active: boolean;
+  sessions_per_week: number | null;
 };
 
 export default async function EditMembershipPlanPage({
@@ -47,7 +49,7 @@ export default async function EditMembershipPlanPage({
 
   const { data, error } = await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
     .from("membership_plans")
-    .select("id, name, plan_type, amount_cents, description, sort_order, is_active")
+    .select("id, name, plan_type, amount_cents, description, sort_order, is_active, sessions_per_week")
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .maybeSingle();
@@ -65,8 +67,8 @@ export default async function EditMembershipPlanPage({
           Edit Plan
         </h1>
         <p className="mt-1 text-sm text-text-light">
-          Update the name, type, price, description, or display order.
-          Active/inactive status is toggled from the{" "}
+          Update the name, type, price, description, display order, or weekly
+          session allowance. Active/inactive status is toggled from the{" "}
           <Link
             href="/admin/memberships/plans"
             className="text-gold hover:underline"
@@ -125,6 +127,17 @@ export default async function EditMembershipPlanPage({
               required
               defaultValue={row.sort_order}
               helper="Lower numbers appear first."
+            />
+            <Input
+              id="sessions_per_week"
+              name="sessions_per_week"
+              label="Sessions / Week (EFT only)"
+              type="number"
+              min={1}
+              step={1}
+              defaultValue={row.sessions_per_week ?? undefined}
+              placeholder="Leave blank for unlimited"
+              helper="Blank = unlimited. Only applies to EFT — ignored for OTC."
             />
           </div>
           <div>

@@ -28,6 +28,13 @@ function parseCents(raw: string | null): number | null {
   return Math.round(dollars * 100);
 }
 
+function parseSessionsPerWeek(raw: string | null | undefined): number | null {
+  if (!raw || raw.trim() === "") return null;
+  const n = parseInt(raw.trim(), 10);
+  if (isNaN(n) || n < 1) return null;
+  return n;
+}
+
 export async function createMembershipPlan(formData: FormData) {
   const { supabase, tenantId } = await requireAdmin();
 
@@ -36,6 +43,7 @@ export async function createMembershipPlan(formData: FormData) {
   const priceRaw = formData.get("amount_dollars") as string | null;
   const description = (formData.get("description") as string | null)?.trim() || null;
   const sortOrderRaw = (formData.get("sort_order") as string | null)?.trim();
+  const sessionsPerWeekRaw = formData.get("sessions_per_week") as string | null;
 
   const BASE = "/admin/memberships/plans";
 
@@ -53,6 +61,10 @@ export async function createMembershipPlan(formData: FormData) {
     redirect(`${BASE}?error=Sort+order+must+be+a+whole+number`);
   }
 
+  // sessions_per_week only applies to EFT plans
+  const sessionsPerWeek =
+    planType === "eft" ? parseSessionsPerWeek(sessionsPerWeekRaw) : null;
+
   const { error } = await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
     .from("membership_plans")
     .insert({
@@ -63,6 +75,7 @@ export async function createMembershipPlan(formData: FormData) {
       description,
       sort_order: sortOrder,
       is_active: true,
+      sessions_per_week: sessionsPerWeek,
     });
 
   if (error) {
@@ -84,6 +97,7 @@ export async function updateMembershipPlan(formData: FormData) {
   const priceRaw = formData.get("amount_dollars") as string | null;
   const description = (formData.get("description") as string | null)?.trim() || null;
   const sortOrderRaw = (formData.get("sort_order") as string | null)?.trim();
+  const sessionsPerWeekRaw = formData.get("sessions_per_week") as string | null;
 
   const BASE = "/admin/memberships/plans";
 
@@ -102,6 +116,9 @@ export async function updateMembershipPlan(formData: FormData) {
     redirect(`${BASE}/${id}/edit?error=Sort+order+must+be+a+whole+number`);
   }
 
+  const sessionsPerWeek =
+    planType === "eft" ? parseSessionsPerWeek(sessionsPerWeekRaw) : null;
+
   const { error } = await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
     .from("membership_plans")
     .update({
@@ -110,6 +127,7 @@ export async function updateMembershipPlan(formData: FormData) {
       amount_cents: amountCents,
       description,
       sort_order: sortOrder,
+      sessions_per_week: sessionsPerWeek,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

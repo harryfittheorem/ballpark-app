@@ -16,6 +16,7 @@ import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/th
 import BookHeader from './components/BookHeader';
 import DateSection from './components/DateSection';
 import MultiDaySlotList from './components/MultiDaySlotList';
+import SessionTypeSection from './components/SessionTypeSection';
 import SummarySection from './components/SummarySection';
 import TimeSection from './components/TimeSection';
 import { useSessionTypes } from './hooks/useSessionTypes';
@@ -87,7 +88,7 @@ export default function BookScreen() {
   const cageRentalEnabled = (activeLocationData.data as { cage_rental_enabled?: boolean } | null)
     ?.cage_rental_enabled ?? false;
 
-  const { data: membership } = useActiveMembership();
+  const { data: membership, weeklyRemaining, weeklyTotal } = useActiveMembership();
   const sessionsRemaining =
     membership?.sessions_remaining !== undefined && membership?.sessions_remaining !== null
       ? membership.sessions_remaining
@@ -249,10 +250,48 @@ export default function BookScreen() {
   const summaryLocked =
     !selectedSessionTypeId || !selectedDate || !selectedSlot || !selectedCoachId;
 
-  const creditsLabel =
-    sessionsRemaining !== null
-      ? `${sessionsRemaining} lesson${sessionsRemaining === 1 ? '' : 's'} remaining`
+  // Sessions total from the pack (OTC)
+  const sessionsTotal =
+    membership?.sessions_total !== undefined && membership?.sessions_total !== null
+      ? membership.sessions_total
       : null;
+
+  // Credit banner:
+  //   OTC pack    → "N of T credits remaining"
+  //   EFT limited → "N of T credits this week"
+  //   EFT unlimited → "Membership active"
+  //   No membership → null (no banner)
+  // Label passed to session type cards for member price display
+  // OTC and EFT-limited → "1 credit"; EFT-unlimited → "Included"; no membership → null
+  const memberCreditLabel: string | null = (() => {
+    if (!membership) return null;
+    if (membership.plan_type === 'otc') return '1 credit';
+    if (membership.plan_type === 'eft') {
+      return membership.sessions_per_week != null ? '1 credit' : 'Included';
+    }
+    return null;
+  })();
+
+  // Non-cage session types — shown as selectable cards (step 1 of booking flow)
+  const nonCageTypes = useMemo(
+    () => (sessionTypes ?? []).filter((s) => s.type_category !== 'cage'),
+    [sessionTypes],
+  );
+  const showSessionTypeCards = !cageMode && nonCageTypes.length > 1;
+
+  const creditsLabel = (() => {
+    if (!membership) return null;
+    if (membership.plan_type === 'otc' && sessionsRemaining !== null && sessionsTotal !== null) {
+      return `${sessionsRemaining} of ${sessionsTotal} credit${sessionsTotal === 1 ? '' : 's'} remaining`;
+    }
+    if (membership.plan_type === 'eft') {
+      if (weeklyTotal !== null && weeklyRemaining !== null) {
+        return `${weeklyRemaining} of ${weeklyTotal} credit${weeklyTotal === 1 ? '' : 's'} this week`;
+      }
+      return 'Membership active';
+    }
+    return null;
+  })();
 
   return (
     <SafeAreaView style={flowStyles.safe} edges={['top']}>
@@ -357,6 +396,24 @@ export default function BookScreen() {
                 CAGE RENTALS
               </Text>
             </Pressable>
+          </View>
+        ) : null}
+
+        {/* SESSION TYPE SELECTION — shown when > 1 non-cage type available ── */}
+        {showSessionTypeCards ? (
+          <View style={flowStyles.section}>
+            <Text style={shellStyles.sectionLabel}>SELECT SESSION TYPE</Text>
+            <SessionTypeSection
+              selectedSessionTypeId={selectedSessionTypeId}
+              onSelect={(id) => {
+                setSelectedSessionTypeId(id);
+                setSelectedDate(null);
+                setSelectedSlot(null);
+                setSelectedCoachId(null);
+              }}
+              categoryFilter="all"
+              memberCreditLabel={memberCreditLabel}
+            />
           </View>
         ) : null}
 

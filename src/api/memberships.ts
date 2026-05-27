@@ -19,8 +19,19 @@ export type ActiveMembership = {
   plan_name: string;
   plan_type: 'eft' | 'otc';
   status: string;
+  /** OTC pack: total sessions in the pack. Null for EFT. */
   sessions_total: number | null;
+  /** OTC pack: sessions remaining. Null for EFT. */
   sessions_remaining: number | null;
+  /**
+   * EFT limited: max sessions allowed per week.
+   * Null = unlimited EFT (no enforcement).
+   */
+  sessions_per_week: number | null;
+  /** EFT: sessions already used in the current weekly period. */
+  weekly_sessions_used: number;
+  /** EFT: ISO date string of Monday that starts the current period. */
+  weekly_period_start: string | null;
   started_at: string;
 };
 
@@ -29,14 +40,20 @@ const untypedClient = supabase as unknown as SupabaseClient;
 /**
  * Fetch the most-recent active membership for the given kid + tenant.
  * Returns null if the kid has no active membership.
+ *
+ * Includes EFT weekly-credit fields added in migration
+ * 20260610000000_eft_weekly_credits.sql — accessed via untyped client
+ * until the next generated-types regen.
  */
 export async function getActiveMembership(
   kidId: string,
   tenantId: string,
 ): Promise<ActiveMembership | null> {
-  const { data, error } = await supabase
+  const { data, error } = await untypedClient
     .from('memberships')
-    .select('id, plan_name, plan_type, status, sessions_total, sessions_remaining, started_at')
+    .select(
+      'id, plan_name, plan_type, status, sessions_total, sessions_remaining, sessions_per_week, weekly_sessions_used, weekly_period_start, started_at',
+    )
     .eq('kid_id', kidId)
     .eq('tenant_id', tenantId)
     .eq('status', 'active')
@@ -44,13 +61,25 @@ export async function getActiveMembership(
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  return data as ActiveMembership | null;
+  if (!data) return null;
+  const row = data as Record<string, unknown>;
+  return {
+    id:                   row.id as string,
+    plan_name:            row.plan_name as string,
+    plan_type:            row.plan_type as 'eft' | 'otc',
+    status:               row.status as string,
+    sessions_total:       (row.sessions_total as number | null) ?? null,
+    sessions_remaining:   (row.sessions_remaining as number | null) ?? null,
+    sessions_per_week:    (row.sessions_per_week as number | null) ?? null,
+    weekly_sessions_used: (row.weekly_sessions_used as number) ?? 0,
+    weekly_period_start:  (row.weekly_period_start as string | null) ?? null,
+    started_at:           row.started_at as string,
+  };
 }
 
 /**
  * Pre-booking check: returns the number of sessions remaining for the kid's
- * active OTC pack, or -1 if the kid has no tracked OTC membership (EFT
- * unlimited counts as -1 = no restriction).
+ * active OTC pack, or EFT weekly allowance, or -1 if unlimited.
  *
  * Call this BEFORE inserting the booking to give the user a clear
  * error before hitting the DB.  The real race-condition guard lives in
@@ -71,7 +100,7 @@ export async function checkSessionCredits(
 /**
  * Atomically decrement the kid's session credit by 1.
  * Returns the new (post-decrement) balance, or -1 for unlimited.
- * Throws if sessions_remaining is already 0.
+ * Throws if sessions are already exhausted.
  */
 export async function deductSessionCredit(bookingId: string): Promise<number> {
   const { data, error } = await untypedClient.rpc('deduct_session_credit', {
@@ -111,18 +140,20 @@ export async function restoreSessionCredit(bookingId: string): Promise<number> {
 /**
  * Atomically book a primary session + a guest (Bring-a-Friend) in one
  * database transaction:
- *   1. Deduct 2 credits (FOR UPDATE lock)
+ *   1. Deduct 2 credits (OTC or EFT weekly, FOR UPDATE lock)
  *   2. Insert primary booking row (is_guest = false)
  *   3. Insert guest booking row  (is_guest = true)
  *   4. Insert points_ledger +100, reason = 'bring_a_friend'
  *
- * Returns { primary_booking_id, guest_booking_id, sessions_remaining }.
+ * Returns { primary_booking_id, guest_booking_id, sessions_remaining,
+ *           weekly_sessions_remaining }.
  * Throws 'no_session_credits' if balance < 2.
  */
 export type BookWithFriendResult = {
   primary_booking_id: string;
   guest_booking_id: string;
   sessions_remaining: number;
+  weekly_sessions_remaining: number;
 };
 
 export async function bookSessionWithFriend(params: {
@@ -150,11 +181,17 @@ export async function bookSessionWithFriend(params: {
     p_guest_email:      params.guest_email ?? null,
   });
   if (error) throw error;
-  const row = data as { primary_booking_id: string; guest_booking_id: string; sessions_remaining: number };
+  const row = data as {
+    primary_booking_id: string;
+    guest_booking_id: string;
+    sessions_remaining: number;
+    weekly_sessions_remaining?: number;
+  };
   return {
-    primary_booking_id: row.primary_booking_id,
-    guest_booking_id:   row.guest_booking_id,
-    sessions_remaining: typeof row.sessions_remaining === 'number' ? row.sessions_remaining : -1,
+    primary_booking_id:        row.primary_booking_id,
+    guest_booking_id:          row.guest_booking_id,
+    sessions_remaining:        typeof row.sessions_remaining === 'number' ? row.sessions_remaining : -1,
+    weekly_sessions_remaining: typeof row.weekly_sessions_remaining === 'number' ? row.weekly_sessions_remaining : -1,
   };
 }
 
