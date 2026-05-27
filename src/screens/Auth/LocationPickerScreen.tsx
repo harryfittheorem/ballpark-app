@@ -17,6 +17,8 @@ import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
 import type { AuthStackScreenProps } from '@/navigation/types';
 
+const TENANT_SLUG = process.env.EXPO_PUBLIC_TENANT_SLUG ?? '';
+
 type LocationRow = {
   id: string;
   name: string;
@@ -41,13 +43,35 @@ export default function LocationPickerScreen({ route, navigation }: Props) {
   useEffect(() => {
     async function fetchLocations() {
       try {
+        // In single-tenant builds, resolve the tenant UUID first so we can
+        // filter locations to only that tenant's active facilities.
+        // Fail-closed: if the tenant slug cannot be resolved, surface an error
+        // and do NOT fall back to an unfiltered query.
+        let singleTenantId: string | null = null;
+        if (TENANT_SLUG) {
+          const { data: tenantRows, error: tenantErr } = await supabase
+            .from('tenants')
+            .select('id')
+            .eq('slug', TENANT_SLUG)
+            .limit(1);
+          if (tenantErr) throw tenantErr;
+          singleTenantId = tenantRows?.[0]?.id ?? null;
+          if (!singleTenantId) {
+            throw new Error('Facility configuration error. Please contact support.');
+          }
+        }
+
         // Two queries: locations (anon can read active), then tenants for slugs.
-        const { data: locs, error: locsErr } = await supabase
+        let locsQuery = supabase
           .from('locations')
           .select('id, name, city, state, tenant_id')
-          // @ts-expect-error is_active exists in DB but is not yet in generated types
-          .eq('is_active', true)
           .order('name');
+
+        if (singleTenantId) {
+          locsQuery = locsQuery.eq('tenant_id', singleTenantId);
+        }
+
+        const { data: locs, error: locsErr } = await locsQuery;
 
         if (locsErr) throw locsErr;
         if (!locs || locs.length === 0) {

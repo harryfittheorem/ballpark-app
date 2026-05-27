@@ -381,14 +381,12 @@ export default function ProfileScreen({ navigation }: Props) {
           }
           onPress={() => navigation.navigate('PaymentMethod')}
         />
-        {primaryLocation?.name ? (
-          <Row
-            icon={MapPin}
-            label="My Location"
-            subtitle={primaryLocation.name}
-            subtitleTone="muted"
-          />
-        ) : null}
+        <Row
+          icon={MapPin}
+          label="My Location"
+          subtitle={primaryLocation?.name ?? '—'}
+          subtitleTone="muted"
+        />
         <Row
           icon={Activity}
           label="HitTrax"

@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { signUpParent } from '@/api/auth';
 import { Button, Input } from '@/components/ui';
+import { supabase } from '@/lib/supabase';
 import type { AuthStackScreenProps } from '@/navigation/types';
 import {
   signUpSchema,
@@ -46,27 +47,57 @@ export default function SignUpScreen({ navigation }: Props) {
 
   const onSubmit = handleSubmit(async (values) => {
     try {
+      const signUpData = {
+        email: values.email,
+        password: values.password,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phone: values.phone,
+      };
+
       if (TENANT_SLUG) {
-        // Single-tenant build: sign up directly with baked-in slug.
+        // Single-tenant build: resolve locations for this tenant first.
+        // Fail-closed: if the tenant or its locations cannot be resolved, block signup.
+        const { data: tenantRows, error: tenantErr } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('slug', TENANT_SLUG)
+          .limit(1);
+
+        if (tenantErr) throw tenantErr;
+
+        const tenantId = tenantRows?.[0]?.id ?? null;
+        if (!tenantId) {
+          throw new Error('Facility configuration error. Please contact support.');
+        }
+
+        const { data: locs, error: locsErr } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .order('name');
+
+        if (locsErr) throw locsErr;
+
+        if (!locs || locs.length === 0) {
+          throw new Error('No active locations are available. Please contact support.');
+        }
+
+        if (locs.length > 1) {
+          // Multiple locations — let the parent choose.
+          navigation.navigate('LocationPicker', { signUpData });
+          return;
+        }
+
+        // Exactly one location — auto-select and skip the picker.
         await signUpParent({
-          email: values.email,
-          password: values.password,
-          firstName: values.firstName,
-          lastName: values.lastName,
-          phone: values.phone,
+          ...signUpData,
+          locationId: locs[0].id,
         });
         // Auth state listener routes us into the app.
       } else {
         // Multi-tenant: navigate to location picker first.
-        navigation.navigate('LocationPicker', {
-          signUpData: {
-            email: values.email,
-            password: values.password,
-            firstName: values.firstName,
-            lastName: values.lastName,
-            phone: values.phone,
-          },
-        });
+        navigation.navigate('LocationPicker', { signUpData });
       }
     } catch (err) {
       Alert.alert('Sign-up failed', errorMessage(err));
