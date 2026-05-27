@@ -3,48 +3,58 @@
 import Link from 'next/link';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, SectionHeader, OCard } from '@/components/owner/ui';
-import { TrendingUp, TrendingDown, Clock, DollarSign, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, DollarSign, Download, Info } from 'lucide-react';
 import type { RetentionData } from '@/lib/supabase/ownerQueries';
 
 type Props = { data: RetentionData };
 
 const COHORT_MONTHS = ['M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9'];
 
-// ── Demo data ──────────────────────────────────────────────────────────────
+// ── Demo data — only shown when the tenant has zero membership records ───────
 
 const DEMO_DATA: RetentionData = {
+  hasMemberships: false,
   retentionRate: 91.2,
   avgLifetimeMonths: 14.3,
+  churnedMtd: 2,
   cohortRetention: [
-    { cohort: 'May 2025',  size: 18, retention: [100, 94, 89, 83, 78, 78, 78, 78,   undefined as unknown as number, undefined as unknown as number] },
-    { cohort: 'Jun 2025',  size: 14, retention: [100, 93, 86, 79, 79, 79, 79, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number] },
-    { cohort: 'Jul 2025',  size: 21, retention: [100, 95, 90, 86, 86, 86, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number] },
-    { cohort: 'Aug 2025',  size: 16, retention: [100, 94, 88, 88, 88, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number] },
-    { cohort: 'Sep 2025',  size: 19, retention: [100, 89, 84, 84, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number] },
-    { cohort: 'Oct 2025',  size: 22, retention: [100, 95, 91, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number] },
-    { cohort: 'Nov 2025',  size: 17, retention: [100, 94, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number] },
-    { cohort: 'Dec 2025',  size: 12, retention: [100, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number, undefined as unknown as number] },
+    { cohort: 'May 2025', size: 18, retention: [100, 94,   89,   83,   78,   78,   78,   78,   null, null] },
+    { cohort: 'Jun 2025', size: 14, retention: [100, 93,   86,   79,   79,   79,   79,   null, null, null] },
+    { cohort: 'Jul 2025', size: 21, retention: [100, 95,   90,   86,   86,   86,   null, null, null, null] },
+    { cohort: 'Aug 2025', size: 16, retention: [100, 94,   88,   88,   88,   null, null, null, null, null] },
+    { cohort: 'Sep 2025', size: 19, retention: [100, 89,   84,   84,   null, null, null, null, null, null] },
+    { cohort: 'Oct 2025', size: 22, retention: [100, 95,   91,   null, null, null, null, null, null, null] },
+    { cohort: 'Nov 2025', size: 17, retention: [100, 94,   null, null, null, null, null, null, null, null] },
+    { cohort: 'Dec 2025', size: 12, retention: [100, null, null, null, null, null, null, null, null, null] },
   ],
   churnReasons: [
-    { reason: 'Schedule conflict / too busy',          count: 8,  pct: 38 },
-    { reason: 'Cost / financial reasons',              count: 5,  pct: 24 },
-    { reason: 'Athlete lost interest in baseball',     count: 4,  pct: 19 },
-    { reason: 'Relocated or moved away',               count: 2,  pct: 10 },
-    { reason: 'Switched to team practice only',        count: 2,  pct: 10 },
+    { reason: 'Schedule conflict / too busy',      count: 8, pct: 38 },
+    { reason: 'Cost / financial reasons',          count: 5, pct: 24 },
+    { reason: 'Athlete lost interest in baseball', count: 4, pct: 19 },
+    { reason: 'Relocated or moved away',           count: 2, pct: 10 },
+    { reason: 'Switched to team practice only',    count: 2, pct: 10 },
+  ],
+  programBreakdown: [
+    { name: 'EFT Monthly',  retentionRate: 91.2 },
+    { name: 'OTC Packages', retentionRate: 80.0 },
   ],
 };
 
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function RetentionContent({ data: rawData }: Props) {
-  const hasLiveData = rawData.avgLifetimeMonths > 0 || rawData.cohortRetention.length > 0;
-  const data = hasLiveData ? rawData : DEMO_DATA;
+  const isDemo = !rawData.hasMemberships;
+  const data = isDemo ? DEMO_DATA : rawData;
 
-  const { retentionRate, avgLifetimeMonths, cohortRetention, churnReasons } = data;
+  const { retentionRate, avgLifetimeMonths, cohortRetention, churnReasons, programBreakdown } = data;
   const churnRate = Math.round((100 - retentionRate) * 10) / 10;
   const avgLtv = (avgLifetimeMonths * 280).toFixed(0);
 
   const activeChurnReasons = churnReasons.filter(r => r.count > 0);
+
+  // How many cohorts have at least M1 data (i.e., history >= 2 months)
+  const cohortsWithHistory = cohortRetention.filter(c => c.retention[1] !== null).length;
+  const isSparse = !isDemo && cohortsWithHistory < 3;
 
   return (
     <div>
@@ -55,6 +65,21 @@ export function RetentionContent({ data: rawData }: Props) {
       />
 
       <div style={{ padding: 24 }}>
+
+        {isDemo && (
+          <div style={{ marginBottom: 20, padding: '10px 14px', background: brand.infoBg, borderRadius: 8, fontSize: 12, color: brand.text, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Info size={14} color={brand.goldDeep} style={{ flexShrink: 0 }} />
+            <span><strong>Sample data</strong> — no memberships found for this tenant. Add members to see real cohort analytics.</span>
+          </div>
+        )}
+
+        {isSparse && (
+          <div style={{ marginBottom: 20, padding: '10px 14px', background: brand.infoBg, borderRadius: 8, fontSize: 12, color: brand.text, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Info size={14} color={brand.goldDeep} style={{ flexShrink: 0 }} />
+            <span><strong>Building history…</strong> — {cohortsWithHistory === 0 ? 'cohort data will appear' : `${cohortsWithHistory} month${cohortsWithHistory === 1 ? '' : 's'} of cohort data so far`}. Cells marked <strong>—</strong> will fill in as more time passes.</span>
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           <KPICard label="Retention Rate"        value={`${retentionRate}%`}          icon={TrendingUp}   color="success"  delta={1.8}  deltaLabel="vs last month" />
           <KPICard label="Churn Rate (Monthly)"  value={`${churnRate}%`}              icon={TrendingDown}  color={churnRate > 5 ? 'warning' : 'success'} delta={-0.4} deltaLabel="vs last month" deltaInvert />
@@ -113,18 +138,24 @@ export function RetentionContent({ data: rawData }: Props) {
             <div style={{ marginTop: 20 }}>
               <SectionHeader title="Retention by Program" />
               <OCard>
-                {[
-                  { name: 'EFT Monthly',  retention: retentionRate, color: retentionRate >= 85 ? brand.success : brand.warning },
-                  { name: 'OTC Packages', retention: 80,            color: brand.warning },
-                ].map((p, i, arr) => (
-                  <div key={i} style={{ padding: '10px 0', borderBottom: i < arr.length - 1 ? `1px solid ${brand.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{p.name}</div>
-                    <div style={{ flex: 1, height: 8, background: brand.border, borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ width: `${p.retention}%`, height: '100%', background: p.color }} />
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, fontFamily: fonts.display, color: p.color, width: 60, textAlign: 'right' }}>{p.retention}%</div>
+                {programBreakdown.length === 0 ? (
+                  <div style={{ fontSize: 12, color: brand.textMuted, textAlign: 'center', padding: 16 }}>
+                    No program data yet.
                   </div>
-                ))}
+                ) : (
+                  programBreakdown.map((p, i, arr) => {
+                    const color = p.retentionRate >= 85 ? brand.success : brand.warning;
+                    return (
+                      <div key={i} style={{ padding: '10px 0', borderBottom: i < arr.length - 1 ? `1px solid ${brand.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{p.name}</div>
+                        <div style={{ flex: 1, height: 8, background: brand.border, borderRadius: 4, overflow: 'hidden' }}>
+                          <div style={{ width: `${p.retentionRate}%`, height: '100%', background: color }} />
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 700, fontFamily: fonts.display, color, width: 60, textAlign: 'right' }}>{p.retentionRate}%</div>
+                      </div>
+                    );
+                  })
+                )}
               </OCard>
             </div>
           </div>
