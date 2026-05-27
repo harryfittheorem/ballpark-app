@@ -228,7 +228,7 @@ export default function VideoPlaybackScreen() {
     );
   }
 
-  if (!video || video.status !== 'ready' || !video.muxPlaybackId) {
+  if (!video || !video.muxPlaybackId) {
     return (
       <View style={styles.messageWrap}>
         <ActivityIndicator size="large" color={colors.gold} style={styles.processingSpinner} />
