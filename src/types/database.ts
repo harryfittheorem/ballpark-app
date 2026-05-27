@@ -307,7 +307,11 @@ export type Database = {
           cancelled_at: string | null
           coach_id: string
           created_at: string
+          guest_email: string | null
+          guest_name: string | null
+          guest_phone: string | null
           id: string
+          is_guest: boolean
           kid_id: string
           location_id: string
           notes: string | null
@@ -326,7 +330,11 @@ export type Database = {
           cancelled_at?: string | null
           coach_id: string
           created_at?: string
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
           id?: string
+          is_guest?: boolean
           kid_id: string
           location_id: string
           notes?: string | null
@@ -345,7 +353,11 @@ export type Database = {
           cancelled_at?: string | null
           coach_id?: string
           created_at?: string
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
           id?: string
+          is_guest?: boolean
           kid_id?: string
           location_id?: string
           notes?: string | null
@@ -1031,6 +1043,7 @@ export type Database = {
       locations: {
         Row: {
           address: string | null
+          cage_rental_enabled: boolean
           city: string | null
           created_at: string
           email: string | null
@@ -1049,6 +1062,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          cage_rental_enabled?: boolean
           city?: string | null
           created_at?: string
           email?: string | null
@@ -1067,6 +1081,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          cage_rental_enabled?: boolean
           city?: string | null
           created_at?: string
           email?: string | null
@@ -2159,6 +2174,21 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string; p_video_id: string }
         Returns: boolean
       }
+      book_session_with_friend: {
+        Args: {
+          p_coach_id: string
+          p_guest_email?: string
+          p_guest_name: string
+          p_guest_phone?: string
+          p_kid_id: string
+          p_location_id: string
+          p_scheduled_end: string
+          p_scheduled_start: string
+          p_session_type_id: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       cancel_assignment_for_coach: {
         Args: { p_assignment_id: string }
         Returns: string
@@ -2204,6 +2234,10 @@ export type Database = {
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       deduct_session_credit: { Args: { p_booking_id: string }; Returns: number }
+      deduct_session_credits: {
+        Args: { p_kid_id: string; p_n: number }
+        Returns: number
+      }
       expire_stale_waitlist_entries: { Args: never; Returns: undefined }
       gen_redemption_code: { Args: never; Returns: string }
       get_coach_hours: {
