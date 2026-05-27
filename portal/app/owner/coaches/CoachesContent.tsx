@@ -16,7 +16,7 @@ const DEMO_COACHES: OwnerCoach[] = [
   { id: 'c1', userId: null, name: 'Mike Rodriguez',  specialty: 'Hitting / Power',       students: 48, utilization: 92, retention: 94, avgRating: 4.9, revenue: 13440, weeklyHours: 38, joinedDate: 'Jan 2023', preset: 'staff' },
   { id: 'c2', userId: null, name: 'Sarah Kim',       specialty: 'Pitching / Mechanics',  students: 41, utilization: 85, retention: 91, avgRating: 4.8, revenue: 11480, weeklyHours: 34, joinedDate: 'Mar 2023', preset: 'instructor' },
   { id: 'c3', userId: null, name: 'Dave Thompson',   specialty: 'Fielding / Speed',      students: 36, utilization: 78, retention: 88, avgRating: 4.7, revenue: 10080, weeklyHours: 30, joinedDate: 'Aug 2023', preset: 'instructor' },
-  { id: 'c4', userId: null, name: 'Jess Morales',    specialty: 'Catching / Defence',    students: 22, utilization: 68, retention: 86, avgRating: 4.6, revenue: 6160,  weeklyHours: 22, joinedDate: 'Feb 2024', preset: 'instructor' },
+  { id: 'c4', userId: null, name: 'Jess Morales',    specialty: 'Catching / Defence',    students: 22, utilization: 68, retention: 86, avgRating: null, revenue: 0,     weeklyHours: 22, joinedDate: 'Feb 2024', preset: 'instructor' },
 ];
 
 const inputStyle: React.CSSProperties = {
@@ -213,12 +213,27 @@ export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
     },
     {
       label: 'Rating', key: 'avgRating', align: 'right',
-      render: (r) => (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-          <Star size={12} color={brand.goldDeep} fill={brand.goldDeep} />
-          <span style={{ fontWeight: 700, fontFamily: fonts.display }}>{r.avgRating as number}</span>
-        </div>
-      ),
+      render: (r) => {
+        const rating = r.avgRating as number | null;
+        if (rating === null) return <span style={{ color: brand.textMuted, fontFamily: fonts.mono }}>–</span>;
+        return (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <Star size={12} color={brand.goldDeep} fill={brand.goldDeep} />
+            <span style={{ fontWeight: 700, fontFamily: fonts.display }}>{rating.toFixed(1)}</span>
+          </div>
+        );
+      },
+    },
+    {
+      label: 'Revenue (90d)', key: 'revenue', align: 'right',
+      render: (r) => {
+        const rev = r.revenue as number;
+        return (
+          <span style={{ fontFamily: fonts.mono, fontWeight: 700, color: rev > 0 ? brand.text : brand.textMuted }}>
+            {rev > 0 ? `$${rev.toLocaleString()}` : '–'}
+          </span>
+        );
+      },
     },
     {
       label: 'Hours/wk', key: 'weeklyHours', align: 'right',

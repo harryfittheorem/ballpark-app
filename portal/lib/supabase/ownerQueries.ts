@@ -87,7 +87,7 @@ export type OwnerCoach = {
   students: number;
   utilization: number;
   retention: number;
-  avgRating: number;
+  avgRating: number | null;
   revenue: number;
   weeklyHours: number;
   joinedDate: string;
@@ -386,48 +386,89 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
 export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string): Promise<OwnerCoach[]> {
   const { data: coaches, error } = await supabase
     .from('coaches')
-    .select('id, user_id, first_name, last_name, is_active, created_at, capabilities')
+    .select('id, user_id, first_name, last_name, specialty, is_active, created_at, capabilities')
     .eq('tenant_id', tenantId)
     .eq('is_active', true);
 
   if (error || !coaches) return [];
 
   const coachIds = coaches.map(c => c.id);
-  const { data: bookings } = await supabase
-    .from('bookings')
-    .select('coach_id, kid_id, status, scheduled_start')
-    .eq('tenant_id', tenantId)
-    .in('coach_id', coachIds)
-    .gte('scheduled_start', new Date(Date.now() - 90 * 86_400_000).toISOString());
+  const coachUserIds = coaches
+    .map(c => (c as unknown as { user_id: string | null }).user_id)
+    .filter((id): id is string => !!id);
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
+
+  const [bookingsRes, assignmentsRes] = await Promise.all([
+    supabase
+      .from('bookings')
+      .select('coach_id, kid_id, status, scheduled_start, session_types(base_price_cents)')
+      .eq('tenant_id', tenantId)
+      .in('coach_id', coachIds)
+      .gte('scheduled_start', ninetyDaysAgo),
+    coachUserIds.length > 0
+      ? supabase
+          .from('assignments')
+          .select('coach_user_id, rating')
+          .eq('tenant_id', tenantId)
+          .in('coach_user_id', coachUserIds)
+          .eq('status', 'reviewed')
+          .not('rating', 'is', null)
+      : Promise.resolve({ data: [] as { coach_user_id: string; rating: number }[], error: null }),
+  ]);
+
+  type BookingRow = {
+    coach_id: string;
+    kid_id: string;
+    status: string;
+    scheduled_start: string;
+    session_types: { base_price_cents: number } | null;
+  };
 
   const sessionsByCoach: Record<string, Set<string>> = {};
   const studentsByCoach: Record<string, Set<string>> = {};
-  for (const b of (bookings ?? [])) {
+  const revenueByCoach: Record<string, number> = {};
+  for (const b of (bookingsRes.data ?? []) as unknown as BookingRow[]) {
     if (!sessionsByCoach[b.coach_id]) sessionsByCoach[b.coach_id] = new Set();
     sessionsByCoach[b.coach_id].add(b.scheduled_start);
     if (!studentsByCoach[b.coach_id]) studentsByCoach[b.coach_id] = new Set();
     studentsByCoach[b.coach_id].add(b.kid_id);
+    if (b.status === 'completed' && b.session_types) {
+      revenueByCoach[b.coach_id] = (revenueByCoach[b.coach_id] ?? 0) + b.session_types.base_price_cents;
+    }
+  }
+
+  const ratingsByCoachUser: Record<string, number[]> = {};
+  for (const a of (assignmentsRes.data ?? []) as { coach_user_id: string; rating: number }[]) {
+    if (!ratingsByCoachUser[a.coach_user_id]) ratingsByCoachUser[a.coach_user_id] = [];
+    ratingsByCoachUser[a.coach_user_id].push(a.rating);
   }
 
   return coaches.map(c => {
+    const raw = c as unknown as { user_id: string | null; specialty?: string | null; capabilities?: { preset?: string } };
     const sessions = sessionsByCoach[c.id]?.size ?? 0;
     const students = studentsByCoach[c.id]?.size ?? 0;
     const weeklyHours = Math.round((sessions / 13) * 1.5);
     const utilization = Math.min(100, Math.round((sessions / Math.max(sessions + 5, 40)) * 100));
 
-    const raw = c as unknown as { user_id: string | null; capabilities?: { preset?: string } };
-    const preset =
-      raw.capabilities?.preset === 'staff' ? 'staff' : 'instructor';
+    const ratings = raw.user_id ? (ratingsByCoachUser[raw.user_id] ?? []) : [];
+    const avgRating = ratings.length > 0
+      ? Math.round(ratings.reduce((s, r) => s + r, 0) / ratings.length * 10) / 10
+      : null;
+
+    const revenue = Math.round((revenueByCoach[c.id] ?? 0) / 100);
+    const specialty = raw.specialty?.trim() || 'Coach';
+    const preset = raw.capabilities?.preset === 'staff' ? 'staff' : 'instructor';
+
     return {
       id: c.id,
       userId: raw.user_id ?? null,
       name: `${c.first_name} ${c.last_name}`,
-      specialty: 'Hitting Coach',
+      specialty,
       students,
       utilization,
       retention: 90,
-      avgRating: 4.8,
-      revenue: 0,
+      avgRating,
+      revenue,
       weeklyHours,
       joinedDate: formatJoinDate(c.created_at ?? new Date().toISOString()),
       preset: preset as 'instructor' | 'staff',
