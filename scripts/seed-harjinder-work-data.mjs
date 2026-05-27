@@ -565,6 +565,92 @@ if (!hasVideoMsg) {
 console.log(`   coach_messages: ${msgInserted} inserted, ${msgSkipped} already existed`);
 
 // ---------------------------------------------------------------------------
+// 10. Active membership for Harry Singh (Membership screen)
+// ---------------------------------------------------------------------------
+console.log('\n→ Seeding active membership...');
+
+// Check for an existing active/paused membership for this family+kid.
+// memberships has no unique constraint on (family_id, kid_id) so we do a
+// manual existence check and skip insert if already present.
+const existingMemberships = await rest(
+  'GET',
+  `memberships?family_id=eq.${familyId}&kid_id=eq.${kidId}&status=in.(active,paused)&select=id,plan_name,status`,
+);
+
+if (existingMemberships.length > 0) {
+  console.log(`   membership: already exists (${existingMemberships[0].plan_name}, ${existingMemberships[0].status}) — skipped`);
+} else {
+  const membershipRow = {
+    tenant_id:          TENANT_ID,
+    family_id:          familyId,
+    kid_id:             kidId,
+    plan_name:          'Elite Monthly',
+    plan_type:          'eft',
+    status:             'active',
+    amount_cents:       19900,
+    billing_anchor_day: 1,
+    started_at:         '2025-01-01T00:00:00Z',
+    contract_url:       'https://infinitehitting.com/contracts/sample-elite.pdf',
+    pause_start:        null,
+    pause_end:          null,
+  };
+
+  const mbrRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/memberships`,
+    {
+      method: 'POST',
+      headers: { ...headers, Prefer: 'return=minimal' },
+      body: JSON.stringify(membershipRow),
+    },
+  );
+  const mbrText = await mbrRes.text();
+  if (!mbrRes.ok) {
+    throw new Error(`memberships insert → ${mbrRes.status}: ${mbrText}`);
+  }
+  console.log('   membership: inserted (Elite Monthly, $199.00/mo, active, billing anchor day 1)');
+}
+
+// ---------------------------------------------------------------------------
+// 11. Ensure an upgrade plan exists (amount_cents > 19900 and is_active)
+//     The 20260607000000 migration seeds "Elite — Unlimited" at $249/mo.
+//     This step is a safety net in case the plans seed hasn't run yet.
+// ---------------------------------------------------------------------------
+console.log('\n→ Checking for upgrade plan...');
+
+const upgradePlans = await rest(
+  'GET',
+  `membership_plans?tenant_id=eq.${TENANT_ID}&is_active=eq.true&amount_cents=gt.19900&select=id,name,amount_cents&limit=1`,
+);
+
+if (upgradePlans.length > 0) {
+  console.log(`   upgrade plan: "${upgradePlans[0].name}" ($${(upgradePlans[0].amount_cents / 100).toFixed(2)}/mo) — already exists`);
+} else {
+  console.log('   upgrade plan: none found — inserting "Elite Pro" fallback plan...');
+  const planRow = {
+    tenant_id:    TENANT_ID,
+    name:         'Elite Pro',
+    plan_type:    'eft',
+    amount_cents: 24900,
+    description:  'Unlimited private lessons, cage time, and HitTrax session access.',
+    sort_order:   10,
+    is_active:    true,
+  };
+  const planRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/membership_plans`,
+    {
+      method: 'POST',
+      headers: { ...headers, Prefer: 'return=minimal' },
+      body: JSON.stringify(planRow),
+    },
+  );
+  const planText = await planRes.text();
+  if (!planRes.ok) {
+    throw new Error(`membership_plans insert → ${planRes.status}: ${planText}`);
+  }
+  console.log('   upgrade plan: inserted "Elite Pro" ($249.00/mo)');
+}
+
+// ---------------------------------------------------------------------------
 // Done
 // ---------------------------------------------------------------------------
 console.log(`
@@ -580,5 +666,8 @@ DONE — Work tab seed for ${TARGET_EMAIL}
   Messages    1 text message + 1 video message from coach
   HW tab      1 submitted assignment + 1 reviewed assignment (4★ + feedback)
   Drills tab  uses existing training-videos seed (run training-videos.sql if empty)
+  Membership  Elite Monthly, $199.00/mo, active, billing anchor day 1
+              contract_url set → View Contract link visible
+              Upgrade Plan button visible (upgrade plan present at > $199/mo)
 =============================================================================
 `);
