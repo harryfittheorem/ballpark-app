@@ -1,6 +1,7 @@
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 
-import type { Product } from '@/api/earn';
+import type { OrderWithProduct, Product } from '@/api/earn';
+import { useOrders } from '@/hooks/useOrders';
 import { useProducts } from '@/hooks/useProducts';
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
 
@@ -10,11 +11,25 @@ import ProductCard from './ProductCard';
 export default function RewardsTab({
   pointsBalance,
   onSelect,
+  onSelectExisting,
 }: {
   pointsBalance: number;
   onSelect: (p: Product) => void;
+  onSelectExisting?: (orderId: string, productId: string) => void;
 }) {
   const { data, isPending, isError, error } = useProducts();
+  const { data: orders } = useOrders();
+
+  // Build a map of productId → pending order for quick lookup.
+  const pendingByProductId = (orders ?? []).reduce<Record<string, OrderWithProduct>>(
+    (acc, o) => {
+      if (o.status === 'ordered' && o.product?.id) {
+        acc[o.product.id] = o;
+      }
+      return acc;
+    },
+    {},
+  );
 
   if (isPending) {
     return (
@@ -50,14 +65,24 @@ export default function RewardsTab({
         </View>
       }
       ListEmptyComponent={<Text style={styles.empty}>No rewards available yet.</Text>}
-      renderItem={({ item }) => (
-        <ProductCard
-          product={item}
-          mode="redeem"
-          pointsBalance={pointsBalance}
-          onPress={() => onSelect(item)}
-        />
-      )}
+      renderItem={({ item }) => {
+        const pending = pendingByProductId[item.id] ?? null;
+        return (
+          <ProductCard
+            product={item}
+            mode="redeem"
+            pointsBalance={pointsBalance}
+            pendingOrder={pending}
+            onPress={() => {
+              if (pending) {
+                onSelectExisting?.(pending.id, item.id);
+              } else {
+                onSelect(item);
+              }
+            }}
+          />
+        );
+      }}
     />
   );
 }

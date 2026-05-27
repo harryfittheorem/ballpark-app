@@ -2,16 +2,29 @@
  * RewardRedeemScreen — confirm + redeem a reward, then surface the
  * server-issued redemption code so the parent can show it at the front
  * desk. The actual spend happens in the `redeem_reward_for_kid` RPC.
+ *
+ * Accepts an optional `existingOrderId` param. When present the screen
+ * skips the confirmation step and jumps straight to the success view
+ * using the already-issued code from that order.
  */
 
-import { CheckCircle2, Coins, X } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { CheckCircle2, Coins, Copy, X } from 'lucide-react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
 import { useFamily } from '@/hooks/useFamily';
+import { useOrders } from '@/hooks/useOrders';
 import { useProducts } from '@/hooks/useProducts';
 import { useRedeemReward } from '@/hooks/useRedeemReward';
 import type { EarnStackScreenProps } from '@/navigation/types';
@@ -21,9 +34,10 @@ import { errorMessage } from '@/utils/error';
 type Props = EarnStackScreenProps<'RewardRedeem'>;
 
 export default function RewardRedeemScreen({ route, navigation }: Props) {
-  const { productId, kidId } = route.params;
+  const { productId, kidId, existingOrderId } = route.params;
   const { kids } = useFamily();
   const { data: products, isPending } = useProducts();
+  const { data: orders } = useOrders();
   const product = useMemo(
     () => (products ?? []).find((p) => p.id === productId) ?? null,
     [products, productId],
@@ -34,6 +48,17 @@ export default function RewardRedeemScreen({ route, navigation }: Props) {
   const redeem = useRedeemReward();
   const [code, setCode] = useState<string | null>(null);
   const [newBalance, setNewBalance] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Short-circuit to success view when navigated with an existing order id.
+  useEffect(() => {
+    if (!existingOrderId || !orders) return;
+    const existing = orders.find((o) => o.id === existingOrderId);
+    if (existing?.redemption_code && !code) {
+      setCode(existing.redemption_code);
+      setNewBalance(kid?.points_balance ?? null);
+    }
+  }, [existingOrderId, orders, code, kid?.points_balance]);
 
   const handleRedeem = async () => {
     if (!product) return;
@@ -44,6 +69,16 @@ export default function RewardRedeemScreen({ route, navigation }: Props) {
     } catch {
       // Surfaced via redeem.error below.
     }
+  };
+
+  const handleCopy = async (value: string) => {
+    await Clipboard.setStringAsync(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleViewOrders = () => {
+    navigation.navigate('Me', { screen: 'Orders' });
   };
 
   if (isPending) {
@@ -71,7 +106,10 @@ export default function RewardRedeemScreen({ route, navigation }: Props) {
   if (code) {
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <View style={styles.successWrap}>
+        <ScrollView
+          contentContainerStyle={styles.successContent}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.successIcon}>
             <CheckCircle2 size={56} color={colors.gold} />
           </View>
@@ -85,16 +123,31 @@ export default function RewardRedeemScreen({ route, navigation }: Props) {
               backgroundColor={colors.cream}
             />
           </View>
-          <Text style={styles.codeBlock}>{code}</Text>
+          <TouchableOpacity
+            style={styles.codeBlock}
+            onPress={() => handleCopy(code)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.codeText}>{code}</Text>
+            <Copy size={18} color={colors.gold} style={styles.copyIcon} />
+          </TouchableOpacity>
+          {copied ? (
+            <Text style={styles.copiedLabel}>Copied ✓</Text>
+          ) : null}
           <Text style={styles.successProduct}>{product.name}</Text>
           {newBalance !== null ? (
             <Text style={styles.successBalance}>
-              New balance: <Text style={styles.successBalanceVal}>{newBalance.toLocaleString()} pts</Text>
+              New balance:{' '}
+              <Text style={styles.successBalanceVal}>{newBalance.toLocaleString()} pts</Text>
             </Text>
           ) : null}
-          <View style={{ height: spacing['5xl'] }} />
-          <Button label="Done" onPress={() => navigation.popToTop()} fullWidth />
-        </View>
+          <View style={styles.actions}>
+            <Button label="Done" onPress={() => navigation.popToTop()} fullWidth />
+            <TouchableOpacity onPress={handleViewOrders} style={styles.viewOrdersBtn}>
+              <Text style={styles.viewOrdersText}>View my orders →</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -153,7 +206,7 @@ export default function RewardRedeemScreen({ route, navigation }: Props) {
           <Text style={styles.warn}>{errorMessage(redeem.error)}</Text>
         ) : null}
 
-        <View style={styles.actions}>
+        <View style={styles.confirmActions}>
           <Button
             label="Redeem"
             onPress={handleRedeem}
@@ -259,14 +312,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing['2xl'],
   },
-  actions: {
+  confirmActions: {
     gap: spacing.lg,
   },
-  successWrap: {
-    flex: 1,
+  // Success state
+  successContent: {
+    flexGrow: 1,
     padding: spacing['4xl'],
     alignItems: 'center',
     justifyContent: 'center',
+    paddingBottom: spacing['6xl'],
   },
   successIcon: {
     width: 96,
@@ -301,32 +356,61 @@ const styles = StyleSheet.create({
     marginBottom: spacing['2xl'],
   },
   codeBlock: {
-    fontFamily: fontFamilies.oswaldBold,
-    fontSize: fontSizes['3xl'],
-    color: colors.gold,
-    letterSpacing: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.darker,
     borderColor: colors.borderGold,
     borderWidth: 1,
     borderRadius: radius['2xl'],
     paddingVertical: spacing['2xl'],
     paddingHorizontal: spacing['3xl'],
-    marginBottom: spacing['2xl'],
+    marginBottom: spacing.xs,
+    gap: spacing.lg,
+  },
+  codeText: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes['3xl'],
+    color: colors.gold,
+    letterSpacing: 6,
+  },
+  copyIcon: {
+    marginLeft: spacing.sm,
+  },
+  copiedLabel: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
+    color: colors.gold,
+    marginBottom: spacing.lg,
   },
   successProduct: {
     fontFamily: fontFamilies.interSemiBold,
     fontSize: fontSizes.lg,
     color: colors.textOnDark,
+    marginTop: spacing.lg,
     marginBottom: spacing.lg,
   },
   successBalance: {
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.md,
     color: colors.textLight,
+    marginBottom: spacing['3xl'],
   },
   successBalanceVal: {
     fontFamily: fontFamilies.oswaldBold,
     color: colors.gold,
+  },
+  actions: {
+    width: '100%',
+    gap: spacing.lg,
+    alignItems: 'center',
+  },
+  viewOrdersBtn: {
+    paddingVertical: spacing.lg,
+  },
+  viewOrdersText: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.md,
+    color: colors.textLight,
   },
   errorTitle: {
     fontFamily: fontFamilies.oswaldBold,

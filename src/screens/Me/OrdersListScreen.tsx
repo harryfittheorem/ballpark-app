@@ -10,14 +10,17 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { OrderWithProduct } from '@/api/earn';
 import { useOrders } from '@/hooks/useOrders';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
+import { useState } from 'react';
 
 const STATUS_LABEL: Record<string, string> = {
   ordered: 'Ordered',
@@ -38,6 +41,7 @@ function formatDateTime(iso: string): string {
 }
 
 function OrderRow({ order }: { order: OrderWithProduct }) {
+  const [showQR, setShowQR] = useState(false);
   const isPoints = order.payment_method === 'points';
   const cost = isPoints
     ? `${order.amount_paid_points?.toLocaleString() ?? 0} pts`
@@ -72,6 +76,27 @@ function OrderRow({ order }: { order: OrderWithProduct }) {
         <View style={styles.codeBox}>
           <Text style={styles.codeLabel}>Front-desk code</Text>
           <Text style={styles.codeValue}>{order.redemption_code}</Text>
+          {order.status === 'ordered' && order.redemption_code ? (
+            <>
+              <TouchableOpacity
+                onPress={() => setShowQR((v) => !v)}
+                style={styles.showQRBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.showQRText}>{showQR ? 'Hide QR' : 'Show QR'}</Text>
+              </TouchableOpacity>
+              {showQR ? (
+                <View style={styles.qrWrap}>
+                  <QRCode
+                    value={order.redemption_code}
+                    size={160}
+                    color={colors.dark}
+                    backgroundColor={colors.cream}
+                  />
+                </View>
+              ) : null}
+            </>
+          ) : null}
         </View>
       ) : null}
       {isFailed ? (
@@ -231,6 +256,22 @@ const styles = StyleSheet.create({
     fontSize: fontSizes['2xl'],
     color: colors.gold,
     letterSpacing: 4,
+  },
+  showQRBtn: {
+    marginTop: spacing.lg,
+  },
+  showQRText: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
+    color: colors.textLight,
+    textDecorationLine: 'underline',
+  },
+  qrWrap: {
+    marginTop: spacing.lg,
+    alignSelf: 'center',
+    backgroundColor: colors.cream,
+    padding: spacing['2xl'],
+    borderRadius: radius.lg,
   },
   emptyBox: {
     alignItems: 'center',

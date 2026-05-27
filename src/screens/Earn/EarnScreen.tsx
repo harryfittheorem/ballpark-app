@@ -49,6 +49,11 @@ export default function EarnScreen() {
     navigation.navigate('RewardRedeem', { productId: p.id, kidId: kid.id });
   };
 
+  const handleSelectExisting = (orderId: string, productId: string) => {
+    if (!kid) return;
+    navigation.navigate('RewardRedeem', { productId, kidId: kid.id, existingOrderId: orderId });
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
@@ -80,7 +85,11 @@ export default function EarnScreen() {
 
       <View style={styles.body}>
         {tab === 'rewards' && (
-          <RewardsTab pointsBalance={kid?.points_balance ?? 0} onSelect={handleSelect} />
+          <RewardsTab
+            pointsBalance={kid?.points_balance ?? 0}
+            onSelect={handleSelect}
+            onSelectExisting={handleSelectExisting}
+          />
         )}
         {tab === 'store' && (
           <StoreTab

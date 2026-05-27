@@ -9,17 +9,20 @@ export default function ProductCard({
   mode,
   pointsBalance,
   onPress,
+  pendingOrder,
 }: {
   product: Product;
   mode: 'redeem' | 'store';
   pointsBalance: number;
   onPress: () => void;
+  pendingOrder?: { id: string } | null;
 }) {
   const showPoints = mode === 'redeem';
   const canAfford =
     !showPoints || (product.points_cost !== null && pointsBalance >= product.points_cost);
   const soldOut = product.inventory_count !== null && product.inventory_count <= 0;
-  const disabled = soldOut || (showPoints && !canAfford);
+  const hasPending = !!pendingOrder;
+  const disabled = soldOut || (showPoints && !canAfford) || hasPending;
 
   return (
     <TouchableOpacity
@@ -55,7 +58,8 @@ export default function ProductCard({
         ) : null}
       </View>
       {soldOut ? <Text style={styles.tag}>SOLD OUT</Text> : null}
-      {showPoints && !canAfford && !soldOut ? (
+      {hasPending ? <Text style={styles.tagPending}>PENDING PICKUP</Text> : null}
+      {showPoints && !canAfford && !soldOut && !hasPending ? (
         <Text style={styles.tagMuted}>NEED {product.points_cost! - pointsBalance} MORE</Text>
       ) : null}
     </TouchableOpacity>
@@ -119,6 +123,13 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.interBold,
     fontSize: fontSizes.xs,
     color: colors.danger,
+    letterSpacing: tracking.wide,
+  },
+  tagPending: {
+    marginTop: spacing.xs,
+    fontFamily: fontFamilies.interBold,
+    fontSize: fontSizes.xs,
+    color: colors.gold,
     letterSpacing: tracking.wide,
   },
   tagMuted: {
