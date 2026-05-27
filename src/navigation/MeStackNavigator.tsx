@@ -11,6 +11,7 @@ import PaymentMethodScreen from '@/screens/Me/PaymentMethodScreen';
 import ProfileScreen from '@/screens/Me/ProfileScreen';
 import UpgradeMembershipScreen from '@/screens/Me/UpgradeMembershipScreen';
 import WaitlistClaimScreen from '@/screens/Me/WaitlistClaimScreen';
+import CircleBackButton from '@/components/ui/CircleBackButton';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
 import type { MeStackParamList } from './types';
@@ -49,7 +50,12 @@ export default function MeStackNavigator() {
       <Stack.Screen
         name="Orders"
         component={OrdersListScreen}
-        options={{ title: 'Orders' }}
+        options={({ navigation }) => ({
+          title: 'Orders',
+          headerLeft: () => (
+            <CircleBackButton onPress={() => navigation.goBack()} />
+          ),
+        })}
       />
       <Stack.Screen
         name="ConnectHitTrax"
