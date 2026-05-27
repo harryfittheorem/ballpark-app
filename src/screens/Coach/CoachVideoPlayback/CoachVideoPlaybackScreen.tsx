@@ -20,7 +20,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { CoachInboxStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, spacing } from '@/theme';
@@ -36,6 +36,8 @@ export default function CoachVideoPlaybackScreen() {
   const route = useRoute<Route>();
   const navigation = useNavigation<Nav>();
   const { playbackId } = route.params;
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, 50);
 
   // Three reasons the screen can look "black" without this state:
   //  1. expo-av takes a beat to fetch the HLS manifest — show a poster
@@ -80,13 +82,15 @@ export default function CoachVideoPlaybackScreen() {
       {errMsg ? (
         <View style={styles.errorOverlay}>
           <Text style={styles.errorTitle}>Couldn&rsquo;t play this video</Text>
-          <Text style={styles.errorBody}>{errMsg}</Text>
+          <Text style={styles.errorBody}>
+            This video is no longer available. It may have expired or been
+            removed — re-record and resend to the family.
+          </Text>
         </View>
       ) : null}
-      <SafeAreaView
+      <View
         pointerEvents="box-none"
-        style={styles.closeOverlay}
-        edges={['top', 'left']}
+        style={[styles.closeOverlay, { top: topInset }]}
       >
         <Pressable
           onPress={goBack}
@@ -97,7 +101,7 @@ export default function CoachVideoPlaybackScreen() {
         >
           <X size={22} color={colors.gold} />
         </Pressable>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }

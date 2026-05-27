@@ -177,7 +177,9 @@ export default function VideoPlaybackScreen() {
     if (navigation.canGoBack()) navigation.goBack();
   }, [navigation]);
 
-  const topInset = insets.top;
+  // fullScreenModal on iOS can return insets.top=0 — enforce a minimum so
+  // the X button always clears the status bar clock on every device.
+  const topInset = Math.max(insets.top, 50);
 
   // Overlay is visible when AVPlayer hasn't painted frames yet OR is
   // mid-buffer stall. Both guards must be clear before we hide it.
