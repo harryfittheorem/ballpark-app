@@ -4,12 +4,29 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, OCard, Chip } from '@/components/owner/ui';
-import { Send, Phone, Mail, Gift, Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
+import { Send, Phone, Mail, Gift, Sparkles, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import type { OwnerMember } from '@/lib/supabase/ownerQueries';
 
 type Props = { members: OwnerMember[] };
 
+// ── Demo data ──────────────────────────────────────────────────────────────
+
+const DEMO_AT_RISK: OwnerMember[] = [
+  { id: 'd00', kidId: 'k00', name: 'Alex Owner Jr.',  age: '12U', parent: 'Owner Demo',      parentEmail: 'owner@example.com',    parentPhone: '555-100-0000', program: 'Unlimited Monthly',   planType: 'eft', status: 'active', engagementScore: 38, churnRisk: 'high',   lastSession: '31d ago', nextCharge: 'Overdue', mrr: 280, lifetime: 2240, joinedDate: 'May 2024', riskReason: '31 days without a session and one failed payment. This is your owner test account — use it to verify email delivery.',   cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
+  { id: 'd03', kidId: 'k03', name: 'Marcus Williams', age: '10U', parent: 'Darius Williams',  parentEmail: 'darius@example.com',   parentPhone: '555-100-0003', program: 'Unlimited Monthly',   planType: 'eft', status: 'active', engagementScore: 41, churnRisk: 'high',   lastSession: '28d ago', nextCharge: 'Overdue', mrr: 280, lifetime: 1680, joinedDate: 'Sep 2024', riskReason: '28 days without a session plus one failed payment. Historical data shows 88% churn probability at this stage.',            cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
+  { id: 'd02', kidId: 'k02', name: 'Tyler Johnson',   age: '14U', parent: 'Brad Johnson',      parentEmail: 'brad@example.com',     parentPhone: '555-100-0002', program: 'Team Training',        planType: 'eft', status: 'active', engagementScore: 60, churnRisk: 'high',   lastSession: '23d ago', nextCharge: 'Jun 5',   mrr: 450, lifetime: 5480, joinedDate: 'Mar 2024', riskReason: '23 days since last session. Members in Team Training who miss 3+ consecutive weeks churn 72% of the time.',             cardLast4: '5555', cardBrand: 'Mastercard', cardExpMonth: 6,    cardExpYear: 2028 },
+  { id: 'd11', kidId: 'k11', name: 'Owen Murphy',     age: '15U', parent: 'Patrick Murphy',    parentEmail: 'patrick@example.com',  parentPhone: '555-100-0011', program: 'Team Training',        planType: 'eft', status: 'paused', engagementScore: 30, churnRisk: 'high',   lastSession: '35d ago', nextCharge: '—',       mrr: 0,   lifetime: 2250, joinedDate: 'May 2024', riskReason: '35 days inactive — critical window. Contact required today.',                                                               cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
+  { id: 'd05', kidId: 'k05', name: 'Ethan Brooks',    age: '13U', parent: 'Kevin Brooks',      parentEmail: 'kevin@example.com',    parentPhone: '555-100-0005', program: 'Cage Rental Monthly',  planType: 'eft', status: 'active', engagementScore: 63, churnRisk: 'medium', lastSession: '16d ago', nextCharge: 'Jun 3',   mrr: 120, lifetime: 960,  joinedDate: 'Jul 2024', riskReason: 'Attendance dropped significantly compared to prior months. Targeted messaging recommended.',                               cardLast4: '4444', cardBrand: 'Mastercard', cardExpMonth: 8,    cardExpYear: 2027 },
+  { id: 'd06', kidId: 'k06', name: 'Noah Patel',      age: '11U', parent: 'Raj Patel',         parentEmail: 'raj@example.com',      parentPhone: '555-100-0006', program: 'Unlimited Monthly',   planType: 'eft', status: 'active', engagementScore: 55, churnRisk: 'medium', lastSession: '15d ago', nextCharge: 'Jun 8',   mrr: 280, lifetime: 2240, joinedDate: 'Jun 2024', riskReason: 'Missed last 3 scheduled sessions without notice. Progress highlights may help re-engage.',                               cardLast4: '1234', cardBrand: 'Visa',       cardExpMonth: 11,   cardExpYear: 2026 },
+];
+
+
 type LoadingKey = `${string}-email` | `${string}-free_session`;
+
+type CampaignState =
+  | { status: 'idle' }
+  | { status: 'sending'; sent: number; total: number }
+  | { status: 'done'; succeeded: number; skipped: number; failed: number; notConfigured: boolean };
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -17,9 +34,10 @@ export function AtRiskContent({ members: rawMembers }: Props) {
   const router = useRouter();
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState<Set<LoadingKey>>(new Set());
+  const [campaign, setCampaign] = useState<CampaignState>({ status: 'idle' });
 
   useEffect(() => {
-    if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }
+    if (toast) { const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }
   }, [toast]);
 
   const atRisk = rawMembers.filter(
@@ -28,17 +46,54 @@ export function AtRiskContent({ members: rawMembers }: Props) {
   );
   const totalMrr = atRisk.reduce((s, m) => s + m.mrr, 0);
 
-  const handleCampaign = () => {
-    setToast(`Re-engagement campaign queued for ${atRisk.length} at-risk member${atRisk.length !== 1 ? 's' : ''} — emails will send within the hour`);
+  const handleCampaign = async () => {
+    const withEmail = atRisk.filter(m => m.parentEmail);
+    if (withEmail.length === 0) {
+      setToast('No at-risk members have an email address on file');
+      return;
+    }
+
+    setCampaign({ status: 'sending', sent: 0, total: withEmail.length });
+
+    let succeeded = 0;
+    let failed = 0;
+    let skipped = 0;
+    let notConfigured = false;
+
+    for (let i = 0; i < withEmail.length; i++) {
+      const m = withEmail[i];
+      setCampaign({ status: 'sending', sent: i, total: withEmail.length });
+      try {
+        const res = await fetch('/api/owner/send-reengagement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parentName: m.parent, parentEmail: m.parentEmail, kidName: m.name, type: 'email' }),
+        });
+        const data = await res.json() as { success?: boolean; skipped?: boolean; error?: string };
+        if (!res.ok || data.error) {
+          failed++;
+        } else if (data.skipped) {
+          skipped++;
+          notConfigured = true;
+        } else {
+          succeeded++;
+        }
+      } catch {
+        failed++;
+      }
+    }
+
+    setCampaign({ status: 'done', succeeded, skipped, failed, notConfigured });
   };
+
+  const dismissCampaignResult = () => setCampaign({ status: 'idle' });
 
   async function sendReengagement(m: OwnerMember, type: 'email' | 'free_session') {
     const key: LoadingKey = `${m.id}-${type}`;
     const parentEmail = m.parentEmail;
-    const kidName = m.name;
 
     if (!parentEmail) {
-      setToast(`No email on file — contact ${m.parent} directly`);
+      setToast(`No email on file for ${m.parent} — contact them directly`);
       return;
     }
 
@@ -47,19 +102,17 @@ export function AtRiskContent({ members: rawMembers }: Props) {
       const res = await fetch('/api/owner/send-reengagement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ parentName: m.parent, parentEmail, kidName, type }),
+        body: JSON.stringify({ parentName: m.parent, parentEmail, kidName: m.name, type }),
       });
       const data = await res.json() as { success?: boolean; skipped?: boolean; error?: string };
       if (!res.ok || data.error) {
         setToast(`Failed to send email: ${data.error ?? 'Unknown error'}`);
       } else if (data.skipped) {
-        setToast(type === 'email'
-          ? `Re-engagement email queued for ${m.parent} (email not configured — contact ${parentEmail})`
-          : `Free session offer queued for ${m.parent} for ${kidName} (email not configured — contact ${parentEmail})`);
+        setToast(`Email not configured — contact your admin to set up Resend (${parentEmail})`);
       } else {
         setToast(type === 'email'
           ? `Re-engagement email sent to ${m.parent} (${parentEmail})`
-          : `Free session offer sent to ${m.parent} for ${kidName} (${parentEmail})`);
+          : `Free session offer sent to ${m.parent} for ${m.name} (${parentEmail})`);
       }
     } catch {
       setToast('Network error — email not sent');
@@ -68,21 +121,55 @@ export function AtRiskContent({ members: rawMembers }: Props) {
     }
   }
 
-  function handleCallParent(m: OwnerMember) {
-    if (m.parentPhone) {
-      setToast(`${m.parent} · ${m.parentPhone}`);
-    } else {
-      setToast(`No phone on file for ${m.parent} — send an email instead`);
+  function copyPhone(m: OwnerMember) {
+    const phone = m.parentPhone;
+    if (!phone) {
+      setToast(`No phone number on file for ${m.parent}`);
+      return;
     }
+    navigator.clipboard.writeText(phone).then(() => {
+      setToast(`${m.parent}'s number copied: ${phone}`);
+    }).catch(() => {
+      setToast(`Phone: ${phone}`);
+    });
   }
+
+  const campaignIsSending = campaign.status === 'sending';
+
 
   return (
     <div>
       <PageHeader
         title="At-Risk Members"
         subtitle={`${atRisk.length} member${atRisk.length !== 1 ? 's' : ''} flagged · $${totalMrr.toLocaleString()} monthly revenue at risk`}
-        actions={<OButton variant="gold" icon={Send} onClick={handleCampaign}>Send Re-engagement Campaign</OButton>}
+        actions={
+          <OButton
+            variant="gold"
+            icon={campaignIsSending ? Loader2 : Send}
+            onClick={handleCampaign}
+            disabled={campaignIsSending}
+          >
+            {campaignIsSending
+              ? `Sending ${campaign.sent + 1} of ${campaign.total}…`
+              : 'Send Re-engagement Campaign'}
+          </OButton>
+        }
       />
+
+      {/* Campaign result banner */}
+      {campaign.status === 'done' && (
+        <div style={{ margin: '0 24px', padding: '12px 16px', background: campaign.notConfigured ? `${brand.warning}22` : campaign.failed > 0 ? `${brand.danger}22` : `${brand.success}22`, border: `1px solid ${campaign.notConfigured ? brand.warning : campaign.failed > 0 ? brand.danger : brand.success}44`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          {campaign.notConfigured
+            ? <AlertCircle size={16} color={brand.warning} />
+            : <CheckCircle2 size={16} color={campaign.failed > 0 ? brand.danger : brand.success} />}
+          <div style={{ flex: 1, fontSize: 13 }}>
+            {campaign.notConfigured
+              ? <><strong>Email not configured</strong> — contact your admin to set up Resend. {campaign.succeeded} sent, {campaign.skipped} skipped.</>
+              : <>Campaign complete — <strong>{campaign.succeeded} sent</strong>{campaign.failed > 0 ? `, ${campaign.failed} failed` : ''}{campaign.skipped > 0 ? `, ${campaign.skipped} skipped (no email)` : ''}.</>}
+          </div>
+          <button onClick={dismissCampaignResult} style={{ background: 'none', border: 'none', cursor: 'pointer', color: brand.textMuted, fontSize: 18, lineHeight: 1 }}>×</button>
+        </div>
+      )}
 
       <div style={{ padding: 24 }}>
         {atRisk.length === 0 ? (
@@ -135,13 +222,13 @@ export function AtRiskContent({ members: rawMembers }: Props) {
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <OButton variant="gold" size="sm" icon={Phone} onClick={() => handleCallParent(m)}>Call Parent</OButton>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <OButton variant="gold" size="sm" icon={Phone} onClick={() => copyPhone(m)}>Call Parent</OButton>
                         <OButton
                           variant="secondary" size="sm"
                           icon={emailLoading ? Loader2 : Mail}
                           onClick={() => sendReengagement(m, 'email')}
-                          disabled={emailLoading}
+                          disabled={emailLoading || campaignIsSending}
                         >
                           {emailLoading ? 'Sending…' : 'Send Email'}
                         </OButton>
@@ -149,7 +236,7 @@ export function AtRiskContent({ members: rawMembers }: Props) {
                           variant="secondary" size="sm"
                           icon={freeLoading ? Loader2 : Gift}
                           onClick={() => sendReengagement(m, 'free_session')}
-                          disabled={freeLoading}
+                          disabled={freeLoading || campaignIsSending}
                         >
                           {freeLoading ? 'Sending…' : 'Offer Free Session'}
                         </OButton>
