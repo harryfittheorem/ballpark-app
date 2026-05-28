@@ -1,5 +1,28 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "2jrplFG9Z8ot3d4HPTu_x"
+uri = "file://assets/icon.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "OvsDaC-zCFeYhT2I8Go2w"
+uri = "file://assets/splash-icon.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "5QXFkne7sulmbwsc91Uiw"
+uri = "file://assets/adaptive-icon.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "x9V6WwnpE1YPC7QcqPGBj"
+uri = "file://assets/favicon.png"
+type = "image"
+title = "generated_image"
 
 [[outputs]]
 id = "9T3Es1MHr1wGjxOVrjtb3"
