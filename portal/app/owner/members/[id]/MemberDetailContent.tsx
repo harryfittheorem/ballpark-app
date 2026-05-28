@@ -5,7 +5,7 @@ import { OButton, PageHeader, SectionHeader, OCard, Chip } from '@/components/ow
 import {
   Calendar, MessageCircle, Edit2, Activity, Clock,
   CheckCircle, XCircle, CreditCard, Star, Zap, TrendingUp,
-  AlertCircle, PauseCircle, PlayCircle, Package,
+  AlertCircle, PauseCircle, PlayCircle, Package, Phone, Mail,
 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import type { MemberDetail } from '@/lib/supabase/ownerQueries';
@@ -934,8 +934,34 @@ export function MemberDetailContent({ member: m }: Props) {
             <OCard style={{ padding: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <InfoRow label="Parent" value={m.parent} large />
-                <InfoRow label="Email" value={demo?.parentEmail ?? '—'} />
-                <InfoRow label="Phone" value={demo?.parentPhone ?? '—'} />
+                <div>
+                  <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>Email</div>
+                  {m.parentEmail ? (
+                    <a
+                      href={`mailto:${m.parentEmail}`}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, color: brand.gold, textDecoration: 'none', fontWeight: 500 }}
+                    >
+                      <Mail size={12} />
+                      {m.parentEmail}
+                    </a>
+                  ) : (
+                    <div style={{ fontSize: 13, color: brand.textMuted }}>—</div>
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>Phone</div>
+                  {m.parentPhone ? (
+                    <a
+                      href={`tel:${m.parentPhone}`}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, color: brand.gold, textDecoration: 'none', fontWeight: 500 }}
+                    >
+                      <Phone size={12} />
+                      {m.parentPhone}
+                    </a>
+                  ) : (
+                    <div style={{ fontSize: 13, color: brand.textMuted }}>—</div>
+                  )}
+                </div>
               </div>
             </OCard>
           </div>

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, OTable, Chip } from '@/components/owner/ui';
 import type { TableColumn } from '@/components/owner/ui';
-import { Download, Plus, Filter, X, CreditCard, AlertTriangle, UserPlus } from 'lucide-react';
+import { Download, Plus, Filter, X, CreditCard, AlertTriangle, UserPlus, Phone } from 'lucide-react';
 import type { OwnerMember } from '@/lib/supabase/ownerQueries';
 import { exportCsv } from '@/lib/exportCsv';
 
@@ -34,21 +34,21 @@ function isCardExpired(expMonth: number | null, expYear: number | null): boolean
 // ── Demo data ──────────────────────────────────────────────────────────────
 
 const DEMO_MEMBERS: OwnerMember[] = [
-  { id: 'd01', kidId: 'k01', name: 'Jake Martinez',    age: '12U', parent: 'Carlos Martinez',   parentEmail: 'carlos@example.com',  parentPhone: null, program: 'Unlimited Monthly',   planType: 'eft', status: 'active',    engagementScore: 92, churnRisk: 'low',    lastSession: '2d ago',  nextCharge: 'Jun 1',   mrr: 280, lifetime: 3920, joinedDate: 'Jan 2025', cardLast4: '4242', cardBrand: 'Visa',       cardExpMonth: 12, cardExpYear: 2029 },
-  { id: 'd02', kidId: 'k02', name: 'Tyler Johnson',    age: '14U', parent: 'Brad Johnson',       parentEmail: 'brad@example.com',    parentPhone: null, program: 'Team Training',        planType: 'eft', status: 'active',    engagementScore: 60, churnRisk: 'high',   lastSession: '23d ago', nextCharge: 'Jun 5',   mrr: 450, lifetime: 5480, joinedDate: 'Mar 2024', cardLast4: '5555', cardBrand: 'Mastercard', cardExpMonth: 6,  cardExpYear: 2028, riskReason: '23 days since last session.' },
-  { id: 'd03', kidId: 'k03', name: 'Marcus Williams',  age: '10U', parent: 'Darius Williams',    parentEmail: 'darius@example.com',  parentPhone: null, program: 'Unlimited Monthly',   planType: 'eft', status: 'active',    engagementScore: 41, churnRisk: 'high',   lastSession: '28d ago', nextCharge: 'Overdue', mrr: 280, lifetime: 1680, joinedDate: 'Sep 2024', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null, riskReason: '28 days without a session plus a failed payment.' },
-  { id: 'd04', kidId: 'k04', name: 'Ryan Chen',        age: '11U', parent: 'David Chen',         parentEmail: 'david@example.com',   parentPhone: null, program: '8-Pack Lessons',       planType: 'otc', status: 'active',    engagementScore: 85, churnRisk: 'low',    lastSession: '5d ago',  nextCharge: '—',        mrr: 0,   lifetime: 1280, joinedDate: 'Feb 2025', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
-  { id: 'd05', kidId: 'k05', name: 'Ethan Brooks',     age: '13U', parent: 'Kevin Brooks',       parentEmail: 'kevin@example.com',   parentPhone: null, program: 'Cage Rental Monthly',  planType: 'eft', status: 'active',    engagementScore: 63, churnRisk: 'medium', lastSession: '16d ago', nextCharge: 'Jun 3',   mrr: 120, lifetime: 960,  joinedDate: 'Jul 2024', cardLast4: '4444', cardBrand: 'Mastercard', cardExpMonth: new Date().getMonth() + 2 > 12 ? new Date().getMonth() + 2 - 12 : new Date().getMonth() + 2, cardExpYear: new Date().getMonth() + 2 > 12 ? new Date().getFullYear() + 1 : new Date().getFullYear(), riskReason: 'Attendance dropped significantly vs prior months.' },
-  { id: 'd06', kidId: 'k06', name: 'Noah Patel',       age: '11U', parent: 'Raj Patel',          parentEmail: 'raj@example.com',     parentPhone: null, program: 'Unlimited Monthly',   planType: 'eft', status: 'active',    engagementScore: 55, churnRisk: 'medium', lastSession: '15d ago', nextCharge: 'Jun 8',   mrr: 280, lifetime: 2240, joinedDate: 'Jun 2024', cardLast4: '1234', cardBrand: 'Visa',       cardExpMonth: 8,  cardExpYear: 2027 },
-  { id: 'd07', kidId: 'k07', name: 'Logan Scott',      age: '9U',  parent: 'James Scott',        parentEmail: 'james@example.com',   parentPhone: null, program: '4-Pack Lessons',       planType: 'otc', status: 'active',    engagementScore: 78, churnRisk: 'low',    lastSession: '4d ago',  nextCharge: '—',        mrr: 0,   lifetime: 720,  joinedDate: 'Mar 2025', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
-  { id: 'd08', kidId: 'k08', name: 'Aiden Torres',     age: '12U', parent: 'Maria Torres',       parentEmail: 'maria@example.com',   parentPhone: null, program: 'Team Training',        planType: 'eft', status: 'active',    engagementScore: 88, churnRisk: 'low',    lastSession: '1d ago',  nextCharge: 'Jun 2',   mrr: 450, lifetime: 4050, joinedDate: 'Apr 2024', cardLast4: '9876', cardBrand: 'Amex',       cardExpMonth: 3,  cardExpYear: 2030 },
-  { id: 'd09', kidId: 'k09', name: 'Caleb Nguyen',     age: '13U', parent: 'Linh Nguyen',        parentEmail: 'linh@example.com',    parentPhone: null, program: 'Unlimited Monthly',   planType: 'eft', status: 'active',    engagementScore: 95, churnRisk: 'low',    lastSession: 'Today',   nextCharge: 'Jun 10',  mrr: 280, lifetime: 5040, joinedDate: 'Nov 2023', cardLast4: '3333', cardBrand: 'Visa',       cardExpMonth: 11, cardExpYear: 2026 },
-  { id: 'd10', kidId: 'k10', name: 'Jaxon Rivera',     age: '10U', parent: 'Sofia Rivera',       parentEmail: 'sofia@example.com',   parentPhone: null, program: 'Cage Rental Monthly',  planType: 'eft', status: 'active',    engagementScore: 70, churnRisk: 'low',    lastSession: '7d ago',  nextCharge: 'Jun 6',   mrr: 120, lifetime: 1080, joinedDate: 'Aug 2024', cardLast4: '7777', cardBrand: 'Mastercard', cardExpMonth: 1,  cardExpYear: 2028 },
-  { id: 'd11', kidId: 'k11', name: 'Owen Murphy',      age: '15U', parent: 'Patrick Murphy',     parentEmail: 'patrick@example.com', parentPhone: null, program: 'Team Training',        planType: 'eft', status: 'paused',    engagementScore: 30, churnRisk: 'high',   lastSession: '35d ago', nextCharge: '—',        mrr: 0,   lifetime: 2250, joinedDate: 'May 2024', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
-  { id: 'd12', kidId: 'k12', name: 'Liam Perez',       age: '11U', parent: 'Ana Perez',          parentEmail: 'ana@example.com',     parentPhone: null, program: '8-Pack Lessons',       planType: 'otc', status: 'active',    engagementScore: 82, churnRisk: 'low',    lastSession: '3d ago',  nextCharge: '—',        mrr: 0,   lifetime: 960,  joinedDate: 'Jan 2025', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
-  { id: 'd13', kidId: 'k13', name: 'Zane Harris',      age: '14U', parent: 'Terry Harris',       parentEmail: 'terry@example.com',   parentPhone: null, program: 'Unlimited Monthly',   planType: 'eft', status: 'active',    engagementScore: 77, churnRisk: 'low',    lastSession: '6d ago',  nextCharge: 'Jun 12',  mrr: 280, lifetime: 3360, joinedDate: 'Feb 2024', cardLast4: '2222', cardBrand: 'Visa',       cardExpMonth: 7,  cardExpYear: new Date().getFullYear() },
-  { id: 'd14', kidId: 'k14', name: 'Carter Simmons',   age: '12U', parent: 'Gina Simmons',       parentEmail: 'gina@example.com',    parentPhone: null, program: '4-Pack Lessons',       planType: 'otc', status: 'cancelled', engagementScore: 0,  churnRisk: 'high',   lastSession: '52d ago', nextCharge: '—',        mrr: 0,   lifetime: 540,  joinedDate: 'Oct 2024', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
-  { id: 'd15', kidId: 'k15', name: 'Hunter Davis',     age: '13U', parent: 'Todd Davis',         parentEmail: 'todd@example.com',    parentPhone: null, program: 'Cage Rental Monthly',  planType: 'eft', status: 'active',    engagementScore: 68, churnRisk: 'low',    lastSession: '9d ago',  nextCharge: 'Jun 4',   mrr: 120, lifetime: 1320, joinedDate: 'Sep 2024', cardLast4: '6868', cardBrand: 'Discover',   cardExpMonth: 9,  cardExpYear: 2027 },
+  { id: 'd01', kidId: 'k01', name: 'Jake Martinez',    age: '12U', parent: 'Carlos Martinez',   parentEmail: 'carlos@example.com',  parentPhone: '(312) 555-0101', program: 'Unlimited Monthly',   planType: 'eft', status: 'active',    engagementScore: 92, churnRisk: 'low',    lastSession: '2d ago',  nextCharge: 'Jun 1',   mrr: 280, lifetime: 3920, joinedDate: 'Jan 2025', cardLast4: '4242', cardBrand: 'Visa',       cardExpMonth: 12, cardExpYear: 2029 },
+  { id: 'd02', kidId: 'k02', name: 'Tyler Johnson',    age: '14U', parent: 'Brad Johnson',       parentEmail: 'brad@example.com',    parentPhone: '(312) 555-0102', program: 'Team Training',        planType: 'eft', status: 'active',    engagementScore: 60, churnRisk: 'high',   lastSession: '23d ago', nextCharge: 'Jun 5',   mrr: 450, lifetime: 5480, joinedDate: 'Mar 2024', cardLast4: '5555', cardBrand: 'Mastercard', cardExpMonth: 6,  cardExpYear: 2028, riskReason: '23 days since last session.' },
+  { id: 'd03', kidId: 'k03', name: 'Marcus Williams',  age: '10U', parent: 'Darius Williams',    parentEmail: 'darius@example.com',  parentPhone: '(312) 555-0103', program: 'Unlimited Monthly',   planType: 'eft', status: 'active',    engagementScore: 41, churnRisk: 'high',   lastSession: '28d ago', nextCharge: 'Overdue', mrr: 280, lifetime: 1680, joinedDate: 'Sep 2024', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null, riskReason: '28 days without a session plus a failed payment.' },
+  { id: 'd04', kidId: 'k04', name: 'Ryan Chen',        age: '11U', parent: 'David Chen',         parentEmail: 'david@example.com',   parentPhone: '(312) 555-0104', program: '8-Pack Lessons',       planType: 'otc', status: 'active',    engagementScore: 85, churnRisk: 'low',    lastSession: '5d ago',  nextCharge: '—',        mrr: 0,   lifetime: 1280, joinedDate: 'Feb 2025', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
+  { id: 'd05', kidId: 'k05', name: 'Ethan Brooks',     age: '13U', parent: 'Kevin Brooks',       parentEmail: 'kevin@example.com',   parentPhone: '(312) 555-0105', program: 'Cage Rental Monthly',  planType: 'eft', status: 'active',    engagementScore: 63, churnRisk: 'medium', lastSession: '16d ago', nextCharge: 'Jun 3',   mrr: 120, lifetime: 960,  joinedDate: 'Jul 2024', cardLast4: '4444', cardBrand: 'Mastercard', cardExpMonth: new Date().getMonth() + 2 > 12 ? new Date().getMonth() + 2 - 12 : new Date().getMonth() + 2, cardExpYear: new Date().getMonth() + 2 > 12 ? new Date().getFullYear() + 1 : new Date().getFullYear(), riskReason: 'Attendance dropped significantly vs prior months.' },
+  { id: 'd06', kidId: 'k06', name: 'Noah Patel',       age: '11U', parent: 'Raj Patel',          parentEmail: 'raj@example.com',     parentPhone: '(312) 555-0106', program: 'Unlimited Monthly',   planType: 'eft', status: 'active',    engagementScore: 55, churnRisk: 'medium', lastSession: '15d ago', nextCharge: 'Jun 8',   mrr: 280, lifetime: 2240, joinedDate: 'Jun 2024', cardLast4: '1234', cardBrand: 'Visa',       cardExpMonth: 8,  cardExpYear: 2027 },
+  { id: 'd07', kidId: 'k07', name: 'Logan Scott',      age: '9U',  parent: 'James Scott',        parentEmail: 'james@example.com',   parentPhone: null,             program: '4-Pack Lessons',       planType: 'otc', status: 'active',    engagementScore: 78, churnRisk: 'low',    lastSession: '4d ago',  nextCharge: '—',        mrr: 0,   lifetime: 720,  joinedDate: 'Mar 2025', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
+  { id: 'd08', kidId: 'k08', name: 'Aiden Torres',     age: '12U', parent: 'Maria Torres',       parentEmail: 'maria@example.com',   parentPhone: '(312) 555-0108', program: 'Team Training',        planType: 'eft', status: 'active',    engagementScore: 88, churnRisk: 'low',    lastSession: '1d ago',  nextCharge: 'Jun 2',   mrr: 450, lifetime: 4050, joinedDate: 'Apr 2024', cardLast4: '9876', cardBrand: 'Amex',       cardExpMonth: 3,  cardExpYear: 2030 },
+  { id: 'd09', kidId: 'k09', name: 'Caleb Nguyen',     age: '13U', parent: 'Linh Nguyen',        parentEmail: 'linh@example.com',    parentPhone: '(312) 555-0109', program: 'Unlimited Monthly',   planType: 'eft', status: 'active',    engagementScore: 95, churnRisk: 'low',    lastSession: 'Today',   nextCharge: 'Jun 10',  mrr: 280, lifetime: 5040, joinedDate: 'Nov 2023', cardLast4: '3333', cardBrand: 'Visa',       cardExpMonth: 11, cardExpYear: 2026 },
+  { id: 'd10', kidId: 'k10', name: 'Jaxon Rivera',     age: '10U', parent: 'Sofia Rivera',       parentEmail: 'sofia@example.com',   parentPhone: '(312) 555-0110', program: 'Cage Rental Monthly',  planType: 'eft', status: 'active',    engagementScore: 70, churnRisk: 'low',    lastSession: '7d ago',  nextCharge: 'Jun 6',   mrr: 120, lifetime: 1080, joinedDate: 'Aug 2024', cardLast4: '7777', cardBrand: 'Mastercard', cardExpMonth: 1,  cardExpYear: 2028 },
+  { id: 'd11', kidId: 'k11', name: 'Owen Murphy',      age: '15U', parent: 'Patrick Murphy',     parentEmail: 'patrick@example.com', parentPhone: '(312) 555-0111', program: 'Team Training',        planType: 'eft', status: 'paused',    engagementScore: 30, churnRisk: 'high',   lastSession: '35d ago', nextCharge: '—',        mrr: 0,   lifetime: 2250, joinedDate: 'May 2024', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
+  { id: 'd12', kidId: 'k12', name: 'Liam Perez',       age: '11U', parent: 'Ana Perez',          parentEmail: 'ana@example.com',     parentPhone: null,             program: '8-Pack Lessons',       planType: 'otc', status: 'active',    engagementScore: 82, churnRisk: 'low',    lastSession: '3d ago',  nextCharge: '—',        mrr: 0,   lifetime: 960,  joinedDate: 'Jan 2025', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
+  { id: 'd13', kidId: 'k13', name: 'Zane Harris',      age: '14U', parent: 'Terry Harris',       parentEmail: 'terry@example.com',   parentPhone: '(312) 555-0113', program: 'Unlimited Monthly',   planType: 'eft', status: 'active',    engagementScore: 77, churnRisk: 'low',    lastSession: '6d ago',  nextCharge: 'Jun 12',  mrr: 280, lifetime: 3360, joinedDate: 'Feb 2024', cardLast4: '2222', cardBrand: 'Visa',       cardExpMonth: 7,  cardExpYear: new Date().getFullYear() },
+  { id: 'd14', kidId: 'k14', name: 'Carter Simmons',   age: '12U', parent: 'Gina Simmons',       parentEmail: 'gina@example.com',    parentPhone: null,             program: '4-Pack Lessons',       planType: 'otc', status: 'cancelled', engagementScore: 0,  churnRisk: 'high',   lastSession: '52d ago', nextCharge: '—',        mrr: 0,   lifetime: 540,  joinedDate: 'Oct 2024', cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
+  { id: 'd15', kidId: 'k15', name: 'Hunter Davis',     age: '13U', parent: 'Todd Davis',         parentEmail: 'todd@example.com',    parentPhone: '(312) 555-0115', program: 'Cage Rental Monthly',  planType: 'eft', status: 'active',    engagementScore: 68, churnRisk: 'low',    lastSession: '9d ago',  nextCharge: 'Jun 4',   mrr: 120, lifetime: 1320, joinedDate: 'Sep 2024', cardLast4: '6868', cardBrand: 'Discover',   cardExpMonth: 9,  cardExpYear: 2027 },
 ];
 
 // ── Payment cell renderer ───────────────────────────────────────────────────
@@ -99,17 +99,30 @@ function PaymentCell({ member }: { member: OwnerMember }) {
 const columns: TableColumn<OwnerMember & Record<string, unknown>>[] = [
   {
     label: 'Member', key: 'name', sortable: true,
-    render: (r) => (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 18, background: brand.dark, color: brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, fontFamily: fonts.display }}>
-          {(r.name as string).charAt(0)}
+    render: (r) => {
+      const phone = r.parentPhone as string | null;
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 18, background: brand.dark, color: brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, fontFamily: fonts.display, flexShrink: 0 }}>
+            {(r.name as string).charAt(0)}
+          </div>
+          <div>
+            <div style={{ fontWeight: 700 }}>{r.name as string}</div>
+            <div style={{ fontSize: 11, color: brand.textMuted }}>{r.age as string} · {r.parent as string}</div>
+            {phone && (
+              <a
+                href={`tel:${phone}`}
+                onClick={e => e.stopPropagation()}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: brand.gold, textDecoration: 'none', marginTop: 2 }}
+              >
+                <Phone size={10} />
+                {phone}
+              </a>
+            )}
+          </div>
         </div>
-        <div>
-          <div style={{ fontWeight: 700 }}>{r.name as string}</div>
-          <div style={{ fontSize: 11, color: brand.textMuted }}>{r.age as string} · {r.parent as string}</div>
-        </div>
-      </div>
-    ),
+      );
+    },
   },
   {
     label: 'Program', key: 'program', sortable: true,
@@ -230,6 +243,8 @@ export function MembersContent({ members }: Props) {
         { label: 'Name',         key: 'name' },
         { label: 'Age',          key: 'age' },
         { label: 'Parent',       key: 'parent' },
+        { label: 'Parent Phone', key: 'parentPhone' },
+        { label: 'Parent Email', key: 'parentEmail' },
         { label: 'Program',      key: 'program' },
         { label: 'Plan',         key: 'planType' },
         { label: 'Status',       key: 'status' },
