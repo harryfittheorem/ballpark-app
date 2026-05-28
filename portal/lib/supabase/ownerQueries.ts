@@ -23,6 +23,36 @@ function relativeTime(ts: string | null): string {
   return `${d}d ago`;
 }
 
+function formatDeclineCode(code: string | null | undefined): string | null {
+  if (!code) return null;
+  const labels: Record<string, string> = {
+    insufficient_funds:       'Insufficient funds',
+    card_declined:            'Card declined',
+    expired_card:             'Card expired',
+    incorrect_cvc:            'Incorrect CVC',
+    lost_card:                'Card reported lost',
+    stolen_card:              'Card reported stolen',
+    do_not_honor:             'Card declined',
+    generic_decline:          'Card declined',
+    fraudulent:               'Flagged as fraudulent',
+    pickup_card:              'Card declined',
+    restricted_card:          'Card restricted',
+    security_violation:       'Security violation',
+    service_not_allowed:      'Service not allowed',
+    stop_payment_order:       'Stop payment order',
+    transaction_not_allowed:  'Transaction not allowed',
+    card_velocity_exceeded:   'Too many recent transactions',
+    invalid_account:          'Invalid account',
+    no_checking_account:      'No checking account',
+    not_permitted:            'Not permitted',
+    authentication_required:  'Authentication required',
+    currency_not_supported:   'Currency not supported',
+    duplicate_transaction:    'Duplicate transaction',
+    invalid_amount:           'Invalid amount',
+  };
+  return labels[code] ?? code.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function churnRisk(daysSinceLastSession: number): 'low' | 'medium' | 'high' {
   if (daysSinceLastSession > 21) return 'high';
   if (daysSinceLastSession > 14) return 'medium';
@@ -349,11 +379,12 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       .eq('status', 'paid'),
     supabase
       .from('payment_events')
-      .select('membership_id')
+      .select('membership_id, error_code')
       .eq('tenant_id', tenantId)
       .eq('status', 'failed')
       .in('membership_id', membershipIds)
-      .gte('created_at', new Date(Date.now() - 30 * 86_400_000).toISOString()),
+      .gte('created_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
+      .order('created_at', { ascending: false }),
   ]);
 
   const lastBookingByKid: Record<string, string> = {};
@@ -366,7 +397,14 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       lifetimeByMembership[p.membership_id] = (lifetimeByMembership[p.membership_id] ?? 0) + p.amount_cents;
     }
   }
-  const failedMembershipSet = new Set((recentFailed ?? []).map(f => f.membership_id).filter(Boolean));
+  // Map membership_id → error_code of most-recent failure (array is already DESC ordered)
+  const failedByMembership = new Map<string, string | null>();
+  for (const f of (recentFailed ?? []) as { membership_id: string | null; error_code: string | null }[]) {
+    if (f.membership_id && !failedByMembership.has(f.membership_id)) {
+      failedByMembership.set(f.membership_id, f.error_code ?? null);
+    }
+  }
+  const failedMembershipSet = new Set(failedByMembership.keys());
 
   return rows.map(r => {
     const kid = r.kids as unknown as { first_name: string; last_name: string | null; age_group: string | null };
@@ -394,7 +432,10 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
     if (risk === 'high' || risk === 'medium') {
       const parts: string[] = [];
       if (days < 9999) parts.push(`No session in ${days} day${days !== 1 ? 's' : ''}`);
-      if (hasFailedPayment) parts.push('last payment failed');
+      if (hasFailedPayment) {
+        const declineLabel = formatDeclineCode(failedByMembership.get(r.id));
+        parts.push(declineLabel ? `Last payment failed — ${declineLabel}` : 'Last payment failed');
+      }
       if (parts.length > 0) {
         riskReason = parts.join(' · ') + (risk === 'high' ? '. Call within 48 hours.' : '. Send an engagement message.');
       }
