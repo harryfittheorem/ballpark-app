@@ -17,6 +17,14 @@ import { createServiceClient } from '@/lib/supabase/serviceClient';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function getOrigin(req: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_PORTAL_URL) return process.env.NEXT_PUBLIC_PORTAL_URL;
+  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  const proto = req.headers.get('x-forwarded-proto') ?? 'https';
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? req.nextUrl.host;
+  return `${proto}://${host}`;
+}
+
 function redirectWithError(origin: string, message: string) {
   const url = new URL('/owner/payments', origin);
   url.searchParams.set('error', encodeURIComponent(message));
@@ -53,7 +61,7 @@ function verifyAndParseToken(
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const token = searchParams.get('token');
-  const origin = `${req.nextUrl.protocol}//${req.nextUrl.host}`;
+  const origin = getOrigin(req);
 
   if (!token) {
     return redirectWithError(origin, 'Missing token parameter');

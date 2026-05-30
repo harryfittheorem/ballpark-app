@@ -11,6 +11,14 @@ import { createHmac, timingSafeEqual } from 'crypto';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function getOrigin(req: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_PORTAL_URL) return process.env.NEXT_PUBLIC_PORTAL_URL;
+  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  const proto = req.headers.get('x-forwarded-proto') ?? 'https';
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? req.nextUrl.host;
+  return `${proto}://${host}`;
+}
+
 function verifyAndParseToken(
   token: string,
   secret: string,
@@ -41,8 +49,7 @@ function verifyAndParseToken(
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const token = searchParams.get('token');
-  const host = req.headers.get('host') ?? req.nextUrl.host;
-  const origin = process.env.NEXT_PUBLIC_PORTAL_URL ?? `https://${host}`;
+  const origin = getOrigin(req);
 
   const fallback = new URL('/owner/payments', origin);
   fallback.searchParams.set('error', encodeURIComponent('Onboarding link expired — please try again'));

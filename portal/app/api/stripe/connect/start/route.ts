@@ -23,6 +23,14 @@ export const dynamic = 'force-dynamic';
 
 const STATE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
+function getOrigin(req: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_PORTAL_URL) return process.env.NEXT_PUBLIC_PORTAL_URL;
+  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  const proto = req.headers.get('x-forwarded-proto') ?? 'https';
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? req.nextUrl.host;
+  return `${proto}://${host}`;
+}
+
 function b64url(s: string): string {
   return Buffer.from(s).toString('base64url');
 }
@@ -54,8 +62,7 @@ export async function POST(req: NextRequest) {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) return clientErr(500, 'STRIPE_SECRET_KEY is not configured');
 
-  const host = req.headers.get('host') ?? req.nextUrl.host;
-  const origin = process.env.NEXT_PUBLIC_PORTAL_URL ?? req.headers.get('origin') ?? `https://${host}`;
+  const origin = getOrigin(req);
 
   // Verify the location belongs to the authenticated user's tenant
   const svc = createServiceClient();
