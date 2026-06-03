@@ -7,6 +7,11 @@
  * - Exposes `appRole` decoded from the JWT's custom claim (set by the
  *   Custom Access Token Hook). Missing/unknown values fall back to
  *   `'parent'` so existing parent users without the claim keep working.
+ * - Races getSession() against an 8-second timeout on startup and on
+ *   foreground resume so a stalled network never leaves the splash
+ *   spinning forever. The onAuthStateChange listener remains mounted in
+ *   both cases and will update session automatically once the network
+ *   recovers, navigating the user in without any manual re-login.
  */
 
 import type { Session, User } from "@supabase/supabase-js";
@@ -17,9 +22,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { AppState, type AppStateStatus } from "react-native";
 
 import { supabase } from "@/lib/supabase";
 import { registerForPushNotifications } from "@/services/notifications";
@@ -67,19 +74,51 @@ function readAppRole(session: Session | null): AppRole | null {
   return "parent";
 }
 
+/**
+ * Race supabase.auth.getSession() against an 8-second timeout.
+ *
+ * On iOS/Android, the network stack is not always immediately ready when
+ * the app cold-starts after a long gap — the underlying fetch() can hang at
+ * the TCP layer. Because getSession() has no built-in timeout, setLoading(false)
+ * would never fire and the splash spinner would spin forever.
+ *
+ * The timeout resolves with { data: { session: null } } so the caller's
+ * code path is identical whether the real call won or the timeout won.
+ * The onAuthStateChange listener remains mounted in both cases and will
+ * update the session automatically when the actual refresh completes.
+ */
+async function getSessionWithTimeout() {
+  const TIMEOUT_MS = 8_000;
+  const timeout = new Promise<{ data: { session: null } }>((resolve) => {
+    setTimeout(() => {
+      console.warn(
+        "[auth] getSession timed out — network may be unavailable on resume",
+      );
+      resolve({ data: { session: null } });
+    }, TIMEOUT_MS);
+  });
+  return Promise.race([supabase.auth.getSession(), timeout]);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Tracks whether the initial getSession() has resolved (either by real
+  // result or by timeout). Used by the AppState handler to avoid firing
+  // during the initial mount check.
+  const initializedRef = useRef(false);
+
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+    getSessionWithTimeout().then(({ data }) => {
       if (!mounted) return;
       setSession(data.session);
       if (data.session?.user) {
         void registerForPushNotifications();
       }
+      initializedRef.current = true;
       setLoading(false);
     });
 
@@ -178,11 +217,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     );
 
+    // AppState listener — re-check session when the app transitions from
+    // background/inactive to active (e.g. user reopens after 1+ hour).
+    // Only runs after the initial mount check has completed (`initializedRef`)
+    // so it never races with the startup path.
+    // Never sets `loading` back to true — the UI stays usable during the
+    // silent re-check. `onAuthStateChange` handles the visible update if a
+    // fresh token comes back.
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState !== "active") return;
+      if (!initializedRef.current) return;
+
+      getSessionWithTimeout().then(({ data }) => {
+        if (!mounted) return;
+        setSession(data.session);
+      });
+    };
+
+    const appStateSub = AppState.addEventListener("change", handleAppStateChange);
+
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
       linkingSub.remove();
       notifSub.remove();
+      appStateSub.remove();
     };
   }, []);
 
