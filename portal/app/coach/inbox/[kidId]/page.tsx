@@ -4,6 +4,7 @@ import { ArrowLeft, Smartphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { InboxReplyForm } from "../InboxReplyForm";
+import { ThreadMessages, type ThreadMessage } from "./ThreadMessages";
 
 type VideoRow = {
   id: string;
@@ -26,22 +27,18 @@ type RawMessageRow = {
   video: VideoRow | VideoRow[] | null;
 };
 
-const RTF = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diffSec = Math.round((then - now) / 1000);
-  const abs = Math.abs(diffSec);
-  if (abs < 60) return RTF.format(diffSec, "second");
-  if (abs < 3600) return RTF.format(Math.round(diffSec / 60), "minute");
-  if (abs < 86400) return RTF.format(Math.round(diffSec / 3600), "hour");
-  if (abs < 86400 * 7) return RTF.format(Math.round(diffSec / 86400), "day");
-  if (abs < 86400 * 30)
-    return RTF.format(Math.round(diffSec / (86400 * 7)), "week");
-  if (abs < 86400 * 365)
-    return RTF.format(Math.round(diffSec / (86400 * 30)), "month");
-  return RTF.format(Math.round(diffSec / (86400 * 365)), "year");
+function normalizeVideo(
+  raw: VideoRow | VideoRow[] | null,
+): ThreadMessage["video"] {
+  const v = Array.isArray(raw) ? (raw[0] ?? null) : raw;
+  if (!v) return null;
+  return {
+    id: v.id,
+    status: v.status,
+    mux_playback_id: v.mux_playback_id,
+    duration_seconds: v.duration_seconds,
+    purpose: v.purpose,
+  };
 }
 
 export default async function CoachInboxThreadPage({
@@ -77,7 +74,22 @@ export default async function CoachInboxThreadPage({
     )
     .order("created_at", { ascending: true });
 
-  const messages = (data ?? []) as unknown as RawMessageRow[];
+  const raw = (data ?? []) as unknown as RawMessageRow[];
+
+  // Normalise into the shape ThreadMessages expects.
+  const initialMessages: ThreadMessage[] = raw.map((msg) => ({
+    id: msg.id,
+    created_at: msg.created_at,
+    sender_user_id: msg.sender_user_id,
+    sender_display: msg.sender_display,
+    recipient_family_id: msg.recipient_family_id,
+    recipient_kid_id: msg.recipient_kid_id,
+    recipient_coach_user_id: msg.recipient_coach_user_id,
+    message_text: msg.message_text,
+    viewed_at: msg.viewed_at,
+    video: normalizeVideo(msg.video),
+  }));
+
   const kidDisplayName = [kid.first_name, kid.last_name]
     .filter(Boolean)
     .join(" ");
@@ -105,98 +117,14 @@ export default async function CoachInboxThreadPage({
             Failed to load thread: {error.message}
           </p>
         </Card>
-      ) : messages.length === 0 ? (
-        <Card padding="lg" className="border-dashed text-center">
-          <p className="text-sm text-text-light">
-            No messages yet in this thread.
-          </p>
-        </Card>
       ) : (
-        /* Chat bubbles */
+        /* Chat bubbles — live via Realtime */
         <Card padding="none" className="overflow-hidden">
-          <div className="flex flex-col gap-3 p-5">
-            {messages.map((msg) => {
-              const isSelf = msg.sender_user_id === user!.id;
-              const video = Array.isArray(msg.video)
-                ? (msg.video[0] ?? null)
-                : msg.video;
-              const created = new Date(msg.created_at);
-              const timeStr = Number.isNaN(created.getTime())
-                ? ""
-                : relativeTime(msg.created_at);
-
-              return (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col gap-1 ${isSelf ? "items-end" : "items-start"}`}
-                >
-                  {/* Sender label + time */}
-                  <div
-                    className={`flex items-center gap-2 ${isSelf ? "flex-row-reverse" : ""}`}
-                  >
-                    <span
-                      className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${
-                        isSelf
-                          ? "bg-gold text-dark"
-                          : "bg-gold/20 text-gold"
-                      }`}
-                    >
-                      {isSelf ? "You" : (msg.sender_display ?? "Family")}
-                    </span>
-                    {timeStr && (
-                      <span className="text-[11px] text-text-light/60">
-                        {timeStr}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Bubble */}
-                  {video?.mux_playback_id ? (
-                    <div
-                      className={`overflow-hidden rounded-2xl border ${isSelf ? "border-gold" : "border-border-gold"}`}
-                      style={{ width: 240 }}
-                    >
-                      <div className="relative aspect-video bg-darkest">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={`https://image.mux.com/${video.mux_playback_id}/thumbnail.jpg?width=480`}
-                          alt="Video thumbnail"
-                          className="h-full w-full object-cover"
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                          <span className="text-4xl">▶</span>
-                        </div>
-                      </div>
-                      <p className="px-3 py-2 text-xs text-text-light">
-                        Video message
-                      </p>
-                    </div>
-                  ) : video ? (
-                    <div
-                      className={`flex items-center gap-2 rounded-2xl border px-4 py-3 ${isSelf ? "border-gold bg-gold/10" : "border-border-gold bg-dark"}`}
-                      style={{ maxWidth: 280 }}
-                    >
-                      <span className="text-xl">🎬</span>
-                      <span className="text-sm text-text-light">
-                        Processing video…
-                      </span>
-                    </div>
-                  ) : (
-                    <div
-                      className={`rounded-2xl border px-4 py-3 text-sm leading-relaxed ${
-                        isSelf
-                          ? "border-gold bg-gold text-dark font-medium"
-                          : "border-border-gold bg-dark text-cream-light"
-                      }`}
-                      style={{ maxWidth: 320 }}
-                    >
-                      {msg.message_text ?? ""}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <ThreadMessages
+            initialMessages={initialMessages}
+            kidId={kidId}
+            coachUserId={user!.id}
+          />
         </Card>
       )}
 

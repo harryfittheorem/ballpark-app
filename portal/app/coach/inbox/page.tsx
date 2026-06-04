@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
+import { InboxList, type ConversationRow } from "./InboxList";
 
 type RawRow = {
   id: string;
@@ -12,37 +12,11 @@ type RawRow = {
   recipient_kid_id: string | null;
   recipient_family_id: string | null;
   recipient_coach_user_id: string | null;
-  recipient_kid: { first_name: string; last_name: string | null } | { first_name: string; last_name: string | null }[] | null;
+  recipient_kid:
+    | { first_name: string; last_name: string | null }
+    | { first_name: string; last_name: string | null }[]
+    | null;
 };
-
-type ConversationRow = {
-  kidId: string;
-  kidName: string;
-  lastMessageText: string | null;
-  lastHasVideo: boolean;
-  lastCreatedAt: string;
-  lastIsInbound: boolean;
-  hasUnread: boolean;
-};
-
-const RTF = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-function relativeTime(iso: string): string {
-  if (!iso) return "";
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diffSec = Math.round((then - now) / 1000);
-  const abs = Math.abs(diffSec);
-  if (abs < 60) return RTF.format(diffSec, "second");
-  if (abs < 3600) return RTF.format(Math.round(diffSec / 60), "minute");
-  if (abs < 86400) return RTF.format(Math.round(diffSec / 3600), "hour");
-  if (abs < 86400 * 7) return RTF.format(Math.round(diffSec / 86400), "day");
-  if (abs < 86400 * 30)
-    return RTF.format(Math.round(diffSec / (86400 * 7)), "week");
-  if (abs < 86400 * 365)
-    return RTF.format(Math.round(diffSec / (86400 * 30)), "month");
-  return RTF.format(Math.round(diffSec / (86400 * 365)), "year");
-}
 
 function kidNameFromRow(row: RawRow): string {
   const k = row.recipient_kid;
@@ -112,87 +86,12 @@ export default async function CoachInboxPage() {
         </p>
       </div>
 
-      {conversations.length === 0 ? (
-        <Card padding="lg" className="border-dashed text-center">
-          <p className="text-sm text-text-light">
-            No messages yet. Use the Ballpark mobile app to record a video for
-            a family — it will show up here.
-          </p>
-        </Card>
-      ) : (
-        <Card padding="none" className="overflow-hidden">
-          <ul className="divide-y divide-border-gold">
-            {conversations.map((conv) => {
-              const preview = conv.lastHasVideo
-                ? "📹 Video message"
-                : conv.lastMessageText?.trim() || "(empty message)";
-
-              const initials = conv.kidName
-                .split(" ")
-                .map((w) => w[0])
-                .slice(0, 2)
-                .join("")
-                .toUpperCase();
-
-              return (
-                <li key={conv.kidId}>
-                  <Link
-                    href={`/coach/inbox/${conv.kidId}`}
-                    className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-darkest/40"
-                  >
-                    {/* Avatar */}
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-darker border border-border-gold">
-                      <span className="font-display text-base font-semibold text-gold">
-                        {initials || "?"}
-                      </span>
-                    </div>
-
-                    {/* Content */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={`truncate text-sm font-semibold uppercase tracking-wide ${conv.hasUnread ? "text-cream-light" : "text-text-light"}`}
-                        >
-                          {conv.kidName}
-                        </span>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {conv.hasUnread && (
-                            <span className="h-2 w-2 rounded-full bg-gold" />
-                          )}
-                          <span className="text-xs text-text-light">
-                            {relativeTime(conv.lastCreatedAt)}
-                          </span>
-                        </div>
-                      </div>
-                      <p
-                        className={`mt-0.5 truncate text-sm ${conv.hasUnread ? "font-medium text-cream-light" : "text-text-light"}`}
-                      >
-                        {conv.lastIsInbound ? "" : "You: "}
-                        {preview}
-                      </p>
-                    </div>
-
-                    {/* Chevron */}
-                    <svg
-                      className="h-4 w-4 shrink-0 text-text-light/40"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
+      <Card padding="none" className="overflow-hidden">
+        {/* InboxList is a client component that subscribes to Realtime and
+            calls router.refresh() when a new message arrives, re-running this
+            server component so the grouped list stays current automatically. */}
+        <InboxList conversations={conversations} coachUserId={user!.id} />
+      </Card>
     </div>
   );
 }
