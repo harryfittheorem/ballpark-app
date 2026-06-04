@@ -16,7 +16,9 @@
 //   node scripts/provision-coach-mike.mjs   (Coach Mike must exist)
 //   node scripts/seed-demo-scenario.mjs     (Marcus + peers must exist)
 //
-// Idempotent: every INSERT uses ON CONFLICT (id) DO NOTHING.
+// Idempotent: INSERT uses ON CONFLICT (id) DO NOTHING for future bookings.
+// The today booking (days: 0) is always PATCHed after insert so its timestamps
+// stay current on every re-run — preventing the "stale today" bug.
 //
 // Cleanup:
 //   node scripts/delete-coach-mike-sessions.mjs
@@ -103,6 +105,18 @@ async function restInsert(table, rows) {
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`INSERT ${table} → ${res.status}: ${t}`);
+  }
+}
+
+async function restPatch(table, id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...baseHeaders, Prefer: 'return=minimal' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`PATCH ${table}/${id} → ${res.status}: ${t}`);
   }
 }
 
@@ -228,6 +242,20 @@ const bookings = BOOKING_DEFS.map((def) => {
 });
 
 await restInsert('bookings', bookings);
+
+// Always refresh the today booking's timestamps so re-runs don't leave a stale
+// scheduled_start from a previous day. ON CONFLICT DO NOTHING skips the row on
+// subsequent runs, so we need an explicit PATCH to keep it current.
+const todayDef = BOOKING_DEFS.find(d => d.days === 0);
+if (todayDef) {
+  const freshStart = daysFromNowAtUTC(0, todayDef.hour);
+  const freshEnd   = addMinutes(freshStart, todayDef.stType.duration_minutes);
+  await restPatch('bookings', todayDef.id, {
+    scheduled_start: freshStart,
+    scheduled_end:   freshEnd,
+  });
+  console.log(`  ↻ Today booking refreshed → ${freshStart}`);
+}
 
 for (const def of BOOKING_DEFS) {
   const kidName = kidNames[kidIds.indexOf(def.kid)];
