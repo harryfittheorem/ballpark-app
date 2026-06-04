@@ -50,6 +50,20 @@ node scripts/delete-demo-scenario.mjs     # Remove every record seeded by seed-d
                                            # Coach Mike is NOT deleted (provisioned separately).
 ```
 
+**Coach Mike sessions (for Sessions tab testing):**
+
+```bash
+node scripts/seed-coach-mike-sessions.mjs   # Insert 6 confirmed upcoming bookings for Coach Mike
+                                             # spread across the next 15 days (days +1, +3, +5, +8,
+                                             # +11, +14), across Marcus Rivera, Jaylen Carter, and
+                                             # Sofia Martinez. Times rotate 9 AM / 11 AM / 2 PM / 4 PM.
+                                             # Requires provision-coach-mike.mjs + seed-demo-scenario.mjs.
+                                             # Uses c0ac… UUID namespace. Idempotent — safe to re-run.
+
+node scripts/delete-coach-mike-sessions.mjs # Remove the 6 bookings inserted by seed-coach-mike-sessions.mjs
+                                             # (c0ac0006-0000-0000-0000-000000000001 … 000000000006).
+```
+
 **Environment Variables:**
 
 - `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_TENANT_SLUG=infinitehitting`

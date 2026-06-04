@@ -138,7 +138,13 @@ export default function CoachHomeScreen() {
         >
           {appRole !== 'parent' && (
             <View style={styles.section}>
-              <BookingsStatRow upcomingCount={PLACEHOLDER_UPCOMING_BOOKINGS} />
+              <Pressable
+                onPress={() => setTab('sessions')}
+                accessibilityRole="button"
+                accessibilityLabel="View upcoming sessions"
+              >
+                <BookingsStatRow upcomingCount={PLACEHOLDER_UPCOMING_BOOKINGS} />
+              </Pressable>
             </View>
           )}
           <View style={[styles.section, styles.cards]}>
