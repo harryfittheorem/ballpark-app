@@ -2312,6 +2312,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _get_caller_tenant_family_ids: { Args: never; Returns: string[] }
       _grant_achievement: {
         Args: { p_key: string; p_kid_id: string }
         Returns: undefined
