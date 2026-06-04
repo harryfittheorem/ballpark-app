@@ -90,7 +90,7 @@ export default function CoachHomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <CoachGreetingHeader firstName={firstName} />
+      <CoachGreetingHeader firstName={firstName} appRole={appRole} />
 
       {/* Sub-tab pill bar */}
       <View style={styles.tabBarWrapper}>
@@ -136,7 +136,7 @@ export default function CoachHomeScreen() {
             />
           }
         >
-          {appRole === 'coach' && (
+          {appRole !== 'parent' && (
             <View style={styles.section}>
               <BookingsStatRow upcomingCount={PLACEHOLDER_UPCOMING_BOOKINGS} />
             </View>
@@ -154,7 +154,7 @@ export default function CoachHomeScreen() {
               icon={Send}
               onPress={() => navigation.navigate('SentVideos')}
             />
-            {appRole === 'coach' && (
+            {appRole !== 'parent' && (
               <>
                 <CoachActionCard
                   title="Assign Drill"

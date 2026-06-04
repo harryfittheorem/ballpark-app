@@ -4,8 +4,9 @@ import { colors, fontFamilies, fontSizes, spacing, tracking } from '@/theme';
 
 import type { CoachGreetingHeaderProps } from '../types';
 
-export default function CoachGreetingHeader({ firstName }: CoachGreetingHeaderProps) {
-  const name = firstName?.trim() || 'Coach';
+export default function CoachGreetingHeader({ firstName, appRole }: CoachGreetingHeaderProps) {
+  const fallback = appRole === 'admin' ? 'Admin' : 'Coach';
+  const name = firstName?.trim() || fallback;
   return (
     <View style={styles.wrap}>
       <Text style={styles.eyebrow}>WELCOME BACK</Text>

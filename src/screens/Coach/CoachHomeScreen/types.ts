@@ -10,4 +10,5 @@ export type CoachActionCardProps = {
 
 export type CoachGreetingHeaderProps = {
   firstName: string | null;
+  appRole: string | null;
 };
