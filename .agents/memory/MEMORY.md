@@ -1,0 +1,1 @@
+- [Expo Go proxy domain](expo-proxy-domain.md) — use REPLIT_DEV_DOMAIN (not REPLIT_EXPO_DEV_DOMAIN) as EXPO_MANIFEST_PROXY_URL; the expo subdomain doesn't route to the portal.

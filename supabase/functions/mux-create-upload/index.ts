@@ -168,7 +168,7 @@ serve(async (req) => {
       return jsonError(403, "forbidden", "Admin role required for training uploads");
     }
   } else {
-    if (appRole !== "coach" && appRole !== "owner") {
+    if (appRole !== "coach" && appRole !== "owner" && appRole !== "admin") {
       return jsonError(403, "forbidden", "Coach or owner role required");
     }
   }
