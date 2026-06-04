@@ -32,7 +32,10 @@ function coachSessionId(index) {
   return `c0ac0006-0000-0000-0000-${i}`;
 }
 
-const ALL_BOOKING_IDS = Array.from({ length: 6 }, (_, i) => coachSessionId(i + 1));
+const ALL_BOOKING_IDS = [
+  coachSessionId(7),
+  ...Array.from({ length: 6 }, (_, i) => coachSessionId(i + 1)),
+];
 
 // =============================================================================
 // REST helpers
@@ -69,6 +72,6 @@ console.log(`
 DONE — Coach Mike sessions removed
 =============================================================================
   Bookings deleted: ${bookingDel}
-  (UUIDs c0ac0006-0000-0000-0000-000000000001 … 000000000006)
+  (UUIDs c0ac0006-0000-0000-0000-000000000001 … 000000000007)
 =============================================================================
 `);

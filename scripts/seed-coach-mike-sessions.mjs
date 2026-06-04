@@ -202,6 +202,7 @@ console.log(`  Group   → "${groupType.name}" (${groupType.duration_minutes} mi
 console.log('\n─── INSERTING BOOKINGS ───────────────────────────────────────────────');
 
 const BOOKING_DEFS = [
+  { id: coachSessionId(7), days: 0,  hour: 9,  kid: MARCUS_KID_ID, cage: '1', stType: privateType },
   { id: coachSessionId(1), days: 1,  hour: 9,  kid: MARCUS_KID_ID, cage: '1', stType: privateType },
   { id: coachSessionId(2), days: 3,  hour: 11, kid: JAYLEN_KID_ID, cage: '2', stType: privateType },
   { id: coachSessionId(3), days: 5,  hour: 14, kid: SOFIA_KID_ID,  cage: '3', stType: privateType },
@@ -245,9 +246,9 @@ console.log(`
 =============================================================================
 DONE — Coach Mike sessions seeded
 =============================================================================
-  6 confirmed bookings inserted over the next 15 days.
+  7 confirmed bookings (1 today + 6 over the next 15 days).
   Kids: Marcus Rivera, Jaylen Carter, Sofia Martinez.
-  UUID namespace: c0ac0006-0000-0000-0000-000000000001 … 000000000006
+  UUID namespace: c0ac0006-0000-0000-0000-000000000001 … 000000000007
 
   Remove with: node scripts/delete-coach-mike-sessions.mjs
 =============================================================================
