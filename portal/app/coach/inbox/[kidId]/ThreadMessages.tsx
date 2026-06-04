@@ -50,6 +50,15 @@ export function ThreadMessages({ initialMessages, kidId, coachUserId }: Props) {
   const [messages, setMessages] = useState<ThreadMessage[]>(initialMessages);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Sync state when the server re-renders with updated initialMessages after
+  // revalidatePath. useState only uses the prop on mount, so without this
+  // effect the component never reflects the new message from the server render.
+  const lastInitialId = initialMessages[initialMessages.length - 1]?.id ?? "";
+  useEffect(() => {
+    setMessages(initialMessages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastInitialId, initialMessages.length]);
+
   // Scroll to bottom on mount and when messages grow.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

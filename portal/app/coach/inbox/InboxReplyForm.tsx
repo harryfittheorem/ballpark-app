@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Send } from "lucide-react";
 import { replyToThread } from "./actions";
 
 export function InboxReplyForm({ kidId }: { kidId: string }) {
   const [pending, startTransition] = useTransition();
+  const [sendError, setSendError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -13,13 +14,22 @@ export function InboxReplyForm({ kidId }: { kidId: string }) {
     const text = textareaRef.current?.value?.trim();
     if (!text) return;
 
+    setSendError(null);
+
+    // Optimistically clear the textarea; restore if the action fails.
     if (textareaRef.current) textareaRef.current.value = "";
 
     const fd = new FormData();
     fd.append("kid_id", kidId);
     fd.append("message_text", text);
+
     startTransition(async () => {
-      await replyToThread(fd);
+      const result = await replyToThread(fd);
+      if (result?.error) {
+        setSendError(result.error);
+        // Restore the unsent text so the coach doesn't lose it.
+        if (textareaRef.current) textareaRef.current.value = text;
+      }
     });
   }
 
@@ -45,6 +55,9 @@ export function InboxReplyForm({ kidId }: { kidId: string }) {
             {pending ? "Sending…" : "Send"}
           </button>
         </div>
+        {sendError && (
+          <p className="text-xs text-red-400">{sendError}</p>
+        )}
       </form>
     </div>
   );
