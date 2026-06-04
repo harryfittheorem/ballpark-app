@@ -6,6 +6,9 @@
 -- 2. Add contact_email to tenants (used by request-membership-upgrade fn)
 -- 3. Create membership_plans table with RLS + seed for infinitehitting
 -- 4. Create membership_upgrade_requests table with RLS
+--
+-- Made idempotent: DROP POLICY IF EXISTS before each CREATE POLICY so this
+-- can be re-applied even if some objects already exist in production.
 -- =============================================================================
 
 -- ── 1. memberships.contract_url ───────────────────────────────────────────────
@@ -37,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.membership_plans (
 
 ALTER TABLE public.membership_plans ENABLE ROW LEVEL SECURITY;
 
--- Members can SELECT active plans for their own tenant
+DROP POLICY IF EXISTS "members_select_active_plans" ON public.membership_plans;
 CREATE POLICY "members_select_active_plans"
   ON public.membership_plans
   FOR SELECT
@@ -49,7 +52,7 @@ CREATE POLICY "members_select_active_plans"
     )
   );
 
--- Admins / owners have full access
+DROP POLICY IF EXISTS "admins_all_plans" ON public.membership_plans;
 CREATE POLICY "admins_all_plans"
   ON public.membership_plans
   FOR ALL
@@ -105,7 +108,7 @@ CREATE TABLE IF NOT EXISTS public.membership_upgrade_requests (
 
 ALTER TABLE public.membership_upgrade_requests ENABLE ROW LEVEL SECURITY;
 
--- Parents can INSERT and SELECT their own requests
+DROP POLICY IF EXISTS "parents_insert_own_upgrade_requests" ON public.membership_upgrade_requests;
 CREATE POLICY "parents_insert_own_upgrade_requests"
   ON public.membership_upgrade_requests
   FOR INSERT
@@ -116,6 +119,7 @@ CREATE POLICY "parents_insert_own_upgrade_requests"
     )
   );
 
+DROP POLICY IF EXISTS "parents_select_own_upgrade_requests" ON public.membership_upgrade_requests;
 CREATE POLICY "parents_select_own_upgrade_requests"
   ON public.membership_upgrade_requests
   FOR SELECT
@@ -126,7 +130,7 @@ CREATE POLICY "parents_select_own_upgrade_requests"
     )
   );
 
--- Admins / owners have full access
+DROP POLICY IF EXISTS "admins_all_upgrade_requests" ON public.membership_upgrade_requests;
 CREATE POLICY "admins_all_upgrade_requests"
   ON public.membership_upgrade_requests
   FOR ALL
