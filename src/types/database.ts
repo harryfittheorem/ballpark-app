@@ -1120,6 +1120,7 @@ export type Database = {
           is_active: boolean
           name: string
           plan_type: string
+          sessions_per_week: number | null
           sort_order: number
           tenant_id: string
           updated_at: string
@@ -1132,6 +1133,7 @@ export type Database = {
           is_active?: boolean
           name: string
           plan_type: string
+          sessions_per_week?: number | null
           sort_order?: number
           tenant_id: string
           updated_at?: string
@@ -1144,6 +1146,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           plan_type?: string
+          sessions_per_week?: number | null
           sort_order?: number
           tenant_id?: string
           updated_at?: string
@@ -1235,6 +1238,7 @@ export type Database = {
           paused_at: string | null
           plan_name: string
           plan_type: string
+          sessions_per_week: number | null
           sessions_remaining: number | null
           sessions_total: number | null
           started_at: string
@@ -1242,6 +1246,8 @@ export type Database = {
           stripe_subscription_id: string | null
           tenant_id: string
           updated_at: string
+          weekly_period_start: string | null
+          weekly_sessions_used: number
         }
         Insert: {
           amount_cents: number
@@ -1260,6 +1266,7 @@ export type Database = {
           paused_at?: string | null
           plan_name: string
           plan_type: string
+          sessions_per_week?: number | null
           sessions_remaining?: number | null
           sessions_total?: number | null
           started_at?: string
@@ -1267,6 +1274,8 @@ export type Database = {
           stripe_subscription_id?: string | null
           tenant_id: string
           updated_at?: string
+          weekly_period_start?: string | null
+          weekly_sessions_used?: number
         }
         Update: {
           amount_cents?: number
@@ -1285,6 +1294,7 @@ export type Database = {
           paused_at?: string | null
           plan_name?: string
           plan_type?: string
+          sessions_per_week?: number | null
           sessions_remaining?: number | null
           sessions_total?: number | null
           started_at?: string
@@ -1292,6 +1302,8 @@ export type Database = {
           stripe_subscription_id?: string | null
           tenant_id?: string
           updated_at?: string
+          weekly_period_start?: string | null
+          weekly_sessions_used?: number
         }
         Relationships: [
           {
