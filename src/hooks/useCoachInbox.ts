@@ -170,6 +170,10 @@ export function useCoachMessageThread(
             return [...prev, msg];
           });
 
+          // Force a refetch so the cache stays in sync when the insert
+          // originated from the web portal rather than a mobile mutation.
+          void qc.invalidateQueries({ queryKey: threadKey });
+
           // Keep the inbox list preview current.
           void qc.invalidateQueries({
             queryKey: coachInboxKeys.inbox(coachUserId),

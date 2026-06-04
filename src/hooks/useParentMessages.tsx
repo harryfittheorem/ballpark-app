@@ -9,6 +9,7 @@
  * Mutations invalidate the inbox + relevant thread on success.
  */
 
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -19,6 +20,7 @@ import {
   type SendParentMessageInput,
   type SentParentMessage,
 } from '@/api/parentMessages';
+import { supabase } from '@/lib/supabase';
 
 import { useAuth } from './useAuth';
 
@@ -52,7 +54,9 @@ export function useMessageThread(
   coachUserId: string | null | undefined,
 ) {
   const { user } = useAuth();
-  return useQuery({
+  const qc = useQueryClient();
+
+  const query = useQuery({
     queryKey:
       kidId && coachUserId
         ? parentMessageKeys.thread(kidId, coachUserId)
@@ -65,6 +69,44 @@ export function useMessageThread(
         selfUserId: user!.id,
       }),
   });
+
+  // Realtime: invalidate thread when a new coach_message arrives so
+  // web-portal-sent messages appear without a manual pull-to-refresh.
+  useEffect(() => {
+    if (!kidId || !coachUserId || !user) return;
+
+    const channel = supabase
+      .channel(`parent-thread-${kidId}-${coachUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'coach_messages',
+          filter: `recipient_kid_id=eq.${kidId}`,
+        },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          // Only react to messages in this (kid, coach) thread.
+          if (
+            row.sender_user_id !== coachUserId &&
+            row.recipient_coach_user_id !== coachUserId
+          ) {
+            return;
+          }
+          void qc.invalidateQueries({
+            queryKey: parentMessageKeys.thread(kidId, coachUserId),
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [kidId, coachUserId, user, qc]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return query;
 }
 
 export function useSendParentMessage(

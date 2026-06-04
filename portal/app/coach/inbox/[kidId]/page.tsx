@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Smartphone } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { InboxReplyForm } from "../InboxReplyForm";
@@ -130,22 +130,10 @@ export default async function CoachInboxThreadPage({
 
       {/* Reply area */}
       <Card padding="lg" className="space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-text-light">
-              Reply
-            </h2>
-            <InboxReplyForm kidId={kidId} />
-          </div>
-          <div className="shrink-0 rounded-xl border border-border-gold bg-darkest p-4 text-center">
-            <Smartphone size={20} className="mx-auto mb-1.5 text-text-light/60" />
-            <p className="text-[11px] leading-snug text-text-light/60">
-              Record video
-              <br />
-              from the app
-            </p>
-          </div>
-        </div>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-text-light">
+          Reply
+        </h2>
+        <InboxReplyForm kidId={kidId} />
       </Card>
     </div>
   );
