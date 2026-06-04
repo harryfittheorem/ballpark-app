@@ -47,8 +47,21 @@ if [ -d "supabase/functions" ]; then
     fi
   }
 
+  # mux-create-upload is deployed explicitly (not via the silent deploy_fn) so
+  # its deployment is verifiable: we log the source SHA-1 and the Supabase
+  # project ID to stdout, making it easy to confirm the right binary is live.
+  if [ -f "supabase/functions/mux-create-upload/index.ts" ]; then
+    MUX_UPLOAD_SHA=$(sha1sum supabase/functions/mux-create-upload/index.ts | awk '{print $1}')
+    echo "[post-merge] deploying mux-create-upload (source sha1=${MUX_UPLOAD_SHA})"
+    (
+      npx --yes supabase functions deploy mux-create-upload --use-api 2>&1 \
+        && echo "[post-merge] mux-create-upload deployed OK (sha1=${MUX_UPLOAD_SHA})" \
+        || echo "[post-merge] WARN: mux-create-upload deploy failed (sha1=${MUX_UPLOAD_SHA})"
+    ) &
+    PIDS+=($!)
+  fi
+
   # Standard JWT-verified functions
-  deploy_fn mux-create-upload
   deploy_fn send-push-notification
   deploy_fn send-coach-video-notification
   deploy_fn hittrax-associate

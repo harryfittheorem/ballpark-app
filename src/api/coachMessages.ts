@@ -448,17 +448,39 @@ export async function markCoachMessageViewed(messageId: string): Promise<void> {
 }
 
 /**
+ * Decode a single string claim from a JWT payload (base64url).
+ * Server-side RLS independently validates the same claims, so a plain
+ * decode without re-verification is safe for client-side UX use.
+ */
+function jwtStringClaim(token: string | undefined | null, key: string): string | null {
+  if (!token) return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4;
+    if (pad) b64 += '='.repeat(4 - pad);
+    const payload = JSON.parse(globalThis.atob(b64)) as Record<string, unknown>;
+    const val = payload[key];
+    return typeof val === 'string' ? val : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Insert a row into `public.coach_messages`. Mirrors `createBooking` in
  * `bookings.ts` — relies on RLS to reject any attempt to smuggle a row
  * into another tenant or impersonate another sender.
  *
- * tenant_id is read from the caller's `public.coaches` row (single source
- * of truth on the client; the JWT also carries it but we already keep
- * `coaches.tenant_id` cached via `useCoach`). sender_user_id is taken from
- * `supabase.auth.getUser()` so the value matches what auth.uid() will
- * resolve to inside the RLS policy. We `.select().single()` so callers get
- * the freshly-inserted row (id + created_at) for cache priming on the
- * sent-videos list later.
+ * tenant_id is read from the caller's `public.coaches` row when available.
+ * For admin / owner / super_admin callers who have no coaches row by design,
+ * falls back to the tenant_id claim in the JWT access token (same value,
+ * different source — the server enforces RLS using the JWT claim directly).
+ * sender_user_id is taken from `supabase.auth.getUser()` so the value
+ * matches what auth.uid() will resolve to inside the RLS policy.
+ * We `.select().single()` so callers get the freshly-inserted row
+ * (id + created_at) for cache priming on the sent-videos list later.
  */
 /**
  * Send a text-only reply from a coach to a family thread.
@@ -511,18 +533,31 @@ export async function sendCoachMessage(
   if (userErr) throw userErr;
   if (!user) throw new Error('You appear to be signed out. Sign back in and try again.');
 
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  const appRole = jwtStringClaim(accessToken, 'app_role');
+  const staffRoles = ['admin', 'owner', 'super_admin'];
+
   const { data: coach, error: coachErr } = await supabase
     .from('coaches')
     .select('tenant_id')
     .eq('user_id', user.id)
     .maybeSingle();
   if (coachErr) throw coachErr;
-  if (!coach) throw new Error('Coach profile not found for the current user.');
+
+  // Admin / owner / super_admin users have no coaches row by design.
+  // Fall back to the JWT tenant_id claim so they can send messages.
+  const tenantId =
+    coach?.tenant_id ??
+    (staffRoles.includes(appRole ?? '') ? jwtStringClaim(accessToken, 'tenant_id') : null);
+  if (!tenantId) {
+    throw new Error('Could not resolve tenant. Sign out, sign back in, and try again.');
+  }
 
   const { data, error } = await supabase
     .from('coach_messages')
     .insert({
-      tenant_id: coach.tenant_id,
+      tenant_id: tenantId,
       sender_user_id: user.id,
       video_id: input.videoId,
       recipient_family_id: input.recipientFamilyId,

@@ -119,10 +119,34 @@ export type CreateAssignmentInput = {
 };
 
 /**
+ * Decode a single string claim from a JWT payload (base64url).
+ * Used only to read custom claims (app_role, tenant_id) injected by the
+ * access-token hook. Server-side RLS re-validates independently, so a
+ * plain decode without re-verification is safe here.
+ */
+function jwtStringClaim(token: string | undefined | null, key: string): string | null {
+  if (!token) return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4;
+    if (pad) b64 += '='.repeat(4 - pad);
+    const payload = JSON.parse(globalThis.atob(b64)) as Record<string, unknown>;
+    const val = payload[key];
+    return typeof val === 'string' ? val : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Insert a new assignment. Looks up the caller's tenant_id from
- * `public.coaches` so the RLS tenant pin matches. Returns the freshly
- * inserted row (with refs hydrated) so the caller can prime its TanStack
- * Query cache without a re-fetch.
+ * `public.coaches` so the RLS tenant pin matches. For admin / owner /
+ * super_admin callers who have no row in `public.coaches`, falls back to
+ * the tenant_id claim in the JWT (same value, different source).
+ * Returns the freshly inserted row (with refs hydrated) so the caller can
+ * prime its TanStack Query cache without a re-fetch.
  */
 export async function createAssignment(
   input: CreateAssignmentInput,
@@ -134,16 +158,29 @@ export async function createAssignment(
   if (userErr) throw userErr;
   if (!user) throw new Error('You appear to be signed out. Sign back in and try again.');
 
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  const appRole = jwtStringClaim(accessToken, 'app_role');
+  const staffRoles = ['admin', 'owner', 'super_admin'];
+
   const { data: coach, error: coachErr } = await supabase
     .from('coaches')
     .select('tenant_id')
     .eq('user_id', user.id)
     .maybeSingle();
   if (coachErr) throw coachErr;
-  if (!coach) throw new Error('Coach profile not found for the current user.');
+
+  // Admin / owner / super_admin users have no coaches row by design.
+  // Fall back to the JWT tenant_id claim — the server enforces RLS using
+  // the same claim, so pinning from JWT here is safe.
+  const tenantId =
+    coach?.tenant_id ?? (staffRoles.includes(appRole ?? '') ? jwtStringClaim(accessToken, 'tenant_id') : null);
+  if (!tenantId) {
+    throw new Error('Could not resolve tenant. Sign out, sign back in, and try again.');
+  }
 
   const row: TablesInsert<'assignments'> = {
-    tenant_id: coach.tenant_id,
+    tenant_id: tenantId,
     coach_user_id: user.id,
     kid_id: input.kidId,
     family_id: input.familyId,
