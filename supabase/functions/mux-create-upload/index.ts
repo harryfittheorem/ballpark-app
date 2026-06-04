@@ -155,20 +155,26 @@ serve(async (req) => {
 
   // Role check, defence-in-depth on top of DB RLS:
   //   coach_message / drill   -> app_role='coach' OR app_role='owner'
-  //                             (owner sends on behalf of a coach from portal)
+  //                             OR app_role='admin' OR app_role='super_admin'
+  //                             (owner/admin/super_admin can upload on behalf of a coach)
   //   parent_to_coach         -> app_role='parent'
-  //   training                -> app_role='admin' (HQ-curated catalog;
-  //                             v0.7 task #121)
+  //   training                -> app_role='admin' OR app_role='super_admin'
+  //                             (HQ-curated catalog; v0.7 task #121)
   if (purpose === "parent_to_coach") {
     if (appRole !== "parent") {
       return jsonError(403, "forbidden", "Parent role required for parent_to_coach uploads");
     }
   } else if (purpose === "training") {
-    if (appRole !== "admin") {
+    if (appRole !== "admin" && appRole !== "super_admin") {
       return jsonError(403, "forbidden", "Admin role required for training uploads");
     }
   } else {
-    if (appRole !== "coach" && appRole !== "owner" && appRole !== "admin") {
+    if (
+      appRole !== "coach" &&
+      appRole !== "owner" &&
+      appRole !== "admin" &&
+      appRole !== "super_admin"
+    ) {
       return jsonError(403, "forbidden", "Coach or owner role required");
     }
   }
