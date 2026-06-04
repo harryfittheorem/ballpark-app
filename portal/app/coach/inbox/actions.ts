@@ -27,10 +27,21 @@ export async function replyToThread(formData: FormData) {
     user.email ??
     "Coach";
 
+  // Resolve family_id from the kid row — required by parent-side RLS SELECT policy
+  // (coach_messages_select_parent checks recipient_family_id = family.id).
+  const { data: kid, error: kidErr } = await supabase
+    .from("kids")
+    .select("family_id")
+    .eq("id", kidId)
+    .maybeSingle();
+
+  if (kidErr || !kid?.family_id) return;
+
   await supabase.from("coach_messages").insert({
     sender_user_id: user.id,
     sender_display: senderDisplay,
     recipient_kid_id: kidId,
+    recipient_family_id: kid.family_id,
     message_text: messageText,
     video_id: null,
     label: null,
@@ -38,4 +49,5 @@ export async function replyToThread(formData: FormData) {
   });
 
   revalidatePath("/coach/inbox");
+  revalidatePath(`/coach/inbox/${kidId}`);
 }

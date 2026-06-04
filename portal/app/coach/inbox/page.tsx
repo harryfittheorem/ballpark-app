@@ -1,23 +1,34 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
-import { InboxReplyForm } from "./InboxReplyForm";
 
-type Row = {
+type RawRow = {
   id: string;
   message_text: string | null;
   video_id: string | null;
   viewed_at: string | null;
   created_at: string;
   sender_user_id: string;
-  sender_display: string | null;
-  recipient_coach_user_id: string | null;
   recipient_kid_id: string | null;
-  recipient_kid: { first_name: string } | { first_name: string }[] | null;
+  recipient_family_id: string | null;
+  recipient_coach_user_id: string | null;
+  recipient_kid: { first_name: string; last_name: string | null } | { first_name: string; last_name: string | null }[] | null;
+};
+
+type ConversationRow = {
+  kidId: string;
+  kidName: string;
+  lastMessageText: string | null;
+  lastHasVideo: boolean;
+  lastCreatedAt: string;
+  lastIsInbound: boolean;
+  hasUnread: boolean;
 };
 
 const RTF = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
 function relativeTime(iso: string): string {
+  if (!iso) return "";
   const then = new Date(iso).getTime();
   const now = Date.now();
   const diffSec = Math.round((then - now) / 1000);
@@ -33,15 +44,12 @@ function relativeTime(iso: string): string {
   return RTF.format(Math.round(diffSec / (86400 * 365)), "year");
 }
 
-function kidName(row: Row): string {
+function kidNameFromRow(row: RawRow): string {
   const k = row.recipient_kid;
   if (!k) return "Unknown";
-  if (Array.isArray(k)) return k[0]?.first_name ?? "Unknown";
-  return k.first_name;
-}
-
-function kidId(row: Row): string | null {
-  return row.recipient_kid_id;
+  const item = Array.isArray(k) ? k[0] : k;
+  if (!item) return "Unknown";
+  return [item.first_name, item.last_name].filter(Boolean).join(" ");
 }
 
 export default async function CoachInboxPage() {
@@ -54,7 +62,7 @@ export default async function CoachInboxPage() {
   const { data, error } = await supabase
     .from("coach_messages")
     .select(
-      "id, message_text, video_id, viewed_at, created_at, sender_user_id, sender_display, recipient_coach_user_id, recipient_kid_id, recipient_kid:recipient_kid_id(first_name)",
+      "id, message_text, video_id, viewed_at, created_at, sender_user_id, recipient_kid_id, recipient_family_id, recipient_coach_user_id, recipient_kid:recipient_kid_id(first_name, last_name)",
     )
     .or(`sender_user_id.eq.${user!.id},recipient_coach_user_id.eq.${user!.id}`)
     .order("created_at", { ascending: false });
@@ -69,7 +77,29 @@ export default async function CoachInboxPage() {
     );
   }
 
-  const rows = (data ?? []) as Row[];
+  const rows = (data ?? []) as unknown as RawRow[];
+
+  // Group by recipient_kid_id — one conversation per kid.
+  // Walk newest-first so first encounter = latest message.
+  const folder = new Map<string, ConversationRow>();
+  for (const row of rows) {
+    const kidId = row.recipient_kid_id;
+    if (!kidId) continue;
+    if (folder.has(kidId)) continue;
+
+    const isInbound = row.sender_user_id !== user!.id;
+    folder.set(kidId, {
+      kidId,
+      kidName: kidNameFromRow(row),
+      lastMessageText: row.message_text,
+      lastHasVideo: !!row.video_id,
+      lastCreatedAt: row.created_at,
+      lastIsInbound: isInbound,
+      hasUnread: isInbound && !row.viewed_at,
+    });
+  }
+
+  const conversations = Array.from(folder.values());
 
   return (
     <div className="space-y-6">
@@ -78,11 +108,11 @@ export default async function CoachInboxPage() {
           Inbox
         </h1>
         <p className="mt-1 text-sm text-text-light">
-          Messages between you and your families.
+          One conversation per athlete — tap to view the full thread and reply.
         </p>
       </div>
 
-      {rows.length === 0 ? (
+      {conversations.length === 0 ? (
         <Card padding="lg" className="border-dashed text-center">
           <p className="text-sm text-text-light">
             No messages yet. Use the Ballpark mobile app to record a video for
@@ -92,76 +122,71 @@ export default async function CoachInboxPage() {
       ) : (
         <Card padding="none" className="overflow-hidden">
           <ul className="divide-y divide-border-gold">
-            {rows.map((row) => {
-              const isVideo = !!row.video_id;
-              const preview = isVideo
-                ? "Video message"
-                : (row.message_text ?? "").trim() || "(empty message)";
-              const isInbound = row.sender_user_id !== user!.id;
-              const directionLabel = isInbound ? "From" : "To";
-              const personName = isInbound
-                ? row.sender_display?.trim() || "Family"
-                : kidName(row);
-              const threadKidId = kidId(row);
+            {conversations.map((conv) => {
+              const preview = conv.lastHasVideo
+                ? "📹 Video message"
+                : conv.lastMessageText?.trim() || "(empty message)";
+
+              const initials = conv.kidName
+                .split(" ")
+                .map((w) => w[0])
+                .slice(0, 2)
+                .join("")
+                .toUpperCase();
+
               return (
-                <li
-                  key={row.id}
-                  className="flex flex-col gap-2 px-6 py-4 transition-colors hover:bg-darkest/40 sm:flex-row sm:items-start sm:gap-4"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                          isInbound
-                            ? "border border-gold bg-gold/10 text-gold"
-                            : "border border-border-gold bg-darkest text-text-light"
-                        }`}
-                      >
-                        {isInbound ? "Received" : "Sent"}
+                <li key={conv.kidId}>
+                  <Link
+                    href={`/coach/inbox/${conv.kidId}`}
+                    className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-darkest/40"
+                  >
+                    {/* Avatar */}
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-darker border border-border-gold">
+                      <span className="font-display text-base font-semibold text-gold">
+                        {initials || "?"}
                       </span>
-                      <span className="text-sm font-semibold text-cream-light">
-                        {directionLabel} {personName}
-                        {isInbound ? ` · about ${kidName(row)}` : ""}
-                      </span>
-                      {isVideo ? (
-                        <span className="inline-flex items-center rounded-full border border-border-gold bg-darkest px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gold">
-                          Video
-                        </span>
-                      ) : null}
                     </div>
-                    <p className="mt-1 truncate text-sm text-text-light">
-                      {preview}
-                    </p>
-                    {isInbound && threadKidId && (
-                      <InboxReplyForm kidId={threadKidId} />
-                    )}
-                  </div>
-                  <div className="flex shrink-0 flex-row items-center gap-3 sm:flex-col sm:items-end sm:gap-1">
-                    <span className="text-xs text-text-light">
-                      {relativeTime(row.created_at)}
-                    </span>
-                    {isInbound ? (
-                      row.viewed_at ? (
-                        <span className="text-[11px] text-text-light/70">
-                          Read
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={`truncate text-sm font-semibold uppercase tracking-wide ${conv.hasUnread ? "text-cream-light" : "text-text-light"}`}
+                        >
+                          {conv.kidName}
                         </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gold">
-                          <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-                          New
-                        </span>
-                      )
-                    ) : row.viewed_at ? (
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-success">
-                        <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                        Viewed
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-text-light/70">
-                        Not viewed
-                      </span>
-                    )}
-                  </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {conv.hasUnread && (
+                            <span className="h-2 w-2 rounded-full bg-gold" />
+                          )}
+                          <span className="text-xs text-text-light">
+                            {relativeTime(conv.lastCreatedAt)}
+                          </span>
+                        </div>
+                      </div>
+                      <p
+                        className={`mt-0.5 truncate text-sm ${conv.hasUnread ? "font-medium text-cream-light" : "text-text-light"}`}
+                      >
+                        {conv.lastIsInbound ? "" : "You: "}
+                        {preview}
+                      </p>
+                    </div>
+
+                    {/* Chevron */}
+                    <svg
+                      className="h-4 w-4 shrink-0 text-text-light/40"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </Link>
                 </li>
               );
             })}

@@ -92,7 +92,7 @@ export type EarnStackScreenProps<T extends keyof EarnStackParamList> = Composite
 
 export type CoachInboxStackParamList = {
   CoachInboxHome: undefined;
-  CoachMessageThread: { kidId: string; coachUserId: string; familyDisplayName?: string };
+  CoachMessageThread: { kidId: string; coachUserId: string; familyId: string; familyDisplayName?: string };
   InboxHome: undefined;
   RecordVideo: { purpose?: 'coach_message' | 'drill_assignment' } | undefined;
   RecipientPicker: { videoId: string };

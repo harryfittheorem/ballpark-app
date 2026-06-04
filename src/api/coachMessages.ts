@@ -460,6 +460,47 @@ export async function markCoachMessageViewed(messageId: string): Promise<void> {
  * the freshly-inserted row (id + created_at) for cache priming on the
  * sent-videos list later.
  */
+/**
+ * Send a text-only reply from a coach to a family thread.
+ * Unlike `sendCoachMessage` (which requires a videoId for the initial
+ * video message), this is used for follow-up text replies in an existing thread.
+ */
+export async function sendCoachTextReply(input: {
+  recipientFamilyId: string;
+  recipientKidId: string;
+  messageText: string;
+}): Promise<SentCoachMessage> {
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!user) throw new Error('You appear to be signed out. Sign back in and try again.');
+
+  const { data: coach, error: coachErr } = await supabase
+    .from('coaches')
+    .select('tenant_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (coachErr) throw coachErr;
+  if (!coach) throw new Error('Coach profile not found for the current user.');
+
+  const { data, error } = await supabase
+    .from('coach_messages')
+    .insert({
+      tenant_id: coach.tenant_id,
+      sender_user_id: user.id,
+      video_id: null,
+      recipient_family_id: input.recipientFamilyId,
+      recipient_kid_id: input.recipientKidId,
+      message_text: input.messageText,
+    })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function sendCoachMessage(
   input: SendCoachMessageInput,
 ): Promise<SentCoachMessage> {

@@ -10,26 +10,30 @@
  * parent→coach rows; this screen uses the dedicated coach-side query instead.
  *
  * Video bubbles navigate to CoachVideoPlayback (takes playbackId directly).
- * The compose button is omitted — coaches initiate threads via "New Video"
- * from CoachHomeScreen.
+ * Text compose bar at the bottom lets coaches send text replies.
  */
 
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { ArrowLeft, PlayCircle } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, PlayCircle, Send } from 'lucide-react-native';
+import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { CoachThreadMessage } from '@/api/coachInbox';
-import { useCoachMessageThread } from '@/hooks/useCoachInbox';
+import { sendCoachTextReply } from '@/api/coachMessages';
+import { coachInboxKeys, useCoachMessageThread } from '@/hooks/useCoachInbox';
 import type { CoachInboxStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
@@ -58,61 +62,140 @@ function formatSentRelative(date: Date): string {
 export default function CoachMessageThreadScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { kidId, coachUserId, familyDisplayName } = route.params;
+  const { kidId, coachUserId, familyId, familyDisplayName } = route.params;
 
+  const queryClient = useQueryClient();
   const { data: messages, isPending, isError, error, refetch } = useCoachMessageThread(
     kidId,
     coachUserId,
   );
 
   const data = useMemo(() => messages ?? [], [messages]);
+  const flatListRef = useRef<FlatList>(null);
+
+  const [replyText, setReplyText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+
+  async function handleSend() {
+    const text = replyText.trim();
+    if (!text || sending) return;
+
+    setSending(true);
+    setSendError(null);
+    try {
+      await sendCoachTextReply({
+        recipientFamilyId: familyId,
+        recipientKidId: kidId,
+        messageText: text,
+      });
+      setReplyText('');
+      await queryClient.invalidateQueries({
+        queryKey: coachInboxKeys.thread(kidId, coachUserId),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: coachInboxKeys.inbox(coachUserId),
+      });
+      // Scroll to bottom after data refreshes
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 300);
+    } catch (e) {
+      setSendError(errorMessage(e));
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.headerBar}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
-          <ArrowLeft size={22} color={colors.textOnDark} />
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <Text numberOfLines={1} style={styles.headerTitle}>
-            {(familyDisplayName ?? 'Family').toUpperCase()}
-          </Text>
-        </View>
-        {/* Spacer to keep title centred */}
-        <View style={{ width: 22 }} />
-      </View>
-
-      {isPending ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.gold} />
-        </View>
-      ) : isError ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>{errorMessage(error)}</Text>
-          <Pressable onPress={() => refetch()} style={{ marginTop: spacing['2xl'] }}>
-            <Text style={styles.retryText}>RETRY</Text>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        {/* Header */}
+        <View style={styles.headerBar}>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
+            <ArrowLeft size={22} color={colors.textOnDark} />
           </Pressable>
+          <View style={styles.headerCenter}>
+            <Text numberOfLines={1} style={styles.headerTitle}>
+              {(familyDisplayName ?? 'Family').toUpperCase()}
+            </Text>
+          </View>
+          <View style={{ width: 22 }} />
         </View>
-      ) : data.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>No messages yet.</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={data}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
-            <Bubble
-              message={item}
-              coachUserId={coachUserId}
-              onPlayVideo={(playbackId) =>
-                navigation.navigate('CoachVideoPlayback', { playbackId })
-              }
+
+        {/* Message list */}
+        {isPending ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.gold} />
+          </View>
+        ) : isError ? (
+          <View style={styles.center}>
+            <Text style={styles.errorText}>{errorMessage(error)}</Text>
+            <Pressable onPress={() => refetch()} style={{ marginTop: spacing['2xl'] }}>
+              <Text style={styles.retryText}>RETRY</Text>
+            </Pressable>
+          </View>
+        ) : data.length === 0 ? (
+          <View style={styles.center}>
+            <Text style={styles.emptyText}>No messages yet.</Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={data}
+            keyExtractor={(m) => m.id}
+            contentContainerStyle={styles.list}
+            onContentSizeChange={() =>
+              flatListRef.current?.scrollToEnd({ animated: false })
+            }
+            renderItem={({ item }) => (
+              <Bubble
+                message={item}
+                coachUserId={coachUserId}
+                onPlayVideo={(playbackId) =>
+                  navigation.navigate('CoachVideoPlayback', { playbackId })
+                }
+              />
+            )}
+          />
+        )}
+
+        {/* Compose bar */}
+        <View style={styles.composeArea}>
+          {sendError ? (
+            <Text style={styles.sendErrorText}>{sendError}</Text>
+          ) : null}
+          <View style={styles.composeRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Type a reply…"
+              placeholderTextColor={colors.textMuted}
+              value={replyText}
+              onChangeText={setReplyText}
+              multiline
+              maxLength={2000}
+              returnKeyType="default"
             />
-          )}
-        />
-      )}
+            <Pressable
+              onPress={handleSend}
+              disabled={sending || !replyText.trim()}
+              style={({ pressed }) => [
+                styles.sendBtn,
+                (!replyText.trim() || sending) && styles.sendBtnDisabled,
+                pressed && styles.sendBtnPressed,
+              ]}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color={colors.dark} />
+              ) : (
+                <Send size={18} color={replyText.trim() ? colors.dark : colors.textMuted} />
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -192,6 +275,7 @@ function Bubble({
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   safe: { flex: 1, backgroundColor: colors.darkest },
   headerBar: {
     flexDirection: 'row',
@@ -294,5 +378,52 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.base,
     lineHeight: 22,
+  },
+  composeArea: {
+    borderTopWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.darkest,
+    paddingHorizontal: spacing['3xl'],
+    paddingTop: spacing.lg,
+    paddingBottom: spacing['2xl'],
+  },
+  sendErrorText: {
+    color: colors.danger,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    marginBottom: spacing.base,
+  },
+  composeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.lg,
+  },
+  input: {
+    flex: 1,
+    minHeight: 40,
+    maxHeight: 120,
+    borderRadius: radius.xl,
+    borderWidth: 1.5,
+    borderColor: colors.borderGold,
+    backgroundColor: colors.dark,
+    paddingHorizontal: spacing['2xl'],
+    paddingVertical: spacing.base,
+    color: colors.textOnDark,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.base,
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBtnDisabled: {
+    backgroundColor: colors.darker,
+  },
+  sendBtnPressed: {
+    opacity: 0.8,
   },
 });

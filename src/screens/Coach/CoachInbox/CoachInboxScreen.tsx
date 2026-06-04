@@ -111,6 +111,7 @@ export default function CoachInboxScreen() {
                   navigation.navigate('CoachMessageThread', {
                     kidId: item.kidId,
                     coachUserId: item.coachUserId,
+                    familyId: item.familyId,
                     familyDisplayName: familyName,
                   })
                 }
