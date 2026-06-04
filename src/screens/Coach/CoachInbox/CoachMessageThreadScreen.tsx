@@ -150,6 +150,9 @@ export default function CoachMessageThreadScreen() {
             onContentSizeChange={() =>
               flatListRef.current?.scrollToEnd({ animated: false })
             }
+            onLayout={() =>
+              flatListRef.current?.scrollToEnd({ animated: false })
+            }
             renderItem={({ item }) => (
               <Bubble
                 message={item}

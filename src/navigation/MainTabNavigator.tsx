@@ -1,7 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Briefcase, Calendar, Home, Sparkles, User } from 'lucide-react-native';
 
-import { useCoachMessageBadge } from '@/hooks/useNewCoachMessage';
 import BookScreen from '@/screens/Book/BookScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
 
@@ -14,7 +13,6 @@ import type { MainTabParamList } from './types';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function MainTabNavigator() {
-  const hasNewCoachMessage = useCoachMessageBadge();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -46,10 +44,6 @@ export default function MainTabNavigator() {
         component={WorkStackNavigator}
         options={{
           tabBarIcon: ({ color, size }) => <Briefcase color={color} size={size} />,
-          // Messages lives under Work, so the "new coach
-          // message" badge follows it from the old Home tab.
-          tabBarBadge: hasNewCoachMessage ? '' : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.gold },
         }}
       />
       <Tab.Screen
