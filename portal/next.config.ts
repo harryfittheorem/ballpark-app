@@ -5,6 +5,7 @@ const replitDevDomain = process.env.REPLIT_DEV_DOMAIN;
 const replitExpoDevDomain = process.env.REPLIT_EXPO_DEV_DOMAIN;
 
 const allowedOrigins = [
+  "localhost:5000",
   "localhost:3000",
   ...(replitDevDomain
     ? [replitDevDomain, `${replitDevDomain}:5000`]

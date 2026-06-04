@@ -46,10 +46,6 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 5001
-externalPort = 6000
-
-[[ports]]
 localPort = 8080
 externalPort = 8080
 
@@ -121,10 +117,6 @@ args = "Portal dev"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Expo web"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Pitch Deck"
 
 [[workflows.workflow]]
@@ -142,24 +134,12 @@ args = "EXPO_PACKAGER_PROXY_URL=\"https://$REPLIT_DEV_DOMAIN\" EXPO_MANIFEST_PRO
 name = "Portal dev"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd portal && npm run dev"
-waitForPort = 3000
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "Expo web"
-author = "agent"
-
 [workflows.workflow.metadata]
 outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx expo start --web --port 5000 --offline < /dev/null"
+args = "cd portal && npm run dev -- -p 5000"
 waitForPort = 5000
 
 [[workflows.workflow]]
