@@ -89,6 +89,9 @@ if [ -d "supabase/functions" ]; then
   deploy_fn mux-webhook              "--no-verify-jwt"
   deploy_fn hittrax-registration-complete "--no-verify-jwt"
   deploy_fn hittrax-forget           "--no-verify-jwt"
+  # HitTrax-spec canonical endpoint names (required for HitTrax to call us)
+  deploy_fn CompleteHitTraxRegistration "--no-verify-jwt"
+  deploy_fn ForgetHitTraxUser           "--no-verify-jwt"
   deploy_fn stripe-webhook           "--no-verify-jwt"
 
   # Wait for all background deploys to finish
