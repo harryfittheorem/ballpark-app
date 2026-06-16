@@ -186,8 +186,9 @@ serve(async (req) => {
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), HITTRAX_TIMEOUT_MS);
   let res: Response;
+  console.log("hittrax-associate outbound", { url: url.toString(), method: "POST" });
   try {
-    res = await fetch(url, { method: "GET", signal: controller.signal });
+    res = await fetch(url, { method: "POST", body: "", signal: controller.signal });
   } catch (err) {
     clearTimeout(timeoutHandle);
     console.error("hittrax-associate fetch failed", err);
@@ -198,13 +199,13 @@ serve(async (req) => {
   }
   clearTimeout(timeoutHandle);
 
+  const responseBody = await res.text().catch(() => "");
+  console.log("hittrax-associate response", { status: res.status, body: responseBody });
+
   if (!res.ok) {
-    const errBody = await res.text().catch(() => "");
-    console.error("hittrax-associate HitTrax error", { status: res.status, url: url.toString(), body: errBody });
     return jsonError(502, "hittrax_error", `HitTrax returned status ${res.status}`);
   }
-  const text = await res.text();
-  const parsed = parseHitTraxTextResponse(text);
+  const parsed = parseHitTraxTextResponse(responseBody);
   if (!parsed.ok) {
     console.error(`hittrax-associate hittrax_error kid=${kidId} body=${parsed.error.slice(0, 200)}`);
     return jsonError(502, "hittrax_error", parsed.error);
