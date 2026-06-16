@@ -1,0 +1,56 @@
+[
+  {
+    "event_message": "hittrax-associate response { status: 400, body: \"No HitTrax User found\" }\n",
+    "event_type": "Log",
+    "execution_id": "606b875e-9786-4a94-87d7-c774a2ab8959",
+    "function_id": "31fbc897-8c8a-48f6-91b3-6bffed392f49",
+    "id": "31dc85b5-e981-4ba3-bb21-adddf64b5f6d",
+    "level": "info",
+    "timestamp": 1781631149524000
+  },
+  {
+    "event_message": "hittrax-associate outbound {\n  url: \"https://api.hittraxbaseball.com/api/AssociateThirdPartyAccount?PartnerID=660d712f-1cbb-4602-b03a-bcd97e83ec1e&APIKey=3B0F8977-8269-4B9C-B35E-E535E75473A9&UserID=Info%40infiniteclearwater.com&ThirdPartyUserID=0b8da420-4ed8-4dc5-a975-55b2196c9621\",\n  method: \"POST\"\n}\n",
+    "event_type": "Log",
+    "execution_id": "606b875e-9786-4a94-87d7-c774a2ab8959",
+    "function_id": "31fbc897-8c8a-48f6-91b3-6bffed392f49",
+    "id": "7ae8b0b5-4aa5-407f-98a9-1771638e1d4a",
+    "level": "info",
+    "timestamp": 1781631148005000
+  },
+  {
+    "event_message": "Listening on http://localhost:9999/\n",
+    "event_type": "Log",
+    "execution_id": "606b875e-9786-4a94-87d7-c774a2ab8959",
+    "function_id": "31fbc897-8c8a-48f6-91b3-6bffed392f49",
+    "id": "ae566134-af87-4ed3-afc2-c65fe013b68f",
+    "level": "info",
+    "timestamp": 1781631146137000
+  },
+  {
+    "event_message": "booted (time: 26ms)",
+    "event_type": "Boot",
+    "execution_id": "606b875e-9786-4a94-87d7-c774a2ab8959",
+    "function_id": "31fbc897-8c8a-48f6-91b3-6bffed392f49",
+    "id": "15fab7b4-96a9-436b-9491-b946b84cd12b",
+    "level": "log",
+    "timestamp": 1781631146126000
+  },
+  {
+    "event_message": "shutdown",
+    "event_type": "Shutdown",
+    "execution_id": "de6ca1f6-b014-4742-a63a-b87fe3c77a67",
+    "function_id": "31fbc897-8c8a-48f6-91b3-6bffed392f49",
+    "id": "5b5f603f-70d3-4588-bcb7-3553df373602",
+    "level": "log",
+    "timestamp": 1781630873558000
+  },
+  {
+    "event_message": "hittrax-associate response { status: 400, body: \"No HitTrax User found\" }\n",
+    "event_type": "Log",
+    "execution_id": "de6ca1f6-b014-4742-a63a-b87fe3c77a67",
+    "function_id": "31fbc897-8c8a-48f6-91b3-6bffed392f49",
+    "id": "4a21849d-43dc-4aee-9e99-01a48bb1f3a5",
+    "level": "info",
+    "timestamp": 1781630676800000
+  }
+]

@@ -203,7 +203,11 @@ serve(async (req) => {
   console.log("hittrax-associate response", { status: res.status, body: responseBody });
 
   if (!res.ok) {
-    return jsonError(502, "hittrax_error", `HitTrax returned status ${res.status}`);
+    const lowerBody = responseBody.toLowerCase();
+    if (res.status === 400 && lowerBody.includes("no hittrax user found")) {
+      return jsonError(422, "hittrax_user_not_found", "No HitTrax account found for that email. Double-check the email your athlete uses to log in to HitTrax and try again.");
+    }
+    return jsonError(502, "hittrax_error", `HitTrax returned status ${res.status}: ${responseBody.slice(0, 200)}`);
   }
   const parsed = parseHitTraxTextResponse(responseBody);
   if (!parsed.ok) {

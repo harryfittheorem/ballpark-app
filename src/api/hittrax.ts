@@ -75,6 +75,28 @@ export type AssociateResponse = {
   hittrax_release_status: boolean;
 };
 
+/**
+ * Extract a human-readable message from a Supabase FunctionsError.
+ * `FunctionsHttpError.context` is the raw Response object — we need to
+ * read its JSON body to get the server-side error message. Falls back
+ * to the SDK-level message if the body isn't parseable JSON.
+ */
+async function extractFunctionError(error: unknown): Promise<string> {
+  try {
+    const ctx = (error as { context?: unknown }).context;
+    if (ctx instanceof Response) {
+      const body = await ctx.json().catch(() => null);
+      const serverMessage = body?.error?.message;
+      if (typeof serverMessage === 'string' && serverMessage.length > 0) {
+        return serverMessage;
+      }
+    }
+  } catch {
+    // ignore — fall through to error.message
+  }
+  return (error as { message?: string }).message ?? 'An unexpected error occurred.';
+}
+
 /** Kick off the AssociateThirdPartyAccount flow for a kid. */
 export async function associateHitTrax(
   kidId: string,
@@ -83,14 +105,7 @@ export async function associateHitTrax(
   const { data, error } = await supabase.functions.invoke('hittrax-associate', {
     body: { kid_id: kidId, hittrax_user_id: hittraxUserId },
   });
-  if (error) {
-    // Edge Function errors come back as FunctionsError — surface the
-    // server-side error code/message when present.
-    const message =
-      (error as unknown as { context?: { error?: { message?: string } } })?.context
-        ?.error?.message ?? error.message;
-    throw new Error(message);
-  }
+  if (error) throw new Error(await extractFunctionError(error));
   return data as AssociateResponse;
 }
 
@@ -99,11 +114,6 @@ export async function disconnectHitTrax(kidId: string): Promise<{ link_id: strin
   const { data, error } = await supabase.functions.invoke('hittrax-disconnect', {
     body: { kid_id: kidId },
   });
-  if (error) {
-    const message =
-      (error as unknown as { context?: { error?: { message?: string } } })?.context
-        ?.error?.message ?? error.message;
-    throw new Error(message);
-  }
+  if (error) throw new Error(await extractFunctionError(error));
   return data as { link_id: string };
 }
