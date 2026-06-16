@@ -1,27 +1,27 @@
 /**
- * Deno integration tests for the HitTrax shared helpers (task #118).
+ * Deno integration tests for the HitTrax shared helpers.
  *
  * Run from the project root:
  *   deno test --allow-env supabase/functions/_shared/hittrax.test.ts
  *
- * Covers the contracts the registration-complete, forget, and poll Edge
- * Functions depend on:
+ * Covers the contracts the forget, poll, and inbound Edge Functions depend on:
  *   - timingSafeEqual: constant-time string compare; rejects mismatch /
  *     length difference / mid-string flips.
  *   - verifyHitTraxInbound: rejects mismatched PartnerID and APIKey, and
  *     400s on missing params, before any downstream work happens.
- *   - parseAssociateResponse: parses HitTrax's "true|false" booleans and
- *     returns null on malformed shapes.
  *   - parseHitTraxTextResponse: routes "Error ..." to {ok:false}.
  *   - parseSwingsPayload: maps every accepted field-name variant to the
  *     canonical column, handles top-level array and {Data:[...]} envelopes,
  *     drops rows with no usable event id, and preserves raw payload.
+ *
+ * Note: parseAssociateResponse was removed in v1.3 — the new
+ * AssociateThirdPartyAccountWithCloudCredentials endpoint returns a plain
+ * ThirdPartyUserPassword string, not a "bool|bool" pair.
  */
 
 import { assert, assertEquals, assertFalse } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
 import {
-  parseAssociateResponse,
   parseHitTraxTextResponse,
   parseSwingsPayload,
   parseSwingsPayloadStrict,
@@ -99,21 +99,8 @@ Deno.test("verifyHitTraxInbound: missing APIKey -> 400 missing_api_key", () => {
 });
 
 // ---------------------------------------------------------------------------
-// parseAssociateResponse / parseHitTraxTextResponse
+// parseHitTraxTextResponse
 // ---------------------------------------------------------------------------
-Deno.test("parseAssociateResponse: 'true|false' (license, no release)", () => {
-  assertEquals(parseAssociateResponse("true|false"), { registration: true, release: false });
-});
-
-Deno.test("parseAssociateResponse: 'false|false' (no license)", () => {
-  assertEquals(parseAssociateResponse("false|false"), { registration: false, release: false });
-});
-
-Deno.test("parseAssociateResponse: malformed returns null", () => {
-  assertEquals(parseAssociateResponse("yes|no"), null);
-  assertEquals(parseAssociateResponse("true"), null);
-});
-
 Deno.test("parseHitTraxTextResponse: routes Error strings to {ok:false}", () => {
   const r = parseHitTraxTextResponse("Error Invalid Partner Login");
   assertFalse(r.ok);

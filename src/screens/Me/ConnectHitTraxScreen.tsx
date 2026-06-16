@@ -1,17 +1,19 @@
 /**
  * ConnectHitTraxScreen — Me-tab entry to link or unlink the family kid's
- * HitTrax account at any time. The same component is reused from the post-
- * AddKid onboarding stack via AuthNavigator (see Auth/ConnectHitTraxScreen).
+ * HitTrax account.
  *
- * States the screen renders, driven entirely off useHitTraxLink:
- *   - no link / removed: prompt + input + Connect button
- *   - pending          : waiting card ("check your email") + Cancel button
- *   - active           : connected card + last-poll timestamp + Disconnect
- *   - declined         : declined message + Try again button (re-shows form)
+ * v1.3 flow: parent enters their HitTrax username + password → we
+ * authenticate server-side → the link goes directly to 'active'. No email
+ * confirmation, no waiting. Swings appear within ~5 minutes.
+ *
+ * States:
+ *   no link / removed / declined  → connect form (username + password)
+ *   active                        → connected card + Disconnect button
+ *   pending (v1.x legacy)         → "waiting on email" card + Cancel button
  */
 
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Input } from '@/components/ui';
@@ -40,34 +42,29 @@ export default function ConnectHitTraxScreen() {
   const { data: link, isPending } = useHitTraxLink(kid?.id);
   const associate = useAssociateHitTrax(kid?.id);
   const disconnect = useDisconnectHitTrax(kid?.id);
-  const [hittraxUserId, setHittraxUserId] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const onConnect = async () => {
-    const trimmed = hittraxUserId.trim();
-    if (trimmed.length === 0) {
-      Alert.alert('HitTrax UserID required', 'Enter the HitTrax UserID your athlete uses to log in.');
+    if (!username.trim()) {
+      Alert.alert('Username required', 'Enter the HitTrax username for this athlete.');
+      return;
+    }
+    if (!password) {
+      Alert.alert('Password required', 'Enter the HitTrax password for this athlete.');
       return;
     }
     try {
-      const res = await associate.mutateAsync({ hittraxUserId: trimmed });
-      if (!res.hittrax_registration_status) {
-        Alert.alert(
-          'HitTrax subscription needed',
-          "Your HitTrax account doesn't currently have data sharing enabled. Upgrade in HitTrax, then try again.",
-        );
-      } else {
-        Alert.alert(
-          'Check the HitTrax email',
-          "We've asked HitTrax to send you a confirmation email. Tap the link in that email to finish connecting — this screen will update automatically.",
-        );
-        setHittraxUserId('');
-      }
+      await associate.mutateAsync({ hittraxUsername: username.trim(), hittraxPassword: password });
+      setUsername('');
+      setPassword('');
     } catch (err) {
       Alert.alert('Connect failed', errorMessage(err));
     }
   };
 
-  const onDisconnect = async () => {
+  const onDisconnect = () => {
     Alert.alert(
       'Disconnect HitTrax?',
       "We'll stop pulling new swing data. Past sessions remain in your history.",
@@ -88,13 +85,18 @@ export default function ConnectHitTraxScreen() {
     );
   };
 
+  const showConnectForm =
+    !link ||
+    link.association_status === 'removed' ||
+    link.association_status === 'declined';
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>HitTrax</Text>
         <Text style={styles.subtitle}>
-          Link your athlete&apos;s HitTrax account and we&apos;ll pull every cage swing
-          into Ballpark within ~5 minutes.
+          Link your athlete&apos;s HitTrax account and every cage swing syncs into
+          Ballpark within ~5 minutes of a session ending.
         </Text>
 
         {!kid ? (
@@ -109,10 +111,11 @@ export default function ConnectHitTraxScreen() {
         ) : link?.association_status === 'active' ? (
           <View>
             <View style={styles.card}>
-              <Text style={styles.cardLabel}>Connected</Text>
-              <Text style={styles.cardValue}>
-                HitTrax UserID: {link.external_user_id ?? '—'}
-              </Text>
+              <View style={styles.connectedBadge}>
+                <Text style={styles.connectedBadgeText}>● CONNECTED</Text>
+              </View>
+              <Text style={styles.cardLabel}>HitTrax username</Text>
+              <Text style={styles.cardValue}>{link.external_user_id ?? '—'}</Text>
               <Text style={styles.cardLabel}>Last sync</Text>
               <Text style={styles.cardValue}>
                 {formatRelative(link.last_polled_at)}
@@ -127,56 +130,93 @@ export default function ConnectHitTraxScreen() {
               loading={disconnect.isPending}
             />
           </View>
+
         ) : link?.association_status === 'pending' ? (
+          // Legacy v1.x users who linked before the API upgrade.
+          // They never got a ThirdPartyPassword — the only path forward is
+          // to cancel and re-link via the new v1.3 flow.
           <View>
             <View style={styles.card}>
-              <Text style={styles.cardLabel}>Waiting on email</Text>
+              <Text style={styles.cardLabel}>Waiting on email confirmation</Text>
               <Text style={styles.cardValue}>
-                HitTrax sent a confirmation email to your athlete&apos;s HitTrax
-                account. Tap the link in that email — this screen updates as soon
-                as HitTrax tells us.
+                Your link was created under an older version of the HitTrax
+                integration. Tap &quot;Cancel and re-link&quot; below to switch to the
+                new instant-connect flow — it only takes a few seconds.
               </Text>
             </View>
-            {/* Recovery action — never strand the parent in 'pending' if the
-                email never arrives or they entered the wrong UserID. Cancel
-                flips this row to 'removed' so the form re-appears for a
-                fresh attempt. */}
             <Button
               variant="secondary"
               tone="danger"
-              label="Cancel and start over"
+              label="Cancel and re-link"
               onPress={onDisconnect}
               loading={disconnect.isPending}
             />
           </View>
-        ) : (
+
+        ) : showConnectForm ? (
           <View>
             {link?.association_status === 'declined' ? (
-              <View style={styles.card}>
-                <Text style={styles.cardLabel}>Previously declined</Text>
+              <View style={[styles.card, styles.cardWarning]}>
+                <Text style={styles.cardLabel}>Previous attempt declined</Text>
                 <Text style={styles.cardValue}>
-                  The last HitTrax email was declined. Try again below.
+                  Enter your HitTrax credentials below to try again.
                 </Text>
               </View>
             ) : null}
+
             <Input
-              label="HitTrax UserID"
-              placeholder="e.g. coach.dave@infinitehitting.com"
+              label="HitTrax Username"
+              placeholder="Your HitTrax username"
               autoCapitalize="none"
-              value={hittraxUserId}
-              onChangeText={setHittraxUserId}
+              autoCorrect={false}
+              keyboardType="email-address"
+              value={username}
+              onChangeText={setUsername}
+              testID="connect-hittrax-username"
             />
+
+            <View style={styles.passwordRow}>
+              <View style={styles.passwordInput}>
+                <Input
+                  label="HitTrax Password"
+                  placeholder="Your HitTrax password"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={password}
+                  onChangeText={setPassword}
+                  testID="connect-hittrax-password"
+                />
+              </View>
+              <TouchableOpacity
+                style={styles.showHide}
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.showHideText}>{showPassword ? 'Hide' : 'Show'}</Text>
+              </TouchableOpacity>
+            </View>
+
             <Text style={styles.note}>
-              This is the email or UserID your athlete uses to log into HitTrax
-              online. We never see their password.
+              We authenticate directly with HitTrax — your password is never
+              stored by Ballpark.
             </Text>
+
             <Button
               label="Connect HitTrax"
               onPress={onConnect}
               loading={associate.isPending}
+              testID="connect-hittrax-submit"
             />
+
+            <View style={styles.createHint}>
+              <Text style={styles.createHintText}>
+                Don&apos;t have a HitTrax account?{' '}
+                <Text style={styles.createHintLink}>Create one in-app — coming soon.</Text>
+              </Text>
+            </View>
           </View>
-        )}
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -194,6 +234,7 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.md,
+    lineHeight: 22,
     marginTop: spacing.sm,
     marginBottom: spacing['3xl'],
   },
@@ -204,6 +245,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing['3xl'],
     marginBottom: spacing['3xl'],
+  },
+  cardWarning: {
+    borderColor: colors.gold,
+  },
+  connectedBadge: {
+    marginBottom: spacing.lg,
+  },
+  connectedBadgeText: {
+    color: '#4ade80',
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.xs,
+    letterSpacing: tracking.wide,
   },
   cardLabel: {
     color: colors.textMuted,
@@ -219,11 +272,43 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     marginTop: spacing.xs,
   },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.md,
+  },
+  passwordInput: {
+    flex: 1,
+  },
+  showHide: {
+    paddingBottom: spacing.md,
+  },
+  showHideText: {
+    color: colors.gold,
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
+  },
   note: {
     color: colors.textMuted,
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.sm,
     marginTop: spacing.md,
     marginBottom: spacing['3xl'],
+    lineHeight: 18,
+  },
+  createHint: {
+    marginTop: spacing['2xl'],
+    alignItems: 'center',
+  },
+  createHintText: {
+    color: colors.textMuted,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  createHintLink: {
+    color: colors.gold,
+    fontFamily: fontFamilies.interMedium,
   },
 });

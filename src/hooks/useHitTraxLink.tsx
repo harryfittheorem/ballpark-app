@@ -2,13 +2,13 @@
  * useHitTraxLink — TanStack Query hook for the (kid, hittrax) link row.
  *
  * Primary transport is a Realtime postgres_changes subscription on
- * `kid_capture_links` — when hittrax-registration-complete or hittrax-poll
- * UPDATEs the row, we invalidate the cache and the UI flips immediately.
+ * `kid_capture_links` — when hittrax-poll UPDATEs the row we invalidate
+ * the cache and the UI flips immediately.
  *
- * A short refetch interval (5s while pending, 60s while active) is kept as
- * a fallback for environments where the Realtime channel hasn't connected
- * yet (cold start, network flap) so the parent never gets stuck staring at
- * a stale "Pending" state.
+ * v1.3: new connections go straight to 'active'. The 'pending' refetch
+ * interval is kept for backward-compat with any existing v1.x users who
+ * linked before the API upgrade (they'll still see "pending" until they
+ * cancel + re-link via the new flow).
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -29,23 +29,13 @@ export function hittraxLinkKey(kidId: string) {
 
 export function useHitTraxLink(kidId: string | undefined) {
   const qc = useQueryClient();
-  // Stable per-instance suffix so that two components mounting this hook
-  // with the same kidId get distinct channel names. Supabase Realtime
-  // rejects a second `.on()` call on an already-subscribed channel, which
-  // causes a crash when e.g. ProfileScreen and ConnectHitTraxScreen are
-  // both mounted with the same kidId.
   const instanceId = useRef(`${Math.random().toString(36).slice(2, 8)}`);
 
-  // Realtime subscription on the kid_capture_links row for this kid. Any
-  // INSERT/UPDATE/DELETE invalidates the query so the UI re-reads via the
-  // SAFE_COLUMNS allow-list (the realtime payload itself isn't trusted —
-  // we never touch the password column even if it appears in the diff).
   useEffect(() => {
     if (!kidId) return;
     const channel = supabase
       .channel(`hittrax-link-${kidId}-${instanceId.current}`)
       .on(
-        // postgres_changes is typed with `any` upstream; cast keeps strict mode happy.
         'postgres_changes' as never,
         {
           event: '*',
@@ -69,7 +59,6 @@ export function useHitTraxLink(kidId: string | undefined) {
     enabled: !!kidId,
     refetchInterval: (query) => {
       const link = query.state.data;
-      // Fallback for when the Realtime channel hasn't connected yet.
       if (link?.association_status === 'pending') return 5_000;
       if (link?.association_status === 'active') return 60_000;
       return false;
@@ -79,10 +68,10 @@ export function useHitTraxLink(kidId: string | undefined) {
 
 export function useAssociateHitTrax(kidId: string | undefined) {
   const qc = useQueryClient();
-  return useMutation<AssociateResponse, Error, { hittraxUserId: string }>({
-    mutationFn: ({ hittraxUserId }) => {
+  return useMutation<AssociateResponse, Error, { hittraxUsername: string; hittraxPassword: string }>({
+    mutationFn: ({ hittraxUsername, hittraxPassword }) => {
       if (!kidId) throw new Error('No kid selected');
-      return associateHitTrax(kidId, hittraxUserId);
+      return associateHitTrax(kidId, hittraxUsername, hittraxPassword);
     },
     onSuccess: () => {
       if (kidId) void qc.invalidateQueries({ queryKey: hittraxLinkKey(kidId) });

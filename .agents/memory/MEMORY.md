@@ -1,2 +1,3 @@
 - [Expo Go proxy domain](expo-proxy-domain.md) — use REPLIT_DEV_DOMAIN (not REPLIT_EXPO_DEV_DOMAIN) as EXPO_MANIFEST_PROXY_URL; the expo subdomain doesn't route to the portal.
 - [Portal port routing](portal-port-routing.md) — portal must run on port 5000 (webview); port 3000 breaks preview pane and Stripe Connect callbacks.
+- [HitTrax v1.3 API flow](hittrax-v13-flow.md) — v1.3 is instant/synchronous; no email confirm; remove requires session token (AuthenticateCloudUserViaThirdParty first); all outbound are GET except CreateCloudUserAccount (POST).

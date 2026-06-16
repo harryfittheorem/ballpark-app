@@ -1,26 +1,25 @@
 /**
- * HitTrax API helpers (task #118).
+ * HitTrax API helpers — v1.3 flow.
  *
- * Thin wrappers around the four HitTrax-related Edge Functions:
- *   - hittrax-associate          POST { kid_id, hittrax_user_id }
- *   - hittrax-disconnect         POST { kid_id }
- *   - (registration-complete + forget are inbound — never called from client)
+ * Thin wrappers around the HitTrax-related Edge Functions:
+ *   - hittrax-associate   POST { kid_id, hittrax_username, hittrax_password }
+ *   - hittrax-disconnect  POST { kid_id }
+ *   (registration-complete + forget are inbound — never called from client)
  *
- * Plus a SELECT helper that scopes by kid_id and returns ONLY the columns
- * the UI is allowed to render — explicitly excluding
- * `third_party_user_password` so a leaked client log never spills the
- * HitTrax-issued credential. (RLS narrows rows; column projection narrows
- * fields. PostgREST has no per-column RLS, so this lives in the API layer.)
+ * v1.3 change: association is now instant and synchronous. The link goes
+ * directly to 'active' — no email confirmation / pending state needed for
+ * new connections. Existing v1.x users with 'pending' rows are supported via
+ * the "Cancel and start over" disconnect path.
+ *
+ * getHitTraxLinkForKid excludes `third_party_user_password` so a leaked
+ * client log never spills the HitTrax-issued credential. Column projection
+ * + RLS work together: RLS narrows rows, this projection narrows fields.
  */
 
 import { supabase } from '@/lib/supabase';
 
 import type { Database } from '@/types/database';
 
-// Narrow the generated Row to the columns we actually project + the union
-// types we know are enforced by the table-level CHECK constraints. Picking
-// from the typed Row keeps us in sync with future schema changes — adding a
-// new column won't widen this type until we add it to SAFE_COLUMNS too.
 type KidCaptureLinkRow = Database['public']['Tables']['kid_capture_links']['Row'];
 export type KidCaptureLink = Omit<
   Pick<
@@ -58,28 +57,20 @@ export async function getHitTraxLinkForKid(
     .eq('capture_source', 'hittrax')
     .maybeSingle();
   if (error) throw error;
-  // The PostgREST projection narrows the row at runtime; the union narrowing
-  // on capture_source/association_status is enforced by the table CHECK
-  // constraints (see migration 20260508060000) so this cast is sound.
   return (data as KidCaptureLink | null) ?? null;
 }
 
+/** v1.3: association is immediate — link goes straight to 'active'. */
 export type AssociateResponse = {
   link_id: string;
-  // 'pending' when HitTrax accepted and is sending the confirmation email,
-  // 'declined' when HitTrax has no eligible subscription for the UserID.
-  // The UI branches on this — declined leaves the connect form visible so
-  // the parent can upgrade and retry without backend intervention.
-  association_status: 'pending' | 'declined';
-  hittrax_registration_status: boolean;
-  hittrax_release_status: boolean;
+  association_status: 'active';
+  hittrax_username: string;
 };
 
 /**
  * Extract a human-readable message from a Supabase FunctionsError.
- * `FunctionsHttpError.context` is the raw Response object — we need to
- * read its JSON body to get the server-side error message. Falls back
- * to the SDK-level message if the body isn't parseable JSON.
+ * `FunctionsHttpError.context` is the raw Response — read its JSON body to
+ * surface the server-side error message. Falls back to the SDK message.
  */
 async function extractFunctionError(error: unknown): Promise<string> {
   try {
@@ -97,19 +88,24 @@ async function extractFunctionError(error: unknown): Promise<string> {
   return (error as { message?: string }).message ?? 'An unexpected error occurred.';
 }
 
-/** Kick off the AssociateThirdPartyAccount flow for a kid. */
+/**
+ * Associate a kid with a HitTrax account using the parent's HitTrax
+ * username + password. v1.3 flow: authenticate → associate → active.
+ * The link is activated immediately — no email confirmation required.
+ */
 export async function associateHitTrax(
   kidId: string,
-  hittraxUserId: string,
+  hittraxUsername: string,
+  hittraxPassword: string,
 ): Promise<AssociateResponse> {
   const { data, error } = await supabase.functions.invoke('hittrax-associate', {
-    body: { kid_id: kidId, hittrax_user_id: hittraxUserId },
+    body: { kid_id: kidId, hittrax_username: hittraxUsername, hittrax_password: hittraxPassword },
   });
   if (error) throw new Error(await extractFunctionError(error));
   return data as AssociateResponse;
 }
 
-/** Disconnect a kid's HitTrax link (RemoveThirdPartyAssociation + flip status). */
+/** Disconnect a kid's HitTrax link (remove association + flip status). */
 export async function disconnectHitTrax(kidId: string): Promise<{ link_id: string }> {
   const { data, error } = await supabase.functions.invoke('hittrax-disconnect', {
     body: { kid_id: kidId },

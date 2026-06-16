@@ -1,25 +1,13 @@
 /**
  * ConnectHitTraxOnboardingScreen — post-AddKid onboarding step.
  *
- * This is the onboarding-flavoured twin of Me/ConnectHitTraxScreen. It runs
- * inline (not via a redirect) so the parent can complete the connection in
- * the same flow as Add Kid. Two affordances:
+ * v1.3 flow: parent enters HitTrax username + password → we authenticate
+ * server-side → the link activates immediately. No email wait, no pending
+ * state. On success we pop to Home and swings start appearing within ~5 min.
  *
- *   1. Inline HitTrax UserID input + helper text + "Connect HitTrax" button.
- *      Submitting calls hittrax-associate; on success we surface the
- *      "check your HitTrax email" card AND let the parent tap Continue to
- *      land on Home — the link will flip to active in the background once
- *      HitTrax POSTs hittrax-registration-complete (Realtime hook updates
- *      the Home banner with no manual refresh).
- *   2. "Skip for now" button — pops back to Home. The Home banner remains
- *      as a passive nudge so a parent who skips here can connect later
- *      from Home or Me → HitTrax.
- *
- * Lifecycle note: hittrax-associate is now atomic — the kid_capture_links
- * row is only written AFTER HitTrax accepts the request. On any HitTrax
- * error (timeout, unreachable, bad UserID) we surface the message and
- * keep the form ready for retry; the parent is never stranded in
- * 'pending' on this screen.
+ * Two affordances:
+ *   1. HitTrax username + password form → "Connect HitTrax" button
+ *   2. "Skip for now" → pops to Home (Home banner nudges later)
  */
 
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -31,6 +19,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -46,27 +35,24 @@ export default function ConnectHitTraxOnboardingScreen() {
   const navigation = useNavigation<HomeStackScreenProps<'ConnectHitTraxOnboarding'>['navigation']>();
   const route = useRoute<HomeStackScreenProps<'ConnectHitTraxOnboarding'>['route']>();
   const { kids } = useFamily();
-  // Prefer the explicit kidId routed from AddKidScreen so we never race
-  // the family refetch. Falls back to kids[0] for direct navigations
-  // (e.g. Home → onboarding banner) where no param is supplied.
   const routedKidId = route.params?.kidId;
   const kid = routedKidId ? kids.find((k) => k.id === routedKidId) ?? { id: routedKidId } : kids[0];
   const { data: link } = useHitTraxLink(kid?.id);
   const associate = useAssociateHitTrax(kid?.id);
-  const [hittraxUserId, setHittraxUserId] = useState('');
-  // Local "we just submitted, the email is on its way" flag. Kept separate
-  // from the link.association_status so we can show the success card even
-  // before Realtime delivers the row (the row IS persisted at this point —
-  // hittrax-associate writes it after HitTrax accepts — but the React
-  // Query refetch may lag the navigation by a tick).
-  const [submittedOk, setSubmittedOk] = useState(false);
+
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const goHome = () => navigation.popToTop();
 
   const onConnect = async () => {
-    const trimmed = hittraxUserId.trim();
-    if (trimmed.length === 0) {
-      Alert.alert('HitTrax UserID required', 'Enter the HitTrax UserID your athlete uses to log in.');
+    if (!username.trim()) {
+      Alert.alert('Username required', 'Enter the HitTrax username for this athlete.');
+      return;
+    }
+    if (!password) {
+      Alert.alert('Password required', 'Enter the HitTrax password for this athlete.');
       return;
     }
     if (!kid) {
@@ -74,34 +60,17 @@ export default function ConnectHitTraxOnboardingScreen() {
       return;
     }
     try {
-      const res = await associate.mutateAsync({ hittraxUserId: trimmed });
-      // Atomic associate succeeded — link is now persisted in 'pending'.
-      // Show the appropriate next step based on the registration boolean.
-      if (!res.hittrax_registration_status) {
-        Alert.alert(
-          'HitTrax subscription needed',
-          "Your HitTrax account doesn't currently have data sharing enabled. Upgrade in HitTrax, then try again.",
-        );
-        // Do NOT auto-advance — let the parent fix it and re-submit, or Skip.
-        return;
-      }
-      setSubmittedOk(true);
-      // Spec: "submit lands parent on Home". Auto-navigate immediately —
-      // the Home screen already renders the pending HitTrax banner driven
-      // by useHitTraxLink, so the parent sees the same "check your email"
-      // affordance there with no second tap required.
+      await associate.mutateAsync({ hittraxUsername: username.trim(), hittraxPassword: password });
+      // v1.3: link is immediately active — go straight to Home.
+      // The Work/Swings screen will show data within ~5 minutes.
       goHome();
     } catch (err) {
-      // hittrax-associate is atomic: a thrown error here means HitTrax
-      // refused (or was unreachable) and NO row was written. The parent
-      // can correct the UserID and retry without being stuck in 'pending'.
+      // hittrax-associate is atomic — on any error no row is written.
+      // The parent can fix credentials and retry immediately.
       Alert.alert('Connect failed', errorMessage(err));
     }
   };
 
-  // Already-active edge case: if the parent had an active link from a
-  // prior kid (one-kid-per-family today, but futureproof) we skip the
-  // form and just acknowledge.
   const alreadyActive = link?.association_status === 'active';
 
   return (
@@ -114,49 +83,75 @@ export default function ConnectHitTraxOnboardingScreen() {
           <View>
             <Text style={styles.title}>Connect HitTrax</Text>
             <Text style={styles.subtitle}>
-              Pull your kid&apos;s cage swings into Ballpark automatically — exit
-              velo, distance, and personal bests show up within a few minutes
-              of every session. Requires a HitTrax membership.
+              Pull your athlete&apos;s cage swings into Ballpark automatically — exit
+              velo, distance, and personal bests appear within ~5 minutes of
+              every session. Requires a HitTrax account.
             </Text>
 
             {alreadyActive ? (
               <View style={styles.card}>
                 <Text style={styles.cardLabel}>Already connected</Text>
                 <Text style={styles.cardValue}>
-                  This kid&apos;s HitTrax account is linked. You can manage it any
-                  time from Me → HitTrax.
+                  HitTrax is linked. Manage it any time from Me → HitTrax.
                 </Text>
               </View>
-            ) : submittedOk || link?.association_status === 'pending' ? (
+
+            ) : link?.association_status === 'pending' ? (
+              // Legacy v1.x user — guide them to cancel + re-link.
               <View style={styles.card}>
-                <Text style={styles.cardLabel}>Check your HitTrax email</Text>
+                <Text style={styles.cardLabel}>Previous link pending</Text>
                 <Text style={styles.cardValue}>
-                  We&apos;ve asked HitTrax to send a confirmation email. Tap the
-                  link in that email to finish connecting — Ballpark will start
-                  pulling swings within a few minutes after you confirm. You
-                  can continue to Home; the connection updates automatically.
+                  An older link is waiting on email confirmation. Go to
+                  Me → HitTrax to cancel it and re-link with the new
+                  instant-connect flow.
                 </Text>
               </View>
+
             ) : (
               <View>
                 <Input
-                  label="HitTrax UserID"
-                  placeholder="e.g. coach.dave@infinitehitting.com"
+                  label="HitTrax Username"
+                  placeholder="Your HitTrax username"
                   autoCapitalize="none"
-                  value={hittraxUserId}
-                  onChangeText={setHittraxUserId}
-                  testID="connect-hittrax-onboarding-userid"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  value={username}
+                  onChangeText={setUsername}
+                  testID="connect-hittrax-onboarding-username"
                 />
+
+                <View style={styles.passwordRow}>
+                  <View style={styles.passwordInput}>
+                    <Input
+                      label="HitTrax Password"
+                      placeholder="Your HitTrax password"
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={password}
+                      onChangeText={setPassword}
+                      testID="connect-hittrax-onboarding-password"
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={styles.showHide}
+                    onPress={() => setShowPassword((v) => !v)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.showHideText}>{showPassword ? 'Hide' : 'Show'}</Text>
+                  </TouchableOpacity>
+                </View>
+
                 <Text style={styles.note}>
-                  This is the email or UserID your athlete uses to log into
-                  HitTrax online. We never see their password.
+                  We verify directly with HitTrax — your password is never
+                  stored by Ballpark.
                 </Text>
               </View>
             )}
           </View>
 
           <View style={styles.actions}>
-            {alreadyActive || submittedOk || link?.association_status === 'pending' ? (
+            {alreadyActive || link?.association_status === 'pending' ? (
               <Button
                 label="Continue to Home"
                 onPress={goHome}
@@ -170,7 +165,8 @@ export default function ConnectHitTraxOnboardingScreen() {
                 testID="connect-hittrax-onboarding-connect"
               />
             )}
-            {!(alreadyActive || submittedOk || link?.association_status === 'pending') ? (
+
+            {!(alreadyActive || link?.association_status === 'pending') ? (
               <View style={styles.skipWrap}>
                 <Button
                   label="Skip for now"
@@ -182,6 +178,7 @@ export default function ConnectHitTraxOnboardingScreen() {
                 />
               </View>
             ) : null}
+
             <Text style={styles.footnote}>
               You can connect or change this any time from Me → HitTrax.
             </Text>
@@ -235,12 +232,29 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     lineHeight: 22,
   },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.md,
+  },
+  passwordInput: {
+    flex: 1,
+  },
+  showHide: {
+    paddingBottom: spacing.md,
+  },
+  showHideText: {
+    color: colors.gold,
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
+  },
   note: {
     color: colors.textMuted,
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.sm,
     marginTop: spacing.md,
     marginBottom: spacing['3xl'],
+    lineHeight: 18,
   },
   actions: { marginTop: spacing['3xl'] },
   skipWrap: { marginTop: spacing.md },

@@ -1,32 +1,35 @@
 // =============================================================================
 // supabase/functions/_shared/hittrax.ts
 // =============================================================================
-// Shared helpers for the HitTrax Edge Functions:
-//   * Inbound auth (PartnerID + APIKey verification, constant-time)
-//   * Outbound URL builder + response parser
-//   * Swing-payload parser (placeholder schema — see TODO)
+// Shared helpers for the HitTrax Edge Functions.
 //
-// HitTrax API conventions (per Third Party Data Sharing API v1.0):
-//   * All credentials are passed as URL query parameters (PartnerID, APIKey,
-//     ThirdPartyUserID, ThirdPartyUserPassword). No Authorization header.
-//   * Successful responses are plain text:
-//       - AssociateThirdPartyAccount   -> "true|false" (registration|release)
-//       - CompleteHitTraxRegistration  -> "true"
-//       - GetAvailableThirdPartyData   -> JSON string (content-type-dependent)
-//       - RemoveThirdPartyAssociation  -> "true"
-//       - ForgetHitTraxUser            -> "true"
-//   * Error responses are plain text starting with "Error" + a detail string
-//     drawn from the Appendix table on page 12 of the spec.
+// HitTrax API v1.3 — Third Party / HitTrax Account Management and Data
+// Retrieval API (Developers Guide v1.3, HitTrax, Northborough MA).
 //
-// HitTrax inbound auth model (CompleteHitTraxRegistration / ForgetHitTraxUser):
-//   the spec instructs the third party to "validate that we are referring to
-//   them with the same PartnerID and APIKey we provided at time of initial
-//   setup." That is the entire authentication mechanism — there is no HMAC
-//   signature, no OAuth, no mTLS. We MUST therefore:
-//     * Compare BOTH values in constant time (timingSafeEqual below).
-//     * Refuse the request if either is missing/wrong (401).
-//     * Accept only HTTPS (Supabase Edge Functions are HTTPS-only — no extra
-//       check needed).
+// ---- Outbound calls WE make TO HitTrax (all GET unless noted) ----
+//   CheckForCloudUsernameEligibility      GET  → "true"|"false"
+//   CreateCloudUserAccount                POST → ThirdPartyUserPassword
+//   AuthenticateCloudUser                 GET  → session token
+//   ProvideOTPResponseCode                GET  → session token
+//   AuthenticateCloudUserViaThirdParty    GET  → session token
+//   AssociateThirdPartyAccountWithCloudCredentials GET → ThirdPartyUserPassword
+//   RemoveThirdPartyAssociationFromCloudUser       GET → "true"
+//   RetrieveThirdPartyAccountFromLinkedCloudUser   GET → JSON
+//   RetrieveCloudUserAccountFromLinkedThirdPartyAccount GET → JSON
+//   NotifyKioskOfUserEvent                GET  → "true"
+//   GetAvailableThirdPartyData            GET  → JSON
+//   LogOutThirdPartyCloudUser             GET  → "true"
+//
+// ---- Inbound calls HitTrax makes TO US ----
+//   ForgetHitTraxUser  POST  (GDPR purge)
+//
+// All responses on success are plain text.
+// All error responses begin with "Error" followed by a reason string
+// (see Appendix, p.20 of the spec).
+//
+// Auth model: PartnerID + APIKey in every query string. No Authorization
+// header. Session tokens are short-lived (2h inactivity TTL) and must
+// never be persisted — generate fresh per-request.
 // =============================================================================
 
 export type HitTraxConfig = {
@@ -43,8 +46,7 @@ export function readHitTraxConfig(): HitTraxConfig | null {
   return { baseUrl: baseUrl.replace(/\/+$/, ""), partnerId, apiKey };
 }
 
-// Constant-time string comparison. NEVER use === on a secret — early-out on
-// the first differing byte leaks length/prefix to a timing attacker.
+// Constant-time string comparison — never use === on a secret value.
 export function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -52,9 +54,8 @@ export function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-// Verify that an inbound HitTrax callback (CompleteHitTraxRegistration,
-// ForgetHitTraxUser) carries the PartnerID + APIKey HitTrax issued to us.
-// Returns { ok: true } or a structured error suitable for jsonError().
+// Verify an inbound HitTrax callback (ForgetHitTraxUser) carries the
+// PartnerID + APIKey issued to us.
 export function verifyHitTraxInbound(
   url: URL,
   cfg: HitTraxConfig,
@@ -69,12 +70,12 @@ export function verifyHitTraxInbound(
   return { ok: true };
 }
 
-// Build a HitTrax outbound URL. Always uses URLSearchParams so we never
-// double-encode and never leak un-escaped user input into the path.
+// Build a HitTrax outbound URL. Uses URLSearchParams so values are always
+// properly encoded and secrets never leak into the URL path.
 export function buildHitTraxUrl(
   cfg: HitTraxConfig,
   endpoint: string,
-  params: Record<string, string | number | undefined | null>,
+  params: Record<string, string | number | undefined | null> = {},
 ): string {
   const url = new URL(`${cfg.baseUrl}/${endpoint}`);
   url.searchParams.set("PartnerID", cfg.partnerId);
@@ -86,9 +87,8 @@ export function buildHitTraxUrl(
   return url.toString();
 }
 
-// Format a Date for HitTrax StartDate/EndDate query params. Spec says
-// YYYY-MM-DDTHH:MI:SS:SSS (note the colon before milliseconds). We pass it
-// through URLSearchParams which handles URI-encoding for us.
+// Format a Date for HitTrax StartDate/EndDate params.
+// Spec format: YYYY-MM-DDTHH:MI:SS:SSS (colon before milliseconds).
 export function formatHitTraxDate(d: Date): string {
   const pad = (n: number, w = 2) => String(n).padStart(w, "0");
   return (
@@ -97,9 +97,9 @@ export function formatHitTraxDate(d: Date): string {
   );
 }
 
-// Parse a HitTrax plain-text response. Returns either { ok: true, body } when
-// the response is a normal string (e.g. "true", "true|false") or
-// { ok: false, error } when HitTrax returned an "Error ..." string.
+// Parse a HitTrax plain-text response.
+// Returns { ok: true, body } for normal values ("true", session token, password, etc.)
+// Returns { ok: false, error } when HitTrax returned an "Error ..." string.
 export type HitTraxResponse = { ok: true; body: string } | { ok: false; error: string };
 
 export function parseHitTraxTextResponse(body: string): HitTraxResponse {
@@ -110,39 +110,238 @@ export function parseHitTraxTextResponse(body: string): HitTraxResponse {
   return { ok: true, body: trimmed };
 }
 
-// Parse the registration|release booleans returned by AssociateThirdPartyAccount.
-// Spec example: "true|false" — they have the license but have not approved sharing.
-export function parseAssociateResponse(
-  body: string,
-): { registration: boolean; release: boolean } | null {
-  const parts = body.split("|").map((s) => s.trim().toLowerCase());
-  if (parts.length !== 2) return null;
-  const reg = parts[0] === "true" ? true : parts[0] === "false" ? false : null;
-  const rel = parts[1] === "true" ? true : parts[1] === "false" ? false : null;
-  if (reg === null || rel === null) return null;
-  return { registration: reg, release: rel };
+// =============================================================================
+// v1.3 HTTP helpers — one function per outbound endpoint.
+// All throw a descriptive Error on failure so callers can catch + re-throw
+// as structured edge-function errors.
+// =============================================================================
+
+const DEFAULT_TIMEOUT_MS = 15_000;
+
+// Internal: GET a HitTrax URL and return the plain-text body.
+// Throws on network error, timeout, or non-2xx HTTP status.
+async function hitTraxGet(url: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(url, { method: "GET", signal: controller.signal });
+  } catch (err) {
+    clearTimeout(timer);
+    if ((err as Error)?.name === "AbortError") throw new Error("hittrax_timeout");
+    throw new Error("hittrax_unreachable");
+  }
+  clearTimeout(timer);
+  const text = await res.text().catch(() => "");
+  if (!res.ok) {
+    console.error("hitTraxGet non-2xx", { status: res.status, url, body: text.slice(0, 200) });
+    throw new Error(`hittrax_http_${res.status}: ${text.slice(0, 200)}`);
+  }
+  return text;
+}
+
+// Internal: POST a HitTrax URL with a JSON body, return plain-text body.
+async function hitTraxPost(url: string, bodyObj: unknown, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bodyObj),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if ((err as Error)?.name === "AbortError") throw new Error("hittrax_timeout");
+    throw new Error("hittrax_unreachable");
+  }
+  clearTimeout(timer);
+  const text = await res.text().catch(() => "");
+  if (!res.ok) {
+    console.error("hitTraxPost non-2xx", { status: res.status, url, body: text.slice(0, 200) });
+    throw new Error(`hittrax_http_${res.status}: ${text.slice(0, 200)}`);
+  }
+  return text;
+}
+
+// ---------------------------------------------------------------------------
+// AuthenticateCloudUser (v1.3 p.6)
+// Authenticate with HitTrax username + password → session token.
+// Throws on bad credentials ("HitTrax User Authentication Failure") or any
+// other HitTrax error so the caller can surface a meaningful message.
+// ---------------------------------------------------------------------------
+export async function authenticateCloudUser(
+  cfg: HitTraxConfig,
+  username: string,
+  password: string,
+): Promise<string> {
+  const url = buildHitTraxUrl(cfg, "AuthenticateCloudUser", {
+    UserName: username,
+    Password: password,
+    UseOTP: "false",
+  });
+  const raw = await hitTraxGet(url);
+  const parsed = parseHitTraxTextResponse(raw);
+  if (!parsed.ok) {
+    const lower = parsed.error.toLowerCase();
+    if (lower.includes("authentication failure") || lower.includes("account not verified")) {
+      throw new Error("invalid_hittrax_credentials: " + parsed.error);
+    }
+    throw new Error("hittrax_auth_error: " + parsed.error);
+  }
+  return parsed.body; // session token
+}
+
+// ---------------------------------------------------------------------------
+// AuthenticateCloudUserViaThirdParty (v1.3 p.9)
+// Authenticate using the ThirdPartyUserID + ThirdPartyUserPassword we stored
+// at association time → session token. Used for disconnect and future re-auth.
+// ---------------------------------------------------------------------------
+export async function authenticateCloudUserViaThirdParty(
+  cfg: HitTraxConfig,
+  thirdPartyUserId: string,
+  thirdPartyUserPassword: string,
+): Promise<string> {
+  const url = buildHitTraxUrl(cfg, "AuthenticateCloudUserViaThirdParty", {
+    ThirdPartyUserID: thirdPartyUserId,
+    ThirdPartyUserPassword: thirdPartyUserPassword,
+  });
+  const raw = await hitTraxGet(url);
+  const parsed = parseHitTraxTextResponse(raw);
+  if (!parsed.ok) throw new Error("hittrax_third_party_auth_error: " + parsed.error);
+  return parsed.body; // session token
+}
+
+// ---------------------------------------------------------------------------
+// AssociateThirdPartyAccountWithCloudCredentials (v1.3 p.10)
+// Associate our ThirdPartyUserID with the authenticated session.
+// Returns the ThirdPartyUserPassword — store it; it's the permanent credential
+// for future API calls on behalf of this user.
+// ---------------------------------------------------------------------------
+export async function associateThirdPartyAccount(
+  cfg: HitTraxConfig,
+  sessionToken: string,
+  thirdPartyUserId: string,
+): Promise<string> {
+  const url = buildHitTraxUrl(cfg, "AssociateThirdPartyAccountWithCloudCredentials", {
+    UserSessionToken: sessionToken,
+    ThirdPartyUserID: thirdPartyUserId,
+  });
+  const raw = await hitTraxGet(url);
+  const parsed = parseHitTraxTextResponse(raw);
+  if (!parsed.ok) throw new Error("hittrax_associate_error: " + parsed.error);
+  return parsed.body; // ThirdPartyUserPassword
+}
+
+// ---------------------------------------------------------------------------
+// RemoveThirdPartyAssociationFromCloudUser (v1.3 p.11)
+// Terminates the association. Requires an active session token — call
+// authenticateCloudUserViaThirdParty first.
+// ---------------------------------------------------------------------------
+export async function removeThirdPartyAssociation(
+  cfg: HitTraxConfig,
+  sessionToken: string,
+): Promise<void> {
+  const url = buildHitTraxUrl(cfg, "RemoveThirdPartyAssociationFromCloudUser", {
+    UserSessionToken: sessionToken,
+  });
+  const raw = await hitTraxGet(url);
+  const parsed = parseHitTraxTextResponse(raw);
+  if (!parsed.ok) throw new Error("hittrax_remove_error: " + parsed.error);
+}
+
+// ---------------------------------------------------------------------------
+// LogOutThirdPartyCloudUser (v1.3 p.17)
+// Terminates the session. Best-effort — always call after associate/remove to
+// avoid leaving dangling sessions on HitTrax servers.
+// ---------------------------------------------------------------------------
+export async function logOutSession(cfg: HitTraxConfig, sessionToken: string): Promise<void> {
+  try {
+    const url = buildHitTraxUrl(cfg, "LogOutThirdPartyCloudUser", { UserSessionToken: sessionToken });
+    await hitTraxGet(url);
+  } catch (err) {
+    // Best-effort — log but never let a logout failure bubble up.
+    console.warn("hittrax logOutSession failed (non-fatal)", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CheckForCloudUsernameEligibility (v1.3 p.3)
+// Returns true if username is available, false if taken.
+// ---------------------------------------------------------------------------
+export async function checkCloudUsernameEligibility(
+  cfg: HitTraxConfig,
+  cloudUsername: string,
+): Promise<boolean> {
+  const url = buildHitTraxUrl(cfg, "CheckForCloudUsernameEligibility", { CloudUsername: cloudUsername });
+  const raw = await hitTraxGet(url);
+  const parsed = parseHitTraxTextResponse(raw);
+  if (!parsed.ok) throw new Error("hittrax_username_check_error: " + parsed.error);
+  return parsed.body.toLowerCase() === "true";
+}
+
+// ---------------------------------------------------------------------------
+// CreateCloudUserAccount (v1.3 p.4)
+// Creates a HitTrax Cloud account and automatically links it to our
+// ThirdPartyUserID. Returns the ThirdPartyUserPassword — store it.
+// ---------------------------------------------------------------------------
+export type CreateHitTraxAccountParams = {
+  username: string;
+  thirdPartyUsername: string; // our internal identifier (e.g. kid's Supabase UUID as string)
+  password: string;
+  firstName: string;
+  lastName: string;
+  birthdate: string; // MM/DD/YYYY
+  email: string;
+  guardianEmail?: string; // required if user < 13
+  cellPhone?: string;
+  heightInches?: number;
+  gender: "male" | "female" | "other";
+  sport: "Baseball" | "Fastpitch Softball" | "Slowpitch Softball";
+  skillLevel: string;
+  position?: string;
+  bats?: "Right" | "Left" | "Switch";
+  throws?: "Right" | "Left";
+};
+
+export async function createCloudUserAccount(
+  cfg: HitTraxConfig,
+  params: CreateHitTraxAccountParams,
+): Promise<string> {
+  const url = buildHitTraxUrl(cfg, "CreateCloudUserAccount");
+  const postBody = {
+    Username: params.username,
+    ThirdPartyUsername: params.thirdPartyUsername,
+    Password: params.password,
+    FirstName: params.firstName,
+    LastName: params.lastName,
+    Birthdate: params.birthdate,
+    Email: params.email,
+    ...(params.guardianEmail ? { GuardianEmailAddress: params.guardianEmail } : {}),
+    ...(params.cellPhone ? { CellPhoneNumber: params.cellPhone } : {}),
+    ...(params.heightInches !== undefined ? { Height: params.heightInches } : {}),
+    Gender: params.gender,
+    Sport: params.sport,
+    SkillLevel: params.skillLevel,
+    ...(params.position ? { Position: params.position } : {}),
+    ...(params.bats ? { Bats: params.bats } : {}),
+    ...(params.throws ? { Throws: params.throws } : {}),
+  };
+  const raw = await hitTraxPost(url, postBody);
+  const parsed = parseHitTraxTextResponse(raw);
+  if (!parsed.ok) {
+    if (parsed.error.toLowerCase().includes("username already in use")) {
+      throw new Error("hittrax_username_taken: " + parsed.error);
+    }
+    throw new Error("hittrax_create_account_error: " + parsed.error);
+  }
+  return parsed.body; // ThirdPartyUserPassword
 }
 
 // =============================================================================
-// Swing payload parser
-// =============================================================================
-// HitTrax's GetAvailableThirdPartyData JSON schema is "content-type dependent"
-// per the spec — the exact field names are not in the publicly-shared portion
-// of the v1.0 docs (pages 1-5). The shape below mirrors the headline metrics
-// HitTrax surfaces in their own dashboard and is the schema our fixture file
-// uses. When we receive the contracted ContentType definition from HitTrax
-// (or have an actual response in hand), update FIELD_MAP accordingly — every
-// parser caller goes through this one function.
-//
-// Defensive choices:
-//   * Unknown / missing fields are silently dropped (left null). We never
-//     throw on a partial payload — a swing with only exit_velocity is still
-//     more useful than no swing.
-//   * Numeric fields are coerced via Number() and Number.isFinite-checked.
-//   * occurred_at parsing falls back to created_at / now() so a malformed
-//     timestamp does not drop the swing entirely.
-//   * The full JSON object is preserved on swings.raw for re-parsing later
-//     once the canonical schema is confirmed.
+// Swing payload parser (GetAvailableThirdPartyData)
 // =============================================================================
 
 export type ParsedSwing = {
@@ -161,10 +360,6 @@ export type ParsedSwing = {
 };
 
 const FIELD_MAP = {
-  // Possible HitTrax field name variants we accept. First non-null wins.
-  // TODO(hittrax-pages-6-12): tighten to the canonical names once the
-  // contracted ContentType schema is confirmed. Until then we accept the
-  // common variants that show up in the HitTrax web dashboard exports.
   event_id:           ["SwingID", "EventID", "Id", "id"],
   session_id:         ["SessionID", "session_id"],
   facility_id:        ["FacilityID", "facility_id"],
@@ -202,15 +397,11 @@ function pickNumber(obj: Record<string, unknown>, keys: readonly string[]): numb
 export function parseSwingRow(raw: unknown): ParsedSwing | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const obj = raw as Record<string, unknown>;
-
   const eventId = pickString(obj, FIELD_MAP.event_id);
-  if (!eventId) return null; // can't dedupe without an event id — drop.
-
+  if (!eventId) return null;
   const occurredAtRaw = pickString(obj, FIELD_MAP.occurred_at);
   let occurred_at = occurredAtRaw ?? new Date().toISOString();
-  // Validate parseability — if HitTrax sent us a malformed string, fall back.
   if (Number.isNaN(Date.parse(occurred_at))) occurred_at = new Date().toISOString();
-
   return {
     capture_event_id: eventId,
     capture_session_id: pickString(obj, FIELD_MAP.session_id),
@@ -230,36 +421,11 @@ export function parseSwingRow(raw: unknown): ParsedSwing | null {
   };
 }
 
-// Parse the full GetAvailableThirdPartyData response. Accepts either:
-//   * A bare array of swing objects: [ {...}, {...} ]
-//   * An object with a `Data` / `Swings` / `Records` array property.
-// Anything else returns an empty array.
-//
-// LEGACY shape kept for callers that already accept "no swings" silently
-// (the fixture replay script). Production poll path MUST use
-// parseSwingsPayloadStrict so a malformed 200 is never confused with an
-// empty window — see the discriminated-union version below.
 export function parseSwingsPayload(rawJson: string): ParsedSwing[] {
   const r = parseSwingsPayloadStrict(rawJson);
   return r.ok ? r.swings : [];
 }
 
-// Strict variant — distinguishes a legitimate empty window from a parse
-// failure. The poll worker uses this to fail-loud (cursor untouched,
-// last_poll_error set) when HitTrax returns an unexpected 200 body
-// (contract drift, HTML error page, body truncation). Without this guard
-// a malformed response would silently advance the cursor and skip every
-// event in that window forever.
-//
-// Failure cases (returns { ok: false }):
-//   - JSON.parse throws (`invalid_json`)
-//   - top-level value is not an array AND has no recognised swings array
-//     property (`unexpected_envelope`)
-//   - one or more rows look like swings (have an event id) but failed to
-//     parse — we keep the good ones in `swings` and surface the count via
-//     `dropped` so callers can decide whether to treat partial parse as
-//     failure (poll worker treats dropped > 0 with zero successful as
-//     hard failure).
 export type ParsedSwingsResult =
   | { ok: true; swings: ParsedSwing[]; dropped: number }
   | { ok: false; code: "invalid_json" | "unexpected_envelope"; sample: string };
@@ -278,37 +444,26 @@ export function parseSwingsPayloadStrict(rawJson: string): ParsedSwingsResult {
     const obj = parsed as Record<string, unknown>;
     for (const key of ["Data", "Swings", "Records", "data", "swings", "records"]) {
       const v = obj[key];
-      if (Array.isArray(v)) {
-        arr = v;
-        break;
-      }
+      if (Array.isArray(v)) { arr = v; break; }
     }
   }
   if (arr === null) {
-    // Top-level was an object with no recognised swings array — this is a
-    // contract violation (we don't ever expect e.g. a bare object response).
-    const sample = (() => {
-      try { return JSON.stringify(parsed).slice(0, 200); } catch { return "<unstringifiable>"; }
-    })();
+    const sample = (() => { try { return JSON.stringify(parsed).slice(0, 200); } catch { return "<unstringifiable>"; } })();
     return { ok: false, code: "unexpected_envelope", sample };
   }
   const swings: ParsedSwing[] = [];
   let dropped = 0;
   for (const row of arr) {
     const swing = parseSwingRow(row);
-    if (swing) {
-      swings.push(swing);
-    } else {
-      dropped++;
-    }
+    if (swing) swings.push(swing); else dropped++;
   }
   return { ok: true, swings, dropped };
 }
 
 // =============================================================================
-// jsonError / jsonOk (small enough to repeat-locally vs sharing — but
-// keeping them here keeps every function's response shape identical).
+// Response helpers — shared shape across all functions
 // =============================================================================
+
 export function jsonError(status: number, code: string, message: string): Response {
   return new Response(JSON.stringify({ error: { code, message } }), {
     status,
@@ -323,13 +478,26 @@ export function jsonOk(body: Record<string, unknown>): Response {
   });
 }
 
-// HitTrax expects plain-text "true" / "Error <reason>" responses on the two
-// endpoints WE host (CompleteHitTraxRegistration, ForgetHitTraxUser). Any
-// other shape would either cause HitTrax to retry forever or to silently
-// drop the user's response.
+// Plain-text response for inbound HitTrax callbacks (ForgetHitTraxUser).
 export function hittraxText(body: string, status = 200): Response {
   return new Response(body, {
     status,
     headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
+}
+
+// Map a thrown Error from a v1.3 helper to a structured jsonError response.
+export function hitTraxErrorResponse(err: unknown): Response {
+  const msg = (err instanceof Error ? err.message : String(err)) ?? "unknown";
+  if (msg.startsWith("hittrax_timeout")) return jsonError(504, "hittrax_timeout", "HitTrax request timed out");
+  if (msg.startsWith("hittrax_unreachable")) return jsonError(502, "hittrax_unreachable", "Could not reach HitTrax");
+  if (msg.startsWith("invalid_hittrax_credentials")) {
+    return jsonError(401, "invalid_hittrax_credentials", "Invalid HitTrax username or password. Please check your credentials and try again.");
+  }
+  if (msg.startsWith("hittrax_username_taken")) {
+    return jsonError(409, "hittrax_username_taken", "That HitTrax username is already taken. Please choose a different one.");
+  }
+  // Surface the HitTrax error text after the colon so the app can show it.
+  const detail = msg.includes(": ") ? msg.split(": ").slice(1).join(": ") : msg;
+  return jsonError(502, "hittrax_error", detail);
 }
