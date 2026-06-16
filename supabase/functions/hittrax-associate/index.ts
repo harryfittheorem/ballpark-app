@@ -187,7 +187,7 @@ serve(async (req) => {
   const timeoutHandle = setTimeout(() => controller.abort(), HITTRAX_TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetch(url, { method: "POST", body: "", signal: controller.signal });
+    res = await fetch(url, { method: "GET", signal: controller.signal });
   } catch (err) {
     clearTimeout(timeoutHandle);
     console.error("hittrax-associate fetch failed", err);
@@ -199,6 +199,8 @@ serve(async (req) => {
   clearTimeout(timeoutHandle);
 
   if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    console.error("hittrax-associate HitTrax error", { status: res.status, url: url.toString(), body: errBody });
     return jsonError(502, "hittrax_error", `HitTrax returned status ${res.status}`);
   }
   const text = await res.text();
