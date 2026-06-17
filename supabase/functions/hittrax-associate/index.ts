@@ -5,30 +5,37 @@
 //
 // Contract (POST):
 //   Headers:  Authorization: Bearer <parent-jwt>
-//   Body:     { kid_id: uuid, hittrax_username: string, hittrax_password: string }
-//   Response 200:
-//     { link_id: uuid, association_status: "active", hittrax_username: string }
+//
+//   Mode 1 – password auth:
+//     Body:     { kid_id, hittrax_username, hittrax_password }
+//     Response: { link_id, association_status: "active", hittrax_username }
+//
+//   Mode 2 – OTP trigger (no association yet, just sends SMS):
+//     Body:     { kid_id, hittrax_username, use_otp: true }
+//     Response: { status: "otp_sent" }
+//
+//   Mode 3 – OTP submit + associate:
+//     Body:     { kid_id, hittrax_username, otp_code: "123456" }
+//     Response: { link_id, association_status: "active", hittrax_username }
+//
 //   Errors:
 //     401 unauthorized | 403 forbidden | 400 bad_request
+//     404 hittrax_user_not_found | 400 hittrax_no_phone
 //     409 conflict (kid already active) | 503 hittrax_not_configured
-//     401 invalid_hittrax_credentials | 502 hittrax_error
-//     504 hittrax_timeout | 502 hittrax_unreachable
+//     401 invalid_hittrax_credentials | 401 hittrax_invalid_otp
+//     502 hittrax_error | 504 hittrax_timeout | 502 hittrax_unreachable
 //
-// v1.3 Flow (three sequential HitTrax calls — no email confirmation needed):
-//   1. AuthenticateCloudUser(username, password) → sessionToken
+// v1.3 Association flow (Modes 1 & 3):
+//   1. Authenticate → session token
+//      Mode 1: AuthenticateCloudUser(username, password)
+//      Mode 3: ProvideOTPResponseCode(username, otp_code)
 //   2. AssociateThirdPartyAccountWithCloudCredentials(sessionToken, thirdPartyUserId)
 //      → thirdPartyUserPassword
-//   3. LogOutThirdPartyCloudUser(sessionToken)   [best-effort cleanup]
+//   3. LogOutThirdPartyCloudUser(sessionToken)   [best-effort]
 //   4. Upsert kid_capture_links: status = 'active', password stored.
 //
 // The link goes DIRECTLY to 'active' — no pending/email-confirmation step.
-// The thirdPartyUserId (our UUID) + thirdPartyUserPassword are the permanent
-// credentials for all future HitTrax calls on behalf of this kid. The raw
-// HitTrax password is never stored or logged.
-//
-// Re-link semantics:
-//   * Active link → 409 (disconnect first).
-//   * Pending/declined/removed → upsert in-place with fresh UUID + new password.
+// The raw HitTrax password is never stored or logged.
 // =============================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -42,6 +49,8 @@ import {
   jsonOk,
   logOutSession,
   readHitTraxConfig,
+  submitOTPCode,
+  triggerOTP,
 } from "../_shared/hittrax.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -87,19 +96,30 @@ serve(async (req) => {
   if (!tenantId) return jsonError(401, "unauthorized", "Token missing tenant_id claim");
   if (appRole !== "parent") return jsonError(403, "forbidden", "Parent role required");
 
-  // ---- 2. Parse body -------------------------------------------------------
-  let body: { kid_id?: unknown; hittrax_username?: unknown; hittrax_password?: unknown };
+  // ---- 2. Parse body and detect mode --------------------------------------
+  let body: {
+    kid_id?: unknown;
+    hittrax_username?: unknown;
+    hittrax_password?: unknown;
+    use_otp?: unknown;
+    otp_code?: unknown;
+  };
   try { body = await req.json(); }
   catch { return jsonError(400, "bad_request", "Body is not valid JSON"); }
 
   const kidId = typeof body.kid_id === "string" ? body.kid_id : "";
   const hittraxUsername = typeof body.hittrax_username === "string" ? body.hittrax_username.trim() : "";
   const hittraxPassword = typeof body.hittrax_password === "string" ? body.hittrax_password : "";
+  const useOtp = body.use_otp === true;
+  const otpCode = typeof body.otp_code === "string" ? body.otp_code.trim() : "";
+
   if (!kidId) return jsonError(400, "bad_request", "kid_id required");
   if (!hittraxUsername) return jsonError(400, "bad_request", "hittrax_username required");
-  if (!hittraxPassword) return jsonError(400, "bad_request", "hittrax_password required");
+  if (!useOtp && !otpCode && !hittraxPassword) {
+    return jsonError(400, "bad_request", "One of hittrax_password, use_otp, or otp_code is required");
+  }
 
-  // ---- 3. Verify kid ownership --------------------------------------------
+  // ---- 3. Verify kid ownership (all modes) --------------------------------
   const { data: kid, error: kidErr } = await adminClient
     .from("kids")
     .select("id, family_id, tenant_id:families!inner(tenant_id, parent_user_id)")
@@ -113,9 +133,27 @@ serve(async (req) => {
     return jsonError(403, "forbidden", "Kid does not belong to this parent/tenant");
   }
 
-  // ---- 4. HitTrax config --------------------------------------------------
+  // ---- 4. HitTrax config (all modes) --------------------------------------
   const cfg = readHitTraxConfig();
   if (!cfg) return jsonError(503, "hittrax_not_configured", "HitTrax credentials not provisioned for this environment");
+
+  // =========================================================================
+  // MODE 2: OTP trigger — send SMS, return immediately (no DB write)
+  // =========================================================================
+  if (useOtp) {
+    try {
+      await triggerOTP(cfg, hittraxUsername);
+    } catch (err) {
+      console.error("hittrax-associate otp-trigger failed", String(err));
+      return hitTraxErrorResponse(err);
+    }
+    console.log(`hittrax-associate otp-sent user=${hittraxUsername} ms=${Date.now() - startedAt}`);
+    return jsonOk({ status: "otp_sent" });
+  }
+
+  // =========================================================================
+  // MODES 1 & 3: Authenticate → Associate → persist link
+  // =========================================================================
 
   // ---- 5. Check for existing active link ----------------------------------
   const { data: existing, error: existingErr } = await adminClient
@@ -129,40 +167,41 @@ serve(async (req) => {
     return jsonError(409, "conflict", "This kid is already linked to HitTrax. Disconnect first to re-link.");
   }
 
-  // Generate a fresh ThirdPartyUserID for this attempt (opaque UUID — never
-  // reused across re-links). Written to DB only after HitTrax accepts.
+  // Generate a fresh ThirdPartyUserID for this attempt.
+  // Written to DB only after HitTrax accepts.
   const thirdPartyUserId = crypto.randomUUID();
 
-  // ---- 6. HitTrax v1.3 three-step flow ------------------------------------
-  // Step 6a: Authenticate with HitTrax username + password → session token.
-  // Throws invalid_hittrax_credentials if the credentials are wrong.
+  // ---- 6. Authenticate with HitTrax ---------------------------------------
   let sessionToken: string;
   try {
-    sessionToken = await authenticateCloudUser(cfg, hittraxUsername, hittraxPassword);
+    if (otpCode) {
+      // Mode 3: OTP submit — ProvideOTPResponseCode → session token
+      sessionToken = await submitOTPCode(cfg, hittraxUsername, otpCode);
+    } else {
+      // Mode 1: Password — AuthenticateCloudUser → session token
+      sessionToken = await authenticateCloudUser(cfg, hittraxUsername, hittraxPassword);
+    }
   } catch (err) {
     console.error("hittrax-associate auth failed", String(err));
     return hitTraxErrorResponse(err);
   }
 
-  // Step 6b: Associate our ThirdPartyUserID with the authenticated session.
-  // Returns the ThirdPartyUserPassword — our permanent credential for this kid.
+  // ---- 7. Associate our ThirdPartyUserID with the authenticated session ---
   let thirdPartyUserPassword: string;
   try {
     thirdPartyUserPassword = await associateThirdPartyAccount(cfg, sessionToken, thirdPartyUserId);
   } catch (err) {
     console.error("hittrax-associate associate failed", String(err));
-    // Best-effort logout even if association failed.
     void logOutSession(cfg, sessionToken);
     return hitTraxErrorResponse(err);
   }
 
-  // Step 6c: Log out the session (best-effort — don't fail the request if this errors).
+  // Best-effort session logout — don't await so it doesn't add latency.
   void logOutSession(cfg, sessionToken);
 
-  // ---- 7. Persist kid_capture_links row -----------------------------------
-  // Write AFTER HitTrax success so a transient HitTrax error never strands the
-  // parent in a bad state. The link goes straight to 'active' in v1.3 —
-  // no email confirmation / pending state needed.
+  // ---- 8. Persist kid_capture_links row -----------------------------------
+  // Write AFTER HitTrax success so a transient HitTrax error never strands
+  // the parent. Link goes straight to 'active' in v1.3 — no pending state.
   let linkId: string;
   if (existing) {
     const { data: updated, error: updateErr } = await adminClient
@@ -211,7 +250,8 @@ serve(async (req) => {
     linkId = inserted.id;
   }
 
-  console.log(`hittrax-associate ok link=${linkId} user=${hittraxUsername} ms=${Date.now() - startedAt}`);
+  const mode = otpCode ? "otp" : "password";
+  console.log(`hittrax-associate ok mode=${mode} link=${linkId} user=${hittraxUsername} ms=${Date.now() - startedAt}`);
 
   return jsonOk({
     link_id: linkId,

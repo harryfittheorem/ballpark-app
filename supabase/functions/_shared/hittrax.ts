@@ -195,6 +195,65 @@ export async function authenticateCloudUser(
 }
 
 // ---------------------------------------------------------------------------
+// triggerOTP (v1.3 p.6-7)
+// Initiate OTP authentication: calls AuthenticateCloudUser with UseOTP=true.
+// HitTrax sends an SMS to the user's registered phone and returns the string
+// "Error: Waiting for OTP response" — this is the EXPECTED success response
+// (not a real error). We normalise it to a no-op return.
+// ---------------------------------------------------------------------------
+export async function triggerOTP(cfg: HitTraxConfig, username: string): Promise<void> {
+  const url = buildHitTraxUrl(cfg, "AuthenticateCloudUser", {
+    UserName: username,
+    Password: "",
+    UseOTP: "true",
+  });
+  const raw = await hitTraxGet(url);
+  const lower = raw.trim().toLowerCase();
+  // "Error: Waiting for OTP response" is HitTrax's way of saying "SMS sent".
+  if (lower.includes("waiting for otp response")) return;
+  // If we got a session token back instead (edge case) that's also fine.
+  const parsed = parseHitTraxTextResponse(raw);
+  if (parsed.ok) return;
+  // Any other error string is a real error.
+  const lowerErr = parsed.error.toLowerCase();
+  if (lowerErr.includes("user not found") || lowerErr.includes("account not found")) {
+    throw new Error("hittrax_user_not_found: " + parsed.error);
+  }
+  if (lowerErr.includes("no phone") || lowerErr.includes("phone number")) {
+    throw new Error("hittrax_no_phone: " + parsed.error);
+  }
+  throw new Error("hittrax_otp_trigger_error: " + parsed.error);
+}
+
+// ---------------------------------------------------------------------------
+// submitOTPCode (v1.3 p.8)
+// Submit the OTP code received via SMS → session token.
+// Spec note: the URL example shows "OPTCode" (apparent typo in spec) while
+// the parameter description table says "OTPCode". We use "OTPCode" which is
+// clearly the intended name.
+// ---------------------------------------------------------------------------
+export async function submitOTPCode(
+  cfg: HitTraxConfig,
+  username: string,
+  otpCode: string,
+): Promise<string> {
+  const url = buildHitTraxUrl(cfg, "ProvideOTPResponseCode", {
+    UserName: username,
+    OTPCode: otpCode,
+  });
+  const raw = await hitTraxGet(url);
+  const parsed = parseHitTraxTextResponse(raw);
+  if (!parsed.ok) {
+    const lower = parsed.error.toLowerCase();
+    if (lower.includes("invalid") || lower.includes("expired") || lower.includes("mismatch")) {
+      throw new Error("hittrax_invalid_otp: " + parsed.error);
+    }
+    throw new Error("hittrax_otp_verify_error: " + parsed.error);
+  }
+  return parsed.body; // session token
+}
+
+// ---------------------------------------------------------------------------
 // AuthenticateCloudUserViaThirdParty (v1.3 p.9)
 // Authenticate using the ThirdPartyUserID + ThirdPartyUserPassword we stored
 // at association time → session token. Used for disconnect and future re-auth.
@@ -496,6 +555,19 @@ export function hitTraxErrorResponse(err: unknown): Response {
   }
   if (msg.startsWith("hittrax_username_taken")) {
     return jsonError(409, "hittrax_username_taken", "That HitTrax username is already taken. Please choose a different one.");
+  }
+  if (msg.startsWith("hittrax_user_not_found")) {
+    return jsonError(404, "hittrax_user_not_found", "HitTrax username not found. Please check the username and try again.");
+  }
+  if (msg.startsWith("hittrax_no_phone")) {
+    return jsonError(400, "hittrax_no_phone", "No phone number is registered with this HitTrax account. Use the password option instead.");
+  }
+  if (msg.startsWith("hittrax_invalid_otp")) {
+    return jsonError(401, "hittrax_invalid_otp", "Invalid or expired code. Please go back and request a new one.");
+  }
+  if (msg.startsWith("hittrax_otp_trigger_error") || msg.startsWith("hittrax_otp_verify_error")) {
+    const detail = msg.includes(": ") ? msg.split(": ").slice(1).join(": ") : msg;
+    return jsonError(502, "hittrax_otp_error", detail);
   }
   // Surface the HitTrax error text after the colon so the app can show it.
   const detail = msg.includes(": ") ? msg.split(": ").slice(1).join(": ") : msg;
