@@ -82,22 +82,31 @@ function readAppRole(session: Session | null): AppRole | null {
  * the TCP layer. Because getSession() has no built-in timeout, setLoading(false)
  * would never fire and the splash spinner would spin forever.
  *
- * The timeout resolves with { data: { session: null } } so the caller's
- * code path is identical whether the real call won or the timeout won.
- * The onAuthStateChange listener remains mounted in both cases and will
- * update the session automatically when the actual refresh completes.
+ * Returns `timedOut: true` when the timeout sentinel won the race so callers
+ * can skip writing null over a valid session. The onAuthStateChange listener
+ * remains mounted in both cases and will update the session automatically
+ * when the actual refresh completes.
  */
-async function getSessionWithTimeout() {
+async function getSessionWithTimeout(): Promise<
+  | { timedOut: false; data: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"] }
+  | { timedOut: true; data: { session: null } }
+> {
   const TIMEOUT_MS = 8_000;
-  const timeout = new Promise<{ data: { session: null } }>((resolve) => {
-    setTimeout(() => {
-      console.warn(
-        "[auth] getSession timed out — network may be unavailable on resume",
-      );
-      resolve({ data: { session: null } });
-    }, TIMEOUT_MS);
-  });
-  return Promise.race([supabase.auth.getSession(), timeout]);
+  const timeout = new Promise<{ timedOut: true; data: { session: null } }>(
+    (resolve) => {
+      setTimeout(() => {
+        console.warn(
+          "[auth] getSession timed out — network may be unavailable on resume",
+        );
+        resolve({ timedOut: true, data: { session: null } });
+      }, TIMEOUT_MS);
+    },
+  );
+  const real = supabase.auth.getSession().then((result) => ({
+    timedOut: false as const,
+    data: result.data,
+  }));
+  return Promise.race([real, timeout]);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -228,9 +237,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (nextState !== "active") return;
       if (!initializedRef.current) return;
 
-      getSessionWithTimeout().then(({ data }) => {
+      getSessionWithTimeout().then((result) => {
         if (!mounted) return;
-        setSession(data.session);
+        // Only overwrite session when Supabase actually responded.
+        // If the timeout fired first, skip setSession entirely — writing null
+        // would evict a valid session and bounce the user to the auth stack.
+        // onAuthStateChange will update the session once the network responds.
+        if (!result.timedOut) {
+          setSession(result.data.session);
+        }
       });
     };
 
