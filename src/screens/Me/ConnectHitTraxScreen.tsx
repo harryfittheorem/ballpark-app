@@ -15,12 +15,14 @@
  *   pending (v1.x legacy)         → "older link" card + Cancel and re-link
  */
 
+import { useNavigation } from '@react-navigation/native';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Input } from '@/components/ui';
 import { useSelectedKid } from '@/hooks/useSelectedKid';
+import type { MeStackScreenProps } from '@/navigation/types';
 import {
   useAssociateHitTrax,
   useAssociateHitTraxWithOTP,
@@ -46,6 +48,7 @@ function formatRelative(iso: string | null | undefined): string {
 }
 
 export default function ConnectHitTraxScreen() {
+  const navigation = useNavigation<MeStackScreenProps<'ConnectHitTrax'>['navigation']>();
   const { kid } = useSelectedKid();
   const { data: link, isPending } = useHitTraxLink(kid?.id);
   const associate = useAssociateHitTrax(kid?.id);
@@ -345,12 +348,16 @@ export default function ConnectHitTraxScreen() {
               </View>
             )}
 
-            <View style={styles.createHint}>
+            <TouchableOpacity
+              style={styles.createHint}
+              onPress={() => navigation.navigate('CreateHitTraxAccount')}
+              activeOpacity={0.7}
+            >
               <Text style={styles.createHintText}>
                 Don&apos;t have a HitTrax account?{' '}
-                <Text style={styles.createHintLink}>Create one in-app — coming soon.</Text>
+                <Text style={styles.createHintLink}>Create one in-app →</Text>
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
         ) : null}
       </ScrollView>

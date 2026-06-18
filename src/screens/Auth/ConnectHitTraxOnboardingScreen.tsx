@@ -58,6 +58,8 @@ export default function ConnectHitTraxOnboardingScreen() {
   const [otpCode, setOtpCode] = useState('');
 
   const goHome = () => navigation.popToTop();
+  const onCreateAccount = () =>
+    navigation.navigate('CreateHitTraxAccount', { kidId: kid?.id });
 
   const onConnect = async () => {
     if (!username.trim()) {
@@ -297,6 +299,18 @@ export default function ConnectHitTraxOnboardingScreen() {
               </View>
             ) : null}
 
+            <TouchableOpacity
+              onPress={onCreateAccount}
+              disabled={isConnecting}
+              hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+              style={styles.createHint}
+            >
+              <Text style={styles.createHintText}>
+                No account yet?{' '}
+                <Text style={styles.createHintLink}>Create one in-app →</Text>
+              </Text>
+            </TouchableOpacity>
+
             <Text style={styles.footnote}>
               You can connect or change this any time from Me → HitTrax.
             </Text>
@@ -426,5 +440,20 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     textAlign: 'center',
     marginTop: spacing.lg,
+  },
+  createHint: {
+    alignItems: 'center',
+    marginTop: spacing['2xl'],
+  },
+  createHintText: {
+    color: colors.textMuted,
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  createHintLink: {
+    color: colors.gold,
+    fontFamily: fontFamilies.interMedium,
   },
 });

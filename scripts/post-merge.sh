@@ -65,6 +65,7 @@ if [ -d "supabase/functions" ]; then
   deploy_fn send-push-notification
   deploy_fn send-coach-video-notification
   deploy_fn hittrax-associate
+  deploy_fn hittrax-create-account
   deploy_fn hittrax-poll
   deploy_fn hittrax-disconnect
   deploy_fn account-delete

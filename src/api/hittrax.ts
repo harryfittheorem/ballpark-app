@@ -146,6 +146,62 @@ export async function associateHitTraxWithOTP(
   return data as AssociateResponse;
 }
 
+// ---------------------------------------------------------------------------
+// Create HitTrax account in-app
+// ---------------------------------------------------------------------------
+
+export type CreateHitTraxAccountInput = {
+  kidId: string;
+  hittraxUsername: string;
+  password: string;
+  sport: 'Baseball' | 'Fastpitch Softball' | 'Slowpitch Softball';
+  skillLevel: string;
+  gender: 'male' | 'female' | 'other';
+  position?: string;
+  bats?: 'Right' | 'Left' | 'Switch';
+  throws?: 'Right' | 'Left';
+  heightInches?: number;
+};
+
+/**
+ * Create a new HitTrax Cloud account for the kid. The account is
+ * pre-linked to Ballpark — the link goes straight to 'active' with no
+ * extra association step.
+ */
+export async function createHitTraxAccount(
+  input: CreateHitTraxAccountInput,
+): Promise<AssociateResponse> {
+  const { kidId, hittraxUsername, password, sport, skillLevel, gender, position, bats, throws: throws_, heightInches } = input;
+  const { data, error } = await supabase.functions.invoke('hittrax-create-account', {
+    body: {
+      kid_id: kidId,
+      hittrax_username: hittraxUsername,
+      password,
+      sport,
+      skill_level: skillLevel,
+      gender,
+      ...(position ? { position } : {}),
+      ...(bats ? { bats } : {}),
+      ...(throws_ ? { throws: throws_ } : {}),
+      ...(heightInches !== undefined ? { height_inches: heightInches } : {}),
+    },
+  });
+  if (error) throw new Error(await extractFunctionError(error));
+  return data as AssociateResponse;
+}
+
+/**
+ * Check whether a HitTrax username is available.
+ * Returns true if the username can be registered, false if already taken.
+ */
+export async function checkHitTraxUsernameAvailable(username: string): Promise<boolean> {
+  const { data, error } = await supabase.functions.invoke('hittrax-create-account', {
+    body: { check_username: username },
+  });
+  if (error) throw new Error(await extractFunctionError(error));
+  return (data as { available: boolean }).available;
+}
+
 /** Disconnect a kid's HitTrax link (remove association + flip status). */
 export async function disconnectHitTrax(kidId: string): Promise<{ link_id: string }> {
   const { data, error } = await supabase.functions.invoke('hittrax-disconnect', {

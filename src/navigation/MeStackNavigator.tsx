@@ -5,6 +5,7 @@ import BookingDetailScreen from '@/screens/Me/BookingDetailScreen';
 import EditKidScreen from '@/screens/Me/EditKidScreen';
 import BookingsListScreen from '@/screens/Me/BookingsListScreen';
 import ConnectHitTraxScreen from '@/screens/Me/ConnectHitTraxScreen';
+import CreateHitTraxAccountScreen from '@/screens/Me/CreateHitTraxAccountScreen';
 import MembershipDetailsScreen from '@/screens/Me/MembershipDetailsScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
 import PaymentMethodScreen from '@/screens/Me/PaymentMethodScreen';
@@ -55,6 +56,11 @@ export default function MeStackNavigator() {
         name="ConnectHitTrax"
         component={ConnectHitTraxScreen}
         options={{ title: 'HitTrax' }}
+      />
+      <Stack.Screen
+        name="CreateHitTraxAccount"
+        component={CreateHitTraxAccountScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="PaymentMethod"

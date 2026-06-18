@@ -22,10 +22,12 @@ import { useEffect, useRef } from 'react';
 import {
   associateHitTrax,
   associateHitTraxWithOTP,
+  createHitTraxAccount,
   disconnectHitTrax,
   getHitTraxLinkForKid,
   triggerHitTraxOTP,
   type AssociateResponse,
+  type CreateHitTraxAccountInput,
   type KidCaptureLink,
   type OTPTriggerResponse,
 } from '@/api/hittrax';
@@ -105,6 +107,20 @@ export function useAssociateHitTraxWithOTP(kidId: string | undefined) {
     mutationFn: ({ hittraxUsername, otpCode }) => {
       if (!kidId) throw new Error('No kid selected');
       return associateHitTraxWithOTP(kidId, hittraxUsername, otpCode);
+    },
+    onSuccess: () => {
+      if (kidId) void qc.invalidateQueries({ queryKey: hittraxLinkKey(kidId) });
+    },
+  });
+}
+
+/** Create a new HitTrax account in-app and immediately link it. */
+export function useCreateHitTraxAccount(kidId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation<AssociateResponse, Error, Omit<CreateHitTraxAccountInput, 'kidId'>>({
+    mutationFn: (params) => {
+      if (!kidId) throw new Error('No kid selected');
+      return createHitTraxAccount({ kidId, ...params });
     },
     onSuccess: () => {
       if (kidId) void qc.invalidateQueries({ queryKey: hittraxLinkKey(kidId) });

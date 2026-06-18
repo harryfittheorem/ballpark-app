@@ -41,6 +41,7 @@ export type HomeStackParamList = {
   VideoPlayback: { messageId: string };
   AddKid: { fromMe?: boolean } | undefined;
   ConnectHitTraxOnboarding: { kidId: string } | undefined;
+  CreateHitTraxAccount: { kidId?: string } | undefined;
 };
 
 export type HomeStackScreenProps<T extends keyof HomeStackParamList> = CompositeScreenProps<
@@ -132,6 +133,7 @@ export type MeStackParamList = {
   WaitlistClaim: { waitlistId: string };
   Orders: undefined;
   ConnectHitTrax: undefined;
+  CreateHitTraxAccount: undefined;
   PaymentMethod: undefined;
   MembershipDetails: undefined;
   UpgradeMembership: undefined;
