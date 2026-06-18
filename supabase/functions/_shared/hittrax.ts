@@ -312,6 +312,40 @@ export async function removeThirdPartyAssociation(
 }
 
 // ---------------------------------------------------------------------------
+// NotifyKioskOfUserEvent (v1.3 p.13)
+// The QR code displayed on the kiosk encodes the base event URL.
+// Ballpark appends PartnerID, APIKey, and UserSessionToken then fires it.
+// For security, the caller MUST verify the URL origin matches cfg.baseUrl
+// before calling this function.
+// ---------------------------------------------------------------------------
+export async function notifyKioskOfUserEvent(
+  cfg: HitTraxConfig,
+  sessionToken: string,
+  qrBaseUrl: string,
+): Promise<string> {
+  // Validate: QR URL must be from the same origin as the configured HitTrax server.
+  let parsed: URL;
+  try {
+    parsed = new URL(qrBaseUrl);
+  } catch {
+    throw new Error("hittrax_invalid_qr_url: Not a valid URL");
+  }
+  const cfgOrigin = new URL(cfg.baseUrl).origin;
+  if (parsed.origin !== cfgOrigin) {
+    throw new Error("hittrax_invalid_qr_url: QR code is not from the configured HitTrax server");
+  }
+  // Append auth params (do not re-set PartnerID/APIKey if already present —
+  // the kiosk URL may pre-set them; we override to ensure our credentials).
+  parsed.searchParams.set("PartnerID", cfg.partnerId);
+  parsed.searchParams.set("APIKey", cfg.apiKey);
+  parsed.searchParams.set("UserSessionToken", sessionToken);
+  const raw = await hitTraxGet(parsed.toString());
+  const result = parseHitTraxTextResponse(raw);
+  if (!result.ok) throw new Error("hittrax_kiosk_event_error: " + result.error);
+  return result.body; // "true"
+}
+
+// ---------------------------------------------------------------------------
 // LogOutThirdPartyCloudUser (v1.3 p.17)
 // Terminates the session. Best-effort — always call after associate/remove to
 // avoid leaving dangling sessions on HitTrax servers.
@@ -568,6 +602,14 @@ export function hitTraxErrorResponse(err: unknown): Response {
   if (msg.startsWith("hittrax_otp_trigger_error") || msg.startsWith("hittrax_otp_verify_error")) {
     const detail = msg.includes(": ") ? msg.split(": ").slice(1).join(": ") : msg;
     return jsonError(502, "hittrax_otp_error", detail);
+  }
+  if (msg.startsWith("hittrax_invalid_qr_url")) {
+    const detail = msg.includes(": ") ? msg.split(": ").slice(1).join(": ") : "Not a valid HitTrax kiosk QR code.";
+    return jsonError(400, "hittrax_invalid_qr_url", detail);
+  }
+  if (msg.startsWith("hittrax_kiosk_event_error")) {
+    const detail = msg.includes(": ") ? msg.split(": ").slice(1).join(": ") : "Kiosk event failed.";
+    return jsonError(502, "hittrax_kiosk_event_error", detail);
   }
   // Surface the HitTrax error text after the colon so the app can show it.
   const detail = msg.includes(": ") ? msg.split(": ").slice(1).join(": ") : msg;

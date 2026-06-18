@@ -134,6 +134,7 @@ export type MeStackParamList = {
   Orders: undefined;
   ConnectHitTrax: undefined;
   CreateHitTraxAccount: undefined;
+  KioskScan: { kidId: string };
   PaymentMethod: undefined;
   MembershipDetails: undefined;
   UpgradeMembership: undefined;

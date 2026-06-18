@@ -182,13 +182,21 @@ export default function ConnectHitTraxScreen() {
                 {link.last_poll_error ? ` — ${link.last_poll_error}` : ''}
               </Text>
             </View>
-            <Button
-              variant="secondary"
-              tone="danger"
-              label="Disconnect"
-              onPress={onDisconnect}
-              loading={disconnect.isPending}
-            />
+            {kid ? (
+              <Button
+                label="📷  Scan at Kiosk"
+                onPress={() => navigation.navigate('KioskScan', { kidId: kid.id })}
+              />
+            ) : null}
+            <View style={styles.disconnectRow}>
+              <Button
+                variant="secondary"
+                tone="danger"
+                label="Disconnect"
+                onPress={onDisconnect}
+                loading={disconnect.isPending}
+              />
+            </View>
           </View>
 
         ) : link?.association_status === 'pending' ? (
@@ -485,6 +493,9 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: fontFamilies.interMedium,
     fontSize: fontSizes.sm,
+  },
+  disconnectRow: {
+    marginTop: spacing['2xl'],
   },
   createHint: {
     marginTop: spacing['2xl'],

@@ -25,10 +25,12 @@ import {
   createHitTraxAccount,
   disconnectHitTrax,
   getHitTraxLinkForKid,
+  notifyKioskEvent,
   triggerHitTraxOTP,
   type AssociateResponse,
   type CreateHitTraxAccountInput,
   type KidCaptureLink,
+  type KioskEventResponse,
   type OTPTriggerResponse,
 } from '@/api/hittrax';
 import { supabase } from '@/lib/supabase';
@@ -124,6 +126,16 @@ export function useCreateHitTraxAccount(kidId: string | undefined) {
     },
     onSuccess: () => {
       if (kidId) void qc.invalidateQueries({ queryKey: hittraxLinkKey(kidId) });
+    },
+  });
+}
+
+/** Fire a kiosk QR event for the kid. */
+export function useKioskEvent(kidId: string | undefined) {
+  return useMutation<KioskEventResponse, Error, { qrUrl: string }>({
+    mutationFn: ({ qrUrl }) => {
+      if (!kidId) throw new Error('No kid selected');
+      return notifyKioskEvent(kidId, qrUrl);
     },
   });
 }

@@ -6,6 +6,7 @@ import EditKidScreen from '@/screens/Me/EditKidScreen';
 import BookingsListScreen from '@/screens/Me/BookingsListScreen';
 import ConnectHitTraxScreen from '@/screens/Me/ConnectHitTraxScreen';
 import CreateHitTraxAccountScreen from '@/screens/Me/CreateHitTraxAccountScreen';
+import KioskScanScreen from '@/screens/Me/KioskScanScreen';
 import MembershipDetailsScreen from '@/screens/Me/MembershipDetailsScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
 import PaymentMethodScreen from '@/screens/Me/PaymentMethodScreen';
@@ -60,6 +61,11 @@ export default function MeStackNavigator() {
       <Stack.Screen
         name="CreateHitTraxAccount"
         component={CreateHitTraxAccountScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="KioskScan"
+        component={KioskScanScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

@@ -202,6 +202,32 @@ export async function checkHitTraxUsernameAvailable(username: string): Promise<b
   return (data as { available: boolean }).available;
 }
 
+// ---------------------------------------------------------------------------
+// Kiosk QR scan
+// ---------------------------------------------------------------------------
+
+export type KioskEventResponse = {
+  ok: true;
+  event_type: string;
+  kiosk_response: string;
+};
+
+/**
+ * Fire a HitTrax kiosk event for the kid by scanning the kiosk QR code.
+ * The QR code URL is validated server-side against the configured HitTrax
+ * server origin before credentials are appended.
+ */
+export async function notifyKioskEvent(
+  kidId: string,
+  qrUrl: string,
+): Promise<KioskEventResponse> {
+  const { data, error } = await supabase.functions.invoke('hittrax-kiosk-event', {
+    body: { kid_id: kidId, qr_url: qrUrl },
+  });
+  if (error) throw new Error(await extractFunctionError(error));
+  return data as KioskEventResponse;
+}
+
 /** Disconnect a kid's HitTrax link (remove association + flip status). */
 export async function disconnectHitTrax(kidId: string): Promise<{ link_id: string }> {
   const { data, error } = await supabase.functions.invoke('hittrax-disconnect', {
