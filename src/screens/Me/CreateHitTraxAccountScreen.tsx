@@ -31,6 +31,7 @@ import { Button, Input, PickerField } from '@/components/ui';
 import { useCreateHitTraxAccount } from '@/hooks/useHitTraxLink';
 import { useFamily } from '@/hooks/useFamily';
 import { useSelectedKid } from '@/hooks/useSelectedKid';
+import { useIsFetching } from '@tanstack/react-query';
 import { checkHitTraxUsernameAvailable } from '@/api/hittrax';
 import { colors, fontFamilies, fontSizes, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
@@ -38,6 +39,8 @@ import { errorMessage } from '@/utils/error';
 type Step = 1 | 2 | 3;
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error';
+
+const ALPHANUMERIC_RE = /^[A-Za-z0-9]+$/;
 
 const SPORT_OPTIONS = [
   { value: 'Baseball' as const, label: 'Baseball' },
@@ -77,11 +80,18 @@ export default function CreateHitTraxAccountScreen() {
 
   const { kid: selectedKid } = useSelectedKid();
   const { kids } = useFamily();
+  const isFetchingFamily = useIsFetching({ queryKey: ['family'] }) > 0;
 
-  // Resolve kid: prefer route param, then selectedKid
+  // When a specific kid was requested via route params, we ONLY use that kid.
+  // Never fall back to selectedKid — that could silently create an account for
+  // the wrong athlete if family data hasn't loaded yet.
   const kid = routeKidId
-    ? kids.find((k) => k.id === routeKidId) ?? selectedKid
+    ? kids.find((k) => k.id === routeKidId)
     : selectedKid;
+
+  // If routeKidId was provided but the kid hasn't appeared in family data yet,
+  // block the form until it resolves.
+  const kidPending = Boolean(routeKidId && !kid && isFetchingFamily);
 
   const createAccount = useCreateHitTraxAccount(kid?.id);
 
@@ -156,6 +166,10 @@ export default function CreateHitTraxAccountScreen() {
       Alert.alert('Password too short', 'Password must be at least 8 characters.');
       return;
     }
+    if (!ALPHANUMERIC_RE.test(password)) {
+      Alert.alert('Invalid characters', 'Password must contain letters and numbers only — no spaces or symbols.');
+      return;
+    }
     setStep(3);
   };
 
@@ -192,6 +206,17 @@ export default function CreateHitTraxAccountScreen() {
   };
 
   const stepLabel = `Step ${step} of 3`;
+
+  // Block the form until the specific kid is confirmed in family data.
+  if (kidPending) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <View style={styles.loadingCenter}>
+          <ActivityIndicator size="large" color={colors.gold} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -281,14 +306,14 @@ export default function CreateHitTraxAccountScreen() {
             <View style={styles.stepContent}>
               <Text style={styles.sectionTitle}>Set a password</Text>
               <Text style={styles.sectionNote}>
-                Minimum 8 characters. This password is used to log into HitTrax kiosks — keep it simple but secure.
+                Letters and numbers only, minimum 8 characters. Used to log into HitTrax kiosks.
               </Text>
 
               <View style={styles.passwordRow}>
                 <View style={styles.passwordInput}>
                   <Input
                     label="Password"
-                    placeholder="Minimum 8 characters"
+                    placeholder="Letters and numbers only"
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -311,12 +336,17 @@ export default function CreateHitTraxAccountScreen() {
                   {8 - password.length} more character{8 - password.length !== 1 ? 's' : ''} needed
                 </Text>
               )}
+              {password.length >= 8 && !ALPHANUMERIC_RE.test(password) && (
+                <Text style={styles.takenText}>
+                  Letters and numbers only — remove spaces or symbols
+                </Text>
+              )}
 
               <View style={[styles.actions, { marginTop: spacing['3xl'] }]}>
                 <Button
                   label="Next: Sport Details"
                   onPress={onNextFromStep2}
-                  disabled={password.length < 8}
+                  disabled={password.length < 8 || !ALPHANUMERIC_RE.test(password)}
                   testID="create-hittrax-next-2"
                 />
               </View>
@@ -414,6 +444,7 @@ export default function CreateHitTraxAccountScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.darkest },
   flex: { flex: 1 },
+  loadingCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container: {
     flexGrow: 1,
     padding: spacing['4xl'],
