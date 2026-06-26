@@ -459,16 +459,21 @@ export type ParsedSwing = {
 
 const FIELD_MAP = {
   event_id:           ["SwingID", "EventID", "Id", "id"],
-  session_id:         ["SessionID", "session_id"],
+  // FullPlays uses "SnId" (session number) — "SId" is the user ID, not the session
+  session_id:         ["SnId", "SnUuid", "SessionID", "session_id"],
   facility_id:        ["FacilityID", "facility_id"],
-  occurred_at:        ["TimeStamp", "Timestamp", "EventTime", "occurred_at", "Time"],
-  exit_velocity_mph:  ["Velo", "ExitVelocity", "ExitVelo", "exit_velocity_mph", "EV"],
-  launch_angle_deg:   ["LaunchAngle", "VertAngle", "launch_angle_deg", "LA"],
-  distance_ft:        ["Distance", "distance_ft", "Dist"],
-  contact_quality:    ["ContactQuality", "Quality", "contact_quality"],
-  result:             ["Result", "AB", "result", "Outcome"],
-  pitch_speed_mph:    ["PitchSpeed", "PitchVelo", "pitch_speed_mph"],
-  spray_angle_deg:    ["SprayAngle", "HorzAngle", "spray_angle_deg"],
+  // FullPlays uses "TS" for the swing timestamp
+  occurred_at:        ["TS", "TimeStamp", "Timestamp", "EventTime", "occurred_at", "Time"],
+  exit_velocity_mph:  ["Velo", "EBV", "ExitVelocity", "ExitVelo", "exit_velocity_mph", "EV"],
+  // FullPlays uses "Elv" for elevation/launch angle
+  launch_angle_deg:   ["Elv", "LaunchAngle", "VertAngle", "launch_angle_deg", "LA"],
+  distance_ft:        ["Dist", "Distance", "distance_ft", "GD"],
+  contact_quality:    ["QD", "ContactQuality", "Quality", "contact_quality"],
+  // FullPlays uses "Res" for result
+  result:             ["Res", "Result", "AB", "result", "Outcome"],
+  // FullPlays uses "PV" for pitch velocity
+  pitch_speed_mph:    ["PV", "PitchSpeed", "PitchVelo", "pitch_speed_mph"],
+  spray_angle_deg:    ["HorzAngle", "SprayAngle", "spray_angle_deg"],
 } as const;
 
 function pickString(obj: Record<string, unknown>, keys: readonly string[]): string | null {

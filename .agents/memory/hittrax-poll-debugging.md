@@ -1,53 +1,65 @@
 ---
-name: HitTrax poll debugging findings
-description: Lessons from getting hittrax-poll cron working — auth, date format, ContentType
+name: HitTrax poll pipeline debugging
+description: Durable lessons from getting hittrax-poll edge function fully operational — cron auth, date format, FullPlays field names, partial index bug
 ---
 
-## pg_cron auth (service role key)
+## Cron auth key format
+Replit's `SUPABASE_SERVICE_ROLE_KEY` is `sb_secret_...` format (not a JWT). The pg_cron job must use this directly as the Bearer token in the HTTP request to the edge function. Old `eyJ...` JWT format does not apply.
 
-The `SUPABASE_SERVICE_ROLE_KEY` in the Replit environment is in `sb_secret_...` format (Supabase's new key format), NOT a `eyJ...` JWT. The edge function's `Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")` returns this same `sb_secret_...` value. The old-style JWT visible in the Supabase dashboard under "legacy keys" does NOT match.
+**Why:** Replit injects the service role key in their own format, not as a raw JWT.
 
-To build the cron job correctly, write the SQL to a temp file with shell variable expansion, then run with `--file`:
-```bash
-cat > /tmp/setup_cron.sql << SQLEOF
-SELECT cron.schedule('hittrax-poll-every-2min', '*/2 * * * *',
-  $cron_body$
-    SELECT net.http_post(
-      url := 'https://exjcwvvglthnxerzpukw.supabase.co/functions/v1/hittrax-poll',
-      headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer ${SUPABASE_SERVICE_ROLE_KEY}'),
-      body := '{}'::jsonb);
-  $cron_body$);
-SQLEOF
-npx supabase db query --linked --file /tmp/setup_cron.sql
+## Edge function deploy
+Always use `--use-api` flag:
 ```
-
-**Why:** The cron SQL is stored in the DB. Shell writes it to a file with `$SUPABASE_SERVICE_ROLE_KEY` expanded, so the actual secret value lands in the SQL before execution.
-
-## Edge function deploys (Replit sandbox)
-
-Always use `--use-api` flag — the local bundler tries to fetch Deno stdlib from deno.land which is DNS-blocked in Replit:
-```bash
 npx supabase functions deploy <name> --use-api --project-ref exjcwvvglthnxerzpukw
 ```
+**Why:** DNS for the standard deploy path is blocked in the Replit sandbox.
 
 ## HitTrax date format
+`formatHitTraxDate` must omit milliseconds. ASP.NET model binder rejects the ISO 8601 colon-before-ms format with a generic 400. Removing ms allows HitTrax's own validation to run.
 
-Spec says `YYYY-MM-DDTHH:MI:SS:SSS` (colon before ms). ASP.NET's model binder rejects this with a generic `{"Message":"The request is invalid."}` 400 BEFORE HitTrax's own validation runs. Fix: omit milliseconds entirely — use `YYYY-MM-DDTHH:MM:SS`. HitTrax's own validation errors ("Invalid Start Date") only appear after ASP.NET parsing succeeds.
+**Why:** HitTrax backend is ASP.NET and doesn't accept the `:ms` suffix.
 
-## HitTrax ContentType
+## ContentType is partner-specific
+`HITTRAX_CONTENT_TYPE=FullPlays` — this value came from the partner onboarding email. It is NOT in the public API spec. Other partners may use different values.
 
-`ContentType` is a required parameter for `GetAvailableThirdPartyData`. The value is **partner-specific** — assigned by HitTrax during partner onboarding/contracting (spec v1.3 p.15). Neither `"Swings"` nor `"HitTrax"` are valid for Infinite Hitting's account. The correct value must come from HitTrax or from Infinite Hitting's partner agreement.
+## FullPlays field name mapping
+The `FullPlays` content type uses completely different JSON field names than the v1.3 spec:
 
-Set via: `npx supabase secrets set HITTRAX_CONTENT_TYPE=<value> --project-ref exjcwvvglthnxerzpukw`
+| Our field | Spec name (wrong) | Actual FullPlays key |
+|---|---|---|
+| `occurred_at` | `TimeStamp` | `TS` |
+| `launch_angle_deg` | `LaunchAngle` | `Elv` |
+| `session_id` (capture) | `SessionID` | `SnId` (session number; `SId` is user ID) |
+| `result` | `Result` | `Res` |
+| `pitch_speed_mph` | `PitchSpeed` | `PV` |
+| `exit_velocity_mph` | `ExitVelocity` | `Velo` (already correct) |
+| `distance_ft` | `Distance` | `Dist` (already correct) |
+| `spray_angle_deg` | `SprayAngle` | `HorzAngle` (already correct) |
 
-No redeploy needed — secrets are injected per-invocation.
+**Why:** HitTrax uses abbreviated field names in FullPlays vs longer names in other content types.
 
-## Diagnosing poll errors
+## Partial unique index + ON CONFLICT bug
+`ON CONFLICT (capture_source, capture_session_id)` cannot target a partial unique index
+(`WHERE capture_session_id IS NOT NULL`) — PostgreSQL requires the WHERE predicate to be
+included in the conflict specification. Supabase JS `upsert()` does not support partial
+index conflict targets.
 
-`last_poll_error` in `kid_capture_links` now stores the actual HitTrax response body (up to 200 chars), not just the HTTP status code. Check with:
+**Fix:** Migration `20260626000000_fix_sessions_capture_unique.sql` replaces the partial
+index with a full unique index. NULL values are still allowed (NULL != NULL in SQL, so
+multiple NULL `capture_session_id` rows coexist fine).
+
+**Why:** This is a standard PostgreSQL constraint — partial indexes need their WHERE clause
+in the ON CONFLICT clause. Easy to miss since the error only shows at runtime.
+
+## Historic backfill
+To pull historical HitTrax data after account link:
 ```sql
-SELECT last_polled_at, last_poll_error, retry_count, next_poll_at
-FROM kid_capture_links WHERE capture_source = 'hittrax';
+UPDATE kid_capture_links
+SET associated_at = NOW() - INTERVAL '90 days',
+    last_polled_through = NULL,
+    retry_count = 0,
+    next_poll_at = NULL
+WHERE capture_source = 'hittrax';
 ```
-
-Backoff resets: `UPDATE kid_capture_links SET retry_count=0, next_poll_at=NULL WHERE capture_source='hittrax';`
+The next cron tick will fetch the full window from that date to now in one batch.
