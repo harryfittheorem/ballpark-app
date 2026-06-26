@@ -54,8 +54,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // HitTrax content type for swing data. The exact value is contract-dependent
 // — set this via `npx supabase secrets set HITTRAX_CONTENT_TYPE=...` per
 // the spec's "Content Types: This is a list of data types you can request
-// from HitTrax". Defaults to "Swings" until we have the contracted value.
-const HITTRAX_CONTENT_TYPE = Deno.env.get("HITTRAX_CONTENT_TYPE") ?? "Swings";
+// from HitTrax". Omitted when unset — some partner tiers don't require it.
+const HITTRAX_CONTENT_TYPE = Deno.env.get("HITTRAX_CONTENT_TYPE") ?? null;
 
 const POLL_TIMEOUT_MS = 20_000;
 const SLACK_SECONDS = 30;        // back EndDate off by 30s to avoid boundary misses
@@ -224,8 +224,13 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow, facilityId: string
   clearTimeout(timeoutHandle);
 
   if (!res.ok) {
-    outcome.error = `hittrax_status_${res.status}`;
-    await recordFailure(link.id, link.retry_count, outcome.error);
+    const errBody = await res.text().catch(() => "(unreadable)");
+    console.error(
+      `hittrax-poll GetAvailableThirdPartyData failed link=${link.id} status=${res.status} body=${errBody.slice(0, 500)}`,
+    );
+    const errorCode = `hittrax_status_${res.status}[sd=${formatHitTraxDate(startDate)},ct=${HITTRAX_CONTENT_TYPE}]: ${errBody.slice(0, 120)}`;
+    outcome.error = errorCode;
+    await recordFailure(link.id, link.retry_count, errorCode);
     return outcome;
   }
   const bodyText = await res.text();

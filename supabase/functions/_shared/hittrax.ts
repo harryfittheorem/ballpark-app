@@ -88,12 +88,13 @@ export function buildHitTraxUrl(
 }
 
 // Format a Date for HitTrax StartDate/EndDate params.
-// Spec format: YYYY-MM-DDTHH:MI:SS:SSS (colon before milliseconds).
+// Spec says YYYY-MM-DDTHH:MI:SS:SSS (colon before ms) but ASP.NET model
+// binding rejects that format — use standard ISO 8601 without milliseconds.
 export function formatHitTraxDate(d: Date): string {
   const pad = (n: number, w = 2) => String(n).padStart(w, "0");
   return (
     `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}` +
-    `T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}:${pad(d.getUTCMilliseconds(), 3)}`
+    `T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
   );
 }
 
