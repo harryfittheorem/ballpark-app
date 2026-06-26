@@ -88,8 +88,12 @@ export function buildHitTraxUrl(
 }
 
 // Format a Date for HitTrax StartDate/EndDate params.
-// Spec says YYYY-MM-DDTHH:MI:SS:SSS (colon before ms) but ASP.NET model
-// binding rejects that format — use standard ISO 8601 without milliseconds.
+// Spec says YYYY-MM-DDTHH:MI:SS:SSS (colon before ms, URI-encoded), but
+// ASP.NET's model binder cannot parse the colon-before-ms variant and returns
+// a generic 400 "The request is invalid." BEFORE HitTrax's own validation
+// runs. Omitting milliseconds produces a standard ISO 8601 datetime that
+// ASP.NET parses cleanly; HitTrax returns its own "Invalid Start/End Date"
+// if it still disagrees. Values are URI-encoded by URLSearchParams.
 export function formatHitTraxDate(d: Date): string {
   const pad = (n: number, w = 2) => String(n).padStart(w, "0");
   return (

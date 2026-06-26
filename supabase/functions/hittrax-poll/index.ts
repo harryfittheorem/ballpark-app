@@ -51,10 +51,14 @@ import {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-// HitTrax content type for swing data. The exact value is contract-dependent
-// — set this via `npx supabase secrets set HITTRAX_CONTENT_TYPE=...` per
-// the spec's "Content Types: This is a list of data types you can request
-// from HitTrax". Omitted when unset — some partner tiers don't require it.
+// HitTrax content type for swing data (spec v1.3 p.15).
+// Per the spec: "A string value representing a type data object you would
+// like returned from the list of available data objects provisioned for you
+// during this initial contracting / licensing discussions."
+// → The value is PARTNER-SPECIFIC. HitTrax assigns it during onboarding.
+//   Set via: npx supabase secrets set HITTRAX_CONTENT_TYPE=<contracted_value>
+// → When unset (null), the parameter is OMITTED — HitTrax returns 404.
+// → Common wrong guesses ("Swings", "HitTrax") return "Invalid Content Type".
 const HITTRAX_CONTENT_TYPE = Deno.env.get("HITTRAX_CONTENT_TYPE") ?? null;
 
 const POLL_TIMEOUT_MS = 20_000;
@@ -228,7 +232,7 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow, facilityId: string
     console.error(
       `hittrax-poll GetAvailableThirdPartyData failed link=${link.id} status=${res.status} body=${errBody.slice(0, 500)}`,
     );
-    const errorCode = `hittrax_status_${res.status}[sd=${formatHitTraxDate(startDate)},ct=${HITTRAX_CONTENT_TYPE}]: ${errBody.slice(0, 120)}`;
+    const errorCode = `hittrax_status_${res.status}: ${errBody.slice(0, 200)}`;
     outcome.error = errorCode;
     await recordFailure(link.id, link.retry_count, errorCode);
     return outcome;
