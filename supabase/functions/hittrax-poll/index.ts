@@ -260,6 +260,9 @@ async function pollOneLink(cfg: HitTraxConfig, link: LinkRow, facilityId: string
     return outcome;
   }
   const swings = parseResult.swings;
+  if (swings.length === 0) {
+    console.log(`hittrax-poll empty window link=${link.id} body_sample=${bodyText.slice(0, 200)}`);
+  }
   // ANY dropped row is treated as a hard failure: the cursor stays put and
   // we apply backoff, so a partial schema drift never silently skips
   // events. Without this guard, an unparseable row inside a window with

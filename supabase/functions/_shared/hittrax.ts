@@ -540,7 +540,7 @@ export function parseSwingsPayloadStrict(rawJson: string): ParsedSwingsResult {
     arr = parsed;
   } else if (parsed && typeof parsed === "object") {
     const obj = parsed as Record<string, unknown>;
-    for (const key of ["Data", "Swings", "Records", "data", "swings", "records"]) {
+    for (const key of ["Data", "Swings", "Records", "Plays", "FullPlays", "data", "swings", "records", "plays"]) {
       const v = obj[key];
       if (Array.isArray(v)) { arr = v; break; }
     }
