@@ -202,6 +202,13 @@ serve(async (req) => {
   // ---- 8. Persist kid_capture_links row -----------------------------------
   // Write AFTER HitTrax success so a transient HitTrax error never strands
   // the parent. Link goes straight to 'active' in v1.3 — no pending state.
+  //
+  // associated_at is set 90 days in the past so the first poll window covers
+  // historic swing data. last_polled_through stays NULL so hittrax-poll uses
+  // associated_at as StartDate on its first run.
+  const BACKFILL_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
+  const backfilledAt = new Date(Date.now() - BACKFILL_WINDOW_MS).toISOString();
+
   let linkId: string;
   if (existing) {
     const { data: updated, error: updateErr } = await adminClient
@@ -213,7 +220,7 @@ serve(async (req) => {
         hittrax_registration_status: true,
         hittrax_release_status: true,
         association_status: "active",
-        associated_at: new Date().toISOString(),
+        associated_at: backfilledAt,
         removed_at: null,
         last_polled_through: null,
         last_polled_at: null,
@@ -239,7 +246,7 @@ serve(async (req) => {
         hittrax_registration_status: true,
         hittrax_release_status: true,
         association_status: "active",
-        associated_at: new Date().toISOString(),
+        associated_at: backfilledAt,
       })
       .select("id")
       .single();
@@ -249,6 +256,24 @@ serve(async (req) => {
     }
     linkId = inserted.id;
   }
+
+  // ---- 9. Trigger an immediate poll so historic data loads within seconds --
+  // Fire-and-forget: we do NOT await or propagate errors. The 2-minute pg_cron
+  // tick is the safety net if this call fails. Duplicate swings from a race
+  // with the next cron tick are absorbed by the UNIQUE on
+  // (capture_source, capture_event_id) in the swings table.
+  const pollUrl = `${SUPABASE_URL}/functions/v1/hittrax-poll`;
+  fetch(pollUrl, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+    },
+  }).then(() => {
+    console.log(`hittrax-associate immediate poll dispatched link=${linkId}`);
+  }).catch((err) => {
+    console.warn(`hittrax-associate immediate poll dispatch failed (non-fatal) link=${linkId}`, err);
+  });
 
   const mode = otpCode ? "otp" : "password";
   console.log(`hittrax-associate ok mode=${mode} link=${linkId} user=${hittraxUsername} ms=${Date.now() - startedAt}`);
