@@ -212,7 +212,6 @@ export async function POST(req: NextRequest) {
       .from('kids')
       .insert({
         family_id: familyId,
-        tenant_id: tenantId,
         first_name: kid_first_name,
         last_name: kid_last_name ?? null,
         age_group: age_group ?? null,

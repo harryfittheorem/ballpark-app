@@ -50,8 +50,8 @@ BEGIN
        VALUES (v_tenant_id, v_user_id, 'Test', 'Parent', format('hittrax-test-%s@ballpark.test', v_user_id))
        RETURNING id INTO v_family_id;
 
-  INSERT INTO public.kids (tenant_id, family_id, first_name, last_name, points_balance)
-       VALUES (v_tenant_id, v_family_id, 'Test', 'Kid', 0)
+  INSERT INTO public.kids (family_id, first_name, last_name, points_balance)
+       VALUES (v_family_id, 'Test', 'Kid', 0)
        RETURNING id, points_balance INTO v_kid_id, v_balance_before;
 
   -- ---------------------------------------------------------------------
