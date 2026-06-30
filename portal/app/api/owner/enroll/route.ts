@@ -283,7 +283,7 @@ export async function POST(req: NextRequest) {
         tenant_id: tenantId,
         plan_name: typedPlan.name,
         plan_type: typedPlan.plan_type,
-        status: 'pending',
+        status: 'active',
         amount_cents: typedPlan.amount_cents,
         ...(isEft && typedPlan.sessions_per_week != null ? {
           sessions_per_week: typedPlan.sessions_per_week,
