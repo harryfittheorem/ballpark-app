@@ -1236,6 +1236,7 @@ export type Database = {
           pause_end: string | null
           pause_start: string | null
           paused_at: string | null
+          payment_failed_at: string | null
           plan_name: string
           plan_type: string
           sessions_per_week: number | null
@@ -1264,6 +1265,7 @@ export type Database = {
           pause_end?: string | null
           pause_start?: string | null
           paused_at?: string | null
+          payment_failed_at?: string | null
           plan_name: string
           plan_type: string
           sessions_per_week?: number | null
@@ -1292,6 +1294,7 @@ export type Database = {
           pause_end?: string | null
           pause_start?: string | null
           paused_at?: string | null
+          payment_failed_at?: string | null
           plan_name?: string
           plan_type?: string
           sessions_per_week?: number | null
