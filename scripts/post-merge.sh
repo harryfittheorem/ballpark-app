@@ -104,4 +104,15 @@ if [ -d "supabase/functions" ]; then
   echo "[post-merge] all edge function deploys complete"
 fi
 
+# Rebuild the portal so Next.js always serves code from the current source.
+# portal/.next is cleared first to prevent stale server bundles from being served.
+if [ -d "portal" ]; then
+  echo "[post-merge] clearing portal/.next to remove any stale build cache"
+  rm -rf portal/.next
+
+  echo "[post-merge] rebuilding portal (cd portal && npm run build)"
+  (cd portal && npm run build) && echo "[post-merge] portal build OK" \
+    || echo "[post-merge] WARN: portal build failed; check portal source for errors"
+fi
+
 echo "[post-merge] done"

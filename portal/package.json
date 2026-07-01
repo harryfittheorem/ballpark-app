@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@mux/mux-player-react": "^3.13.0",
-    "@stripe/react-stripe-js": "^6.4.0",
-    "@stripe/stripe-js": "^9.7.0",
+    "@stripe/react-stripe-js": "^6.6.0",
+    "@stripe/stripe-js": "^9.8.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.46.1",
     "@types/react-signature-canvas": "^1.0.7",
