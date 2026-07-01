@@ -48,6 +48,7 @@ import {
   type SetupIntentResult,
   type CardOnFile,
 } from '@/api/stripe';
+import { useMembership } from '@/hooks/useMembership';
 import type { MeStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
 import { errorMessage } from '@/utils/error';
@@ -267,6 +268,7 @@ export default function PaymentMethodScreen({ navigation }: Props) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [card, setCard] = useState<CardOnFile | null>(null);
   const [setupData, setSetupData] = useState<SetupIntentResult | null>(null);
+  const { refresh: refreshMembership } = useMembership();
 
   // Load card on mount
   useEffect(() => {
@@ -306,7 +308,8 @@ export default function PaymentMethodScreen({ navigation }: Props) {
     Alert.alert('Could not save card', msg);
   }, []);
 
-  // After sheet closes with success, call save-payment-method to persist + get card details
+  // After sheet closes with success, call save-payment-method to persist + get card details.
+  // Also refresh the membership so the payment_failed_at banner clears immediately.
   useEffect(() => {
     if (phase !== 'saving') return;
     let mounted = true;
@@ -316,6 +319,8 @@ export default function PaymentMethodScreen({ navigation }: Props) {
         if (!mounted) return;
         setCard(result);
         setPhase('success');
+        // Refresh membership in background — clears payment_failed_at banner.
+        void refreshMembership();
       })
       .catch(err => {
         if (!mounted) return;
@@ -327,7 +332,7 @@ export default function PaymentMethodScreen({ navigation }: Props) {
       });
 
     return () => { mounted = false; };
-  }, [phase]);
+  }, [phase, refreshMembership]);
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (phase === 'loading') {

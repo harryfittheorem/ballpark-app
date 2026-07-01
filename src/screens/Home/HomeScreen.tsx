@@ -1,5 +1,5 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAssignments } from '@/hooks/useAssignments';
 import { useAuth } from '@/hooks/useAuth';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
+import { useMembership } from '@/hooks/useMembership';
 import { useProducts } from '@/hooks/useProducts';
 import {
   latestCoachMessageKey,
@@ -24,6 +25,7 @@ import KidSwitcherSheet from '@/components/ui/KidSwitcherSheet';
 import CoachMessageToast from './components/CoachMessageToast';
 import CoachVideoCard from './components/CoachVideoCard';
 import EmptyHomeCard from './components/EmptyHomeCard';
+import FailedPaymentCard from './components/FailedPaymentCard';
 import HeroCard from './components/HeroCard';
 import HomeAssignmentsCard from './components/HomeAssignmentsCard';
 import HomeHeader from './components/HomeHeader';
@@ -45,10 +47,20 @@ export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
   const [refreshing, setRefreshing] = useState(false);
   const [switcherVisible, setSwitcherVisible] = useState(false);
+  const [paymentAlertDismissed, setPaymentAlertDismissed] = useState(false);
   const qc = useQueryClient();
   const { user } = useAuth();
 
   const { kid, kids, loading: familyLoading, selectedKidId, setSelectedKid } = useSelectedKid();
+  const { membership, refresh: refreshMembership } = useMembership();
+
+  // Re-fetch membership on focus so the payment_failed_at banner clears
+  // immediately after returning from PaymentMethodScreen.
+  useFocusEffect(
+    useCallback(() => {
+      void refreshMembership();
+    }, [refreshMembership]),
+  );
   const showEmpty = !kid && !familyLoading;
   const { session: upcoming } = useUpcomingSession(kid?.id);
   const isFocused = useIsFocused();
@@ -165,6 +177,18 @@ export default function HomeScreen() {
       >
         {kid ? (
           <>
+            {membership?.payment_failed_at && !paymentAlertDismissed ? (
+              <View style={styles.section}>
+                <FailedPaymentCard
+                  onPress={() =>
+                    navigation.navigate('Me', {
+                      screen: 'PaymentMethod',
+                    })
+                  }
+                  onDismiss={() => setPaymentAlertDismissed(true)}
+                />
+              </View>
+            ) : null}
             <View style={styles.section}>
               <HeroCard
                 pointsBalance={kid.points_balance}

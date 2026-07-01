@@ -253,6 +253,19 @@ async function handleRequest(req: Request): Promise<Response> {
     })
     .eq('id', family.id);
 
+  // Optimistically clear payment_failed_at — the parent just updated their card,
+  // so even before Stripe's next retry the banner should disappear. Stripe will
+  // set it again if the retry also fails.
+  const { error: clearErr } = await supabase
+    .from('memberships')
+    .update({ payment_failed_at: null, updated_at: new Date().toISOString() })
+    .eq('family_id', family.id)
+    .not('payment_failed_at', 'is', null);
+
+  if (clearErr) {
+    console.warn('[save-payment-method] payment_failed_at clear failed (non-fatal):', clearErr.message);
+  }
+
   if (updateErr) {
     console.error('[save-payment-method] DB update failed:', updateErr.message);
     return json({ error: { code: 'db_error', message: 'Failed to save card info' } }, 500);

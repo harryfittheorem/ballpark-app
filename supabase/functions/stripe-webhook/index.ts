@@ -133,10 +133,27 @@ async function sendDunningEmail(opts: {
   // Deep link opens the Payment Method screen directly in the Ballpark app
   const appDeepLink = 'ballpark://me/payment-method';
 
+  const plainText = [
+    `Hi ${opts.parentName},`,
+    '',
+    `We were unable to process your ${opts.planName} membership payment of ${amountStr}.`,
+    '',
+    'Please update your payment method to keep your membership active:',
+    `Open the Ballpark app → Me → Payment Method`,
+    '',
+    `Or tap this link on your phone: ${appDeepLink}`,
+    '',
+    'Stripe will automatically retry the charge once your card is updated.',
+    'If payment is not resolved within 7 days, your membership may be paused.',
+    '',
+    'Questions? Reply to this email or contact your facility directly.',
+  ].join('\n');
+
   const body = {
     from: opts.resendFromEmail,
     to: opts.toEmail,
-    subject: `Action needed: Payment of ${amountStr} failed for ${opts.planName}`,
+    subject: 'Action required: update your payment method',
+    text: plainText,
     html: `
       <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; color: #1a1a1a;">
         <div style="background: #1a1a1a; padding: 24px; border-radius: 8px 8px 0 0;">
@@ -562,16 +579,22 @@ Deno.serve(async (req) => {
     return json({ ok: true });
   }
 
-  // ── invoice.payment_succeeded ─────────────────────────────────────────────
-  // A subscription renewal was successfully charged. Insert a paid payment_events
-  // row (if not already present for this invoice+status), ensure membership is
-  // active, and update next_billing_at.
+  // ── invoice.payment_succeeded / invoice.paid ──────────────────────────────
+  // Both events fire when a subscription invoice is successfully charged.
+  // `invoice.payment_succeeded` is the older event name; `invoice.paid` is
+  // the preferred name in current Stripe docs. We handle both so that the
+  // payment_failed_at flag is cleared and the membership re-activates
+  // regardless of which event is configured in the Stripe dashboard webhook.
+  //
+  // Insert a paid payment_events row (if not already present for this
+  // invoice+status), ensure membership is active, update next_billing_at,
+  // and clear payment_failed_at so in-app banners disappear.
   //
   // Idempotency: check (stripe_invoice_id, status='paid') before inserting.
   // This allows a prior failed row for the same invoice to coexist — the family
   // got their card declined (failed row), fixed it, and was then charged
   // successfully (paid row). Both rows are legitimate history.
-  if (event.type === 'invoice.payment_succeeded') {
+  if (event.type === 'invoice.payment_succeeded' || event.type === 'invoice.paid') {
     const invoice = event.data.object as {
       id: string;
       subscription?: string;
@@ -630,11 +653,13 @@ Deno.serve(async (req) => {
 
     if (existingPaid) {
       console.log(`[stripe-webhook] invoice.payment_succeeded: paid row already exists invoice=${invoice.id}`);
-      // Still update membership status + next_billing_at in case a prior webhook fired early
+      // Still update membership status + next_billing_at + clear payment_failed_at
+      // in case a prior webhook fired early.
       await supabase
         .from('memberships')
         .update({
           status: 'active',
+          payment_failed_at: null,
           next_billing_at: invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null,
           updated_at: new Date().toISOString(),
         })
@@ -665,11 +690,13 @@ Deno.serve(async (req) => {
       return json({ error: { code: 'db_error', message: insertErr.message } }, 500);
     }
 
-    // Ensure membership is active (recovers from payment_overdue) + update next_billing_at
+    // Ensure membership is active (recovers from payment_overdue) + update next_billing_at.
+    // Clear payment_failed_at so in-app banners disappear immediately.
     await supabase
       .from('memberships')
       .update({
         status: 'active',
+        payment_failed_at: null,
         next_billing_at: nextBillingAt,
         updated_at: new Date().toISOString(),
       })
@@ -767,40 +794,66 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Mark membership as payment_overdue (only if currently active — don't overwrite cancelled)
+    // Mark membership as payment_overdue + stamp payment_failed_at (only if currently active).
+    // Don't overwrite cancelled or already-overdue — but always stamp payment_failed_at so
+    // the in-app banner appears regardless of which attempt this is.
+    const now = new Date().toISOString();
     await supabase
       .from('memberships')
       .update({
         status: 'payment_overdue',
-        updated_at: new Date().toISOString(),
+        payment_failed_at: now,
+        updated_at: now,
       })
       .eq('id', mem.id)
-      .eq('status', 'active');
+      .in('status', ['active', 'payment_overdue']);
 
-    // Send dunning email — best effort via Promise.allSettled pattern, never fail the webhook
+    // Fan-out: push + email — best-effort via Promise.allSettled, never fail the webhook
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     const resendFromEmail = Deno.env.get('RESEND_FROM_EMAIL');
 
-    if (resendApiKey && resendFromEmail) {
-      const { data: family } = await supabase
-        .from('families')
-        .select('parent_first_name, parent_email')
-        .eq('id', mem.family_id)
-        .single();
+    const { data: family } = await supabase
+      .from('families')
+      .select('parent_first_name, parent_email, parent_user_id')
+      .eq('id', mem.family_id)
+      .single();
 
-      if (family?.parent_email) {
-        const parentName = family.parent_first_name ?? 'there';
-        // Fire-and-forget; webhook must succeed regardless of email outcome
+    const fanOutPromises: Promise<unknown>[] = [];
+
+    // Push notification
+    if (family?.parent_user_id) {
+      fanOutPromises.push(
+        fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            user_ids: [family.parent_user_id],
+            title: 'Payment failed',
+            body: 'Your autopay failed — tap to update your card.',
+            data: { kind: 'payment_failed', screen: 'PaymentMethod' },
+          }),
+        }).catch(err => console.error('[stripe-webhook] push fan-out error:', err)),
+      );
+    }
+
+    // Dunning email
+    if (resendApiKey && resendFromEmail && family?.parent_email) {
+      fanOutPromises.push(
         sendDunningEmail({
           toEmail: family.parent_email,
-          parentName,
+          parentName: family.parent_first_name ?? 'there',
           planName: mem.plan_name,
           amountCents: invoice.amount_due,
           resendApiKey,
           resendFromEmail,
-        }).catch(err => console.error('[stripe-webhook] sendDunningEmail unexpected error:', err));
-      }
+        }).catch(err => console.error('[stripe-webhook] sendDunningEmail unexpected error:', err)),
+      );
     }
+
+    await Promise.allSettled(fanOutPromises);
 
     console.log(`[stripe-webhook] invoice.payment_failed → membership=${mem.id} invoice=${invoice.id} attempt=${invoice.attempt_count}`);
     return json({ ok: true });

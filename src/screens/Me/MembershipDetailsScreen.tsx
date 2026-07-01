@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -9,8 +9,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ExternalLink, Info, Star } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { AlertTriangle, ExternalLink, Info, Star } from 'lucide-react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useMembership } from '@/hooks/useMembership';
@@ -37,11 +37,19 @@ function nextBillingDate(anchorDay: number | null): string {
 }
 
 export default function MembershipDetailsScreen() {
-  const { membership, loading } = useMembership();
+  const { membership, loading, refresh } = useMembership();
   const { family } = useFamily();
   const navigation = useNavigation<NativeStackNavigationProp<MeStackParamList>>();
 
   const [hasUpgradePlans, setHasUpgradePlans] = useState(false);
+
+  // Re-fetch membership when returning from PaymentMethodScreen so the
+  // payment_failed_at banner clears immediately on back-navigation.
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+    }, [refresh]),
+  );
 
   useEffect(() => {
     if (!membership || membership.status !== 'active' || membership.plan_type !== 'eft' || !family?.tenant_id) {
@@ -77,7 +85,8 @@ export default function MembershipDetailsScreen() {
   }
 
   const isPaused = membership.status === 'paused';
-  const statusLabel = isPaused ? 'Paused' : 'Active';
+  const isPaymentFailed = !!membership.payment_failed_at;
+  const statusLabel = isPaused ? 'Paused' : isPaymentFailed ? 'Payment Failed' : 'Active';
   const planTypeLabel = membership.plan_type === 'eft' ? 'Monthly EFT' : 'Session Pack';
   const amountLabel =
     membership.plan_type === 'eft'
@@ -87,6 +96,20 @@ export default function MembershipDetailsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {isPaymentFailed ? (
+          <TouchableOpacity
+            style={styles.failedBanner}
+            onPress={() => navigation.navigate('PaymentMethod')}
+            activeOpacity={0.8}
+          >
+            <AlertTriangle size={18} color="#fff" />
+            <View style={styles.failedBannerText}>
+              <Text style={styles.failedBannerTitle}>Payment failed</Text>
+              <Text style={styles.failedBannerBody}>Tap to update your card →</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+
         <View style={styles.iconWrap}>
           <Star size={28} color={colors.gold} />
         </View>
@@ -108,7 +131,7 @@ export default function MembershipDetailsScreen() {
           <DetailRow
             label="Status"
             value={statusLabel}
-            valueTone={isPaused ? 'gold' : 'success'}
+            valueTone={isPaymentFailed ? 'danger' : isPaused ? 'gold' : 'success'}
             last
           />
         </View>
@@ -175,7 +198,7 @@ function DetailRow({
 }: {
   label: string;
   value: string;
-  valueTone?: 'success' | 'gold';
+  valueTone?: 'success' | 'gold' | 'danger';
   last?: boolean;
 }) {
   return (
@@ -186,6 +209,7 @@ function DetailRow({
           styles.detailValue,
           valueTone === 'success' ? { color: colors.success } : null,
           valueTone === 'gold' ? { color: colors.gold } : null,
+          valueTone === 'danger' ? { color: '#e74c3c' } : null,
         ]}
       >
         {value}
@@ -348,5 +372,31 @@ const styles = StyleSheet.create({
     color: colors.gold,
     letterSpacing: tracking.wide,
     textTransform: 'uppercase',
+  },
+
+  failedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    backgroundColor: '#c0392b',
+    borderRadius: radius.xl,
+    padding: spacing['2xl'],
+    marginBottom: spacing['3xl'],
+  },
+  failedBannerText: {
+    flex: 1,
+  },
+  failedBannerTitle: {
+    fontFamily: fontFamilies.oswaldBold,
+    fontSize: fontSizes.md,
+    color: '#fff',
+    textTransform: 'uppercase',
+    letterSpacing: tracking.wide,
+    marginBottom: 2,
+  },
+  failedBannerBody: {
+    fontFamily: fontFamilies.interMedium,
+    fontSize: fontSizes.sm,
+    color: 'rgba(255,255,255,0.85)',
   },
 });
