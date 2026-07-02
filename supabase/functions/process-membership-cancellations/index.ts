@@ -2,6 +2,7 @@
 // supabase/functions/process-membership-cancellations/index.ts
 // =============================================================================
 // Task #238 — Cancellation Policy Enforcement
+// Task #519 — Wire up cancellation cron (improved logging)
 //
 // Daily cron (scheduled via pg_cron 0 2 * * *) that finalises memberships
 // whose cancel_effective_at <= NOW():
@@ -13,7 +14,7 @@
 //   curl -X POST https://<project>.supabase.co/functions/v1/process-membership-cancellations \
 //     -H "Authorization: Bearer <service_role_key>"
 //
-// Returns HTTP 200 with { cancelled: N } even when N = 0.
+// Returns HTTP 200 with { processed: N, cancelled: N, errors: [...] }
 //
 // Deploy:
 //   npx supabase functions deploy process-membership-cancellations
@@ -109,13 +110,14 @@ Deno.serve(async (req) => {
   }
 
   if (!memberships || memberships.length === 0) {
-    console.log('[process-membership-cancellations] no eligible memberships');
-    return json({ cancelled: 0 });
+    console.log('[process-membership-cancellations] no eligible memberships — done');
+    return json({ processed: 0, cancelled: 0, errors: [] });
   }
 
-  console.log(`[process-membership-cancellations] processing ${memberships.length} memberships`);
+  console.log(`[process-membership-cancellations] processing ${memberships.length} membership(s)`);
 
   let cancelled = 0;
+  const errors: { id: string; error: string }[] = [];
 
   for (const mem of memberships) {
     try {
@@ -140,6 +142,8 @@ Deno.serve(async (req) => {
           stripeAccountId,
         );
         console.log(`[process-membership-cancellations] Stripe sub ${mem.stripe_subscription_id} cancelled`);
+      } else if (!stripeKey) {
+        console.warn(`[process-membership-cancellations] STRIPE_SECRET_KEY not set — skipping Stripe cancellation for ${mem.id}`);
       }
 
       // Update DB: mark cancelled
@@ -155,16 +159,25 @@ Deno.serve(async (req) => {
 
       if (updateErr) {
         console.error(`[process-membership-cancellations] DB update error for ${mem.id}:`, updateErr.message);
+        errors.push({ id: mem.id, error: updateErr.message });
         continue;
       }
 
       cancelled++;
-      console.log(`[process-membership-cancellations] membership ${mem.id} cancelled`);
+      console.log(`[process-membership-cancellations] membership ${mem.id} → cancelled`);
     } catch (err) {
       const e = err as Error;
       console.error(`[process-membership-cancellations] error for ${mem.id}:`, e.message);
+      errors.push({ id: mem.id, error: e.message });
     }
   }
 
-  return json({ cancelled });
+  const summary = {
+    processed: memberships.length,
+    cancelled,
+    skipped: memberships.length - cancelled - errors.length,
+    errors,
+  };
+  console.log('[process-membership-cancellations] run complete:', JSON.stringify(summary));
+  return json(summary);
 });
