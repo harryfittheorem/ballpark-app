@@ -109,6 +109,10 @@ export type OwnerMember = {
   expiresAt?: string | null;
   sessionsRemaining?: number | null;
   sessionsTotal?: number | null;
+  pauseStart?: string | null;
+  pauseEnd?: string | null;
+  cancelRequestedAt?: string | null;
+  cancelEffectiveAt?: string | null;
 };
 
 export type OwnerCoach = {
@@ -353,6 +357,10 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       expires_at,
       sessions_remaining,
       sessions_total,
+      pause_start,
+      pause_end,
+      cancel_requested_at,
+      cancel_effective_at,
       kids!inner(first_name, last_name, age_group),
       families!inner(parent_first_name, parent_last_name, parent_email, parent_phone, card_last4, card_brand, card_exp_month, card_exp_year)
     `)
@@ -467,6 +475,10 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       expiresAt: (r as unknown as { expires_at?: string | null }).expires_at ?? null,
       sessionsRemaining: (r as unknown as { sessions_remaining?: number | null }).sessions_remaining ?? null,
       sessionsTotal: (r as unknown as { sessions_total?: number | null }).sessions_total ?? null,
+      pauseStart: (r as unknown as { pause_start?: string | null }).pause_start ?? null,
+      pauseEnd: (r as unknown as { pause_end?: string | null }).pause_end ?? null,
+      cancelRequestedAt: (r as unknown as { cancel_requested_at?: string | null }).cancel_requested_at ?? null,
+      cancelEffectiveAt: (r as unknown as { cancel_effective_at?: string | null }).cancel_effective_at ?? null,
     };
   });
 }
@@ -1388,6 +1400,10 @@ export type MemberDetail = OwnerMember & {
   pauseEnd: string | null;
   /** Timestamp when the pause was initiated. Null if not paused. */
   pausedAt: string | null;
+  /** ISO timestamp when the parent submitted a cancellation request. Null if no pending cancellation. */
+  cancelRequestedAt?: string | null;
+  /** ISO timestamp when the membership access will actually end. Null if no pending cancellation. */
+  cancelEffectiveAt?: string | null;
   /** OTC pack members only. Null for EFT memberships. */
   sessionsRemaining: number | null;
   /** OTC pack members only. Null for EFT memberships. */
@@ -1420,6 +1436,8 @@ export async function getMemberDetail(
       stripe_subscription_id,
       next_billing_at,
       cancel_at,
+      cancel_requested_at,
+      cancel_effective_at,
       pause_start,
       pause_end,
       paused_at,
@@ -1628,6 +1646,8 @@ export async function getMemberDetail(
     subscriptionStatus,
     nextBillingAt,
     cancelAt: (mem.cancel_at as string | null) ?? null,
+    cancelRequestedAt: (mem.cancel_requested_at as string | null) ?? null,
+    cancelEffectiveAt: (mem.cancel_effective_at as string | null) ?? null,
     pauseStart,
     pauseEnd,
     pausedAt,

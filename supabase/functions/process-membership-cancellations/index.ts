@@ -22,7 +22,11 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const STRIPE_API_VERSION = '2024-06-20';
+const STRIPE_API_VERSION  = '2024-06-20';
+const RESEND_API_KEY      = Deno.env.get('RESEND_API_KEY') ?? '';
+const RESEND_FROM_EMAIL   = Deno.env.get('RESEND_FROM_EMAIL') ?? 'onboarding@resend.dev';
+const SUPABASE_URL_ENV    = Deno.env.get('SUPABASE_URL') ?? '';
+const SERVICE_ROLE_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -40,6 +44,74 @@ function encodeFormBody(obj: Record<string, string | boolean | number>): string 
     parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
   }
   return parts.join('&');
+}
+
+function formatDateLong(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+async function sendCancellationEffectiveEmail(
+  parentEmail: string,
+  parentFirst: string,
+  planName: string,
+): Promise<void> {
+  if (!RESEND_API_KEY) return;
+  const today = formatDateLong(new Date().toISOString());
+  const html = `
+<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0"
+        style="background:#1a1a1a;border-radius:12px;overflow:hidden;max-width:560px;width:100%;">
+        <tr>
+          <td style="background:#cfab56;padding:20px 28px;">
+            <span style="font-size:18px;font-weight:800;color:#1a1a1a;">⚾ Ballpark</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px;">
+            <p style="margin:0 0 14px;font-size:15px;font-weight:700;color:#f5f0e8;">Hi ${parentFirst},</p>
+            <p style="margin:0 0 14px;font-size:14px;color:#a0967e;line-height:1.6;">
+              Your <strong style="color:#f5f0e8;">${planName}</strong> membership has been cancelled
+              as of <strong style="color:#f5f0e8;">${today}</strong>.
+            </p>
+            <p style="margin:0 0 14px;font-size:13px;color:#a0967e;line-height:1.6;">
+              No further billing charges will occur. We hope to see your athlete
+              back on the field soon — reach out to the facility any time to re-enroll.
+            </p>
+            <p style="margin:0;font-size:11px;color:#4a4438;">
+              This is an automated confirmation. No action is required.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: RESEND_FROM_EMAIL,
+      to: [parentEmail],
+      subject: `Your ${planName} membership has been cancelled`,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    console.error(`[process-membership-cancellations] Resend error ${res.status}: ${txt.slice(0, 200)}`);
+  }
 }
 
 async function stripeDel(
@@ -97,8 +169,8 @@ Deno.serve(async (req) => {
   const { data: memberships, error: fetchErr } = await supabase
     .from('memberships')
     .select(`
-      id, tenant_id, stripe_subscription_id, cancel_effective_at,
-      families!inner(id, primary_location_id)
+      id, tenant_id, stripe_subscription_id, cancel_effective_at, plan_name,
+      families!inner(id, primary_location_id, parent_email, parent_first_name)
     `)
     .not('cancel_effective_at', 'is', null)
     .lte('cancel_effective_at', new Date().toISOString())
@@ -122,10 +194,10 @@ Deno.serve(async (req) => {
   for (const mem of memberships) {
     try {
       let stripeAccountId: string | null = null;
+      const fam = mem.families as unknown as { id: string; primary_location_id: string; parent_email: string; parent_first_name: string };
 
       if (mem.stripe_subscription_id && stripeKey) {
         // Resolve connected Stripe account for this location
-        const fam = mem.families as unknown as { id: string; primary_location_id: string };
         if (fam?.primary_location_id) {
           const { data: loc } = await supabase
             .from('locations')
@@ -165,6 +237,9 @@ Deno.serve(async (req) => {
 
       cancelled++;
       console.log(`[process-membership-cancellations] membership ${mem.id} → cancelled`);
+      // Best-effort cancellation-effective email to parent
+      sendCancellationEffectiveEmail(fam.parent_email, fam.parent_first_name, mem.plan_name as string)
+        .catch(e => console.error(`[process-membership-cancellations] email failed for ${mem.id}:`, (e as Error).message));
     } catch (err) {
       const e = err as Error;
       console.error(`[process-membership-cancellations] error for ${mem.id}:`, e.message);

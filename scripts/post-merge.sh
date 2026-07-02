@@ -85,6 +85,8 @@ if [ -d "supabase/functions" ]; then
   deploy_fn request-membership-upgrade
   deploy_fn resume-paused-memberships
   deploy_fn process-membership-cancellations
+  deploy_fn notify-cancel-requested
+  deploy_fn notify-waiver-signed
   deploy_fn promote-waitlist
 
   # --no-verify-jwt: Mux / HitTrax / Stripe authenticate with their own schemes

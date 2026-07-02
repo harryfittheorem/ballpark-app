@@ -561,7 +561,8 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
     }
   }, [member.id, promoValid]);
 
-  const { subscriptionStatus, nextBillingAt, stripeSubscriptionId, cancelAt: persistedCancelAt } = member;
+  const { subscriptionStatus, nextBillingAt, stripeSubscriptionId, cancelAt: persistedCancelAt,
+          cancelRequestedAt, cancelEffectiveAt } = member;
 
   // If DB already has a cancel_at (persisted when cancel was first triggered),
   // pre-populate cancelDone so the "Cancels on <date>" label survives page reloads.
@@ -740,6 +741,27 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
             </span>
           </div>
         </div>
+
+        {cancelRequestedAt && subscriptionStatus !== 'cancelled' && (
+          <div style={{
+            padding: '10px 12px',
+            background: 'rgba(255,193,7,0.08)',
+            borderRadius: 6,
+            border: '1px solid rgba(255,193,7,0.25)',
+            marginBottom: 8,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <AlertCircle size={13} color="#FFC107" />
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#FFC107' }}>Cancellation Pending</span>
+            </div>
+            <div style={{ fontSize: 11, color: brand.textMuted, lineHeight: 1.5 }}>
+              Requested {formatNextBilling(cancelRequestedAt ?? null)}
+              {cancelEffectiveAt && (
+                <span> · Access ends <strong style={{ color: brand.text }}>{formatNextBilling(cancelEffectiveAt ?? null)}</strong></span>
+              )}
+            </div>
+          </div>
+        )}
 
         {effectiveCancelDone && (
           <div style={{

@@ -24,6 +24,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const STRIPE_API_VERSION = '2024-06-20';
+const RESEND_API_KEY     = Deno.env.get('RESEND_API_KEY') ?? '';
+const RESEND_FROM_EMAIL  = Deno.env.get('RESEND_FROM_EMAIL') ?? 'onboarding@resend.dev';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -71,6 +73,89 @@ async function stripePost(
     throw new Error(err?.message ?? `Stripe error ${res.status}`);
   }
   return data;
+}
+
+function formatDateLong(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d.getTime())) return iso;
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+async function sendPauseEmail(
+  parentEmail: string,
+  parentFirst: string,
+  planName: string,
+  pauseStart: string,
+  pauseEnd: string,
+): Promise<void> {
+  if (!RESEND_API_KEY) return;
+  const html = `
+<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0"
+        style="background:#1a1a1a;border-radius:12px;overflow:hidden;max-width:560px;width:100%;">
+        <tr>
+          <td style="background:#cfab56;padding:20px 28px;">
+            <span style="font-size:18px;font-weight:800;color:#1a1a1a;">⚾ Ballpark</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px;">
+            <p style="margin:0 0 14px;font-size:15px;font-weight:700;color:#f5f0e8;">Hi ${parentFirst},</p>
+            <p style="margin:0 0 14px;font-size:14px;color:#a0967e;line-height:1.6;">
+              Your <strong style="color:#f5f0e8;">${planName}</strong> has been paused.
+              Here are the details:
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0"
+              style="background:#252525;border-radius:8px;margin:0 0 16px;">
+              <tr><td style="padding:16px 18px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="font-size:12px;color:#6b6354;padding-bottom:8px;">PAUSED FROM</td>
+                    <td align="right" style="font-size:12px;font-weight:700;color:#f5f0e8;padding-bottom:8px;">${formatDateLong(pauseStart)}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:12px;color:#6b6354;">AUTO-RESUMES</td>
+                    <td align="right" style="font-size:12px;font-weight:700;color:#cfab56;">${formatDateLong(pauseEnd)}</td>
+                  </tr>
+                </table>
+              </td></tr>
+            </table>
+            <p style="margin:0 0 14px;font-size:13px;color:#a0967e;line-height:1.6;">
+              No billing charges will occur during the pause window.
+              Your membership will automatically resume on ${formatDateLong(pauseEnd)}.
+            </p>
+            <p style="margin:0;font-size:11px;color:#4a4438;">
+              This is an automated confirmation. Contact the facility if you need to adjust your pause dates.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: RESEND_FROM_EMAIL,
+      to: [parentEmail],
+      subject: `Your ${planName} is paused — resumes ${formatDateLong(pauseEnd)}`,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    console.error(`[pause-membership] Resend error ${res.status}: ${txt.slice(0, 200)}`);
+  }
 }
 
 const ERROR_MAP: Record<string, { message: string; status: number }> = {
@@ -166,8 +251,8 @@ Deno.serve(async (req) => {
   const { data: mem, error: memErr } = await supabase
     .from('memberships')
     .select(`
-      id, plan_type, status, stripe_subscription_id, tenant_id, family_id,
-      families!inner(id, parent_user_id, primary_location_id)
+      id, plan_name, plan_type, status, stripe_subscription_id, tenant_id, family_id,
+      families!inner(id, parent_user_id, parent_email, parent_first_name, primary_location_id)
     `)
     .eq('id', membership_id)
     .single();
@@ -177,7 +262,7 @@ Deno.serve(async (req) => {
   }
 
   // ── Pre-flight scope check (mirrors RPC check) ────────────────────────────
-  const fam = mem.families as unknown as { id: string; parent_user_id: string; primary_location_id: string };
+  const fam = mem.families as unknown as { id: string; parent_user_id: string; parent_email: string; parent_first_name: string; primary_location_id: string };
   const callerTenant = (user.app_metadata?.tenant_id as string | undefined) ?? null;
 
   const isOwnerAdmin = ['owner', 'admin'].includes(userRole);
@@ -279,6 +364,32 @@ Deno.serve(async (req) => {
   }
 
   console.log(`[pause-membership] paused membership=${membership_id} pause_end=${pauseEndStr}`);
+
+  // Best-effort: email + push notification to parent
+  const pauseStartStr = result.pause_start ?? new Date().toISOString().slice(0, 10);
+  const resolvedPauseEnd = result.pause_end ?? pauseEndStr;
+  const planName = mem.plan_name as string ?? 'your membership';
+
+  Promise.allSettled([
+    sendPauseEmail(fam.parent_email, fam.parent_first_name ?? 'there', planName, pauseStartStr, resolvedPauseEnd),
+    fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({
+        user_ids: [fam.parent_user_id],
+        title: '⏸ Membership Paused',
+        body: `Your ${planName} is paused until ${formatDateLong(resolvedPauseEnd)}.`,
+        data: { kind: 'membership_paused', membership_id },
+      }),
+    }),
+  ]).then(results => {
+    for (const r of results) {
+      if (r.status === 'rejected') console.error('[pause-membership] notification error:', r.reason);
+    }
+  });
 
   return json({ ok: true, pause_start: result.pause_start, pause_end: result.pause_end });
 });

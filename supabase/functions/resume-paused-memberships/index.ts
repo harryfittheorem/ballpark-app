@@ -35,12 +35,81 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const STRIPE_API_VERSION = '2024-06-20';
+const RESEND_API_KEY     = Deno.env.get('RESEND_API_KEY') ?? '';
+const RESEND_FROM_EMAIL  = Deno.env.get('RESEND_FROM_EMAIL') ?? 'onboarding@resend.dev';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
   });
+}
+
+function formatDateLong(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d.getTime())) return iso;
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+async function sendResumeEmail(
+  parentEmail: string,
+  parentFirst: string,
+  planName: string,
+): Promise<void> {
+  if (!RESEND_API_KEY) return;
+  const today = formatDateLong(new Date().toISOString().slice(0, 10));
+  const html = `
+<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0"
+        style="background:#1a1a1a;border-radius:12px;overflow:hidden;max-width:560px;width:100%;">
+        <tr>
+          <td style="background:#cfab56;padding:20px 28px;">
+            <span style="font-size:18px;font-weight:800;color:#1a1a1a;">⚾ Ballpark</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px;">
+            <p style="margin:0 0 14px;font-size:15px;font-weight:700;color:#f5f0e8;">Hi ${parentFirst},</p>
+            <p style="margin:0 0 14px;font-size:14px;color:#a0967e;line-height:1.6;">
+              Great news — your <strong style="color:#f5f0e8;">${planName}</strong> has
+              automatically resumed as of <strong style="color:#f5f0e8;">${today}</strong>.
+            </p>
+            <p style="margin:0 0 14px;font-size:13px;color:#a0967e;line-height:1.6;">
+              Your regular billing cycle will restart on your next billing date.
+              We're excited to have your athlete back!
+            </p>
+            <p style="margin:0;font-size:11px;color:#4a4438;">
+              This is an automated confirmation. Contact the facility if you have any questions.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: RESEND_FROM_EMAIL,
+      to: [parentEmail],
+      subject: `Your ${planName} has resumed`,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    console.error(`[resume-paused-memberships] Resend error ${res.status}: ${txt.slice(0, 200)}`);
+  }
 }
 
 async function stripeRemovePause(
@@ -108,8 +177,8 @@ Deno.serve(async (req) => {
   const { data: toResume, error: queryErr } = await supabase
     .from('memberships')
     .select(`
-      id, stripe_subscription_id,
-      families!inner(primary_location_id)
+      id, plan_name, stripe_subscription_id,
+      families!inner(primary_location_id, parent_email, parent_first_name, parent_user_id)
     `)
     .eq('status', 'paused')
     .lte('pause_end', todayStr);
@@ -145,7 +214,7 @@ Deno.serve(async (req) => {
   const errors: string[] = [];
 
   for (const mem of toResume) {
-    const fam = mem.families as unknown as { primary_location_id: string };
+    const fam = mem.families as unknown as { primary_location_id: string; parent_email: string; parent_first_name: string; parent_user_id: string };
     const connectedAccountId = accountByLocation[fam.primary_location_id] ?? undefined;
 
     try {
@@ -179,6 +248,28 @@ Deno.serve(async (req) => {
 
       resumed++;
       console.log(`[resume-paused-memberships] resumed membership=${mem.id}`);
+      // Best-effort: email + push notification to parent
+      const planName = mem.plan_name as string ?? 'your membership';
+      Promise.allSettled([
+        sendResumeEmail(fam.parent_email, fam.parent_first_name ?? 'there', planName),
+        fam.parent_user_id ? fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            user_ids: [fam.parent_user_id],
+            title: '▶ Membership Resumed',
+            body: `Your ${planName} is now active again. Welcome back!`,
+            data: { kind: 'membership_resumed', membership_id: mem.id },
+          }),
+        }) : Promise.resolve(),
+      ]).then(results => {
+        for (const r of results) {
+          if (r.status === 'rejected') console.error(`[resume-paused-memberships] notification error for ${mem.id}:`, r.reason);
+        }
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[resume-paused-memberships] failed membership=${mem.id}: ${msg}`);

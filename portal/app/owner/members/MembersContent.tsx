@@ -138,11 +138,29 @@ const columns: TableColumn<OwnerMember & Record<string, unknown>>[] = [
     render: (r) => {
       const rawStatus = r.status as string;
       const label = rawStatus === 'payment_overdue' ? 'Payment Overdue'
+        : rawStatus === 'at-risk' ? 'At Risk'
         : rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
-      const color = rawStatus === 'active' ? 'success'
+      const color = (rawStatus === 'active' || rawStatus === 'at-risk') ? 'success'
         : rawStatus === 'paused' ? 'warning'
         : 'danger';
-      return <Chip color={color}>{label}</Chip>;
+      const m = r as unknown as OwnerMember;
+      const resumeDate = rawStatus === 'paused' && m.pauseEnd ? m.pauseEnd.slice(0, 10) : null;
+      const hasPendingCancel = !!(m.cancelRequestedAt) && rawStatus !== 'cancelled';
+      return (
+        <div>
+          <Chip color={color}>{label}</Chip>
+          {resumeDate && (
+            <div style={{ fontSize: 10, color: brand.textMuted, marginTop: 3 }}>
+              Resumes {resumeDate}
+            </div>
+          )}
+          {hasPendingCancel && (
+            <div style={{ fontSize: 10, color: '#FFC107', marginTop: 3, fontWeight: 600 }}>
+              Cancel pending
+            </div>
+          )}
+        </div>
+      );
     },
   },
   {
@@ -198,7 +216,7 @@ const labelStyle: React.CSSProperties = {
 export function MembersContent({ members }: Props) {
   const router  = useRouter();
   const source  = members.length ? members : DEMO_MEMBERS;
-  const [filter, setFilter] = useState<'all' | 'active' | 'at-risk' | 'card-expiring'>('all');
+  const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'pending-cancel' | 'at-risk' | 'card-expiring'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [toast, setToast]   = useState<string | null>(null);
   const [form, setForm]     = useState({
@@ -211,8 +229,10 @@ export function MembersContent({ members }: Props) {
   }, [toast]);
 
   const filtered = source.filter(m => {
-    if (filter === 'active')       return m.status === 'active';
-    if (filter === 'at-risk')      return m.churnRisk === 'high' || m.churnRisk === 'medium';
+    if (filter === 'active')         return m.status === 'active' || m.status === 'at-risk';
+    if (filter === 'paused')         return m.status === 'paused';
+    if (filter === 'pending-cancel') return !!(m as OwnerMember).cancelRequestedAt && m.status !== 'cancelled';
+    if (filter === 'at-risk')        return m.churnRisk === 'high' || m.churnRisk === 'medium';
     if (filter === 'card-expiring') {
       return (
         isCardExpiringSoon(m.cardExpMonth, m.cardExpYear) ||
@@ -229,11 +249,16 @@ export function MembersContent({ members }: Props) {
     (m.planType === 'eft' && !m.cardLast4)
   ).length;
 
+  const pausedCount         = source.filter(m => m.status === 'paused').length;
+  const pendingCancelCount  = source.filter(m => !!(m as OwnerMember).cancelRequestedAt && m.status !== 'cancelled').length;
+
   const tabs = [
-    { id: 'all',            label: 'All',                count: source.length },
-    { id: 'active',         label: 'Active',             count: source.filter(m => m.status === 'active').length },
-    { id: 'at-risk',        label: 'At Risk',            count: source.filter(m => m.churnRisk === 'high' || m.churnRisk === 'medium').length },
-    { id: 'card-expiring',  label: 'Card Expiring Soon', count: cardExpiringSoonCount },
+    { id: 'all',             label: 'All',                count: source.length },
+    { id: 'active',          label: 'Active',             count: source.filter(m => m.status === 'active' || m.status === 'at-risk').length },
+    { id: 'paused',          label: 'Paused',             count: pausedCount },
+    { id: 'pending-cancel',  label: 'Pending Cancel',     count: pendingCancelCount },
+    { id: 'at-risk',         label: 'At Risk',            count: source.filter(m => m.churnRisk === 'high' || m.churnRisk === 'medium').length },
+    { id: 'card-expiring',   label: 'Card Expiring Soon', count: cardExpiringSoonCount },
   ];
 
   const handleExport = () => {
@@ -295,8 +320,8 @@ export function MembersContent({ members }: Props) {
                 style={{
                   padding: '8px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700,
                   background: isActive ? brand.dark : brand.surface,
-                  color: isActive ? brand.gold : isCardTab && f.count > 0 ? '#FFC107' : brand.textMuted,
-                  border: `1px solid ${isActive ? brand.dark : isCardTab && f.count > 0 ? 'rgba(255,193,7,0.4)' : brand.border}`,
+                  color: isActive ? brand.gold : (isCardTab || f.id === 'pending-cancel') && f.count > 0 ? '#FFC107' : brand.textMuted,
+                  border: `1px solid ${isActive ? brand.dark : (isCardTab || f.id === 'pending-cancel') && f.count > 0 ? 'rgba(255,193,7,0.4)' : brand.border}`,
                   cursor: 'pointer', fontFamily: fonts.display, letterSpacing: 0.5, textTransform: 'uppercase',
                   display: 'flex', alignItems: 'center', gap: 5,
                 }}
