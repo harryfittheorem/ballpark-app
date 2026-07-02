@@ -35,6 +35,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
@@ -47,7 +48,11 @@ if (!STRIPE_SECRET_KEY || !SUPABASE_URL || !SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+// Node.js < 22 has no native WebSocket — supply the ws package so the
+// Supabase realtime client initialises without throwing.
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  realtime: { transport: ws },
+});
 
 async function stripeGet(path, stripeAccountId) {
   const headers = {
