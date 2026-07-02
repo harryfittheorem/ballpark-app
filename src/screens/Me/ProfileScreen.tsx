@@ -371,7 +371,9 @@ export default function ProfileScreen({ navigation }: Props) {
             activeMembership.sessions_remaining !== null &&
             activeMembership.sessions_total !== null
               ? `${activeMembership.sessions_remaining} of ${activeMembership.sessions_total} sessions remaining`
-              : 'Manage billing card'
+              : family?.card_last4 && family?.card_brand
+                ? `${family.card_brand} ···· ${family.card_last4}  exp ${String(family.card_exp_month ?? 0).padStart(2, '0')}/${String(family.card_exp_year ?? 0).slice(-2)}`
+                : 'No card saved — tap to add'
           }
           subtitleTone={
             activeMembership?.plan_type === 'otc' &&

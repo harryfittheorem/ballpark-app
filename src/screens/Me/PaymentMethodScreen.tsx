@@ -22,6 +22,7 @@
  * the SDK makes calls against the correct connected account.
  */
 
+import { useQueryClient } from '@tanstack/react-query';
 import { StripeProvider, useStripe } from '@stripe/stripe-react-native';
 import {
   CreditCard,
@@ -48,6 +49,7 @@ import {
   type SetupIntentResult,
   type CardOnFile,
 } from '@/api/stripe';
+import { useAuth } from '@/hooks/useAuth';
 import { useMembership } from '@/hooks/useMembership';
 import type { MeStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
@@ -269,6 +271,8 @@ export default function PaymentMethodScreen({ navigation }: Props) {
   const [card, setCard] = useState<CardOnFile | null>(null);
   const [setupData, setSetupData] = useState<SetupIntentResult | null>(null);
   const { refresh: refreshMembership } = useMembership();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   // Load card on mount
   useEffect(() => {
@@ -321,6 +325,12 @@ export default function PaymentMethodScreen({ navigation }: Props) {
         setPhase('success');
         // Refresh membership in background — clears payment_failed_at banner.
         void refreshMembership();
+        // Invalidate the family query so ProfileScreen's card row shows the
+        // new card details immediately without requiring the parent to leave
+        // and return to the Me tab.
+        if (user?.id) {
+          void queryClient.invalidateQueries({ queryKey: ['family', user.id] });
+        }
       })
       .catch(err => {
         if (!mounted) return;
