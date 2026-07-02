@@ -184,15 +184,18 @@ async function main() {
       // Stripe "uncollectible" = invoices that exhausted all retries (failed to collect).
       // "paid" = successfully charged.
       // We fetch both so the billing table shows the full payment history.
+      //
+      // Date range filter: Stripe requires 'created[gte]' bracket syntax for range
+      // queries. Using `created: timestamp` is exact-match semantics in the API.
       const [paid, uncollectible] = await Promise.all([
         stripeListAll(
           'invoices',
-          { limit: 100, status: 'paid', created: sinceUnix },
+          { limit: 100, status: 'paid', 'created[gte]': sinceUnix },
           accountId,
         ),
         stripeListAll(
           'invoices',
-          { limit: 100, status: 'uncollectible', created: sinceUnix },
+          { limit: 100, status: 'uncollectible', 'created[gte]': sinceUnix },
           accountId,
         ),
       ]);
@@ -211,6 +214,15 @@ async function main() {
 
     // ── 4. Load existing payment_events stripe_invoice_ids for this account
     //       in one batch to avoid N+1 Supabase queries.
+    //
+    // Idempotency design note:
+    //   payment_events.stripe_invoice_id is a non-unique index (by design — the
+    //   same invoice can produce both a 'failed' row on retry attempt 1 and a
+    //   'paid' row on a later successful attempt). A DB-level UPSERT ON CONFLICT
+    //   cannot be used without a unique constraint. Instead we pre-load all
+    //   existing (stripe_invoice_id, status) pairs into a Set and skip any invoice
+    //   whose key is already present. This produces the same idempotent behaviour
+    //   as the stripe-webhook edge function's application-layer existence check.
     const invoiceIds = invoices.map(inv => inv.id).filter(Boolean);
 
     const { data: existingRows } = await supabase
@@ -223,7 +235,7 @@ async function main() {
       (existingRows ?? []).map(r => `${r.stripe_invoice_id}|${r.status}`),
     );
 
-    // ── 5. Upsert missing rows ───────────────────────────────────────────────
+    // ── 5. Insert missing rows ───────────────────────────────────────────────
     for (const inv of invoices) {
       if (!inv.subscription) continue;
 
@@ -255,15 +267,20 @@ async function main() {
 
       if (!DRY_RUN) {
         try {
+          // payment_method: 'card' matches the stripe-webhook edge function which
+          // inserts 'card' for all subscription invoice events. Subscription charges
+          // go through Stripe's card payment infrastructure even though they are
+          // conceptually "auto-pay" / EFT in the UI — using 'card' keeps the
+          // backfilled rows consistent with rows written by the live webhook.
           const row = {
-            tenant_id:        mem.tenant_id,
-            family_id:        mem.family_id,
-            membership_id:    mem.membership_id,
-            amount_cents:     amountCents,
+            tenant_id:         mem.tenant_id,
+            family_id:         mem.family_id,
+            membership_id:     mem.membership_id,
+            amount_cents:      amountCents,
             status,
-            payment_method:   'eft',
+            payment_method:    'card',
             stripe_invoice_id: inv.id,
-            created_at:       invoiceDate,
+            created_at:        invoiceDate,
           };
 
           const { error: insertErr } = await supabase
