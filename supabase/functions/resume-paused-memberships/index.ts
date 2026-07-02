@@ -120,8 +120,8 @@ Deno.serve(async (req) => {
   }
 
   if (!toResume || toResume.length === 0) {
-    console.log('[resume-paused-memberships] no memberships to resume');
-    return json({ ok: true, resumed: 0 });
+    console.log('[resume-paused-memberships] no memberships to resume — done');
+    return json({ ok: true, processed: 0, resumed: 0, errors: [] });
   }
 
   console.log(`[resume-paused-memberships] found ${toResume.length} membership(s) to resume`);
@@ -186,9 +186,13 @@ Deno.serve(async (req) => {
     }
   }
 
-  return json({
+  const summary = {
     ok: errors.length === 0,
+    processed: toResume.length,
     resumed,
-    errors: errors.length > 0 ? errors : undefined,
-  });
+    skipped: toResume.length - resumed - errors.length,
+    errors,
+  };
+  console.log('[resume-paused-memberships] run complete:', JSON.stringify(summary));
+  return json(summary);
 });
