@@ -11,6 +11,18 @@ import { exportCsv } from '@/lib/exportCsv';
 
 type Props = { data: BillingData };
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function formatFetchedAt(iso: string): string {
+  const d = new Date(iso);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${months[d.getMonth()]} ${d.getDate()} at ${hour12}:${m} ${ampm}`;
+}
+
 // ── Demo data ──────────────────────────────────────────────────────────────
 
 const DEMO_PACKAGES: MembershipPackage[] = [
@@ -215,7 +227,11 @@ export function BillingContent({ data }: Props) {
           </div>
         </div>
 
-        <SectionHeader title="Recent Transactions" action={<OButton variant="ghost" size="sm" onClick={handleExport}>View All →</OButton>} />
+        <SectionHeader
+          title="Recent Transactions"
+          subtitle={data.fetchedAt ? `Refreshed ${formatFetchedAt(data.fetchedAt)}` : undefined}
+          action={<OButton variant="ghost" size="sm" onClick={handleExport}>View All →</OButton>}
+        />
         <OTable
           columns={txColumns as TableColumn<Record<string, unknown>>[]}
           rows={recentTransactions as unknown as Record<string, unknown>[]}

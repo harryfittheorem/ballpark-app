@@ -874,6 +874,7 @@ export type BillingData = {
   recentTransactions: RecentTransaction[];
   paidCount: number;
   failedCount: number;
+  fetchedAt: string;
 };
 
 /**
@@ -899,15 +900,21 @@ export async function getBillingData(supabase: SupabaseClient, tenantId: string)
     `)
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(50);
 
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   const recentTransactions: RecentTransaction[] = (events ?? []).map(e => {
-    const mem = e.memberships as unknown as { plan_name: string; kids: { first_name: string; last_name: string | null } | null } | null;
+    const mem = e.memberships as unknown as {
+      plan_name: string;
+      kids: { first_name: string; last_name: string | null } | Array<{ first_name: string; last_name: string | null }> | null;
+    } | null;
+    // kids may be returned as an array (when the join is one-to-many) or as an
+    // object (when selected via memberships→kids as a nested relation). Guard for both.
+    const kidsObj = Array.isArray(mem?.kids) ? mem?.kids[0] ?? null : mem?.kids ?? null;
     const d = new Date(e.created_at);
-    const memberName = mem?.kids
-      ? [mem.kids.first_name, mem.kids.last_name].filter(Boolean).join(' ')
+    const memberName = kidsObj
+      ? [kidsObj.first_name, kidsObj.last_name].filter(Boolean).join(' ')
       : '—';
     return {
       id: e.id,
@@ -923,7 +930,14 @@ export async function getBillingData(supabase: SupabaseClient, tenantId: string)
   const paidCount = (events ?? []).filter(e => e.status === 'paid').length;
   const failedCount = (events ?? []).filter(e => e.status === 'failed').length;
 
-  return { kpis, packages, recentTransactions, paidCount, failedCount };
+  return {
+    kpis,
+    packages,
+    recentTransactions,
+    paidCount,
+    failedCount,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 // ─── Revenue Reports ─────────────────────────────────────────────────────────
