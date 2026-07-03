@@ -375,7 +375,7 @@ export function MembersContent({ members }: Props) {
                 <div>
                   <label style={labelStyle}>Age Group</label>
                   <select style={{ ...inputStyle, appearance: 'auto' }} value={form.ageGroup} onChange={e => setForm(f => ({ ...f, ageGroup: e.target.value }))}>
-                    {['8U','9U','10U','11U','12U','13U','14U','15U','16U+'].map(a => <option key={a}>{a}</option>)}
+                    {['8U','10U','12U','14U','HS','College'].map(a => <option key={a}>{a}</option>)}
                   </select>
                 </div>
               </div>

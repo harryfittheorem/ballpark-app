@@ -209,7 +209,7 @@ function Step1({
             <label style={labelStyle}>Age Group</label>
             <select style={{ ...inputStyle, appearance: 'auto' }} {...f('ageGroup')}>
               <option value="">Select…</option>
-              {['8U','9U','10U','11U','12U','13U','14U','15U','16U+'].map(a => (
+              {['8U','10U','12U','14U','HS','College'].map(a => (
                 <option key={a} value={a}>{a}</option>
               ))}
             </select>
