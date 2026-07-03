@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { PageHeader, SectionHeader, OCard, OButton, Chip } from '@/components/owner/ui';
 import {
   CreditCard, CheckCircle2, AlertCircle, Link2, Link2Off,
-  ExternalLink, Info, Clock,
+  ExternalLink, Info, Clock, RefreshCw,
 } from 'lucide-react';
 import type { LocationStripeStatus } from '@/lib/supabase/ownerQueries';
 
@@ -39,8 +39,10 @@ function statusText(status: LocationStripeStatus['stripe_onboarding_status']) {
 
 export function PaymentsContent({ locations }: Props) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [connecting, setConnecting] = useState<ConnectingState>({});
   const [disconnecting, setDisconnecting] = useState<ConnectingState>({});
+  const [syncing, setSyncing] = useState<ConnectingState>({});
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
@@ -101,6 +103,29 @@ export function PaymentsContent({ locations }: Props) {
       setFlash({ type: 'error', text: e instanceof Error ? e.message : 'Network error' });
     } finally {
       setDisconnecting(prev => ({ ...prev, [locationId]: false }));
+    }
+  }
+
+  async function handleSync(locationId: string) {
+    setSyncing(prev => ({ ...prev, [locationId]: true }));
+    setFlash(null);
+    try {
+      const res = await fetch('/api/stripe/connect/sync-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location_id: locationId }),
+      });
+      const data = await res.json() as { ok?: boolean; status?: string; error?: string };
+      if (!res.ok || !data.ok) {
+        setFlash({ type: 'error', text: data.error ?? 'Failed to sync status from Stripe.' });
+      } else {
+        setFlash({ type: 'success', text: `Status synced from Stripe: ${data.status ?? 'updated'}.` });
+        router.refresh();
+      }
+    } catch (e) {
+      setFlash({ type: 'error', text: e instanceof Error ? e.message : 'Network error' });
+    } finally {
+      setSyncing(prev => ({ ...prev, [locationId]: false }));
     }
   }
 
@@ -173,6 +198,7 @@ export function PaymentsContent({ locations }: Props) {
           const isNotConnected = loc.stripe_onboarding_status === 'not_connected';
           const isConnecting   = !!connecting[loc.id];
           const isDisconnecting = !!disconnecting[loc.id];
+          const isSyncing      = !!syncing[loc.id];
 
           return (
             <OCard key={loc.id} style={{ marginBottom: 16 }}>
@@ -240,6 +266,14 @@ export function PaymentsContent({ locations }: Props) {
                           {isRestricted ? 'Resolve in Stripe Dashboard' : 'Open Stripe Dashboard'}
                         </OButton>
                         <OButton
+                          variant="secondary"
+                          icon={RefreshCw}
+                          onClick={isSyncing ? undefined : () => handleSync(loc.id)}
+                          style={isSyncing ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
+                        >
+                          {isSyncing ? 'Syncing…' : 'Sync from Stripe'}
+                        </OButton>
+                        <OButton
                           variant="ghost"
                           icon={Link2Off}
                           onClick={isDisconnecting ? undefined : () => handleDisconnect(loc.id)}
@@ -258,6 +292,14 @@ export function PaymentsContent({ locations }: Props) {
                           onClick={() => window.open('https://dashboard.stripe.com', '_blank', 'noopener,noreferrer')}
                         >
                           Stripe Dashboard
+                        </OButton>
+                        <OButton
+                          variant="secondary"
+                          icon={RefreshCw}
+                          onClick={isSyncing ? undefined : () => handleSync(loc.id)}
+                          style={isSyncing ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
+                        >
+                          {isSyncing ? 'Syncing…' : 'Sync from Stripe'}
                         </OButton>
                         <OButton
                           variant="ghost"
