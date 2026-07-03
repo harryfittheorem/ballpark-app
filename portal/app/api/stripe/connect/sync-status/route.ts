@@ -73,9 +73,50 @@ export async function POST(req: NextRequest) {
   });
 
   if (!accountRes.ok) {
-    const errData = await accountRes.json().catch(() => ({})) as { error?: { message?: string } };
-    const msg = errData.error?.message ?? `Stripe returned ${accountRes.status}`;
-    return err(502, `Failed to fetch account from Stripe: ${msg}`);
+    const errData = await accountRes.json().catch(() => ({})) as {
+      error?: { message?: string; code?: string; type?: string };
+    };
+    const stripeCode = errData.error?.code ?? '';
+    const stripeType = errData.error?.type ?? '';
+
+    // Map well-known Stripe failures to owner-friendly messages
+    if (
+      accountRes.status === 404 ||
+      stripeCode === 'resource_missing' ||
+      stripeCode === 'account_invalid'
+    ) {
+      return NextResponse.json(
+        {
+          error: 'This Stripe account no longer exists or has been deauthorized. Disconnect this location and reconnect to link a new Stripe account.',
+          error_type: 'account_not_found',
+        },
+        { status: 502 },
+      );
+    }
+
+    if (
+      accountRes.status === 401 ||
+      stripeType === 'authentication_error' ||
+      stripeCode === 'api_key_invalid' ||
+      stripeCode === 'api_key_expired'
+    ) {
+      return NextResponse.json(
+        {
+          error: 'Stripe rejected the API key configured for this server. Please contact support to reconfigure Stripe for your account.',
+          error_type: 'auth_error',
+        },
+        { status: 502 },
+      );
+    }
+
+    // Generic fallback — still friendlier than a raw Stripe message
+    return NextResponse.json(
+      {
+        error: 'Unable to reach Stripe right now. Please try again in a moment. If the problem persists, contact support.',
+        error_type: 'stripe_error',
+      },
+      { status: 502 },
+    );
   }
 
   const acctData = await accountRes.json() as {

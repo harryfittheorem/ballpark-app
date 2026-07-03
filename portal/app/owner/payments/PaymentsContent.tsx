@@ -43,7 +43,7 @@ export function PaymentsContent({ locations }: Props) {
   const [connecting, setConnecting] = useState<ConnectingState>({});
   const [disconnecting, setDisconnecting] = useState<ConnectingState>({});
   const [syncing, setSyncing] = useState<ConnectingState>({});
-  const [flash, setFlash] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [flash, setFlash] = useState<{ type: 'success' | 'error'; text: string; errorType?: string; locationId?: string } | null>(null);
 
   useEffect(() => {
     if (searchParams.get('connected') === '1') {
@@ -161,9 +161,14 @@ export function PaymentsContent({ locations }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ location_id: locationId }),
       });
-      const data = await res.json() as { ok?: boolean; status?: string; error?: string };
+      const data = await res.json() as { ok?: boolean; status?: string; error?: string; error_type?: string };
       if (!res.ok || !data.ok) {
-        setFlash({ type: 'error', text: data.error ?? 'Failed to sync status from Stripe.' });
+        setFlash({
+          type: 'error',
+          text: data.error ?? 'Failed to sync status from Stripe.',
+          errorType: data.error_type,
+          locationId,
+        });
       } else {
         setFlash({ type: 'success', text: `Status synced from Stripe: ${data.status ?? 'updated'}.` });
         router.refresh();
@@ -202,7 +207,20 @@ export function PaymentsContent({ locations }: Props) {
               ? <CheckCircle2 size={16} style={{ flexShrink: 0, marginTop: 1 }} />
               : <AlertCircle  size={16} style={{ flexShrink: 0, marginTop: 1 }} />
             }
-            {flash.text}
+            <div style={{ flex: 1 }}>
+              <div>{flash.text}</div>
+              {flash.errorType === 'account_not_found' && flash.locationId && (
+                <div style={{ marginTop: 10 }}>
+                  <OButton
+                    variant="gold"
+                    icon={Link2Off}
+                    onClick={() => flash.locationId && handleDisconnect(flash.locationId)}
+                  >
+                    Disconnect &amp; Reconnect
+                  </OButton>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
