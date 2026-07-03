@@ -94,6 +94,22 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Fallback: if primary_location_id was null (family enrolled before the fix
+  // landed) or its location isn't connected, search the tenant for any
+  // connected location so existing families aren't permanently broken.
+  if (!connectedAccountId) {
+    const { data: fallbackLocs } = await serviceClient
+      .from('locations')
+      .select('stripe_account_id')
+      .eq('tenant_id', tenantId)
+      .eq('stripe_onboarding_status', 'connected')
+      .limit(1);
+    const fb = (fallbackLocs as Array<{ stripe_account_id?: string }> | null)?.[0];
+    if (fb?.stripe_account_id) {
+      connectedAccountId = fb.stripe_account_id;
+    }
+  }
+
   // Hard gate: a connected Stripe account is required. Without it, any intent
   // created would land on the platform account instead of the tenant's account.
   if (!connectedAccountId) {

@@ -679,11 +679,17 @@ function Step4({
   }
 
   if (error) {
+    const isStripeNotConfigured = error.includes('Stripe account not configured');
     return (
       <div>
         <h2 style={{ fontFamily: fonts.display, fontSize: 22, fontWeight: 700, color: brand.text, marginBottom: 16 }}>Payment</h2>
         <div style={{ padding: '14px 16px', background: brand.dangerBg, borderRadius: 8, color: brand.danger, fontSize: 13, marginBottom: 20 }}>
-          {error}
+          <div>{error}</div>
+          {isStripeNotConfigured && (
+            <div style={{ marginTop: 10, fontSize: 12, color: brand.danger }}>
+              Go to <a href="/owner/payments" target="_blank" rel="noopener noreferrer" style={{ color: brand.danger, fontWeight: 700, textDecoration: 'underline' }}>Payments settings</a> to connect a Stripe account for this location, then return here to complete enrollment.
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <OButton variant="secondary" icon={ChevronLeft} onClick={onBack}>Back</OButton>

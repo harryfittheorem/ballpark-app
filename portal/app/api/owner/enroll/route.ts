@@ -88,8 +88,9 @@ export async function POST(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-  // ── 1. Load tenant slug (required by handle_new_user trigger) + verify plan ─
-  const [{ data: tenant }, { data: plan, error: planErr }] = await Promise.all([
+  // ── 1. Load tenant slug (required by handle_new_user trigger) + verify plan
+  //       + find the first connected location for primary_location_id ─────────
+  const [{ data: tenant }, { data: plan, error: planErr }, { data: connectedLocations }] = await Promise.all([
     serviceClient
       .from('tenants')
       .select('slug')
@@ -102,7 +103,18 @@ export async function POST(req: NextRequest) {
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .single(),
+    serviceClient
+      .from('locations')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('stripe_onboarding_status', 'connected')
+      .limit(1),
   ]);
+
+  // Use the first connected location as the family's primary_location_id.
+  // If none is connected yet, leave it null — enrollment can still proceed;
+  // only the payment step gates on Stripe being present.
+  const primaryLocationId = (connectedLocations as Array<{ id: string }> | null)?.[0]?.id ?? null;
 
   const tenantSlug = (tenant as { slug: string } | null)?.slug;
   if (!tenantSlug) return err(500, 'Could not load tenant configuration');
@@ -185,6 +197,7 @@ export async function POST(req: NextRequest) {
           parent_last_name,
           parent_email,
           parent_phone: parent_phone ?? null,
+          ...(primaryLocationId ? { primary_location_id: primaryLocationId } : {}),
         })
         .select('id')
         .single();
@@ -203,6 +216,7 @@ export async function POST(req: NextRequest) {
           parent_email,
           parent_phone: parent_phone ?? null,
           tenant_id: tenantId,
+          ...(primaryLocationId ? { primary_location_id: primaryLocationId } : {}),
         })
         .eq('id', familyId);
     }

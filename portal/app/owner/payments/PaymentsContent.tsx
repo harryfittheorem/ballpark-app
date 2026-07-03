@@ -307,6 +307,25 @@ export function PaymentsContent({ locations }: Props) {
                     </span>
                   </div>
 
+                  {/* Inline account_not_found alert — visible even when the top banner is dismissed */}
+                  {flash?.errorType === 'account_not_found' && flash.locationId === loc.id && (
+                    <div style={{
+                      marginBottom: 12,
+                      padding: '10px 12px',
+                      borderRadius: 6,
+                      background: brand.dangerBg,
+                      border: `1px solid ${brand.danger}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontSize: 12,
+                      color: brand.danger,
+                    }}>
+                      <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                      <span>Stripe account not found — this account ID is no longer valid. Disconnect and start over.</span>
+                    </div>
+                  )}
+
                   {/* Action buttons */}
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     {isNotConnected && (
@@ -338,12 +357,12 @@ export function PaymentsContent({ locations }: Props) {
                           {isSyncing ? 'Syncing…' : 'Sync from Stripe'}
                         </OButton>
                         <OButton
-                          variant="ghost"
+                          variant={flash?.errorType === 'account_not_found' && flash.locationId === loc.id ? 'gold' : 'ghost'}
                           icon={Link2Off}
                           onClick={isDisconnecting ? undefined : () => handleDisconnect(loc.id)}
                           style={isDisconnecting ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
                         >
-                          {isDisconnecting ? 'Disconnecting…' : (isPending ? 'Disconnect & Restart' : 'Disconnect')}
+                          {isDisconnecting ? 'Disconnecting…' : 'Disconnect & Restart'}
                         </OButton>
                       </>
                     )}
