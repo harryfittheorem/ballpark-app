@@ -47,12 +47,58 @@ export function PaymentsContent({ locations }: Props) {
 
   useEffect(() => {
     if (searchParams.get('connected') === '1') {
-      setFlash({ type: 'success', text: 'Stripe account connected! Stripe is verifying your details — status will update automatically via webhook.' });
+      const pendingLocations = locations.filter(
+        l => l.stripe_onboarding_status === 'pending' && l.stripe_account_id,
+      );
+
+      if (pendingLocations.length === 0) {
+        const alreadyConnected = locations.some(
+          l => l.stripe_onboarding_status === 'connected' && l.stripe_account_id,
+        );
+        setFlash({
+          type: 'success',
+          text: alreadyConnected
+            ? 'Stripe account connected and verified! Card payments are now enabled.'
+            : 'Stripe account connected! Stripe is verifying your details — status will update automatically via webhook.',
+        });
+        return;
+      }
+
+      setFlash({ type: 'success', text: 'Syncing your Stripe account status…' });
+
+      Promise.all(
+        pendingLocations.map(loc =>
+          fetch('/api/stripe/connect/sync-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location_id: loc.id }),
+          })
+            .then(r => r.json() as Promise<{ ok?: boolean; status?: string; error?: string }>)
+            .catch(() => ({ ok: false as const, status: undefined, error: 'Network error' })),
+        ),
+      ).then(results => {
+        const statuses = results.map(r => r.status);
+        const anyConnected = statuses.some(s => s === 'connected');
+        const allConnected = statuses.every(s => s === 'connected');
+
+        if (allConnected) {
+          setFlash({ type: 'success', text: 'Stripe account connected and verified! Card payments are now enabled.' });
+        } else if (anyConnected) {
+          setFlash({ type: 'success', text: 'Stripe account connected! Some locations are still being verified by Stripe.' });
+        } else {
+          setFlash({ type: 'success', text: 'Stripe account connected! Stripe is verifying your details — status will update automatically via webhook.' });
+        }
+        router.refresh();
+      }).catch(() => {
+        setFlash({ type: 'success', text: 'Stripe account connected! Stripe is verifying your details — status will update automatically via webhook.' });
+      });
     }
+
     const err = searchParams.get('error');
     if (err) {
       setFlash({ type: 'error', text: `Connection failed: ${decodeURIComponent(err)}` });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const anyNotConnected = locations.some(l => l.stripe_onboarding_status === 'not_connected');
