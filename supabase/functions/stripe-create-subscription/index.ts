@@ -199,16 +199,8 @@ Deno.serve(async (req) => {
       callerTenantId,
       errCode: memErr?.code,
       errMsg: memErr?.message,
-      errDetails: memErr?.details,
     });
-    return json({
-      error: {
-        code: 'not_found',
-        message: memErr
-          ? `DB error: ${memErr.message}`
-          : 'Membership not found or access denied',
-      },
-    }, 404);
+    return json({ error: { code: 'not_found', message: 'Membership not found or access denied' } }, 404);
   }
 
   // Only EFT memberships get subscriptions

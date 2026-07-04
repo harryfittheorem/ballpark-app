@@ -2,3 +2,5 @@
 - [Portal port routing](portal-port-routing.md) — portal must run on port 5000 (webview); port 3000 breaks preview pane and Stripe Connect callbacks.
 - [HitTrax v1.3 API flow](hittrax-v13-flow.md) — v1.3 is instant/synchronous; no email confirm; remove requires session token (AuthenticateCloudUserViaThirdParty first); all outbound are GET except CreateCloudUserAccount (POST).
 - [HitTrax poll debugging](hittrax-poll-debugging.md) — cron auth, --use-api deploy, FullPlays field names (TS/Elv/SnId/Res/PV), partial index ON CONFLICT bug, historic backfill SQL.
+- [Supabase CLI project link](supabase-cli-link.md) — CLI is linked to local "workspace" not production; always re-link before db push; use management API for schema verification.
+- [JWT claims vs app_metadata](jwt-claims-app-metadata.md) — Custom Access Token Hook injects claims into JWT payload only, never into raw_app_meta_data; edge functions must decode the JWT to read tenant_id/app_role.
