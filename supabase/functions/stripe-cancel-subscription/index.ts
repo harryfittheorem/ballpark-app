@@ -111,8 +111,24 @@ Deno.serve(async (req) => {
     return json({ error: { code: 'forbidden', message: 'Admin or owner role required' } }, 403);
   }
 
-  // Tenant isolation: get the caller's tenant from JWT
-  const callerTenantId = (user.app_metadata?.tenant_id as string | undefined) ?? '';
+  // Tenant isolation: read tenant_id from the JWT payload.
+  // The Custom Access Token Hook injects tenant_id as a top-level JWT claim —
+  // it is NOT stored in raw_app_meta_data, so auth.getUser() does NOT surface
+  // it in user.app_metadata. Decode the token payload directly (signature was
+  // already verified by auth.getUser() above).
+  const callerTenantId: string = (() => {
+    try {
+      const parts = callerToken.split('.');
+      if (parts.length < 2) return '';
+      const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(b64)) as Record<string, unknown>;
+      return (payload.tenant_id as string | undefined)
+        ?? (user.app_metadata?.tenant_id as string | undefined)
+        ?? '';
+    } catch {
+      return (user.app_metadata?.tenant_id as string | undefined) ?? '';
+    }
+  })();
   if (!callerTenantId) {
     return json({ error: { code: 'forbidden', message: 'No tenant in token — re-authenticate' } }, 403);
   }
