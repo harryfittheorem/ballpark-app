@@ -187,14 +187,28 @@ Deno.serve(async (req) => {
       id, plan_name, plan_type, status, amount_cents, billing_anchor_day,
       stripe_subscription_id, stripe_price_id, tenant_id, family_id, kid_id,
       families!inner(id, stripe_connected_customer_id, primary_location_id),
-      kids!inner(first_name, last_name)
+      kids(first_name, last_name)
     `)
     .eq('id', membership_id)
     .eq('tenant_id', callerTenantId)
     .single();
 
   if (memErr || !mem) {
-    return json({ error: { code: 'not_found', message: 'Membership not found or access denied' } }, 404);
+    console.error('[stripe-create-subscription] membership query failed', {
+      membership_id,
+      callerTenantId,
+      errCode: memErr?.code,
+      errMsg: memErr?.message,
+      errDetails: memErr?.details,
+    });
+    return json({
+      error: {
+        code: 'not_found',
+        message: memErr
+          ? `DB error: ${memErr.message}`
+          : 'Membership not found or access denied',
+      },
+    }, 404);
   }
 
   // Only EFT memberships get subscriptions
