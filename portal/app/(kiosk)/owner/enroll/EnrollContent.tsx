@@ -814,8 +814,8 @@ export function EnrollContent({ waiver, stripePublishableKey }: Props) {
       .catch(() => {});
   }, []);
 
-  const handleStep1Next = () => setStep(2);
-  const handleStep2Next = () => setStep(3);
+  const handleStep1Next = () => { setSubmitError(null); setStep(2); };
+  const handleStep2Next = () => { setSubmitError(null); setStep(3); };
   const handleStep3Next = useCallback(async (signatureDataUrl: string) => {
     setSubmitting(true);
     setSubmitError(null);
