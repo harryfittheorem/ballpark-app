@@ -39,9 +39,16 @@ type Waiver = {
   body_text: string;
 };
 
+type Location = {
+  id: string;
+  name: string;
+  stripe_onboarding_status: string | null;
+};
+
 type Props = {
   waiver: Waiver | null;
   stripePublishableKey: string | null;
+  locations: Location[];
 };
 
 type Step = 1 | 2 | 3 | 4 | 5; // 5 = confirmation
@@ -55,6 +62,7 @@ type FormData = {
   kidLastName: string;
   ageGroup: string;
   planId: string;
+  locationId: string;
 };
 
 // ── Styles ─────────────────────────────────────────────────────────────────
@@ -131,13 +139,27 @@ function StepBar({ current }: { current: Step }) {
 // ── Step 1: Family & Athlete ───────────────────────────────────────────────
 
 function Step1({
-  form, setForm, onNext,
+  form, setForm, onNext, locations,
 }: {
   form: FormData;
   setForm: React.Dispatch<React.SetStateAction<FormData>>;
   onNext: () => void;
+  locations: Location[];
 }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const showLocationPicker = locations.length > 1;
+
+  const selectedLocation = locations.find(l => l.id === form.locationId) ?? null;
+  // For single-location tenants the picker is hidden but locationId is auto-set;
+  // readiness must be checked regardless of whether the picker is visible.
+  const locationStripeReady = selectedLocation?.stripe_onboarding_status === 'connected';
+  const hasLocationSelected = !!form.locationId;
+
+  // Block Next when:
+  //  - picker is shown and no location selected yet, OR
+  //  - any location is resolved (picked or defaulted) but not Stripe-connected
+  const nextBlocked = !hasLocationSelected || !locationStripeReady;
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -146,6 +168,7 @@ function Step1({
     if (!form.parentEmail.trim()) e.parentEmail = 'Required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.parentEmail)) e.parentEmail = 'Invalid email';
     if (!form.kidFirstName.trim()) e.kidFirstName = 'Required';
+    if (showLocationPicker && !form.locationId) e.locationId = 'Required';
     return e;
   };
 
@@ -167,6 +190,60 @@ function Step1({
     <div>
       <h2 style={{ fontFamily: fonts.display, fontSize: 22, fontWeight: 700, color: brand.text, marginBottom: 4 }}>Family & Athlete</h2>
       <p style={{ fontSize: 13, color: brand.textMuted, marginBottom: 24 }}>Enter the parent contact details and athlete information.</p>
+
+      {/* Location section — picker shown for multi-location tenants only;
+          Stripe readiness guard shown for all tenants when location is resolved */}
+      {(showLocationPicker || (hasLocationSelected && !locationStripeReady)) && (
+        <div style={{ marginBottom: 20 }}>
+          {showLocationPicker && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 }}>Location</div>
+              <div style={fieldWrap}>
+                <label style={labelStyle}>Enroll Under *</label>
+                <select
+                  style={{ ...inputStyle, appearance: 'auto', borderColor: errors.locationId ? brand.danger : brand.border }}
+                  value={form.locationId}
+                  onChange={e => {
+                    setForm(prev => ({ ...prev, locationId: e.target.value }));
+                    if (errors.locationId) setErrors(prev => ({ ...prev, locationId: '' }));
+                  }}
+                >
+                  <option value="">Select a location…</option>
+                  {locations.map(loc => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+                {errors.locationId && <div style={errorStyle}>{errors.locationId}</div>}
+              </div>
+            </>
+          )}
+
+          {/* Stripe readiness guard — fires for all tenants when location is resolved but not connected */}
+          {hasLocationSelected && !locationStripeReady && (
+            <div style={{
+              marginTop: showLocationPicker ? 4 : 0,
+              padding: '12px 16px',
+              background: '#2d1a00',
+              border: '1px solid #b45309',
+              borderRadius: 8,
+              fontSize: 13,
+              color: '#fbbf24',
+              lineHeight: 1.5,
+            }}>
+              <strong>No Stripe account connected for this location.</strong> Payments will not work until setup is complete.{' '}
+              <a
+                href="/owner/payments"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#fbbf24', fontWeight: 700, textDecoration: 'underline' }}
+              >
+                Go to Payments →
+              </a>{' '}
+              to complete setup first.
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 }}>Parent / Guardian</div>
@@ -218,7 +295,7 @@ function Step1({
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-        <OButton variant="gold" icon={ChevronRight} onClick={handleNext}>Next: Choose Plan</OButton>
+        <OButton variant="gold" icon={ChevronRight} onClick={handleNext} disabled={nextBlocked}>Next: Choose Plan</OButton>
       </div>
     </div>
   );
@@ -790,10 +867,10 @@ function ConfirmationScreen({
 
 const INITIAL_FORM: FormData = {
   parentFirstName: '', parentLastName: '', parentEmail: '', parentPhone: '',
-  kidFirstName: '', kidLastName: '', ageGroup: '', planId: '',
+  kidFirstName: '', kidLastName: '', ageGroup: '', planId: '', locationId: '',
 };
 
-export function EnrollContent({ waiver, stripePublishableKey }: Props) {
+export function EnrollContent({ waiver, stripePublishableKey, locations }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(INITIAL_FORM);
@@ -803,6 +880,13 @@ export function EnrollContent({ waiver, stripePublishableKey }: Props) {
   const [enrollmentIds, setEnrollmentIds] = useState<{
     familyId: string; kidId: string; membershipId: string;
   } | null>(null);
+
+  // Auto-select the only location when there is exactly one
+  useEffect(() => {
+    if (locations.length === 1) {
+      setForm(prev => ({ ...prev, locationId: locations[0].id }));
+    }
+  }, [locations]);
 
   // Preload plans in the background
   useEffect(() => {
@@ -834,6 +918,7 @@ export function EnrollContent({ waiver, stripePublishableKey }: Props) {
           plan_id: form.planId,
           waiver_id: waiver?.id,
           signature_image_data: signatureDataUrl,
+          location_id: form.locationId || undefined,
         }),
       });
       const data = await res.json() as {
@@ -863,7 +948,8 @@ export function EnrollContent({ waiver, stripePublishableKey }: Props) {
   const handlePaymentSuccess = () => setStep(5);
 
   const handleEnrollAnother = () => {
-    setForm(INITIAL_FORM);
+    const defaultLocationId = locations.length === 1 ? locations[0].id : '';
+    setForm({ ...INITIAL_FORM, locationId: defaultLocationId });
     setEnrollmentIds(null);
     setSubmitError(null);
     setStep(1);
@@ -928,7 +1014,7 @@ export function EnrollContent({ waiver, stripePublishableKey }: Props) {
           )}
 
           {step === 1 && (
-            <Step1 form={form} setForm={setForm} onNext={handleStep1Next} />
+            <Step1 form={form} setForm={setForm} onNext={handleStep1Next} locations={locations} />
           )}
 
           {step === 2 && (

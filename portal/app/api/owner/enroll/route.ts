@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
     plan_id?: string;
     waiver_id?: string;
     signature_image_data?: string;
+    location_id?: string;
   };
   try {
     body = await req.json() as typeof body;
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
   const {
     parent_first_name, parent_last_name, parent_email, parent_phone,
     kid_first_name, kid_last_name, age_group,
-    plan_id, waiver_id, signature_image_data,
+    plan_id, waiver_id, signature_image_data, location_id,
   } = body;
 
   if (!parent_first_name) return err(422, 'parent_first_name required');
@@ -89,7 +90,12 @@ export async function POST(req: NextRequest) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
   // ── 1. Load tenant slug (required by handle_new_user trigger) + verify plan
-  //       + find the first connected location for primary_location_id ─────────
+  //       + resolve primary_location_id ────────────────────────────────────────
+  //
+  // If the caller supplies a location_id (staff-selected from the picker),
+  // validate it belongs to this tenant and use it directly.
+  // Otherwise fall back to the first connected location (legacy auto-pick).
+
   const [{ data: tenant }, { data: plan, error: planErr }, { data: connectedLocations }] = await Promise.all([
     serviceClient
       .from('tenants')
@@ -103,18 +109,33 @@ export async function POST(req: NextRequest) {
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .single(),
-    serviceClient
-      .from('locations')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('stripe_onboarding_status', 'connected')
-      .limit(1),
+    // Only run the auto-pick query when no explicit location_id was supplied
+    location_id
+      ? Promise.resolve({ data: null })
+      : serviceClient
+          .from('locations')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .eq('stripe_onboarding_status', 'connected')
+          .limit(1),
   ]);
 
-  // Use the first connected location as the family's primary_location_id.
-  // If none is connected yet, leave it null — enrollment can still proceed;
-  // only the payment step gates on Stripe being present.
-  const primaryLocationId = (connectedLocations as Array<{ id: string }> | null)?.[0]?.id ?? null;
+  // If location_id was provided, validate it belongs to this tenant
+  let primaryLocationId: string | null = null;
+  if (location_id) {
+    const { data: specifiedLocation } = await serviceClient
+      .from('locations')
+      .select('id')
+      .eq('id', location_id)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (!specifiedLocation) return err(422, 'Invalid location_id for this tenant');
+    primaryLocationId = specifiedLocation.id as string;
+  } else {
+    // Auto-pick: use the first connected location (may be null — enrollment proceeds;
+    // only the payment step hard-gates on Stripe being present)
+    primaryLocationId = (connectedLocations as Array<{ id: string }> | null)?.[0]?.id ?? null;
+  }
 
   const tenantSlug = (tenant as { slug: string } | null)?.slug;
   if (!tenantSlug) return err(500, 'Could not load tenant configuration');

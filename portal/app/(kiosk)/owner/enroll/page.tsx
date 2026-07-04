@@ -18,16 +18,30 @@ export default async function EnrollPage() {
 
   const tenantId = readTenantId(session) ?? '';
 
-  // Load the active waiver for this tenant
   const serviceClient = createServiceClient();
-  const { data: waiver } = await serviceClient
-    .from('waivers')
-    .select('id, version, effective_date, body_text')
-    .eq('tenant_id', tenantId)
-    .eq('is_active', true)
-    .maybeSingle();
+
+  // Load waiver + locations in parallel
+  const [{ data: waiver }, { data: locations }] = await Promise.all([
+    serviceClient
+      .from('waivers')
+      .select('id, version, effective_date, body_text')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .maybeSingle(),
+    serviceClient
+      .from('locations')
+      .select('id, name, stripe_onboarding_status')
+      .eq('tenant_id', tenantId)
+      .order('name'),
+  ]);
 
   const stripePublishableKey = process.env.STRIPE_PUBLISHABLE_KEY ?? null;
+
+  const locationList = (locations ?? []) as Array<{
+    id: string;
+    name: string;
+    stripe_onboarding_status: string | null;
+  }>;
 
   return (
     <EnrollContent
@@ -38,6 +52,7 @@ export default async function EnrollPage() {
         body_text: waiver.body_text as string,
       } : null}
       stripePublishableKey={stripePublishableKey}
+      locations={locationList}
     />
   );
 }
