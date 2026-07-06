@@ -109,6 +109,11 @@ fi
 # Rebuild the portal so Next.js always serves code from the current source.
 # portal/.next is cleared first to prevent stale server bundles from being served.
 if [ -d "portal" ]; then
+  echo "[post-merge] installing portal dependencies"
+  (cd portal && npm install --legacy-peer-deps --no-audit --no-fund) \
+    && echo "[post-merge] portal npm install OK" \
+    || echo "[post-merge] WARN: portal npm install failed; continuing"
+
   echo "[post-merge] clearing portal/.next to remove any stale build cache"
   rm -rf portal/.next
 
