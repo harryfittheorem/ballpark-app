@@ -1224,6 +1224,7 @@ export type Database = {
         Row: {
           amount_cents: number
           billing_anchor_day: number | null
+          cancel_at: string | null
           cancel_effective_at: string | null
           cancel_requested_at: string | null
           cancelled_at: string | null
@@ -1244,6 +1245,7 @@ export type Database = {
           sessions_total: number | null
           started_at: string
           status: string
+          stripe_price_id: string | null
           stripe_subscription_id: string | null
           tenant_id: string
           updated_at: string
@@ -1253,6 +1255,7 @@ export type Database = {
         Insert: {
           amount_cents: number
           billing_anchor_day?: number | null
+          cancel_at?: string | null
           cancel_effective_at?: string | null
           cancel_requested_at?: string | null
           cancelled_at?: string | null
@@ -1273,6 +1276,7 @@ export type Database = {
           sessions_total?: number | null
           started_at?: string
           status?: string
+          stripe_price_id?: string | null
           stripe_subscription_id?: string | null
           tenant_id: string
           updated_at?: string
@@ -1282,6 +1286,7 @@ export type Database = {
         Update: {
           amount_cents?: number
           billing_anchor_day?: number | null
+          cancel_at?: string | null
           cancel_effective_at?: string | null
           cancel_requested_at?: string | null
           cancelled_at?: string | null
@@ -1302,6 +1307,7 @@ export type Database = {
           sessions_total?: number | null
           started_at?: string
           status?: string
+          stripe_price_id?: string | null
           stripe_subscription_id?: string | null
           tenant_id?: string
           updated_at?: string
@@ -1470,6 +1476,7 @@ export type Database = {
           membership_id: string | null
           payment_method: string
           status: string
+          stripe_invoice_id: string | null
           stripe_payment_intent_id: string | null
           tenant_id: string
         }
@@ -1482,6 +1489,7 @@ export type Database = {
           membership_id?: string | null
           payment_method: string
           status: string
+          stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
           tenant_id: string
         }
@@ -1494,6 +1502,7 @@ export type Database = {
           membership_id?: string | null
           payment_method?: string
           status?: string
+          stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
           tenant_id?: string
         }
