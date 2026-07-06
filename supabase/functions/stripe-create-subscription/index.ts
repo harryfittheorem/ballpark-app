@@ -105,7 +105,16 @@ Deno.serve(async (req) => {
       },
     });
   }
+  try {
+    return await handleRequest(req);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[stripe-create-subscription] unhandled:', msg);
+    return json({ error: { code: 'internal_error', message: msg } }, 500);
+  }
+});
 
+async function handleRequest(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return json({ error: { code: 'method_not_allowed', message: 'POST only' } }, 405);
   }
@@ -463,4 +472,4 @@ Deno.serve(async (req) => {
     current_period_end: currentPeriodEnd,
     next_billing_at: nextBillingAt,
   });
-});
+}
