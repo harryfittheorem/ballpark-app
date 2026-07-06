@@ -14,7 +14,7 @@
 //   npx supabase functions deploy resume-membership
 // =============================================================================
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const STRIPE_API_VERSION = '2024-06-20';
 

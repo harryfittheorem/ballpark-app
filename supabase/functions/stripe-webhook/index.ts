@@ -43,7 +43,7 @@
 // All unrecognised events → 200 {ignored:true} so Stripe stops retrying.
 // =============================================================================
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const REPLAY_TOLERANCE_SECONDS = 300;
 
