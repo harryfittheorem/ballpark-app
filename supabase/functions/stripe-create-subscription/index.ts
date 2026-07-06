@@ -392,17 +392,16 @@ async function handleRequest(req: Request): Promise<Response> {
 
   // Build subscription params.
   // application_fee_percent lets Stripe apply the platform royalty percentage
-  // to every renewal invoice automatically (unlike application_fee_amount which
-  // is a one-time fixed amount used on PaymentIntents).
-  // on_behalf_of ensures the charge appears as the location's business on the
-  // customer's statement and the connected account bears the Stripe fee.
+  // to every renewal invoice automatically. on_behalf_of is intentionally
+  // omitted — the subscription is already created directly on the connected
+  // account via the Stripe-Account header; setting on_behalf_of to the same
+  // account causes Stripe to reject with "cannot be set to your own account".
   const subParams: Record<string, unknown> = {
     customer: fam.stripe_connected_customer_id,
     'items[0][price]': canonicalPriceId,
     'off_session': 'true',
     'payment_behavior': 'default_incomplete',
     'application_fee_percent': applicationFeePct,
-    'on_behalf_of': connectedAccountId,
     'metadata[membership_id]': mem.id,
     'metadata[tenant_id]': mem.tenant_id,
     'metadata[kid_name]': [kid.first_name, kid.last_name].filter(Boolean).join(' '),
