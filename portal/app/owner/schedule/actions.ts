@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { readTenantId } from '@/lib/auth';
 import type { ScheduleBooking } from '@/lib/supabase/ownerQueries';
 
@@ -19,9 +20,10 @@ export async function fetchScheduleRange(
   rangeStart: string,
   rangeEnd: string,
 ): Promise<FetchScheduleResult> {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  const tenantId = readTenantId(session) ?? '';
+  const _userClient = await createClient();
+  const supabase = createServiceClient();
+  const { data: { session } } = await _userClient.auth.getSession();
+  const tenantId = readTenantId(session) ?? process.env.PORTAL_TENANT_ID ?? '';
 
   if (!tenantId) throw new Error('No authenticated session — cannot fetch schedule');
 
@@ -81,7 +83,8 @@ export async function assignCageAction(
   bookingId: string,
   cageNumber: number | null,
 ): Promise<{ error?: string }> {
-  const supabase = await createClient();
+  const _userClient = await createClient();
+  const supabase = createServiceClient();
   const { error } = await supabase
     .from('bookings')
     .update({ cage_number: cageNumber })

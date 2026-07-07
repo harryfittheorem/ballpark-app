@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { readTenantId } from '@/lib/auth';
 import { getCancelledMemberships } from '@/lib/supabase/ownerQueries';
 import { CancellationsContent } from './CancellationsContent';
@@ -12,9 +13,10 @@ export default async function CancellationsPage({
 }) {
   const params = await searchParams;
 
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  const tenantId = readTenantId(session) ?? '';
+  const _userClient = await createClient();
+  const supabase = createServiceClient();
+  const { data: { session } } = await _userClient.auth.getSession();
+  const tenantId = readTenantId(session) ?? process.env.PORTAL_TENANT_ID ?? '';
 
   const preset = params.preset ?? '30';
   let since: Date;

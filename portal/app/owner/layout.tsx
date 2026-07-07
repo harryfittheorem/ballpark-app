@@ -11,11 +11,12 @@ export const metadata = {
 };
 
 export default async function OwnerLayout({ children }: { children: ReactNode }) {
-  const supabase = await createClient();
+  const _userClient = await createClient();
+  const supabase = createServiceClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login?reason=unauthenticated');
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await _userClient.auth.getSession();
 
   // Decode JWT role; fall back to app_metadata for tokens that predate the
   // Custom Access Token Hook (same pattern used in admin/layout.tsx).
