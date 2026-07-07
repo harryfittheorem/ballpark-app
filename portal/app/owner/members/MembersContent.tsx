@@ -215,7 +215,7 @@ const labelStyle: React.CSSProperties = {
 
 export function MembersContent({ members }: Props) {
   const router  = useRouter();
-  const source  = members.length ? members : DEMO_MEMBERS;
+  const source  = [...DEMO_MEMBERS, ...members];
   const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'pending-cancel' | 'at-risk' | 'card-expiring'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [toast, setToast]   = useState<string | null>(null);
