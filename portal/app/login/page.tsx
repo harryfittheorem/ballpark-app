@@ -1,9 +1,6 @@
 import Link from "next/link";
-import { signIn } from "./actions";
-import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { PasswordInput } from "@/components/ui/PasswordInput";
+import { LoginForm } from "./LoginForm";
 
 const REASON_MESSAGES: Record<string, string> = {
   parent:
@@ -20,8 +17,7 @@ export default async function LoginPage({
   searchParams: Promise<{ reason?: string }>;
 }) {
   const { reason } = await searchParams;
-  const message = reason ? REASON_MESSAGES[reason] : null;
-  const isSignedOut = reason === "signedout";
+  const initialError = reason ? REASON_MESSAGES[reason] : undefined;
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
@@ -48,39 +44,7 @@ export default async function LoginPage({
         </div>
 
         <Card accent padding="lg" className="space-y-5">
-          {message ? (
-            <div
-              role="alert"
-              className={
-                isSignedOut
-                  ? "rounded-xl border border-success/40 bg-success-bg px-4 py-3 text-sm text-success"
-                  : "rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-sm text-warning"
-              }
-            >
-              {message}
-            </div>
-          ) : null}
-
-          <form action={signIn} className="space-y-4">
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              label="Email"
-            />
-            <PasswordInput
-              id="password"
-              name="password"
-              autoComplete="current-password"
-              required
-              label="Password"
-            />
-            <Button type="submit" size="lg" className="w-full">
-              Sign in
-            </Button>
-          </form>
+          <LoginForm initialError={initialError} />
         </Card>
 
         <p className="text-center text-xs text-text-light">
