@@ -29,3 +29,9 @@ id = "9T3Es1MHr1wGjxOVrjtb3"
 uri = "file://artifacts/pitch-deck/ballpark-pitch-deck.pdf"
 type = "pdf"
 title = "Ballpark Pitch Deck (15 slides)"
+
+[[outputs]]
+id = "IuMI-7dc_xBMxu3_B16Xc"
+uri = "file://codebase-extract.txt"
+type = "text"
+title = "Ballpark — Full Codebase Extract"
