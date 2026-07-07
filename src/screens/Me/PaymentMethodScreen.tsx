@@ -230,7 +230,7 @@ const cardStyles = StyleSheet.create({
   last4: {
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.xl,
-    color: colors.text,
+    color: colors.textOnDark,
     letterSpacing: 2,
   },
   footer: {
@@ -248,7 +248,7 @@ const cardStyles = StyleSheet.create({
   footerValue: {
     fontFamily: fontFamilies.oswaldBold,
     fontSize: fontSizes.md,
-    color: colors.text,
+    color: colors.textOnDark,
   },
   iconRight: {
     flexDirection: 'row',
