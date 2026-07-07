@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { readAppRole } from "@/lib/auth";
+import { readAppRole, type AppRole } from "@/lib/auth";
 
 export async function signIn(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -22,7 +22,19 @@ export async function signIn(formData: FormData) {
     redirect("/login?reason=invalid");
   }
 
-  const role = readAppRole(data.session);
+  // Primary: read app_role from the JWT custom claim (injected by the
+  // Custom Access Token Hook). Fallback: read from user_metadata, which
+  // is always present even when the hook hasn't fired yet (e.g. first
+  // login after metadata was patched but before a token refresh).
+  let role = readAppRole(data.session);
+
+  if (role === "parent") {
+    const metaRole = data.user?.user_metadata?.app_role as string | undefined;
+    const validRoles: AppRole[] = ["owner", "admin", "coach", "super_admin"];
+    if (metaRole && validRoles.includes(metaRole as AppRole)) {
+      role = metaRole as AppRole;
+    }
+  }
 
   if (role === "parent") {
     // Parents are not allowed in the portal. Drop the session and bounce
@@ -33,6 +45,7 @@ export async function signIn(formData: FormData) {
 
   if (role === "admin") redirect("/admin");
   if (role === "owner") redirect("/owner/dashboard");
+  if (role === "super_admin") redirect("/hq");
   redirect("/coach/inbox");
 }
 
