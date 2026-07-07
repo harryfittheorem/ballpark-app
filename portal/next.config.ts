@@ -7,6 +7,10 @@ const replitExpoDevDomain = process.env.REPLIT_EXPO_DEV_DOMAIN;
 const allowedOrigins = [
   "localhost:5000",
   "localhost:3000",
+  // Production domains
+  "ballpark-app.replit.app",
+  "ih.fittcoaching.ai",
+  // Dynamic Replit dev domains
   ...(replitDevDomain
     ? [replitDevDomain, `${replitDevDomain}:5000`]
     : []),
