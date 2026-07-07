@@ -91,7 +91,22 @@ Deno.serve(async (req) => {
 
   const userRole     = (user.app_metadata?.app_role as string | undefined)
     ?? (user.user_metadata?.app_role as string | undefined) ?? '';
-  const callerTenant = (user.app_metadata?.tenant_id as string | undefined) ?? null;
+  // The Custom Access Token Hook injects tenant_id into the JWT payload only —
+  // NOT into raw_app_meta_data. Decode the token directly; fall back to
+  // app_metadata for environments where the hook is absent.
+  const callerTenant: string | null = (() => {
+    try {
+      const parts = callerToken.split('.');
+      if (parts.length < 2) return null;
+      const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(b64)) as Record<string, unknown>;
+      return (payload.tenant_id as string | undefined)
+        ?? (user.app_metadata?.tenant_id as string | undefined)
+        ?? null;
+    } catch {
+      return (user.app_metadata?.tenant_id as string | undefined) ?? null;
+    }
+  })();
 
   // Accept any authenticated user. If the role claim is absent (Custom Access
   // Token Hook not running in this environment), we fall back to treating the

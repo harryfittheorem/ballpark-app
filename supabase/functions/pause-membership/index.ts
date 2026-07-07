@@ -263,7 +263,22 @@ Deno.serve(async (req) => {
 
   // ── Pre-flight scope check (mirrors RPC check) ────────────────────────────
   const fam = mem.families as unknown as { id: string; parent_user_id: string; parent_email: string; parent_first_name: string; primary_location_id: string };
-  const callerTenant = (user.app_metadata?.tenant_id as string | undefined) ?? null;
+  // The Custom Access Token Hook injects tenant_id into the JWT payload only —
+  // NOT into raw_app_meta_data. Decode the token directly; fall back to
+  // app_metadata for environments where the hook is absent.
+  const callerTenant: string | null = (() => {
+    try {
+      const parts = callerToken.split('.');
+      if (parts.length < 2) return null;
+      const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(b64)) as Record<string, unknown>;
+      return (payload.tenant_id as string | undefined)
+        ?? (user.app_metadata?.tenant_id as string | undefined)
+        ?? null;
+    } catch {
+      return (user.app_metadata?.tenant_id as string | undefined) ?? null;
+    }
+  })();
 
   const isOwnerAdmin = ['owner', 'admin'].includes(userRole);
   if (isOwnerAdmin) {
