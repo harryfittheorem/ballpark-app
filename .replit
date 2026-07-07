@@ -6,9 +6,9 @@ hidden = [".config", "package-lock.json", "node_modules"]
 channel = "stable-24_05"
 
 [deployment]
-run = ["bash", "-c", "cd portal && npx next start -p 5000 -H 0.0.0.0"]
+run = ["bash", "-c", "cd portal && npm run start -- -p 5000"]
 deploymentTarget = "autoscale"
-build = ["bash", "-c", "cd portal && npm install && npm run build"]
+build = ["bash", "-c", "cd portal && npm install --legacy-peer-deps && npm run build"]
 
 [env]
 PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin"
@@ -91,6 +91,7 @@ EXPO_PUBLIC_SUPABASE_URL = "https://exjcwvvglthnxerzpukw.supabase.co"
 EXPO_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_xyXVBy2HN2pvbDTZC15jQQ_et3pskXc"
 EXPO_PUBLIC_TENANT_SLUG = "infinitehitting"
 RESEND_FROM_EMAIL = "onboarding@resend.dev"
+PORTAL_TENANT_ID = "00000000-0000-0000-0000-000000000001"
 
 [userenv.production]
 NEXT_PUBLIC_PORTAL_URL = "https://ballpark-app.replit.app"
