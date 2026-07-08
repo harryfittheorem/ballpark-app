@@ -1111,6 +1111,50 @@ export type Database = {
           },
         ]
       }
+      membership_billing_date_changes: {
+        Row: {
+          change_type: string
+          changed_by_user_id: string
+          created_at: string
+          effective_date: string
+          id: string
+          membership_id: string
+          new_anchor_day: number
+          old_anchor_day: number
+          reverted_at: string | null
+        }
+        Insert: {
+          change_type: string
+          changed_by_user_id: string
+          created_at?: string
+          effective_date: string
+          id?: string
+          membership_id: string
+          new_anchor_day: number
+          old_anchor_day: number
+          reverted_at?: string | null
+        }
+        Update: {
+          change_type?: string
+          changed_by_user_id?: string
+          created_at?: string
+          effective_date?: string
+          id?: string
+          membership_id?: string
+          new_anchor_day?: number
+          old_anchor_day?: number
+          reverted_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_billing_date_changes_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membership_plans: {
         Row: {
           amount_cents: number
