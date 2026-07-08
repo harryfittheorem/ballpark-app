@@ -13,10 +13,13 @@ export const metadata = {
 export default async function OwnerLayout({ children }: { children: ReactNode }) {
   const _userClient = await createClient();
   const supabase = createServiceClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login?reason=unauthenticated');
 
+  // Auth check must use the cookie-based client, NOT the service client.
+  // The service client has persistSession:false and no cookie adapter so
+  // auth.getUser() always returns null there.
   const { data: { session } } = await _userClient.auth.getSession();
+  if (!session) redirect('/login?reason=unauthenticated');
+  const user = session.user;
 
   // Decode JWT role; fall back to app_metadata for tokens that predate the
   // Custom Access Token Hook (same pattern used in admin/layout.tsx).
