@@ -4,3 +4,4 @@
 - [HitTrax poll debugging](hittrax-poll-debugging.md) — cron auth, --use-api deploy, FullPlays field names (TS/Elv/SnId/Res/PV), partial index ON CONFLICT bug, historic backfill SQL.
 - [Supabase CLI project link](supabase-cli-link.md) — CLI is linked to local "workspace" not production; always re-link before db push; use management API for schema verification.
 - [JWT claims vs app_metadata](jwt-claims-app-metadata.md) — Custom Access Token Hook injects claims into JWT payload only, never into raw_app_meta_data; edge functions must decode the JWT to read tenant_id/app_role.
+- [Owner layout auth pattern](owner-layout-auth.md) — auth checks must use cookie-based createClient(), never createServiceClient() (no cookie adapter, always returns null user).
