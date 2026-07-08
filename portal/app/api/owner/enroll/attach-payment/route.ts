@@ -19,13 +19,16 @@
  *   2. Retrieve PaymentIntent → verify status === 'succeeded'
  *   3. Save card shadow columns to families row
  *   4. Mark membership active via service-role update
- *   5. Send welcome email via Resend
+ *   5. If split: insert scheduled_charges row for the balance
+ *   6. Send welcome email via Resend
  *
  * Body: {
  *   family_id: string,
  *   membership_id: string,
- *   stripe_intent_id: string,  -- SetupIntent or PaymentIntent id
+ *   stripe_intent_id: string,   -- SetupIntent or PaymentIntent id
  *   intent_type: 'setup' | 'payment',
+ *   split_deposit_cents?: number,   -- OTC split only
+ *   split_due_date?: string,        -- OTC split only (YYYY-MM-DD)
  * }
  *
  * Returns: { ok: true, activated: true } or { error: string } with 4xx/5xx
@@ -57,14 +60,26 @@ async function sendWelcomeEmail(opts: {
   planType: string;
   amountCents: number;
   resetLink: string | null;
+  splitBalanceCents?: number | null;
+  splitDueDate?: string | null;
 }) {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return;
 
   const resendFrom = process.env.RESEND_FROM_EMAIL ?? 'noreply@infinitehitting.com';
-  const priceLabel = opts.amountCents > 0
+  const depositPaid = opts.splitBalanceCents != null
+    ? `$${(opts.amountCents / 100).toFixed(2)} deposit`
+    : opts.amountCents > 0
     ? `$${(opts.amountCents / 100).toFixed(2)}${opts.planType === 'eft' ? '/month' : ' (one-time)'}`
     : 'Complimentary';
+
+  const splitNote = opts.splitBalanceCents != null && opts.splitDueDate
+    ? `<div style="background:#2D2B2A;border-radius:8px;padding:14px;margin-bottom:16px;border-left:3px solid #F1E5AD;">
+        <span style="color:#A8A3A0;font-size:12px;">BALANCE DUE</span><br/>
+        <strong style="font-size:15px;">$${(opts.splitBalanceCents / 100).toFixed(2)}</strong>
+        <span style="color:#A8A3A0;font-size:12px;margin-left:8px;">due ${opts.splitDueDate}</span>
+      </div>`
+    : '';
 
   const emailHtml = `
     <div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;background:#1C1B1A;color:#FAF6E8;border-radius:10px;padding:32px;">
@@ -73,7 +88,7 @@ async function sendWelcomeEmail(opts: {
       </div>
       <h1 style="font-size:22px;font-weight:700;color:#F1E5AD;margin:0 0 8px;">Welcome to Infinite Hitting, ${opts.parentFirstName}!</h1>
       <p style="color:#B0ABA8;margin:0 0 20px;">Your enrollment is complete. Here's a summary:</p>
-      <div style="background:#2D2B2A;border-radius:8px;padding:16px;margin-bottom:20px;">
+      <div style="background:#2D2B2A;border-radius:8px;padding:16px;margin-bottom:16px;">
         <div style="margin-bottom:8px;">
           <span style="color:#A8A3A0;font-size:12px;">ATHLETE</span><br/>
           <strong style="font-size:15px;">${opts.kidFirstName}${opts.kidLastName ? ' ' + opts.kidLastName : ''}</strong>
@@ -82,9 +97,10 @@ async function sendWelcomeEmail(opts: {
         <div>
           <span style="color:#A8A3A0;font-size:12px;">PLAN</span><br/>
           <strong style="font-size:15px;">${opts.planName}</strong>
-          <span style="color:#A8A3A0;font-size:12px;margin-left:8px;">${priceLabel}</span>
+          <span style="color:#A8A3A0;font-size:12px;margin-left:8px;">${depositPaid} paid today</span>
         </div>
       </div>
+      ${splitNote}
       <p style="color:#B0ABA8;margin:0 0 8px;">Your signed agreement is on file. Download the Ballpark app to track progress, book sessions, and stay connected with coaches.</p>
       <div style="margin:24px 0;text-align:center;">
         <a href="https://apps.apple.com/app/ballpark" style="background:#F1E5AD;color:#2D2B2A;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;margin:0 6px 12px;">Download on iOS</a>
@@ -126,7 +142,9 @@ export async function POST(req: NextRequest) {
     family_id?: string;
     membership_id?: string;
     stripe_intent_id?: string;
-    intent_type?: string;   // accepted but NOT trusted for branching — DB plan_type is authoritative
+    intent_type?: string;
+    split_deposit_cents?: number;
+    split_due_date?: string;
   };
   try {
     body = await req.json() as typeof body;
@@ -134,7 +152,7 @@ export async function POST(req: NextRequest) {
     return err(400, 'Invalid JSON body');
   }
 
-  const { family_id, membership_id, stripe_intent_id } = body;
+  const { family_id, membership_id, stripe_intent_id, split_deposit_cents, split_due_date } = body;
   if (!family_id) return err(422, 'family_id required');
   if (!membership_id) return err(422, 'membership_id required');
   if (!stripe_intent_id) return err(422, 'stripe_intent_id required');
@@ -154,7 +172,6 @@ export async function POST(req: NextRequest) {
 
   if (!membership) return err(404, 'Membership not found');
 
-  // Verify family matches and belongs to tenant
   if ((membership as { family_id: string }).family_id !== family_id) {
     return err(403, 'family_id does not match membership');
   }
@@ -163,11 +180,25 @@ export async function POST(req: NextRequest) {
   const amountCents = (membership as { amount_cents: number }).amount_cents;
   const planName = (membership as { plan_name: string }).plan_name;
 
+  // Validate split params server-side
+  let isSplit = false;
+  let splitBalanceCents: number | null = null;
+  if (planType === 'otc' && split_deposit_cents != null && split_due_date) {
+    if (split_deposit_cents <= 0 || split_deposit_cents >= amountCents) {
+      return err(422, 'Invalid split_deposit_cents');
+    }
+    const dueDate = new Date(split_due_date + 'T00:00:00Z');
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const diffDays = Math.round((dueDate.getTime() - today.getTime()) / 86400000);
+    if (diffDays < 1 || diffDays > 90) {
+      return err(422, 'Balance due date must be 1–90 days from today');
+    }
+    isSplit = true;
+    splitBalanceCents = amountCents - split_deposit_cents;
+  }
+
   // ── Load family details + derive location-scoped Stripe account ──────────
-  // Must use families.primary_location_id → locations.stripe_account_id,
-  // the same derivation used by stripe-create-subscription, so all Stripe
-  // objects (customer, SetupIntent/PaymentIntent, subscription) live on
-  // the same connected account.
 
   const { data: familyRow } = await serviceClient
     .from('families')
@@ -193,8 +224,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Hard gate: a connected Stripe account is required. Without it, intents or
-  // membership activation would target the wrong Stripe account.
   if (!connectedAccountId) {
     return err(422, 'Stripe account not configured for this location. Complete Stripe Connect onboarding before enrolling members.');
   }
@@ -214,7 +243,6 @@ export async function POST(req: NextRequest) {
   // ── Derive expected intent type from DB plan_type (authoritative) ─────────
   const expectedIntentType: 'setup' | 'payment' = planType === 'otc' ? 'payment' : 'setup';
 
-  // Validate stripe_intent_id prefix matches DB-derived type
   const intentIdPrefix = stripe_intent_id.split('_')[0];
   const validPrefix = expectedIntentType === 'payment' ? 'pi' : 'seti';
   if (intentIdPrefix !== validPrefix) {
@@ -353,16 +381,16 @@ export async function POST(req: NextRequest) {
       return err(422, `Payment was not completed (status: ${piData.status ?? 'unknown'}). Please try again.`);
     }
 
-    // Verify charged amount matches DB plan amount (tamper guard)
-    if (typeof piData.amount === 'number' && piData.amount !== amountCents) {
-      console.error(`[attach-payment] Amount mismatch: PI=${piData.amount} DB=${amountCents}`);
-      return err(422, 'Payment amount does not match plan. Please contact support.');
+    // Amount tamper guard: for split, check against deposit; for full, check against plan amount
+    const expectedAmount = isSplit ? split_deposit_cents! : amountCents;
+    if (typeof piData.amount === 'number' && piData.amount !== expectedAmount) {
+      console.error(`[attach-payment] Amount mismatch: PI=${piData.amount} expected=${expectedAmount}`);
+      return err(422, 'Payment amount does not match. Please contact support.');
     }
 
     cardDetails = piData.payment_method?.card ?? null;
 
-    // Create Stripe customer on the location-scoped connected account for OTC too,
-    // so stripe_connected_customer_id is always set after any successful payment.
+    // Create Stripe customer on the location-scoped connected account for OTC too
     const { data: userRecord } = await serviceClient.auth.admin.getUserById(
       (familyRow as { parent_user_id: string }).parent_user_id,
     );
@@ -385,10 +413,62 @@ export async function POST(req: NextRequest) {
       body: otcCustParams.toString(),
     });
     const otcCustData = await otcCustRes.json() as { id?: string; error?: { message?: string } };
+
     if (otcCustRes.ok && otcCustData.id) {
       otcCustomerId = otcCustData.id;
+
+      // Attach the card as default so collect-scheduled-charges can charge off-session.
+      // For split payments this is REQUIRED — fail the enrollment if it doesn't work.
+      if (piData.payment_method?.id) {
+        const pmId = piData.payment_method.id;
+        const attachParams = new URLSearchParams({ customer: otcCustData.id });
+        const attachRes = await fetch(
+          `https://api.stripe.com/v1/payment_methods/${encodeURIComponent(pmId)}/attach`,
+          {
+            method: 'POST',
+            headers: { ...stripeHeaders, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: attachParams.toString(),
+          },
+        );
+        const attachData = await attachRes.json() as { id?: string; error?: { message?: string } };
+
+        if (!attachRes.ok) {
+          const msg = attachData.error?.message ?? `Card attach failed (${attachRes.status})`;
+          if (isSplit) {
+            // For split payments the card on file is mandatory — fail hard.
+            return err(502, `Could not save card for future balance collection: ${msg}. Please try again.`);
+          }
+          // Non-split: log and continue — card storage is best-effort.
+          console.warn('[attach-payment] OTC card attach failed (non-split, continuing):', msg);
+        } else {
+          // Set as customer's default payment method
+          const updateCustParams = new URLSearchParams();
+          updateCustParams.append('invoice_settings[default_payment_method]', pmId);
+          const updateCustRes = await fetch(
+            `https://api.stripe.com/v1/customers/${encodeURIComponent(otcCustData.id)}`,
+            {
+              method: 'POST',
+              headers: { ...stripeHeaders, 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: updateCustParams.toString(),
+            },
+          );
+          if (!updateCustRes.ok && isSplit) {
+            const ud = await updateCustRes.json() as { error?: { message?: string } };
+            const msg = ud.error?.message ?? `Customer update failed (${updateCustRes.status})`;
+            return err(502, `Could not set default payment method for balance collection: ${msg}. Please try again.`);
+          }
+        }
+      } else if (isSplit) {
+        // PI has no payment_method attached — cannot schedule the balance charge
+        return err(422, 'No payment method found on the confirmed payment. Cannot schedule balance charge.');
+      }
     } else {
-      console.warn('[attach-payment] OTC customer creation failed:', otcCustData.error?.message);
+      const msg = otcCustData.error?.message ?? `Customer creation failed (${otcCustRes.status})`;
+      if (isSplit) {
+        // For split payments, Stripe customer is required for future collection.
+        return err(502, `Could not create Stripe customer for balance collection: ${msg}. Please try again.`);
+      }
+      console.warn('[attach-payment] OTC customer creation failed (non-split, continuing):', msg);
     }
 
     // Save card shadow columns + customer id to families row
@@ -405,21 +485,46 @@ export async function POST(req: NextRequest) {
       .update(otcFamilyUpdate)
       .eq('id', family_id);
 
-    // Mark membership active
-    const { error: activateErr } = await serviceClient
-      .from('memberships')
-      .update({ status: 'active', updated_at: new Date().toISOString() })
-      .eq('id', membership_id)
-      .eq('tenant_id', tenantId);
+    if (isSplit && splitBalanceCents != null && split_due_date) {
+      // ── OTC split: activate membership + create scheduled charge ATOMICALLY ──
+      // Uses a SECURITY DEFINER RPC so both ops happen in one transaction;
+      // any failure rolls back both and returns an error to the client.
+      if (!otcCustomerId) {
+        // Stripe customer creation failed → we have no card on file for future
+        // collection → we cannot complete the split enrollment safely.
+        return err(502, 'Could not create Stripe customer. The balance cannot be scheduled without a card on file. Please try again.');
+      }
 
-    if (activateErr) {
-      console.error('[enroll/attach-payment] OTC activate error:', activateErr.message);
-      return err(500, `Could not activate membership: ${activateErr.message}`);
+      const { error: rpcErr } = await serviceClient
+        .rpc('activate_membership_with_scheduled_charge', {
+          p_membership_id: membership_id,
+          p_tenant_id:     tenantId,
+          p_family_id:     family_id,
+          p_amount_cents:  splitBalanceCents,
+          p_charge_date:   split_due_date,
+        });
+
+      if (rpcErr) {
+        console.error('[enroll/attach-payment] atomic RPC error:', rpcErr.message);
+        return err(500, `Could not activate membership and schedule balance charge: ${rpcErr.message}`);
+      }
+      console.log(`[enroll/attach-payment] atomic activation + scheduled_charges — balance=${splitBalanceCents} due=${split_due_date}`);
+    } else {
+      // ── OTC non-split: activate membership only ──────────────────────────
+      const { error: activateErr } = await serviceClient
+        .from('memberships')
+        .update({ status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', membership_id)
+        .eq('tenant_id', tenantId);
+
+      if (activateErr) {
+        console.error('[enroll/attach-payment] OTC activate error:', activateErr.message);
+        return err(500, `Could not activate membership: ${activateErr.message}`);
+      }
     }
   }
 
   // ── Send welcome email now that membership is confirmed active ────────────
-  // Generate password-reset link so parent can set their own password
   let resetLink: string | null = null;
   try {
     const parentEmail = (familyRow as { parent_email: string }).parent_email ?? '';
@@ -446,8 +551,10 @@ export async function POST(req: NextRequest) {
     ageGroup: kidRow ? ((kidRow as { age_group: string | null }).age_group ?? null) : null,
     planName,
     planType,
-    amountCents,
+    amountCents: isSplit ? split_deposit_cents! : amountCents,
     resetLink,
+    splitBalanceCents: isSplit ? splitBalanceCents : null,
+    splitDueDate: isSplit ? split_due_date : null,
   });
 
   return NextResponse.json({ ok: true, activated: true });

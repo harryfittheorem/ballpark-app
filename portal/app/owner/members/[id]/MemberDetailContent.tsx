@@ -1299,8 +1299,95 @@ export function MemberDetailContent({ member: m }: Props) {
           {!demo && (m as MemberDetail).subscriptionStatus !== 'paused' && (
             <SubscriptionSection member={m as MemberDetail} />
           )}
+
+          {/* Scheduled balance payments (split OTC) */}
+          {!demo && (m as MemberDetail).scheduledCharges?.length > 0 && (
+            <ScheduledChargesSection charges={(m as MemberDetail).scheduledCharges} />
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Scheduled Charges Section (split OTC balance payments) ────────────────────
+
+function ScheduledChargesSection({ charges }: { charges: import('@/lib/supabase/ownerQueries').ScheduledChargeRow[] }) {
+  const hasPending = charges.some(c => c.status === 'pending');
+  const hasFailed = charges.some(c => c.status === 'failed');
+
+  return (
+    <div style={{ marginTop: 2 }}>
+      <SectionHeader title="Scheduled Payments" />
+      <OCard style={{ padding: 0, overflow: 'hidden' }}>
+        {hasFailed && (
+          <div style={{
+            padding: '10px 14px',
+            background: brand.dangerBg,
+            borderBottom: `1px solid ${brand.border}`,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <AlertCircle size={13} color={brand.danger} />
+            <span style={{ fontSize: 12, color: brand.danger, fontWeight: 600 }}>
+              One or more balance payments failed — contact the family to collect manually.
+            </span>
+          </div>
+        )}
+        {hasPending && !hasFailed && (
+          <div style={{
+            padding: '8px 14px',
+            background: 'rgba(241,229,173,0.06)',
+            borderBottom: `1px solid ${brand.border}`,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <Clock size={12} color={brand.goldDeep} />
+            <span style={{ fontSize: 11, color: brand.goldDeep }}>
+              Balance will be collected automatically on the due date.
+            </span>
+          </div>
+        )}
+        {charges.map((charge, i) => {
+          const isLast = i === charges.length - 1;
+          const statusColor = charge.status === 'paid' ? brand.success
+            : charge.status === 'failed' ? brand.danger
+            : brand.goldDeep;
+          const statusBg = charge.status === 'paid' ? brand.successBg
+            : charge.status === 'failed' ? brand.dangerBg
+            : 'rgba(241,229,173,0.08)';
+
+          return (
+            <div
+              key={charge.id}
+              style={{
+                padding: '12px 16px',
+                borderBottom: !isLast ? `1px solid ${brand.border}` : undefined,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: brand.text }}>
+                  ${(charge.amount_cents / 100).toFixed(2)}
+                </div>
+                <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 2 }}>
+                  Due {charge.charge_date}
+                </div>
+                {charge.failure_reason && (
+                  <div style={{ fontSize: 10, color: brand.danger, marginTop: 2 }}>
+                    {charge.failure_reason}
+                  </div>
+                )}
+              </div>
+              <span style={{
+                padding: '3px 9px', borderRadius: 12,
+                fontSize: 10, fontWeight: 700, background: statusBg, color: statusColor,
+                textTransform: 'uppercase', letterSpacing: 0.4,
+              }}>
+                {charge.status}
+              </span>
+            </div>
+          );
+        })}
+      </OCard>
     </div>
   );
 }

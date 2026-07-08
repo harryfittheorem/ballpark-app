@@ -530,6 +530,8 @@ function PaymentForm({
   intentType,
   connectedAccountId,
   enrollmentIds,
+  splitDepositCents,
+  splitDueDate,
   onSuccess,
   onBack,
 }: {
@@ -539,6 +541,8 @@ function PaymentForm({
   intentType: 'setup' | 'payment';
   connectedAccountId: string | null;
   enrollmentIds: { familyId: string; kidId: string; membershipId: string } | null;
+  splitDepositCents: number | null;
+  splitDueDate: string | null;
   onSuccess: () => void;
   onBack: () => void;
 }) {
@@ -548,6 +552,8 @@ function PaymentForm({
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const selectedPlan = plans.find(p => p.id === form.planId);
+  const isSplit = splitDepositCents != null && splitDueDate != null;
+  const splitBalance = isSplit && selectedPlan ? selectedPlan.amount_cents - splitDepositCents! : null;
 
   const handleConfirm = async () => {
     if (!stripe || !elements || !enrollmentIds) return;
@@ -611,18 +617,18 @@ function PaymentForm({
         intent_type: intentType,
         plan_type: selectedPlan?.plan_type ?? 'eft',
         connected_account_id: connectedAccountId,
+        ...(isSplit ? { split_deposit_cents: splitDepositCents, split_due_date: splitDueDate } : {}),
       }),
     });
 
+    const attachData = await attachRes.json().catch(() => ({})) as { ok?: boolean; activated?: boolean; error?: string };
+
     if (!attachRes.ok) {
-      const attachData = await attachRes.json().catch(() => ({})) as { error?: string };
       setPaymentError(attachData.error ?? 'Failed to activate membership. Please contact support.');
       setSubmitting(false);
       return;
     }
 
-    // Guard: only proceed to confirmation when activation succeeded
-    const attachData = await attachRes.json().catch(() => ({})) as { ok?: boolean; activated?: boolean };
     if (!attachData.activated) {
       setPaymentError('Membership activation did not complete. Please contact support.');
       setSubmitting(false);
@@ -632,22 +638,39 @@ function PaymentForm({
     onSuccess();
   };
 
+  const chargeAmount = isSplit ? splitDepositCents! : (selectedPlan?.amount_cents ?? 0);
+
   return (
     <div>
       {selectedPlan && (
         <div style={{
           background: `${brand.gold}14`, border: `1px solid ${brand.goldDeep}`,
-          borderRadius: 8, padding: '12px 16px', marginBottom: 20,
+          borderRadius: 8, padding: '12px 16px', marginBottom: isSplit ? 8 : 20,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: brand.gold }}>{selectedPlan.name}</div>
             <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 2 }}>
-              {selectedPlan.plan_type === 'eft' ? 'Monthly EFT autopay' : 'One-time payment'}
+              {isSplit ? 'Split payment — deposit due today' : selectedPlan.plan_type === 'eft' ? 'Monthly EFT autopay' : 'One-time payment'}
             </div>
           </div>
           <div style={{ fontFamily: fonts.display, fontSize: 20, fontWeight: 700, color: brand.gold }}>
-            ${(selectedPlan.amount_cents / 100).toFixed(2)}
+            ${(chargeAmount / 100).toFixed(2)}
+          </div>
+        </div>
+      )}
+
+      {isSplit && splitBalance != null && splitDueDate && (
+        <div style={{
+          background: brand.surface, border: `1px solid ${brand.border}`,
+          borderRadius: 8, padding: '10px 16px', marginBottom: 20,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div style={{ fontSize: 12, color: brand.textMuted }}>
+            Balance due <strong style={{ color: brand.text }}>{splitDueDate}</strong>
+          </div>
+          <div style={{ fontFamily: fonts.display, fontSize: 16, fontWeight: 700, color: brand.textMuted }}>
+            ${(splitBalance / 100).toFixed(2)}
           </div>
         </div>
       )}
@@ -670,7 +693,13 @@ function PaymentForm({
           onClick={handleConfirm}
           disabled={!stripe || !elements || submitting || !enrollmentIds}
         >
-          {submitting ? 'Processing…' : selectedPlan?.plan_type === 'eft' ? 'Authorize & Activate' : 'Pay & Activate'}
+          {submitting
+            ? 'Processing…'
+            : selectedPlan?.plan_type === 'eft'
+            ? 'Authorize & Activate'
+            : isSplit
+            ? `Pay $${(chargeAmount / 100).toFixed(2)} Deposit`
+            : 'Pay & Activate'}
         </OButton>
       </div>
     </div>
@@ -678,6 +707,8 @@ function PaymentForm({
 }
 
 // ── Step 4: Payment ────────────────────────────────────────────────────────
+// OTC plans have a "configure" phase first (split toggle) before the Stripe form.
+// EFT plans skip straight to the Stripe form (intent created on mount).
 
 function Step4({
   form,
@@ -694,58 +725,289 @@ function Step4({
   onSuccess: () => void;
   onBack: () => void;
 }) {
+  const selectedPlan = plans.find(p => p.id === form.planId);
+  const isOtc = selectedPlan?.plan_type === 'otc';
+
+  // ── Split payment config state (OTC only) ─────────────────────────────────
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [depositInput, setDepositInput] = useState('');
+  const [dueDateInput, setDueDateInput] = useState('');
+  const [configErrors, setConfigErrors] = useState<{ deposit?: string; dueDate?: string }>({});
+
+  // ── Stripe state (loaded after config is confirmed) ───────────────────────
+  const [phase, setPhase] = useState<'configure' | 'payment'>(isOtc ? 'configure' : 'payment');
   const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [intentType, setIntentType] = useState<'setup' | 'payment'>('setup');
   const [connectedAccountId, setConnectedAccountId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [splitDepositCents, setSplitDepositCents] = useState<number | null>(null);
+  const [splitDueDate, setSplitDueDate] = useState<string | null>(null);
+  const [loading, setLoading] = useState(!isOtc); // EFT loads immediately
   const [error, setError] = useState<string | null>(null);
 
-  const selectedPlan = plans.find(p => p.id === form.planId);
-
-  useEffect(() => {
+  // For EFT: create intent on mount. For OTC: deferred until staff confirm config.
+  const initializePayment = useCallback(async (opts: {
+    depositCents?: number;
+    dueDate?: string;
+  }) => {
     if (!stripePublishableKey) {
       setError('Stripe is not configured for this tenant. Contact support to set up payment processing.');
       setLoading(false);
       return;
     }
-
     if (!enrollmentIds?.membershipId) {
       setError('Enrollment data missing. Please go back and try again.');
       setLoading(false);
       return;
     }
 
-    fetch('/api/owner/enroll/setup-intent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        membership_id: enrollmentIds.membershipId,
-        customer_email: form.parentEmail,
-        customer_name: `${form.parentFirstName} ${form.parentLastName}`.trim(),
-      }),
-    })
-      .then(r => r.json())
-      .then((data: { client_secret?: string; intent_type?: string; connected_account_id?: string; error?: string }) => {
-        if (data.error || !data.client_secret) {
-          setError(data.error ?? 'Could not initialize payment');
-          setLoading(false);
-          return;
-        }
-        setClientSecret(data.client_secret);
-        setIntentType(data.intent_type === 'payment' ? 'payment' : 'setup');
-        setConnectedAccountId(data.connected_account_id ?? null);
+    setLoading(true);
+    setError(null);
 
-        const opts = data.connected_account_id
-          ? { stripeAccount: data.connected_account_id }
-          : undefined;
-        setStripePromise(loadStripe(stripePublishableKey, opts));
+    const body: Record<string, unknown> = {
+      membership_id: enrollmentIds.membershipId,
+      customer_email: form.parentEmail,
+      customer_name: `${form.parentFirstName} ${form.parentLastName}`.trim(),
+    };
+    if (opts.depositCents != null) body.split_deposit_cents = opts.depositCents;
+    if (opts.dueDate) body.split_due_date = opts.dueDate;
+
+    try {
+      const r = await fetch('/api/owner/enroll/setup-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await r.json() as {
+        client_secret?: string;
+        intent_type?: string;
+        connected_account_id?: string;
+        is_split?: boolean;
+        split_balance_cents?: number | null;
+        split_due_date?: string | null;
+        error?: string;
+      };
+      if (data.error || !data.client_secret) {
+        setError(data.error ?? 'Could not initialize payment');
         setLoading(false);
-      })
-      .catch(e => { setError(String(e)); setLoading(false); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+        return;
+      }
+      setClientSecret(data.client_secret);
+      setIntentType(data.intent_type === 'payment' ? 'payment' : 'setup');
+      setConnectedAccountId(data.connected_account_id ?? null);
+      if (data.is_split) {
+        setSplitDepositCents(opts.depositCents ?? null);
+        setSplitDueDate(opts.dueDate ?? null);
+      } else {
+        setSplitDepositCents(null);
+        setSplitDueDate(null);
+      }
+      const stripeOpts = data.connected_account_id
+        ? { stripeAccount: data.connected_account_id }
+        : undefined;
+      setStripePromise(loadStripe(stripePublishableKey, stripeOpts));
+      setPhase('payment');
+      setLoading(false);
+    } catch (e) {
+      setError(String(e));
+      setLoading(false);
+    }
   }, [stripePublishableKey, enrollmentIds?.membershipId, form.parentEmail, form.parentFirstName, form.parentLastName]);
 
+  // EFT: auto-initialize on mount
+  useEffect(() => {
+    if (!isOtc) {
+      void initializePayment({});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Min/max date helpers for the date picker ──────────────────────────────
+  const minDate = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  })();
+  const maxDate = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 90);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const handleConfigNext = () => {
+    if (!splitEnabled) {
+      void initializePayment({});
+      return;
+    }
+    const errs: { deposit?: string; dueDate?: string } = {};
+
+    const depositDollars = parseFloat(depositInput.replace(/[$,]/g, ''));
+    const totalDollars = (selectedPlan?.amount_cents ?? 0) / 100;
+
+    if (isNaN(depositDollars) || depositDollars <= 0) {
+      errs.deposit = 'Enter a valid deposit amount';
+    } else if (depositDollars >= totalDollars) {
+      errs.deposit = `Deposit must be less than $${totalDollars.toFixed(2)}`;
+    } else if (Math.round(depositDollars * 100) < 50) {
+      errs.deposit = 'Minimum deposit is $0.50';
+    }
+
+    if (!dueDateInput) {
+      errs.dueDate = 'Select a balance due date';
+    } else {
+      const d = new Date(dueDateInput + 'T00:00:00Z');
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+      if (diff < 1) errs.dueDate = 'Due date must be at least tomorrow';
+      else if (diff > 90) errs.dueDate = 'Due date cannot be more than 90 days out';
+    }
+
+    if (Object.keys(errs).length > 0) { setConfigErrors(errs); return; }
+
+    const depositCents = Math.round(depositDollars * 100);
+    void initializePayment({ depositCents, dueDate: dueDateInput });
+  };
+
+  // ── OTC configure phase ───────────────────────────────────────────────────
+  if (phase === 'configure') {
+    const totalCents = selectedPlan?.amount_cents ?? 0;
+    const depositDollars = parseFloat(depositInput.replace(/[$,]/g, ''));
+    const depositCentsPreview = !isNaN(depositDollars) && depositDollars > 0
+      ? Math.round(depositDollars * 100)
+      : null;
+    const balanceCentsPreview = depositCentsPreview != null
+      ? totalCents - depositCentsPreview
+      : null;
+
+    return (
+      <div>
+        <h2 style={{ fontFamily: fonts.display, fontSize: 22, fontWeight: 700, color: brand.text, marginBottom: 4 }}>Payment</h2>
+        <p style={{ fontSize: 13, color: brand.textMuted, marginBottom: 20 }}>
+          Configure how the family will pay for this one-time charge.
+        </p>
+
+        {/* Plan summary */}
+        <div style={{
+          background: `${brand.gold}14`, border: `1px solid ${brand.goldDeep}`,
+          borderRadius: 8, padding: '12px 16px', marginBottom: 24,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: brand.gold }}>{selectedPlan?.name}</div>
+            <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 2 }}>One-time charge</div>
+          </div>
+          <div style={{ fontFamily: fonts.display, fontSize: 20, fontWeight: 700, color: brand.gold }}>
+            ${(totalCents / 100).toFixed(2)}
+          </div>
+        </div>
+
+        {/* Split toggle */}
+        <div style={{
+          background: brand.surface, border: `1px solid ${brand.border}`,
+          borderRadius: 10, padding: '16px 18px', marginBottom: 20,
+        }}>
+          <div
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+            onClick={() => { setSplitEnabled(v => !v); setConfigErrors({}); }}
+          >
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: brand.text }}>Split payment</div>
+              <div style={{ fontSize: 12, color: brand.textMuted, marginTop: 2 }}>
+                Collect a deposit today and schedule the balance for a future date.
+              </div>
+            </div>
+            {/* Toggle pill */}
+            <div style={{
+              width: 44, height: 24, borderRadius: 12, flexShrink: 0, marginLeft: 16,
+              background: splitEnabled ? brand.gold : brand.border,
+              position: 'relative', transition: 'background 0.2s',
+            }}>
+              <div style={{
+                position: 'absolute', top: 3, left: splitEnabled ? 23 : 3,
+                width: 18, height: 18, borderRadius: 9, background: splitEnabled ? brand.dark : brand.textMuted,
+                transition: 'left 0.2s',
+              }} />
+            </div>
+          </div>
+
+          {splitEnabled && (
+            <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${brand.border}` }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={labelStyle}>Deposit due today *</label>
+                  <input
+                    type="number"
+                    min="0.50"
+                    step="0.01"
+                    placeholder={`e.g. ${(totalCents / 200).toFixed(2)}`}
+                    value={depositInput}
+                    onChange={e => { setDepositInput(e.target.value); setConfigErrors(prev => ({ ...prev, deposit: undefined })); }}
+                    style={{ ...inputStyle, borderColor: configErrors.deposit ? brand.danger : brand.border }}
+                  />
+                  {configErrors.deposit && <div style={errorStyle}>{configErrors.deposit}</div>}
+                </div>
+                <div>
+                  <label style={labelStyle}>Balance due date *</label>
+                  <input
+                    type="date"
+                    min={minDate}
+                    max={maxDate}
+                    value={dueDateInput}
+                    onChange={e => { setDueDateInput(e.target.value); setConfigErrors(prev => ({ ...prev, dueDate: undefined })); }}
+                    style={{ ...inputStyle, borderColor: configErrors.dueDate ? brand.danger : brand.border }}
+                  />
+                  {configErrors.dueDate && <div style={errorStyle}>{configErrors.dueDate}</div>}
+                </div>
+              </div>
+
+              {/* Live balance preview */}
+              {depositCentsPreview != null && balanceCentsPreview != null && balanceCentsPreview > 0 && (
+                <div style={{
+                  marginTop: 14, padding: '10px 14px', background: brand.darker,
+                  borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <div style={{ fontSize: 12, color: brand.textMuted }}>
+                    Deposit today{dueDateInput ? ` · Balance on ${dueDateInput}` : ''}
+                  </div>
+                  <div style={{ display: 'flex', gap: 16, fontFamily: fonts.display, fontSize: 14, fontWeight: 700 }}>
+                    <span style={{ color: brand.gold }}>${(depositCentsPreview / 100).toFixed(2)}</span>
+                    <span style={{ color: brand.textMuted }}>+</span>
+                    <span style={{ color: brand.text }}>${(balanceCentsPreview / 100).toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {loading && (
+          <div style={{ color: brand.textMuted, fontSize: 13, textAlign: 'center', padding: '8px 0', marginBottom: 12 }}>
+            Initializing secure payment…
+          </div>
+        )}
+        {error && (
+          <div style={{ padding: '12px 14px', background: brand.dangerBg, borderRadius: 8, color: brand.danger, fontSize: 13, marginBottom: 16 }}>
+            {error}
+            {error.includes('Stripe account not configured') && (
+              <div style={{ marginTop: 8, fontSize: 12 }}>
+                Go to <a href="/owner/payments" target="_blank" rel="noopener noreferrer" style={{ color: brand.danger, fontWeight: 700, textDecoration: 'underline' }}>Payments settings</a> to connect a Stripe account for this location.
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <OButton variant="secondary" icon={ChevronLeft} onClick={onBack} disabled={loading}>Back</OButton>
+          <OButton variant="gold" icon={ChevronRight} onClick={handleConfigNext} disabled={loading}>
+            {loading ? 'Initializing…' : 'Proceed to Payment'}
+          </OButton>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Stripe payment phase (both EFT and OTC after config) ──────────────────
   if (loading) {
     return (
       <div>
@@ -769,7 +1031,10 @@ function Step4({
           )}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <OButton variant="secondary" icon={ChevronLeft} onClick={onBack}>Back</OButton>
+          <OButton variant="secondary" icon={ChevronLeft} onClick={() => {
+            if (isOtc) { setPhase('configure'); setError(null); }
+            else onBack();
+          }}>Back</OButton>
         </div>
       </div>
     );
@@ -804,8 +1069,13 @@ function Step4({
           intentType={intentType}
           connectedAccountId={connectedAccountId}
           enrollmentIds={enrollmentIds}
+          splitDepositCents={splitDepositCents}
+          splitDueDate={splitDueDate}
           onSuccess={onSuccess}
-          onBack={onBack}
+          onBack={() => {
+            if (isOtc) { setPhase('configure'); setClientSecret(null); setStripePromise(null); }
+            else onBack();
+          }}
         />
       </Elements>
     </div>

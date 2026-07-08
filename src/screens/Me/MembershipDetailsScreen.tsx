@@ -9,13 +9,13 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AlertTriangle, ExternalLink, Info, Star } from 'lucide-react-native';
+import { AlertTriangle, Clock, ExternalLink, Info, Star } from 'lucide-react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useMembership } from '@/hooks/useMembership';
 import { useFamily } from '@/hooks/useFamily';
-import { fetchUpgradePlans } from '@/api/membership';
+import { fetchUpgradePlans, fetchScheduledCharges, type ScheduledCharge } from '@/api/membership';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import type { MeStackParamList } from '@/navigation/types';
 
@@ -46,6 +46,7 @@ export default function MembershipDetailsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MeStackParamList>>();
 
   const [hasUpgradePlans, setHasUpgradePlans] = useState(false);
+  const [scheduledCharges, setScheduledCharges] = useState<ScheduledCharge[]>([]);
 
   // Re-fetch membership when returning from PaymentMethodScreen so the
   // payment_failed_at banner clears immediately on back-navigation.
@@ -64,6 +65,20 @@ export default function MembershipDetailsScreen() {
       .then(plans => setHasUpgradePlans(plans.length > 0))
       .catch(() => setHasUpgradePlans(false));
   }, [membership, family?.tenant_id]);
+
+  // Fetch scheduled charges for OTC memberships (split payment balance)
+  useEffect(() => {
+    if (!membership?.id || membership.plan_type !== 'otc') {
+      setScheduledCharges([]);
+      return;
+    }
+    void fetchScheduledCharges(membership.id)
+      .then(charges => setScheduledCharges(charges))
+      .catch(() => setScheduledCharges([]));
+  }, [membership?.id, membership?.plan_type]);
+
+  const pendingCharges = scheduledCharges.filter(c => c.status === 'pending');
+  const failedCharges = scheduledCharges.filter(c => c.status === 'failed');
 
   if (loading) {
     return (
@@ -112,6 +127,31 @@ export default function MembershipDetailsScreen() {
               <Text style={styles.failedBannerBody}>Tap to update your card →</Text>
             </View>
           </TouchableOpacity>
+        ) : null}
+
+        {failedCharges.length > 0 ? (
+          <View style={[styles.failedBanner, { backgroundColor: '#c0392b' }]}>
+            <AlertTriangle size={16} color="#fff" />
+            <View style={styles.failedBannerText}>
+              <Text style={styles.failedBannerTitle}>Balance payment failed</Text>
+              <Text style={styles.failedBannerBody}>
+                ${(failedCharges[0]!.amount_cents / 100).toFixed(2)} due {failedCharges[0]!.charge_date} — please contact us to resolve.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {pendingCharges.length > 0 ? (
+          <View style={styles.balanceDueBanner}>
+            <Clock size={15} color={colors.gold} />
+            <View style={{ flex: 1, marginLeft: spacing.sm }}>
+              <Text style={styles.balanceDueTitle}>Balance payment scheduled</Text>
+              <Text style={styles.balanceDueBody}>
+                ${(pendingCharges[0]!.amount_cents / 100).toFixed(2)} will be collected automatically on {formatDate(pendingCharges[0]!.charge_date)}.
+                {pendingCharges.length > 1 ? ` (+${pendingCharges.length - 1} more)` : ''}
+              </Text>
+            </View>
+          </View>
         ) : null}
 
         <View style={styles.iconWrap}>
@@ -402,5 +442,28 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.interMedium,
     fontSize: fontSizes.sm,
     color: 'rgba(255,255,255,0.85)',
+  },
+
+  balanceDueBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: `${colors.gold}12`,
+    borderWidth: 1,
+    borderColor: `${colors.gold}40`,
+    borderRadius: radius.xl,
+    padding: spacing['2xl'],
+    marginBottom: spacing['3xl'],
+  },
+  balanceDueTitle: {
+    fontFamily: fontFamilies.interSemiBold,
+    fontSize: fontSizes.sm,
+    color: colors.gold,
+    marginBottom: 2,
+  },
+  balanceDueBody: {
+    fontFamily: fontFamilies.interRegular,
+    fontSize: fontSizes.sm,
+    color: colors.textLight,
+    lineHeight: 19,
   },
 });

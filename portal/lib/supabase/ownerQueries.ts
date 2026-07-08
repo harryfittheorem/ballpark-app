@@ -1414,6 +1414,14 @@ export type RecentPaymentEvent = {
   method: string;
 };
 
+export type ScheduledChargeRow = {
+  id: string;
+  amount_cents: number;
+  charge_date: string;
+  status: 'pending' | 'paid' | 'failed';
+  failure_reason: string | null;
+};
+
 export type MemberDetail = OwnerMember & {
   bookingCount: number;
   hittraxSessionCount: number;
@@ -1447,6 +1455,8 @@ export type MemberDetail = OwnerMember & {
   weeklyPeriodStart: string | null;
   /** Day of month (1–28) used as the billing anchor. Null for OTC memberships. */
   billingAnchorDay: number | null;
+  /** Scheduled balance payments for split OTC enrollments. Empty array if none. */
+  scheduledCharges: ScheduledChargeRow[];
 };
 
 export async function getMemberDetail(
@@ -1639,13 +1649,27 @@ export async function getMemberDetail(
     subscriptionStatus = 'paused';
   }
 
-  const lifetimeRes = await supabase
-    .from('payment_events')
-    .select('amount_cents')
-    .eq('tenant_id', tenantId)
-    .eq('membership_id', membershipId)
-    .eq('status', 'paid');
+  const [lifetimeRes, scheduledChargesRes] = await Promise.all([
+    supabase
+      .from('payment_events')
+      .select('amount_cents')
+      .eq('tenant_id', tenantId)
+      .eq('membership_id', membershipId)
+      .eq('status', 'paid'),
+    supabase
+      .from('scheduled_charges')
+      .select('id, amount_cents, charge_date, status, failure_reason')
+      .eq('membership_id', membershipId)
+      .order('charge_date', { ascending: true }),
+  ]);
   const lifetime = (lifetimeRes.data ?? []).reduce((s, e) => s + (e.amount_cents ?? 0), 0) / 100;
+  const scheduledCharges: ScheduledChargeRow[] = (scheduledChargesRes.data ?? []).map(r => ({
+    id: r.id as string,
+    amount_cents: r.amount_cents as number,
+    charge_date: r.charge_date as string,
+    status: r.status as 'pending' | 'paid' | 'failed',
+    failure_reason: (r.failure_reason as string | null) ?? null,
+  }));
 
   return {
     id: mem.id,
@@ -1698,6 +1722,7 @@ export async function getMemberDetail(
       ? ((mem.weekly_period_start as string | null) ?? null)
       : null,
     billingAnchorDay:    (mem.billing_anchor_day as number | null) ?? null,
+    scheduledCharges,
   };
 }
 

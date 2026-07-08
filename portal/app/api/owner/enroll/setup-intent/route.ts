@@ -7,17 +7,23 @@
  *
  *   EFT plans  → SetupIntent (vault card for recurring billing, no charge now)
  *   OTC plans  → PaymentIntent (charge the full plan amount immediately)
+ *   OTC + split → PaymentIntent for deposit_amount_cents only
  *
  * Body: {
  *   membership_id: string,
- *   customer_email?: string,   -- informational hint only (for Stripe metadata)
+ *   customer_email?: string,
  *   customer_name?: string,
+ *   split_deposit_cents?: number,   -- OTC only; deposit amount to charge now
+ *   split_due_date?: string,        -- OTC split only; YYYY-MM-DD, 1–90 days out
  * }
  *
  * Returns: {
  *   client_secret: string,
  *   intent_type: 'setup' | 'payment',
  *   connected_account_id: string | null,
+ *   is_split: boolean,
+ *   split_balance_cents: number | null,
+ *   split_due_date: string | null,
  * }
  */
 import { type NextRequest, NextResponse } from 'next/server';
@@ -49,22 +55,25 @@ export async function POST(req: NextRequest) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) return err(500, 'Stripe not configured');
 
-  let body: { membership_id?: string; customer_email?: string; customer_name?: string } = {};
+  let body: {
+    membership_id?: string;
+    customer_email?: string;
+    customer_name?: string;
+    split_deposit_cents?: number;
+    split_due_date?: string;
+  } = {};
   try {
     body = await req.json() as typeof body;
   } catch {
     // body optional
   }
 
-  const { membership_id, customer_email, customer_name } = body;
+  const { membership_id, customer_email, customer_name, split_deposit_cents, split_due_date } = body;
   if (!membership_id) return err(422, 'membership_id required');
 
   const serviceClient = createServiceClient();
 
   // ── Load plan + location stripe account from DB (authoritative, never trust client) ──
-  // Use families.primary_location_id → locations.stripe_account_id, the same path
-  // stripe-create-subscription uses, so all Stripe objects live on the same account.
-
   const { data: membership } = await serviceClient
     .from('memberships')
     .select('id, tenant_id, plan_type, amount_cents, families!inner(primary_location_id)')
@@ -76,6 +85,36 @@ export async function POST(req: NextRequest) {
 
   const planType = (membership as { plan_type: string }).plan_type as 'eft' | 'otc';
   const amountCents = (membership as { amount_cents: number }).amount_cents;
+
+  // Validate split params (only allowed for OTC)
+  let isSplit = false;
+  let splitBalanceCents: number | null = null;
+  let validatedDepositCents: number | null = null;
+  let validatedDueDate: string | null = null;
+
+  if (planType === 'otc' && split_deposit_cents != null) {
+    if (!Number.isInteger(split_deposit_cents) || split_deposit_cents <= 0) {
+      return err(422, 'split_deposit_cents must be a positive integer');
+    }
+    if (split_deposit_cents >= amountCents) {
+      return err(422, 'Deposit must be less than the total plan amount');
+    }
+    if (!split_due_date) {
+      return err(422, 'split_due_date required when split_deposit_cents is provided');
+    }
+    const dueDate = new Date(split_due_date + 'T00:00:00Z');
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const diffDays = Math.round((dueDate.getTime() - today.getTime()) / 86400000);
+    if (diffDays < 1 || diffDays > 90) {
+      return err(422, 'Balance due date must be 1–90 days from today');
+    }
+
+    isSplit = true;
+    validatedDepositCents = split_deposit_cents;
+    splitBalanceCents = amountCents - split_deposit_cents;
+    validatedDueDate = split_due_date;
+  }
 
   const primaryLocationId = (
     (membership as { families?: { primary_location_id?: string } }).families
@@ -94,9 +133,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Fallback: if primary_location_id was null (family enrolled before the fix
-  // landed) or its location isn't connected, search the tenant for any
-  // connected location so existing families aren't permanently broken.
+  // Fallback: search tenant for any connected location
   if (!connectedAccountId) {
     const { data: fallbackLocs } = await serviceClient
       .from('locations')
@@ -110,8 +147,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Hard gate: a connected Stripe account is required. Without it, any intent
-  // created would land on the platform account instead of the tenant's account.
   if (!connectedAccountId) {
     return err(422, 'Stripe account not configured for this location. Complete Stripe Connect onboarding before enrolling members.');
   }
@@ -127,17 +162,24 @@ export async function POST(req: NextRequest) {
   const intentType: 'setup' | 'payment' = planType === 'otc' ? 'payment' : 'setup';
 
   if (intentType === 'payment') {
-    // OTC: PaymentIntent — charge the DB-sourced amount immediately
-    if (!amountCents || amountCents <= 0) {
+    // OTC: PaymentIntent — charge deposit (split) or full amount (non-split)
+    const chargeAmount = isSplit ? validatedDepositCents! : amountCents;
+    if (!chargeAmount || chargeAmount <= 0) {
       return err(422, 'Plan amount must be greater than zero for OTC payment');
     }
     const params = new URLSearchParams({
-      amount: String(amountCents),
+      amount: String(chargeAmount),
       currency: 'usd',
       'payment_method_types[]': 'card',
       capture_method: 'automatic',
       'metadata[membership_id]': membership_id,
+      'metadata[is_split]': isSplit ? 'true' : 'false',
     });
+    if (isSplit) {
+      params.append('metadata[split_deposit_cents]', String(validatedDepositCents));
+      params.append('metadata[split_balance_cents]', String(splitBalanceCents));
+      params.append('metadata[split_due_date]', validatedDueDate!);
+    }
     if (customer_email) params.append('metadata[customer_email]', customer_email);
     if (customer_name) params.append('metadata[customer_name]', customer_name);
 
@@ -183,5 +225,8 @@ export async function POST(req: NextRequest) {
     client_secret: clientSecret,
     intent_type: intentType,
     connected_account_id: connectedAccountId,
+    is_split: isSplit,
+    split_balance_cents: splitBalanceCents,
+    split_due_date: validatedDueDate,
   });
 }

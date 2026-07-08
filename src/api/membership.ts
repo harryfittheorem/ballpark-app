@@ -2,6 +2,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { errorMessage } from '@/utils/error';
 
+export type ScheduledCharge = {
+  id: string;
+  amount_cents: number;
+  charge_date: string;
+  status: 'pending' | 'paid' | 'failed';
+  failure_reason: string | null;
+};
+
 // membership_plans and membership_upgrade_requests are not yet in the generated
 // database.ts types — access them via the un-typed SupabaseClient cast until
 // the next post-merge type regen.
@@ -112,6 +120,17 @@ export async function pauseMembership(membershipId: string, pauseEnd: string): P
       : String(body.error ?? `Error ${res.status}`);
     throw new Error(msg);
   }
+}
+
+export async function fetchScheduledCharges(membershipId: string): Promise<ScheduledCharge[]> {
+  const { data, error } = await sb
+    .from('scheduled_charges')
+    .select('id, amount_cents, charge_date, status, failure_reason')
+    .eq('membership_id', membershipId)
+    .order('charge_date', { ascending: true });
+
+  if (error) throw new Error(errorMessage(error));
+  return (data ?? []) as ScheduledCharge[];
 }
 
 export async function resumeMembership(membershipId: string): Promise<void> {
