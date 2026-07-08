@@ -84,6 +84,7 @@ if [ -d "supabase/functions" ]; then
   deploy_fn resume-membership
   deploy_fn request-membership-upgrade
   deploy_fn resume-paused-memberships
+  deploy_fn enforce-payment-pause
   deploy_fn process-membership-cancellations
   deploy_fn notify-cancel-requested
   deploy_fn notify-waiver-signed

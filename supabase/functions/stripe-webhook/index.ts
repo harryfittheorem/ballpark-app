@@ -215,6 +215,271 @@ async function sendDunningEmail(opts: {
   }
 }
 
+// ─── Escalation email (failure #2) via Resend ────────────────────────────────
+
+async function sendEscalationEmail(opts: {
+  toEmail: string;
+  parentName: string;
+  planName: string;
+  amountCents: number;
+  resendApiKey: string;
+  resendFromEmail: string;
+}) {
+  const amountStr = `$${(opts.amountCents / 100).toFixed(2)}`;
+  const appDeepLink = 'ballpark://me/payment-method';
+
+  const plainText = [
+    `Hi ${opts.parentName},`,
+    '',
+    `This is your second failed payment for your ${opts.planName} membership (${amountStr}).`,
+    '',
+    'Please update your payment method within 7 days or your membership will be paused.',
+    `Open the Ballpark app → Me → Payment Method`,
+    '',
+    `Or tap this link on your phone: ${appDeepLink}`,
+    '',
+    'Questions? Reply to this email or contact your facility directly.',
+  ].join('\n');
+
+  const body = {
+    from: opts.resendFromEmail,
+    to: opts.toEmail,
+    subject: 'Second failed payment — update your card within 7 days',
+    text: plainText,
+    html: `
+      <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; color: #1a1a1a;">
+        <div style="background: #1a1a1a; padding: 24px; border-radius: 8px 8px 0 0;">
+          <h1 style="color: #d4a843; font-size: 22px; margin: 0; font-weight: 700; letter-spacing: 1px;">
+            BALLPARK SPORTS
+          </h1>
+        </div>
+        <div style="padding: 32px; background: #fff; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 8px 8px;">
+          <h2 style="font-size: 18px; margin-bottom: 12px; color: #c0392b;">
+            Second failed payment — action needed
+          </h2>
+          <p>Hi ${opts.parentName},</p>
+          <p>This is your <strong>second failed payment</strong> for your <strong>${opts.planName}</strong>
+          membership (<strong>${amountStr}</strong>).</p>
+          <p style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 12px 16px; margin: 16px 0;">
+            ⚠️ Please update your payment method within <strong>7 days</strong> or your membership will be <strong>paused</strong>.
+          </p>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${appDeepLink}"
+               style="display: inline-block; background: #d4a843; color: #1a1a1a;
+                      font-weight: 700; font-size: 15px; padding: 14px 28px;
+                      border-radius: 8px; text-decoration: none; letter-spacing: 0.5px;">
+              Update Payment Method →
+            </a>
+          </div>
+          <p style="color: #666; font-size: 13px;">
+            If the button above doesn't open the app, go to <strong>Me → Payment Method</strong>.
+            Stripe will automatically retry once your card is updated.
+          </p>
+          <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 24px 0;" />
+          <p style="color: #888; font-size: 12px;">
+            Questions? Reply to this email or contact your facility directly.
+          </p>
+        </div>
+      </div>
+    `,
+  };
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${opts.resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[stripe-webhook] Resend escalation email failed: ${res.status} ${errText}`);
+    } else {
+      console.log(`[stripe-webhook] Escalation email sent to ${opts.toEmail}`);
+    }
+  } catch (err) {
+    console.error('[stripe-webhook] Resend escalation email exception:', err);
+  }
+}
+
+// ─── Final-notice email (failure #3) via Resend ───────────────────────────────
+
+async function sendFinalNoticeEmail(opts: {
+  toEmail: string;
+  parentName: string;
+  planName: string;
+  amountCents: number;
+  resendApiKey: string;
+  resendFromEmail: string;
+}) {
+  const amountStr = `$${(opts.amountCents / 100).toFixed(2)}`;
+  const appDeepLink = 'ballpark://me/payment-method';
+
+  const plainText = [
+    `Hi ${opts.parentName},`,
+    '',
+    `This is your third failed payment for your ${opts.planName} membership (${amountStr}).`,
+    '',
+    'Your membership will be paused in 24 hours if payment is not resolved.',
+    `Update now: Open the Ballpark app → Me → Payment Method`,
+    '',
+    `Or tap this link on your phone: ${appDeepLink}`,
+    '',
+    'Questions? Reply to this email or contact your facility directly.',
+  ].join('\n');
+
+  const body = {
+    from: opts.resendFromEmail,
+    to: opts.toEmail,
+    subject: 'Final notice: membership will be paused in 24 hours',
+    text: plainText,
+    html: `
+      <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; color: #1a1a1a;">
+        <div style="background: #1a1a1a; padding: 24px; border-radius: 8px 8px 0 0;">
+          <h1 style="color: #d4a843; font-size: 22px; margin: 0; font-weight: 700; letter-spacing: 1px;">
+            BALLPARK SPORTS
+          </h1>
+        </div>
+        <div style="padding: 32px; background: #fff; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 8px 8px;">
+          <h2 style="font-size: 18px; margin-bottom: 12px; color: #c0392b;">
+            Final notice — membership pausing in 24 hours
+          </h2>
+          <p>Hi ${opts.parentName},</p>
+          <p>This is your <strong>third failed payment</strong> for your <strong>${opts.planName}</strong>
+          membership (<strong>${amountStr}</strong>).</p>
+          <p style="background: #fde8e8; border: 1px solid #e74c3c; border-radius: 6px; padding: 12px 16px; margin: 16px 0; color: #c0392b; font-weight: 600;">
+            🚨 Your membership will be <strong>paused in 24 hours</strong> if payment is not resolved.
+          </p>
+          <p>Update your payment method now to keep your access uninterrupted:</p>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${appDeepLink}"
+               style="display: inline-block; background: #c0392b; color: #fff;
+                      font-weight: 700; font-size: 15px; padding: 14px 28px;
+                      border-radius: 8px; text-decoration: none; letter-spacing: 0.5px;">
+              Update Payment Now →
+            </a>
+          </div>
+          <p style="color: #666; font-size: 13px;">
+            Once your card is updated, Stripe will retry automatically. If your membership is paused,
+            it will reactivate as soon as payment succeeds.
+          </p>
+          <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 24px 0;" />
+          <p style="color: #888; font-size: 12px;">
+            Questions? Reply to this email or contact your facility directly.
+          </p>
+        </div>
+      </div>
+    `,
+  };
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${opts.resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[stripe-webhook] Resend final-notice email failed: ${res.status} ${errText}`);
+    } else {
+      console.log(`[stripe-webhook] Final-notice email sent to ${opts.toEmail}`);
+    }
+  } catch (err) {
+    console.error('[stripe-webhook] Resend final-notice email exception:', err);
+  }
+}
+
+// ─── Reactivation email (payment recovered) via Resend ───────────────────────
+
+async function sendReactivationEmail(opts: {
+  toEmail: string;
+  parentName: string;
+  planName: string;
+  resendApiKey: string;
+  resendFromEmail: string;
+}) {
+  const html = `
+    <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; color: #1a1a1a;">
+      <div style="background: #1a1a1a; padding: 24px; border-radius: 8px 8px 0 0;">
+        <h1 style="color: #d4a843; font-size: 22px; margin: 0; font-weight: 700; letter-spacing: 1px;">
+          BALLPARK SPORTS
+        </h1>
+      </div>
+      <div style="padding: 32px; background: #fff; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 8px 8px;">
+        <h2 style="font-size: 18px; margin-bottom: 12px; color: #27ae60;">
+          ✓ Membership reactivated
+        </h2>
+        <p>Hi ${opts.parentName},</p>
+        <p>Great news — your <strong>${opts.planName}</strong> membership has been
+        <strong style="color: #27ae60;">reactivated</strong>. Payment was received successfully
+        and your membership is now active.</p>
+        <p style="color: #666; font-size: 13px;">
+          Your regular billing cycle resumes on your next billing date. Welcome back!
+        </p>
+        <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 24px 0;" />
+        <p style="color: #888; font-size: 12px;">
+          Questions? Reply to this email or contact your facility directly.
+        </p>
+      </div>
+    </div>
+  `;
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${opts.resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: opts.resendFromEmail,
+        to: opts.toEmail,
+        subject: `Your ${opts.planName} has been reactivated`,
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[stripe-webhook] Resend reactivation email failed: ${res.status} ${errText}`);
+    } else {
+      console.log(`[stripe-webhook] Reactivation email sent to ${opts.toEmail}`);
+    }
+  } catch (err) {
+    console.error('[stripe-webhook] Resend reactivation email exception:', err);
+  }
+}
+
+// ─── Stripe: remove pause_collection ────────────────────────────────────────
+
+async function stripeRemovePause(
+  subscriptionId: string,
+  secretKey: string,
+  stripeAccountId?: string,
+): Promise<void> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${secretKey}`,
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Stripe-Version': '2024-06-20',
+  };
+  if (stripeAccountId) headers['Stripe-Account'] = stripeAccountId;
+
+  const res = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+    method: 'POST',
+    headers,
+    body: 'pause_collection=',
+  });
+  const data = await res.json() as Record<string, unknown>;
+  if (!res.ok) {
+    const err = data.error as { message?: string } | undefined;
+    throw new Error(err?.message ?? `Stripe error ${res.status}`);
+  }
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -610,10 +875,11 @@ Deno.serve(async (req) => {
       return json({ ok: true, ignored: true });
     }
 
-    // Look up the membership by stripe_subscription_id (include location for account verification)
+    // Look up the membership by stripe_subscription_id (include all fields needed for
+    // recovery so we don't need a second round-trip after the payment_events insert).
     const { data: mem, error: memErr } = await supabase
       .from('memberships')
-      .select('id, tenant_id, family_id, status, families!inner(primary_location_id)')
+      .select('id, tenant_id, family_id, plan_name, status, payment_failure_count, payment_paused_reason, stripe_subscription_id, families!inner(primary_location_id)')
       .eq('stripe_subscription_id', invoice.subscription)
       .maybeSingle();
 
@@ -651,58 +917,87 @@ Deno.serve(async (req) => {
       .eq('status', 'paid')
       .maybeSingle();
 
-    if (existingPaid) {
-      console.log(`[stripe-webhook] invoice.payment_succeeded: paid row already exists invoice=${invoice.id}`);
-      // Still update membership status + next_billing_at + clear payment_failed_at
-      // in case a prior webhook fired early.
-      await supabase
-        .from('memberships')
-        .update({
-          status: 'active',
-          payment_failed_at: null,
-          next_billing_at: invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', mem.id);
-      return json({ ok: true });
+    // If a paid row already exists, skip the INSERT but still run full recovery —
+    // the original delivery may have inserted the row then died before completing DB/Stripe updates.
+    if (!existingPaid) {
+      const { error: insertErr } = await supabase
+        .from('payment_events')
+        .insert({
+          tenant_id: mem.tenant_id,
+          family_id: mem.family_id,
+          membership_id: mem.id,
+          amount_cents: invoice.amount_paid,
+          status: 'paid',
+          payment_method: 'card',
+          stripe_invoice_id: invoice.id,
+          created_at: new Date().toISOString(),
+        });
+
+      if (insertErr) {
+        console.error('[stripe-webhook] invoice.payment_succeeded insert error:', insertErr.message);
+        return json({ error: { code: 'db_error', message: insertErr.message } }, 500);
+      }
+    } else {
+      console.log(`[stripe-webhook] invoice.payment_succeeded: paid row already exists invoice=${invoice.id} — running full recovery`);
     }
 
-    // Insert paid payment_events row
+    // ── Full recovery — runs for both fresh and re-delivered paid events ──────
+    // mem now includes all fields needed; no second round-trip required.
     const nextBillingAt = invoice.period_end
       ? new Date(invoice.period_end * 1000).toISOString()
       : null;
 
-    const { error: insertErr } = await supabase
-      .from('payment_events')
-      .insert({
-        tenant_id: mem.tenant_id,
-        family_id: mem.family_id,
-        membership_id: mem.id,
-        amount_cents: invoice.amount_paid,
-        status: 'paid',
-        payment_method: 'card',
-        stripe_invoice_id: invoice.id,
-        created_at: new Date().toISOString(),
-      });
+    const wasPaymentPaused =
+      mem.status === 'paused' &&
+      (mem as unknown as { payment_paused_reason: string | null }).payment_paused_reason === 'payment_overdue';
 
-    if (insertErr) {
-      console.error('[stripe-webhook] invoice.payment_succeeded insert error:', insertErr.message);
-      return json({ error: { code: 'db_error', message: insertErr.message } }, 500);
+    const previousFailureCount =
+      (mem as unknown as { payment_failure_count: number }).payment_failure_count ?? 0;
+
+    // If membership was paused due to payment overdue, remove Stripe pause_collection
+    if (wasPaymentPaused && mem.stripe_subscription_id) {
+      try {
+        const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
+        if (stripeKey) {
+          const famSucc2 = mem.families as unknown as { primary_location_id: string };
+          const { data: locSucc2 } = await supabase
+            .from('locations')
+            .select('stripe_account_id')
+            .eq('id', famSucc2.primary_location_id)
+            .maybeSingle();
+          await stripeRemovePause(
+            mem.stripe_subscription_id as string,
+            stripeKey,
+            (locSucc2?.stripe_account_id as string | null) ?? undefined,
+          );
+          console.log(`[stripe-webhook] invoice.payment_succeeded: removed Stripe pause for membership=${mem.id}`);
+        }
+      } catch (stripeErr) {
+        console.error(`[stripe-webhook] invoice.payment_succeeded: failed to remove Stripe pause for membership=${mem.id}:`, stripeErr);
+      }
     }
 
-    // Ensure membership is active (recovers from payment_overdue) + update next_billing_at.
-    // Clear payment_failed_at so in-app banners disappear immediately.
+    const recoveryUpdate: Record<string, unknown> = {
+      status: 'active',
+      payment_failed_at: null,
+      payment_failure_count: 0,
+      payment_pause_scheduled_at: null,
+      next_billing_at: nextBillingAt,
+      updated_at: new Date().toISOString(),
+    };
+    if (wasPaymentPaused) {
+      recoveryUpdate.payment_paused_reason = null;
+      recoveryUpdate.pause_start = null;
+      recoveryUpdate.pause_end = null;
+      recoveryUpdate.paused_at = null;
+    }
+
     await supabase
       .from('memberships')
-      .update({
-        status: 'active',
-        payment_failed_at: null,
-        next_billing_at: nextBillingAt,
-        updated_at: new Date().toISOString(),
-      })
+      .update(recoveryUpdate)
       .eq('id', mem.id);
 
-    // ── One-time billing date revert ────────────────────────────────────────
+    // ── One-time billing date revert (Task #553) ────────────────────────────
     // If a staff member made a one-time billing date shift (change_type='one_time'),
     // we deferred the next invoice via trial_end to the target day. Now that the
     // invoice has been paid, revert billing_cycle_anchor back to the original
@@ -727,13 +1022,10 @@ Deno.serve(async (req) => {
           .eq('id', famRevert.primary_location_id)
           .maybeSingle();
 
-        const { data: memSub } = await supabase
-          .from('memberships')
-          .select('stripe_subscription_id')
-          .eq('id', mem.id)
-          .maybeSingle();
+        // stripe_subscription_id is now on mem directly (no second fetch needed)
+        const subId = mem.stripe_subscription_id as string | null;
 
-        if (stripeKey && locRevert?.stripe_account_id && memSub?.stripe_subscription_id) {
+        if (stripeKey && locRevert?.stripe_account_id && subId) {
           const oldDay = pendingChange.old_anchor_day as number;
           const now = new Date();
           const revertDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), oldDay));
@@ -746,7 +1038,7 @@ Deno.serve(async (req) => {
             `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`;
 
           const revertRes = await fetch(
-            `https://api.stripe.com/v1/subscriptions/${memSub.stripe_subscription_id as string}`,
+            `https://api.stripe.com/v1/subscriptions/${subId}`,
             {
               method: 'POST',
               headers: {
@@ -789,7 +1081,50 @@ Deno.serve(async (req) => {
       console.error('[stripe-webhook] one-time revert error (non-fatal):', revertErr);
     }
 
-    console.log(`[stripe-webhook] invoice.payment_succeeded → membership=${mem.id} invoice=${invoice.id} amount=${invoice.amount_paid}`);
+    // ── Reactivation notification (Task #554) ────────────────────────────────
+    // Send email + push if membership previously had payment failures.
+    if (previousFailureCount > 0) {
+      const resendApiKey = Deno.env.get('RESEND_API_KEY');
+      const resendFromEmail = Deno.env.get('RESEND_FROM_EMAIL');
+      const { data: famReact } = await supabase
+        .from('families')
+        .select('parent_first_name, parent_email, parent_user_id')
+        .eq('id', mem.family_id)
+        .maybeSingle();
+
+      const reactPromises: Promise<unknown>[] = [];
+      if (resendApiKey && resendFromEmail && famReact?.parent_email) {
+        reactPromises.push(
+          sendReactivationEmail({
+            toEmail: famReact.parent_email,
+            parentName: famReact.parent_first_name ?? 'there',
+            planName: (mem as unknown as { plan_name: string }).plan_name,
+            resendApiKey,
+            resendFromEmail,
+          }).catch(err => console.error('[stripe-webhook] sendReactivationEmail error:', err)),
+        );
+      }
+      if (famReact?.parent_user_id) {
+        reactPromises.push(
+          fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({
+              user_ids: [famReact.parent_user_id],
+              title: '✓ Membership Reactivated',
+              body: `Your ${(mem as unknown as { plan_name: string }).plan_name} is now active. Payment received — welcome back!`,
+              data: { kind: 'membership_reactivated', membership_id: mem.id },
+            }),
+          }).catch(err => console.error('[stripe-webhook] reactivation push error:', err)),
+        );
+      }
+      await Promise.allSettled(reactPromises);
+    }
+
+    console.log(`[stripe-webhook] invoice.payment_succeeded → membership=${mem.id} invoice=${invoice.id} amount=${invoice.amount_paid} was_paused=${wasPaymentPaused} prev_failures=${previousFailureCount}`);
     return json({ ok: true });
   }
 
@@ -823,7 +1158,7 @@ Deno.serve(async (req) => {
     // Look up the membership (include location for account verification)
     const { data: mem, error: memErr } = await supabase
       .from('memberships')
-      .select('id, tenant_id, family_id, plan_name, status, families!inner(primary_location_id)')
+      .select('id, tenant_id, family_id, plan_name, status, payment_failure_count, payment_pause_scheduled_at, families!inner(primary_location_id)')
       .eq('stripe_subscription_id', invoice.subscription)
       .maybeSingle();
 
@@ -860,7 +1195,11 @@ Deno.serve(async (req) => {
       .eq('error_code', attemptCode)
       .maybeSingle();
 
+    const now = new Date().toISOString();
+
     if (!existingAttempt) {
+      // ── New attempt: insert payment_events row, increment counter, fan-out ──
+
       const { error: insertErr } = await supabase
         .from('payment_events')
         .insert({
@@ -872,77 +1211,112 @@ Deno.serve(async (req) => {
           payment_method: 'card',
           stripe_invoice_id: invoice.id,
           error_code: attemptCode,
-          created_at: new Date().toISOString(),
+          created_at: now,
         });
 
       if (insertErr) {
         console.error('[stripe-webhook] invoice.payment_failed insert error:', insertErr.message);
         return json({ error: { code: 'db_error', message: insertErr.message } }, 500);
       }
-    }
 
-    // Mark membership as payment_overdue + stamp payment_failed_at (only if currently active).
-    // Don't overwrite cancelled or already-overdue — but always stamp payment_failed_at so
-    // the in-app banner appears regardless of which attempt this is.
-    const now = new Date().toISOString();
-    await supabase
-      .from('memberships')
-      .update({
+      const currentCount = (mem.payment_failure_count as number) ?? 0;
+      const newCount = currentCount + 1;
+
+      // Set payment_pause_scheduled_at ONLY on the first time we reach 3+
+      // (i.e. it is currently null). Prevents re-extending the 24h window on
+      // subsequent distinct failures (#4, #5) if pause was already scheduled.
+      const currentPauseScheduled = (mem as unknown as { payment_pause_scheduled_at: string | null }).payment_pause_scheduled_at;
+      const membershipUpdate: Record<string, unknown> = {
         status: 'payment_overdue',
         payment_failed_at: now,
+        payment_failure_count: newCount,
         updated_at: now,
-      })
-      .eq('id', mem.id)
-      .in('status', ['active', 'payment_overdue']);
+      };
+      if (newCount >= 3 && !currentPauseScheduled) {
+        membershipUpdate.payment_pause_scheduled_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      }
 
-    // Fan-out: push + email — best-effort via Promise.allSettled, never fail the webhook
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    const resendFromEmail = Deno.env.get('RESEND_FROM_EMAIL');
+      await supabase
+        .from('memberships')
+        .update(membershipUpdate)
+        .eq('id', mem.id)
+        .in('status', ['active', 'payment_overdue']);
 
-    const { data: family } = await supabase
-      .from('families')
-      .select('parent_first_name, parent_email, parent_user_id')
-      .eq('id', mem.family_id)
-      .single();
+      // Fan-out: push + email — best-effort via Promise.allSettled, never fail the webhook
+      const resendApiKey = Deno.env.get('RESEND_API_KEY');
+      const resendFromEmail = Deno.env.get('RESEND_FROM_EMAIL');
 
-    const fanOutPromises: Promise<unknown>[] = [];
+      const { data: family } = await supabase
+        .from('families')
+        .select('parent_first_name, parent_email, parent_user_id')
+        .eq('id', mem.family_id)
+        .single();
 
-    // Push notification
-    if (family?.parent_user_id) {
-      fanOutPromises.push(
-        fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${serviceKey}`,
-          },
-          body: JSON.stringify({
-            user_ids: [family.parent_user_id],
-            title: 'Payment failed',
-            body: 'Your autopay failed — tap to update your card.',
-            data: { kind: 'payment_failed', screen: 'PaymentMethod' },
-          }),
-        }).catch(err => console.error('[stripe-webhook] push fan-out error:', err)),
-      );
-    }
+      const fanOutPromises: Promise<unknown>[] = [];
 
-    // Dunning email
-    if (resendApiKey && resendFromEmail && family?.parent_email) {
-      fanOutPromises.push(
-        sendDunningEmail({
+      if (family?.parent_user_id) {
+        fanOutPromises.push(
+          fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({
+              user_ids: [family.parent_user_id],
+              title: 'Payment failed',
+              body: newCount >= 3
+                ? 'Third failed payment — your membership will be paused in 24 hours.'
+                : newCount === 2
+                  ? 'Second failed payment — update your card within 7 days.'
+                  : 'Your autopay failed — tap to update your card.',
+              data: { kind: 'payment_failed', screen: 'PaymentMethod' },
+            }),
+          }).catch(err => console.error('[stripe-webhook] push fan-out error:', err)),
+        );
+      }
+
+      if (resendApiKey && resendFromEmail && family?.parent_email) {
+        const emailOpts = {
           toEmail: family.parent_email,
           parentName: family.parent_first_name ?? 'there',
           planName: mem.plan_name,
           amountCents: invoice.amount_due,
           resendApiKey,
           resendFromEmail,
-        }).catch(err => console.error('[stripe-webhook] sendDunningEmail unexpected error:', err)),
-      );
+        };
+        if (newCount === 1) {
+          fanOutPromises.push(
+            sendDunningEmail(emailOpts)
+              .catch(err => console.error('[stripe-webhook] sendDunningEmail error:', err)),
+          );
+        } else if (newCount === 2) {
+          fanOutPromises.push(
+            sendEscalationEmail(emailOpts)
+              .catch(err => console.error('[stripe-webhook] sendEscalationEmail error:', err)),
+          );
+        } else if (newCount === 3) {
+          fanOutPromises.push(
+            sendFinalNoticeEmail(emailOpts)
+              .catch(err => console.error('[stripe-webhook] sendFinalNoticeEmail error:', err)),
+          );
+        }
+        // newCount > 3: already sent final notice; no additional email
+      }
+
+      await Promise.allSettled(fanOutPromises);
+      console.log(`[stripe-webhook] invoice.payment_failed → membership=${mem.id} invoice=${invoice.id} attempt=${invoice.attempt_count} failure_count=${newCount}`);
+    } else {
+      // ── Re-delivery of same attempt: idempotent status update only ────────
+      // Do NOT increment failure_count or re-send notifications.
+      await supabase
+        .from('memberships')
+        .update({ status: 'payment_overdue', payment_failed_at: now, updated_at: now })
+        .eq('id', mem.id)
+        .in('status', ['active', 'payment_overdue']);
+      console.log(`[stripe-webhook] invoice.payment_failed: duplicate delivery invoice=${invoice.id} attempt=${attemptCode} — status updated, count not incremented`);
     }
 
-    await Promise.allSettled(fanOutPromises);
-
-    console.log(`[stripe-webhook] invoice.payment_failed → membership=${mem.id} invoice=${invoice.id} attempt=${invoice.attempt_count}`);
     return json({ ok: true });
   }
 

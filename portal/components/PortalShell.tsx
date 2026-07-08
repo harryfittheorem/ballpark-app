@@ -16,6 +16,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
+  badge?: number;
 }
 
 interface NavSection {
@@ -129,6 +130,7 @@ interface PortalShellProps {
   userName?: string;
   locationName?: string;
   isStaff?: boolean;
+  paymentPausedCount?: number;
 }
 
 export function PortalShell({
@@ -138,6 +140,7 @@ export function PortalShell({
   userName,
   locationName,
   isStaff = false,
+  paymentPausedCount = 0,
 }: PortalShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -151,11 +154,21 @@ export function PortalShell({
     setMobileOpen(false);
   }, [pathname]);
 
+  const baseOwnerNav: NavSection[] = role === 'owner' ? OWNER_NAV.map(section => ({
+    ...section,
+    items: section.items.map(item => {
+      if (item.href === '/owner/failed-payments' && paymentPausedCount > 0) {
+        return { ...item, badge: paymentPausedCount };
+      }
+      return item;
+    }),
+  })) : OWNER_NAV;
+
   const sections =
     role === 'owner'
       ? ownerSubRole === 'franchisor'
         ? FRANCHISOR_NAV
-        : OWNER_NAV
+        : baseOwnerNav
       : role === 'coach'
         ? buildCoachNav(isStaff)
         : ADMIN_NAV;
@@ -246,14 +259,21 @@ export function PortalShell({
                 >
                   <item.icon size={16} strokeWidth={2.2} className="flex-shrink-0" />
                   {!collapsed && (
-                    <span
-                      className={[
-                        'text-[13px] whitespace-nowrap',
-                        active ? 'font-bold' : 'font-medium',
-                      ].join(' ')}
-                    >
-                      {item.label}
-                    </span>
+                    <>
+                      <span
+                        className={[
+                          'text-[13px] whitespace-nowrap flex-1',
+                          active ? 'font-bold' : 'font-medium',
+                        ].join(' ')}
+                      >
+                        {item.label}
+                      </span>
+                      {item.badge !== undefined && item.badge > 0 && (
+                        <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[9px] font-bold text-white px-1" style={{ background: '#e74c3c' }}>
+                          {item.badge > 99 ? '99+' : item.badge}
+                        </span>
+                      )}
+                    </>
                   )}
                 </Link>
               );

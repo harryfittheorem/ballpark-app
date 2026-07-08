@@ -4,7 +4,7 @@ import { PortalShell } from '@/components/PortalShell';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { readTenantId, readAppRole, type AppRole } from '@/lib/auth';
-import { getTenantName, getTenantNameBySlug } from '@/lib/supabase/ownerQueries';
+import { getTenantName, getTenantNameBySlug, getPaymentPausedCount } from '@/lib/supabase/ownerQueries';
 
 export const metadata = {
   title: 'Owner Portal — Ballpark',
@@ -37,8 +37,12 @@ export default async function OwnerLayout({ children }: { children: ReactNode })
   const tenantId = readTenantId(session);
 
   let locationName = 'Your Location';
+  let paymentPausedCount = 0;
   if (tenantId) {
-    locationName = await getTenantName(supabase, tenantId);
+    [locationName, paymentPausedCount] = await Promise.all([
+      getTenantName(supabase, tenantId),
+      getPaymentPausedCount(supabase, tenantId),
+    ]);
   } else {
     const slug = session?.user?.user_metadata?.tenant_slug as string | undefined;
     if (slug) {
@@ -59,6 +63,7 @@ export default async function OwnerLayout({ children }: { children: ReactNode })
       email={user?.email ?? null}
       userName={userName}
       locationName={locationName}
+      paymentPausedCount={paymentPausedCount}
     >
       <div style={{ color: '#FAF6E8' }}>
         {children}

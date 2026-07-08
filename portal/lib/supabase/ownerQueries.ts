@@ -132,6 +132,7 @@ export type OwnerCoach = {
 
 export type FailedPayment = {
   id: string;
+  membershipId: string | null;
   member: string;
   parent: string;
   amount: number;
@@ -142,6 +143,8 @@ export type FailedPayment = {
   attempts: number;
   nextAttempt: string;
   source: 'membership' | 'store_order';
+  failureCount: number;
+  isPaused: boolean;
 };
 
 export type RevenueMonth = {
@@ -668,7 +671,7 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
     .select(`
       id, amount_cents, error_code, created_at,
       membership_id,
-      memberships!inner(plan_name, kid_id, family_id,
+      memberships!inner(plan_name, status, payment_failure_count, payment_paused_reason, kid_id, family_id,
         kids!inner(first_name, last_name),
         families!inner(parent_first_name, parent_last_name)
       )
@@ -680,6 +683,9 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
   const membershipRows: FailedPayment[] = (membershipFailures ?? []).map((row, i) => {
     const mem = row.memberships as unknown as {
       plan_name: string;
+      payment_failure_count?: number;
+      payment_paused_reason?: string | null;
+      status?: string;
       kids: { first_name: string; last_name: string | null };
       families: { parent_first_name: string; parent_last_name: string | null };
     };
@@ -687,9 +693,12 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
     const fam = mem.families;
     const failedDate = new Date(row.created_at);
     const nextAttempt = new Date(failedDate.getTime() + 7 * 86_400_000);
+    const failureCount = mem.payment_failure_count ?? 0;
+    const isPaused = mem.status === 'paused' && mem.payment_paused_reason === 'payment_overdue';
 
     return {
       id: row.id,
+      membershipId: row.membership_id ?? null,
       member: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
       parent: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),
       amount: row.amount_cents / 100,
@@ -700,6 +709,8 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
       attempts: i + 1,
       nextAttempt: `${months[nextAttempt.getMonth()]} ${nextAttempt.getDate()}`,
       source: 'membership' as const,
+      failureCount,
+      isPaused,
     };
   });
 
@@ -728,6 +739,7 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
 
     return {
       id: row.id,
+      membershipId: null,
       member: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
       parent: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),
       amount: (row.amount_paid_cents ?? 0) / 100,
@@ -738,6 +750,8 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
       attempts: 1,
       nextAttempt: `${months[nextAttempt.getMonth()]} ${nextAttempt.getDate()}`,
       source: 'store_order' as const,
+      failureCount: 0,
+      isPaused: false,
     };
   });
 
@@ -745,6 +759,20 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
   return [...membershipRows, ...orderRows].sort(
     (a, b) => new Date(b.failedAt).getTime() - new Date(a.failedAt).getTime(),
   );
+}
+
+// ─── Payment-Paused Count (for sidebar badge) ────────────────────────────────
+
+export async function getPaymentPausedCount(supabase: SupabaseClient, tenantId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('memberships')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .eq('status', 'paused')
+    .eq('payment_paused_reason', 'payment_overdue');
+
+  if (error) return 0;
+  return count ?? 0;
 }
 
 // ─── Monthly Revenue ─────────────────────────────────────────────────────────
