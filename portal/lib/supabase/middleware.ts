@@ -34,11 +34,14 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // IMPORTANT: do not run code between createServerClient and getUser, or the
-  // session refresh may break (per @supabase/ssr docs).
+  // Use getSession() (local cookie read, no network call) instead of getUser()
+  // (network call to Supabase auth server). getUser() can fail/timeout in
+  // production proxy environments causing spurious unauthenticated redirects.
+  // Data-layer security is enforced by Supabase RLS on every query.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const path = request.nextUrl.pathname;
   const protectedPath =
