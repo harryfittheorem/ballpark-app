@@ -367,7 +367,10 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
     .eq('tenant_id', tenantId)
     .order('started_at', { ascending: false });
 
-  if (error || !rows) return [];
+  if (error || !rows) {
+    console.error('[getOwnerMembers] query error:', error?.message, '| tenantId:', tenantId);
+    return [];
+  }
 
   const kidIds = [...new Set(rows.map(r => r.kid_id))];
   const membershipIds = rows.map(r => r.id);
