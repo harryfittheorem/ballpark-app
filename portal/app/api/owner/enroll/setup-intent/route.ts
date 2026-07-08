@@ -5,9 +5,10 @@
  * All payment parameters are loaded SERVER-SIDE from the DB using membership_id —
  * the client has no influence over amount, plan type, or connected account.
  *
- *   EFT plans  → SetupIntent (vault card for recurring billing, no charge now)
- *   OTC plans  → PaymentIntent (charge the full plan amount immediately)
- *   OTC + split → PaymentIntent for deposit_amount_cents only
+ *   EFT plans           → SetupIntent (vault card for recurring billing, no charge now)
+ *   OTC plans           → PaymentIntent (charge the full plan amount immediately)
+ *   OTC + split         → PaymentIntent for deposit_amount_cents only
+ *   OTC + deferred      → SetupIntent (vault card, full charge on deferred_charge_date)
  *
  * Body: {
  *   membership_id: string,
@@ -15,6 +16,8 @@
  *   customer_name?: string,
  *   split_deposit_cents?: number,   -- OTC only; deposit amount to charge now
  *   split_due_date?: string,        -- OTC split only; YYYY-MM-DD, 1–90 days out
+ *   deferred?: boolean,             -- OTC only; vault card, charge full amount later
+ *   deferred_charge_date?: string,  -- OTC deferred only; YYYY-MM-DD, 1–90 days out
  * }
  *
  * Returns: {
@@ -24,6 +27,9 @@
  *   is_split: boolean,
  *   split_balance_cents: number | null,
  *   split_due_date: string | null,
+ *   is_deferred: boolean,
+ *   deferred_amount_cents: number | null,
+ *   deferred_charge_date: string | null,
  * }
  */
 import { type NextRequest, NextResponse } from 'next/server';
@@ -61,6 +67,8 @@ export async function POST(req: NextRequest) {
     customer_name?: string;
     split_deposit_cents?: number;
     split_due_date?: string;
+    deferred?: boolean;
+    deferred_charge_date?: string;
   } = {};
   try {
     body = await req.json() as typeof body;
@@ -68,7 +76,7 @@ export async function POST(req: NextRequest) {
     // body optional
   }
 
-  const { membership_id, customer_email, customer_name, split_deposit_cents, split_due_date } = body;
+  const { membership_id, customer_email, customer_name, split_deposit_cents, split_due_date, deferred, deferred_charge_date } = body;
   if (!membership_id) return err(422, 'membership_id required');
 
   const serviceClient = createServiceClient();
@@ -116,6 +124,25 @@ export async function POST(req: NextRequest) {
     validatedDueDate = split_due_date;
   }
 
+  // Validate deferred params (only allowed for OTC, mutually exclusive with split)
+  let isDeferred = false;
+  let validatedDeferredDate: string | null = null;
+
+  if (planType === 'otc' && deferred && !isSplit) {
+    if (!deferred_charge_date) {
+      return err(422, 'deferred_charge_date required when deferred is true');
+    }
+    const deferDate = new Date(deferred_charge_date + 'T00:00:00Z');
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const diffDays = Math.round((deferDate.getTime() - today.getTime()) / 86400000);
+    if (diffDays < 1 || diffDays > 90) {
+      return err(422, 'Deferred charge date must be 1–90 days from today');
+    }
+    isDeferred = true;
+    validatedDeferredDate = deferred_charge_date;
+  }
+
   const primaryLocationId = (
     (membership as { families?: { primary_location_id?: string } }).families
   )?.primary_location_id ?? null;
@@ -159,7 +186,8 @@ export async function POST(req: NextRequest) {
   if (connectedAccountId) stripeHeaders['Stripe-Account'] = connectedAccountId;
 
   let clientSecret: string;
-  const intentType: 'setup' | 'payment' = planType === 'otc' ? 'payment' : 'setup';
+  // Deferred OTC uses a SetupIntent (vault only, charge fires later via cron)
+  const intentType: 'setup' | 'payment' = (planType === 'otc' && !isDeferred) ? 'payment' : 'setup';
 
   if (intentType === 'payment') {
     // OTC: PaymentIntent — charge deposit (split) or full amount (non-split)
@@ -197,12 +225,17 @@ export async function POST(req: NextRequest) {
     }
     clientSecret = piData.client_secret;
   } else {
-    // EFT: SetupIntent — vault card for recurring billing
+    // EFT or deferred OTC: SetupIntent — vault card (no charge now)
     const params = new URLSearchParams({
       usage: 'off_session',
       'payment_method_types[]': 'card',
       'metadata[membership_id]': membership_id,
     });
+    if (isDeferred) {
+      params.append('metadata[is_deferred]', 'true');
+      params.append('metadata[deferred_charge_date]', validatedDeferredDate!);
+      params.append('metadata[deferred_amount_cents]', String(amountCents));
+    }
     if (customer_email) params.append('metadata[customer_email]', customer_email);
     if (customer_name) params.append('metadata[customer_name]', customer_name);
 
@@ -228,5 +261,8 @@ export async function POST(req: NextRequest) {
     is_split: isSplit,
     split_balance_cents: splitBalanceCents,
     split_due_date: validatedDueDate,
+    is_deferred: isDeferred,
+    deferred_amount_cents: isDeferred ? amountCents : null,
+    deferred_charge_date: validatedDeferredDate,
   });
 }

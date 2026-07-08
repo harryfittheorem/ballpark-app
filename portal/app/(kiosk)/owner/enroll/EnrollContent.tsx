@@ -532,6 +532,8 @@ function PaymentForm({
   enrollmentIds,
   splitDepositCents,
   splitDueDate,
+  deferredChargeDate,
+  deferredAmountCents,
   onSuccess,
   onBack,
 }: {
@@ -543,7 +545,9 @@ function PaymentForm({
   enrollmentIds: { familyId: string; kidId: string; membershipId: string } | null;
   splitDepositCents: number | null;
   splitDueDate: string | null;
-  onSuccess: () => void;
+  deferredChargeDate: string | null;
+  deferredAmountCents: number | null;
+  onSuccess: (deferred?: { chargeDate: string; amountCents: number }) => void;
   onBack: () => void;
 }) {
   const stripe = useStripe();
@@ -554,6 +558,7 @@ function PaymentForm({
   const selectedPlan = plans.find(p => p.id === form.planId);
   const isSplit = splitDepositCents != null && splitDueDate != null;
   const splitBalance = isSplit && selectedPlan ? selectedPlan.amount_cents - splitDepositCents! : null;
+  const isDeferred = deferredChargeDate != null && deferredAmountCents != null;
 
   const handleConfirm = async () => {
     if (!stripe || !elements || !enrollmentIds) return;
@@ -618,6 +623,7 @@ function PaymentForm({
         plan_type: selectedPlan?.plan_type ?? 'eft',
         connected_account_id: connectedAccountId,
         ...(isSplit ? { split_deposit_cents: splitDepositCents, split_due_date: splitDueDate } : {}),
+        ...(isDeferred ? { deferred_charge_date: deferredChargeDate } : {}),
       }),
     });
 
@@ -635,7 +641,11 @@ function PaymentForm({
       return;
     }
 
-    onSuccess();
+    onSuccess(
+      isDeferred && deferredChargeDate && deferredAmountCents
+        ? { chargeDate: deferredChargeDate, amountCents: deferredAmountCents }
+        : undefined
+    );
   };
 
   const chargeAmount = isSplit ? splitDepositCents! : (selectedPlan?.amount_cents ?? 0);
@@ -645,17 +655,38 @@ function PaymentForm({
       {selectedPlan && (
         <div style={{
           background: `${brand.gold}14`, border: `1px solid ${brand.goldDeep}`,
-          borderRadius: 8, padding: '12px 16px', marginBottom: isSplit ? 8 : 20,
+          borderRadius: 8, padding: '12px 16px', marginBottom: (isSplit || isDeferred) ? 8 : 20,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: brand.gold }}>{selectedPlan.name}</div>
             <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 2 }}>
-              {isSplit ? 'Split payment — deposit due today' : selectedPlan.plan_type === 'eft' ? 'Monthly EFT autopay' : 'One-time payment'}
+              {isDeferred
+                ? 'Card saved now — charge on future date'
+                : isSplit
+                ? 'Split payment — deposit due today'
+                : selectedPlan.plan_type === 'eft'
+                ? 'Monthly EFT autopay'
+                : 'One-time payment'}
             </div>
           </div>
           <div style={{ fontFamily: fonts.display, fontSize: 20, fontWeight: 700, color: brand.gold }}>
-            ${(chargeAmount / 100).toFixed(2)}
+            {isDeferred ? 'Card only' : `$${(chargeAmount / 100).toFixed(2)}`}
+          </div>
+        </div>
+      )}
+
+      {isDeferred && deferredAmountCents != null && deferredChargeDate && (
+        <div style={{
+          background: brand.surface, border: `1px solid ${brand.goldDeep}`,
+          borderRadius: 8, padding: '10px 16px', marginBottom: 20,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div style={{ fontSize: 12, color: brand.textMuted }}>
+            Full charge on <strong style={{ color: brand.gold }}>{deferredChargeDate}</strong>
+          </div>
+          <div style={{ fontFamily: fonts.display, fontSize: 16, fontWeight: 700, color: brand.gold }}>
+            ${(deferredAmountCents / 100).toFixed(2)}
           </div>
         </div>
       )}
@@ -695,6 +726,8 @@ function PaymentForm({
         >
           {submitting
             ? 'Processing…'
+            : isDeferred
+            ? 'Save Card & Schedule Charge'
             : selectedPlan?.plan_type === 'eft'
             ? 'Authorize & Activate'
             : isSplit
@@ -722,7 +755,7 @@ function Step4({
   plans: MembershipPlan[];
   stripePublishableKey: string | null;
   enrollmentIds: { familyId: string; kidId: string; membershipId: string } | null;
-  onSuccess: () => void;
+  onSuccess: (deferred?: { chargeDate: string; amountCents: number }) => void;
   onBack: () => void;
 }) {
   const selectedPlan = plans.find(p => p.id === form.planId);
@@ -732,7 +765,11 @@ function Step4({
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [depositInput, setDepositInput] = useState('');
   const [dueDateInput, setDueDateInput] = useState('');
-  const [configErrors, setConfigErrors] = useState<{ deposit?: string; dueDate?: string }>({});
+  const [configErrors, setConfigErrors] = useState<{ deposit?: string; dueDate?: string; deferDate?: string }>({});
+
+  // ── Deferred charge state (OTC only, mutually exclusive with split) ────────
+  const [deferEnabled, setDeferEnabled] = useState(false);
+  const [deferDateInput, setDeferDateInput] = useState('');
 
   // ── Stripe state (loaded after config is confirmed) ───────────────────────
   const [phase, setPhase] = useState<'configure' | 'payment'>(isOtc ? 'configure' : 'payment');
@@ -745,10 +782,16 @@ function Step4({
   const [loading, setLoading] = useState(!isOtc); // EFT loads immediately
   const [error, setError] = useState<string | null>(null);
 
+  // ── Deferred OTC charge state (propagated to confirmation) ───────────────
+  const [deferredChargeDate, setDeferredChargeDate] = useState<string | null>(null);
+  const [deferredAmountCents, setDeferredAmountCents] = useState<number | null>(null);
+
   // For EFT: create intent on mount. For OTC: deferred until staff confirm config.
   const initializePayment = useCallback(async (opts: {
     depositCents?: number;
     dueDate?: string;
+    deferred?: boolean;
+    deferredChargeDate?: string;
   }) => {
     if (!stripePublishableKey) {
       setError('Stripe is not configured for this tenant. Contact support to set up payment processing.');
@@ -771,6 +814,8 @@ function Step4({
     };
     if (opts.depositCents != null) body.split_deposit_cents = opts.depositCents;
     if (opts.dueDate) body.split_due_date = opts.dueDate;
+    if (opts.deferred) body.deferred = true;
+    if (opts.deferredChargeDate) body.deferred_charge_date = opts.deferredChargeDate;
 
     try {
       const r = await fetch('/api/owner/enroll/setup-intent', {
@@ -785,6 +830,9 @@ function Step4({
         is_split?: boolean;
         split_balance_cents?: number | null;
         split_due_date?: string | null;
+        is_deferred?: boolean;
+        deferred_amount_cents?: number | null;
+        deferred_charge_date?: string | null;
         error?: string;
       };
       if (data.error || !data.client_secret) {
@@ -801,6 +849,13 @@ function Step4({
       } else {
         setSplitDepositCents(null);
         setSplitDueDate(null);
+      }
+      if (data.is_deferred) {
+        setDeferredChargeDate(data.deferred_charge_date ?? null);
+        setDeferredAmountCents(data.deferred_amount_cents ?? null);
+      } else {
+        setDeferredChargeDate(null);
+        setDeferredAmountCents(null);
       }
       const stripeOpts = data.connected_account_id
         ? { stripeAccount: data.connected_account_id }
@@ -835,6 +890,22 @@ function Step4({
   })();
 
   const handleConfigNext = () => {
+    if (deferEnabled) {
+      const errs: { deferDate?: string } = {};
+      if (!deferDateInput) {
+        errs.deferDate = 'Select a charge date';
+      } else {
+        const d = new Date(deferDateInput + 'T00:00:00Z');
+        const today = new Date();
+        today.setUTCHours(0, 0, 0, 0);
+        const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+        if (diff < 1) errs.deferDate = 'Charge date must be at least tomorrow';
+        else if (diff > 90) errs.deferDate = 'Charge date cannot be more than 90 days out';
+      }
+      if (Object.keys(errs).length > 0) { setConfigErrors(errs); return; }
+      void initializePayment({ deferred: true, deferredChargeDate: deferDateInput });
+      return;
+    }
     if (!splitEnabled) {
       void initializePayment({});
       return;
@@ -902,17 +973,84 @@ function Step4({
           </div>
         </div>
 
+        {/* Charge later toggle */}
+        <div style={{
+          background: brand.surface, border: `1px solid ${deferEnabled ? brand.gold : brand.border}`,
+          borderRadius: 10, padding: '16px 18px', marginBottom: 12,
+          transition: 'border-color 0.2s',
+        }}>
+          <div
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+            onClick={() => {
+              const next = !deferEnabled;
+              setDeferEnabled(next);
+              if (next) setSplitEnabled(false);
+              setConfigErrors({});
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: deferEnabled ? brand.gold : brand.text }}>Charge later</div>
+              <div style={{ fontSize: 12, color: brand.textMuted, marginTop: 2 }}>
+                Save card now and charge the full amount on a future date.
+              </div>
+            </div>
+            <div style={{
+              width: 44, height: 24, borderRadius: 12, flexShrink: 0, marginLeft: 16,
+              background: deferEnabled ? brand.gold : brand.border,
+              position: 'relative', transition: 'background 0.2s',
+            }}>
+              <div style={{
+                position: 'absolute', top: 3, left: deferEnabled ? 23 : 3,
+                width: 18, height: 18, borderRadius: 9, background: deferEnabled ? brand.dark : brand.textMuted,
+                transition: 'left 0.2s',
+              }} />
+            </div>
+          </div>
+
+          {deferEnabled && (
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${brand.border}` }}>
+              <div style={{ maxWidth: 260 }}>
+                <label style={labelStyle}>Charge date *</label>
+                <input
+                  type="date"
+                  min={minDate}
+                  max={maxDate}
+                  value={deferDateInput}
+                  onChange={e => { setDeferDateInput(e.target.value); setConfigErrors(prev => ({ ...prev, deferDate: undefined })); }}
+                  style={{ ...inputStyle, borderColor: configErrors.deferDate ? brand.danger : brand.border }}
+                />
+                {configErrors.deferDate && <div style={errorStyle}>{configErrors.deferDate}</div>}
+              </div>
+              {deferDateInput && (
+                <div style={{
+                  marginTop: 12, padding: '10px 14px', background: `${brand.gold}14`,
+                  borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  border: `1px solid ${brand.goldDeep}`,
+                }}>
+                  <div style={{ fontSize: 12, color: brand.textMuted }}>Full amount charged on {deferDateInput}</div>
+                  <div style={{ fontFamily: fonts.display, fontSize: 16, fontWeight: 700, color: brand.gold }}>
+                    ${(totalCents / 100).toFixed(2)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Split toggle */}
         <div style={{
-          background: brand.surface, border: `1px solid ${brand.border}`,
+          background: brand.surface, border: `1px solid ${splitEnabled ? brand.gold : brand.border}`,
           borderRadius: 10, padding: '16px 18px', marginBottom: 20,
+          transition: 'border-color 0.2s',
+          opacity: deferEnabled ? 0.45 : 1,
+          pointerEvents: deferEnabled ? 'none' : 'auto',
         }}>
           <div
             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
             onClick={() => { setSplitEnabled(v => !v); setConfigErrors({}); }}
           >
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: brand.text }}>Split payment</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: splitEnabled ? brand.gold : brand.text }}>Split payment</div>
               <div style={{ fontSize: 12, color: brand.textMuted, marginTop: 2 }}>
                 Collect a deposit today and schedule the balance for a future date.
               </div>
@@ -1071,6 +1209,8 @@ function Step4({
           enrollmentIds={enrollmentIds}
           splitDepositCents={splitDepositCents}
           splitDueDate={splitDueDate}
+          deferredChargeDate={deferredChargeDate}
+          deferredAmountCents={deferredAmountCents}
           onSuccess={onSuccess}
           onBack={() => {
             if (isOtc) { setPhase('configure'); setClientSecret(null); setStripePromise(null); }
@@ -1085,13 +1225,14 @@ function Step4({
 // ── Confirmation ───────────────────────────────────────────────────────────
 
 function ConfirmationScreen({
-  form, plans, onEnrollAnother, onViewMember, memberId,
+  form, plans, onEnrollAnother, onViewMember, memberId, deferredCharge,
 }: {
   form: FormData;
   plans: MembershipPlan[];
   onEnrollAnother: () => void;
   onViewMember: () => void;
   memberId: string | null;
+  deferredCharge: { chargeDate: string; amountCents: number } | null;
 }) {
   const selectedPlan = plans.find(p => p.id === form.planId);
 
@@ -1106,7 +1247,7 @@ function ConfirmationScreen({
         <CheckCircle size={36} color={brand.success} strokeWidth={2} />
       </div>
       <h2 style={{ fontFamily: fonts.display, fontSize: 28, fontWeight: 700, color: brand.text, marginBottom: 8 }}>
-        Enrollment Complete!
+        {deferredCharge ? 'Card Saved!' : 'Enrollment Complete!'}
       </h2>
       <p style={{ fontSize: 15, color: brand.textLight, marginBottom: 4 }}>
         <strong style={{ color: brand.gold }}>{form.kidFirstName}{form.kidLastName ? ' ' + form.kidLastName : ''}</strong> is now enrolled.
@@ -1116,10 +1257,40 @@ function ConfirmationScreen({
           Plan: {selectedPlan.name} · ${(selectedPlan.amount_cents / 100).toFixed(2)}{selectedPlan.plan_type === 'eft' ? '/mo' : ' one-time'}
         </p>
       )}
-      <p style={{ fontSize: 13, color: brand.textMuted, marginBottom: 28 }}>
-        A welcome email has been sent to <strong style={{ color: brand.text }}>{form.parentEmail}</strong>.
-      </p>
-      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+
+      {deferredCharge ? (
+        <div style={{
+          margin: '20px auto 20px',
+          maxWidth: 400,
+          background: `${brand.gold}14`,
+          border: `1px solid ${brand.goldDeep}`,
+          borderRadius: 10,
+          padding: '16px 20px',
+          textAlign: 'left',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 18 }}>💳</span>
+            <span style={{ fontFamily: fonts.display, fontSize: 13, fontWeight: 700, color: brand.gold, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+              Payment Scheduled
+            </span>
+          </div>
+          <p style={{ fontSize: 13, color: brand.textLight, margin: '0 0 6px' }}>
+            Card saved. Full payment of{' '}
+            <strong style={{ color: brand.gold }}>${(deferredCharge.amountCents / 100).toFixed(2)}</strong>{' '}
+            will be charged on{' '}
+            <strong style={{ color: brand.gold }}>{deferredCharge.chargeDate}</strong>.
+          </p>
+          <p style={{ fontSize: 12, color: brand.textMuted, margin: 0 }}>
+            A confirmation email has been sent to {form.parentEmail}.
+          </p>
+        </div>
+      ) : (
+        <p style={{ fontSize: 13, color: brand.textMuted, marginBottom: 28 }}>
+          A welcome email has been sent to <strong style={{ color: brand.text }}>{form.parentEmail}</strong>.
+        </p>
+      )}
+
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginTop: deferredCharge ? 8 : 0 }}>
         <OButton variant="secondary" icon={UserPlus} onClick={onEnrollAnother}>
           Enroll Another
         </OButton>
@@ -1150,6 +1321,7 @@ export function EnrollContent({ waiver, stripePublishableKey, locations }: Props
   const [enrollmentIds, setEnrollmentIds] = useState<{
     familyId: string; kidId: string; membershipId: string;
   } | null>(null);
+  const [deferredCharge, setDeferredCharge] = useState<{ chargeDate: string; amountCents: number } | null>(null);
 
   // Auto-select the only location when there is exactly one
   useEffect(() => {
@@ -1215,12 +1387,16 @@ export function EnrollContent({ waiver, stripePublishableKey, locations }: Props
     setSubmitting(false);
   }, [form, waiver]);
 
-  const handlePaymentSuccess = () => setStep(5);
+  const handlePaymentSuccess = (deferred?: { chargeDate: string; amountCents: number }) => {
+    setDeferredCharge(deferred ?? null);
+    setStep(5);
+  };
 
   const handleEnrollAnother = () => {
     const defaultLocationId = locations.length === 1 ? locations[0].id : '';
     setForm({ ...INITIAL_FORM, locationId: defaultLocationId });
     setEnrollmentIds(null);
+    setDeferredCharge(null);
     setSubmitError(null);
     setStep(1);
   };
@@ -1329,6 +1505,7 @@ export function EnrollContent({ waiver, stripePublishableKey, locations }: Props
               form={form}
               plans={plans}
               memberId={enrollmentIds?.familyId ?? null}
+              deferredCharge={deferredCharge}
               onEnrollAnother={handleEnrollAnother}
               onViewMember={handleViewMember}
             />

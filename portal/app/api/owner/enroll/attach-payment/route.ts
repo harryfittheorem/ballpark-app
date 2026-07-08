@@ -29,6 +29,7 @@
  *   intent_type: 'setup' | 'payment',
  *   split_deposit_cents?: number,   -- OTC split only
  *   split_due_date?: string,        -- OTC split only (YYYY-MM-DD)
+ *   deferred_charge_date?: string,  -- OTC deferred only (YYYY-MM-DD)
  * }
  *
  * Returns: { ok: true, activated: true } or { error: string } with 4xx/5xx
@@ -49,6 +50,84 @@ function err(status: number, message: string) {
 }
 
 type CardDetail = { brand: string; last4: string; exp_month: number; exp_year: number };
+
+async function sendPaymentScheduledEmail(opts: {
+  parentEmail: string;
+  parentFirstName: string;
+  kidFirstName: string;
+  kidLastName: string | null;
+  planName: string;
+  amountCents: number;
+  chargeDate: string;
+  cardBrand: string | null;
+  cardLast4: string | null;
+}) {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) return;
+
+  const resendFrom = process.env.RESEND_FROM_EMAIL ?? 'noreply@infinitehitting.com';
+  const amountLabel = `$${(opts.amountCents / 100).toFixed(2)}`;
+  const cardNote = opts.cardBrand && opts.cardLast4
+    ? `<span style="color:#A8A3A0;font-size:12px;">${opts.cardBrand.toUpperCase()} ending ···· ${opts.cardLast4}</span>`
+    : '';
+
+  const emailHtml = `
+    <div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;background:#1C1B1A;color:#FAF6E8;border-radius:10px;padding:32px;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <span style="font-size:28px;font-weight:900;letter-spacing:3px;color:#F1E5AD;font-family:Oswald,Impact,sans-serif;">BALLPARK</span>
+      </div>
+      <h1 style="font-size:22px;font-weight:700;color:#F1E5AD;margin:0 0 8px;">Payment Scheduled, ${opts.parentFirstName}!</h1>
+      <p style="color:#B0ABA8;margin:0 0 20px;">Your card has been saved. Here's a summary of your upcoming charge:</p>
+      <div style="background:#2D2B2A;border-radius:8px;padding:16px;margin-bottom:16px;">
+        <div style="margin-bottom:12px;">
+          <span style="color:#A8A3A0;font-size:12px;">ATHLETE</span><br/>
+          <strong style="font-size:15px;">${opts.kidFirstName}${opts.kidLastName ? ' ' + opts.kidLastName : ''}</strong>
+        </div>
+        <div style="margin-bottom:12px;">
+          <span style="color:#A8A3A0;font-size:12px;">PLAN</span><br/>
+          <strong style="font-size:15px;">${opts.planName}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <span style="color:#A8A3A0;font-size:12px;">AMOUNT DUE</span><br/>
+            <strong style="font-size:18px;color:#F1E5AD;">${amountLabel}</strong>
+          </div>
+          <div style="text-align:right;">
+            <span style="color:#A8A3A0;font-size:12px;">CHARGE DATE</span><br/>
+            <strong style="font-size:15px;">${opts.chargeDate}</strong>
+          </div>
+        </div>
+      </div>
+      <div style="background:#1A2820;border:1px solid #2A5040;border-radius:8px;padding:14px;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:16px;">💳</span>
+          <div>
+            <span style="color:#4CAF8A;font-size:12px;font-weight:700;">CARD SAVED</span><br/>
+            <span style="color:#FAF6E8;font-size:13px;">Your card will be charged automatically on ${opts.chargeDate}.</span>
+            ${cardNote ? `<br/>${cardNote}` : ''}
+          </div>
+        </div>
+      </div>
+      <p style="color:#B0ABA8;font-size:13px;margin:0 0 20px;">Download the Ballpark app to track progress, book sessions, and stay connected with coaches.</p>
+      <div style="margin:0 0 16px;text-align:center;">
+        <a href="https://apps.apple.com/app/ballpark" style="background:#F1E5AD;color:#2D2B2A;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;margin:0 6px 12px;">Download on iOS</a>
+        <a href="https://play.google.com/store/apps/ballpark" style="background:#F1E5AD;color:#2D2B2A;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;margin:0 6px 12px;">Get on Android</a>
+      </div>
+      <p style="color:#A8A3A0;font-size:11px;margin:24px 0 0;text-align:center;">Infinite Hitting Baseball Academy</p>
+    </div>
+  `;
+
+  await fetch(RESEND_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}` },
+    body: JSON.stringify({
+      from: resendFrom,
+      to: opts.parentEmail,
+      subject: `Payment of ${amountLabel} scheduled for ${opts.chargeDate} — ${opts.planName}`,
+      html: emailHtml,
+    }),
+  }).catch(e => console.warn('[attach-payment] payment scheduled email failed:', e));
+}
 
 async function sendWelcomeEmail(opts: {
   parentEmail: string;
@@ -145,6 +224,7 @@ export async function POST(req: NextRequest) {
     intent_type?: string;
     split_deposit_cents?: number;
     split_due_date?: string;
+    deferred_charge_date?: string;
   };
   try {
     body = await req.json() as typeof body;
@@ -152,7 +232,7 @@ export async function POST(req: NextRequest) {
     return err(400, 'Invalid JSON body');
   }
 
-  const { family_id, membership_id, stripe_intent_id, split_deposit_cents, split_due_date } = body;
+  const { family_id, membership_id, stripe_intent_id, split_deposit_cents, split_due_date, deferred_charge_date } = body;
   if (!family_id) return err(422, 'family_id required');
   if (!membership_id) return err(422, 'membership_id required');
   if (!stripe_intent_id) return err(422, 'stripe_intent_id required');
@@ -198,6 +278,19 @@ export async function POST(req: NextRequest) {
     splitBalanceCents = amountCents - split_deposit_cents;
   }
 
+  // Validate deferred params server-side (OTC + deferred, mutually exclusive with split)
+  let isDeferred = false;
+  if (planType === 'otc' && deferred_charge_date && !isSplit) {
+    const deferDate = new Date(deferred_charge_date + 'T00:00:00Z');
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const diffDays = Math.round((deferDate.getTime() - today.getTime()) / 86400000);
+    if (diffDays < 1 || diffDays > 90) {
+      return err(422, 'Deferred charge date must be 1–90 days from today');
+    }
+    isDeferred = true;
+  }
+
   // ── Load family details + derive location-scoped Stripe account ──────────
 
   const { data: familyRow } = await serviceClient
@@ -241,12 +334,13 @@ export async function POST(req: NextRequest) {
   if (connectedAccountId) stripeHeaders['Stripe-Account'] = connectedAccountId;
 
   // ── Derive expected intent type from DB plan_type (authoritative) ─────────
-  const expectedIntentType: 'setup' | 'payment' = planType === 'otc' ? 'payment' : 'setup';
+  // Deferred OTC uses a SetupIntent (card vault only, charge fires via cron later)
+  const expectedIntentType: 'setup' | 'payment' = (planType === 'otc' && !isDeferred) ? 'payment' : 'setup';
 
   const intentIdPrefix = stripe_intent_id.split('_')[0];
   const validPrefix = expectedIntentType === 'payment' ? 'pi' : 'seti';
   if (intentIdPrefix !== validPrefix) {
-    return err(422, `Stripe intent ID prefix "${intentIdPrefix}" does not match plan type "${planType}"`);
+    return err(422, `Stripe intent ID prefix "${intentIdPrefix}" does not match plan type "${planType}"${isDeferred ? ' (deferred)' : ''}`);
   }
 
   let cardDetails: CardDetail | null = null;
@@ -339,7 +433,40 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', family_id);
 
-    // Activate membership — fail hard on error
+    if (isDeferred && deferred_charge_date) {
+      // ── Deferred OTC: vault complete — schedule full charge + activate membership ──
+      const { error: rpcErr } = await serviceClient
+        .rpc('activate_membership_with_scheduled_charge', {
+          p_membership_id: membership_id,
+          p_tenant_id:     tenantId,
+          p_family_id:     family_id,
+          p_amount_cents:  amountCents,
+          p_charge_date:   deferred_charge_date,
+        });
+
+      if (rpcErr) {
+        console.error('[enroll/attach-payment] deferred OTC RPC error:', rpcErr.message);
+        return err(500, `Could not activate membership and schedule deferred charge: ${rpcErr.message}`);
+      }
+      console.log(`[enroll/attach-payment] deferred OTC activation + scheduled_charges — amount=${amountCents} due=${deferred_charge_date}`);
+
+      // Send "Payment scheduled" email (not welcome email) and return early
+      await sendPaymentScheduledEmail({
+        parentEmail: (familyRow as { parent_email: string }).parent_email ?? '',
+        parentFirstName: (familyRow as { parent_first_name: string }).parent_first_name ?? '',
+        kidFirstName: kidRow ? (kidRow as { first_name: string }).first_name : '',
+        kidLastName: kidRow ? ((kidRow as { last_name: string | null }).last_name ?? null) : null,
+        planName,
+        amountCents,
+        chargeDate: deferred_charge_date,
+        cardBrand: cardDetails?.brand ?? null,
+        cardLast4: cardDetails?.last4 ?? null,
+      });
+
+      return NextResponse.json({ ok: true, activated: true });
+    }
+
+    // ── EFT: Activate membership via activate endpoint ─────────────────────
     const host = req.headers.get('host') ?? 'localhost:3000';
     const proto = process.env.NODE_ENV === 'production' ? 'https' : 'http';
     const activateRes = await fetch(`${proto}://${host}/api/memberships/activate`, {
