@@ -1417,6 +1417,8 @@ export type MemberDetail = OwnerMember & {
   weeklyTotal: number | null;
   /** EFT limited: Monday (YYYY-MM-DD) that starts the current weekly period. Null otherwise. */
   weeklyPeriodStart: string | null;
+  /** Day of month (1–28) used as the billing anchor. Null for OTC memberships. */
+  billingAnchorDay: number | null;
 };
 
 export async function getMemberDetail(
@@ -1667,6 +1669,7 @@ export async function getMemberDetail(
     weeklyPeriodStart:   mem.plan_type === 'eft'
       ? ((mem.weekly_period_start as string | null) ?? null)
       : null,
+    billingAnchorDay:    (mem.billing_anchor_day as number | null) ?? null,
   };
 }
 

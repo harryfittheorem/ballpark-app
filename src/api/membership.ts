@@ -14,6 +14,7 @@ export type MembershipRow = {
   status: 'active' | 'paused' | 'cancelled' | 'payment_overdue';
   amount_cents: number;
   billing_anchor_day: number | null;
+  next_billing_at: string | null;
   stripe_subscription_id: string | null;
   pause_start: string | null;
   pause_end: string | null;
@@ -33,7 +34,7 @@ export type MembershipPlan = {
 export async function fetchActiveMembership(familyId: string): Promise<MembershipRow | null> {
   const { data, error } = await supabase
     .from('memberships')
-    .select('id, plan_name, plan_type, status, amount_cents, billing_anchor_day, stripe_subscription_id, pause_start, pause_end, contract_url, payment_failed_at')
+    .select('id, plan_name, plan_type, status, amount_cents, billing_anchor_day, next_billing_at, stripe_subscription_id, pause_start, pause_end, contract_url, payment_failed_at')
     .eq('family_id', familyId)
     .in('status', ['active', 'paused', 'payment_overdue'])
     .order('started_at', { ascending: false })

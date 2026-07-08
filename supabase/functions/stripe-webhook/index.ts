@@ -702,6 +702,93 @@ Deno.serve(async (req) => {
       })
       .eq('id', mem.id);
 
+    // ── One-time billing date revert ────────────────────────────────────────
+    // If a staff member made a one-time billing date shift (change_type='one_time'),
+    // we deferred the next invoice via trial_end to the target day. Now that the
+    // invoice has been paid, revert billing_cycle_anchor back to the original
+    // anchor day so future charges fall on the original schedule.
+    try {
+      const { data: pendingChange } = await supabase
+        .from('membership_billing_date_changes')
+        .select('id, old_anchor_day')
+        .eq('membership_id', mem.id)
+        .eq('change_type', 'one_time')
+        .is('reverted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (pendingChange) {
+        const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
+        const famRevert = mem.families as unknown as { primary_location_id: string };
+        const { data: locRevert } = await supabase
+          .from('locations')
+          .select('stripe_account_id')
+          .eq('id', famRevert.primary_location_id)
+          .maybeSingle();
+
+        const { data: memSub } = await supabase
+          .from('memberships')
+          .select('stripe_subscription_id')
+          .eq('id', mem.id)
+          .maybeSingle();
+
+        if (stripeKey && locRevert?.stripe_account_id && memSub?.stripe_subscription_id) {
+          const oldDay = pendingChange.old_anchor_day as number;
+          const now = new Date();
+          const revertDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), oldDay));
+          if (revertDate.getTime() <= now.getTime()) {
+            revertDate.setUTCMonth(revertDate.getUTCMonth() + 1);
+          }
+          const revertTs = Math.floor(revertDate.getTime() / 1000);
+
+          const enc = (k: string, v: string | number) =>
+            `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`;
+
+          const revertRes = await fetch(
+            `https://api.stripe.com/v1/subscriptions/${memSub.stripe_subscription_id as string}`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${stripeKey}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Stripe-Version': '2024-06-20',
+                'Stripe-Account': locRevert.stripe_account_id as string,
+              },
+              body: [
+                enc('billing_cycle_anchor', revertTs),
+                enc('proration_behavior', 'none'),
+              ].join('&'),
+            },
+          );
+
+          if (!revertRes.ok) {
+            const errBody = await revertRes.json().catch(() => ({})) as { error?: { message?: string } };
+            console.error(
+              `[stripe-webhook] one-time revert Stripe call failed (${revertRes.status}): ${errBody.error?.message ?? 'unknown error'} — membership=${mem.id}`,
+            );
+          } else {
+            await supabase
+              .from('memberships')
+              .update({
+                billing_anchor_day: oldDay,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', mem.id);
+
+            await supabase
+              .from('membership_billing_date_changes')
+              .update({ reverted_at: new Date().toISOString() })
+              .eq('id', pendingChange.id);
+
+            console.log(`[stripe-webhook] one-time billing date reverted: membership=${mem.id} anchor_day=${oldDay}`);
+          }
+        }
+      }
+    } catch (revertErr) {
+      console.error('[stripe-webhook] one-time revert error (non-fatal):', revertErr);
+    }
+
     console.log(`[stripe-webhook] invoice.payment_succeeded → membership=${mem.id} invoice=${invoice.id} amount=${invoice.amount_paid}`);
     return json({ ok: true });
   }
@@ -914,6 +1001,37 @@ Deno.serve(async (req) => {
       .eq('id', mem.id);
 
     console.log(`[stripe-webhook] subscription.deleted → membership=${mem.id} cancelled`);
+    return json({ ok: true });
+  }
+
+  // ── customer.subscription.updated ─────────────────────────────────────────
+  // Fired whenever a subscription is modified (billing anchor change, trial end,
+  // plan change, etc.). We sync next_billing_at so the mobile app reflects the
+  // correct next charge date immediately after a billing date change.
+  if (event.type === 'customer.subscription.updated') {
+    const sub = event.data.object as {
+      id: string;
+      current_period_end?: number;
+      status?: string;
+    };
+
+    const { data: memUpdated } = await supabase
+      .from('memberships')
+      .select('id')
+      .eq('stripe_subscription_id', sub.id)
+      .maybeSingle();
+
+    if (memUpdated && sub.current_period_end) {
+      await supabase
+        .from('memberships')
+        .update({
+          next_billing_at: new Date(sub.current_period_end * 1000).toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', memUpdated.id);
+      console.log(`[stripe-webhook] subscription.updated → synced next_billing_at membership=${memUpdated.id}`);
+    }
+
     return json({ ok: true });
   }
 

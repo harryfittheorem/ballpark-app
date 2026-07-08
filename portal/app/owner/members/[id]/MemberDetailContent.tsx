@@ -7,7 +7,7 @@ import {
   CheckCircle, XCircle, CreditCard, Star, Zap, TrendingUp,
   AlertCircle, PauseCircle, PlayCircle, Package, Phone, Mail,
 } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { MemberDetail } from '@/lib/supabase/ownerQueries';
 import type { DemoMemberDetail } from './demoMemberDetails';
 
@@ -415,6 +415,211 @@ function EftWeeklyCreditsSection({ member }: { member: MemberDetail }) {
         {monday && (
           <div style={{ fontSize: 10, color: brand.textMuted, marginTop: 8 }}>
             Week starting {monday} · Resets every Monday.
+          </div>
+        )}
+      </OCard>
+    </div>
+  );
+}
+
+function ChangeBillingDateSection({ member }: { member: MemberDetail }) {
+  const [open, setOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<number>(member.billingAnchorDay ?? 1);
+  const [changeType, setChangeType] = useState<'permanent' | 'one_time'>('permanent');
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [result, setResult] = useState<{ effectiveDate: string; changeType: string; newDay: number } | null>(null);
+  const selectRef = useRef<HTMLSelectElement>(null);
+
+  const handleOpen = useCallback(() => {
+    setSelectedDay(member.billingAnchorDay ?? 1);
+    setChangeType('permanent');
+    setSaveErr(null);
+    setResult(null);
+    setOpen(true);
+  }, [member.billingAnchorDay]);
+
+  const handleSubmit = useCallback(async () => {
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      const res = await fetch(`/api/owner/memberships/${member.id}/billing-date`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_anchor_day: selectedDay, change_type: changeType }),
+      });
+      const data = await res.json() as {
+        ok?: boolean;
+        effective_date?: string;
+        change_type?: string;
+        new_anchor_day?: number;
+        error?: string;
+      };
+      if (!res.ok || !data.ok) {
+        setSaveErr(data.error ?? `Error ${res.status}`);
+      } else {
+        setResult({
+          effectiveDate: data.effective_date ?? '',
+          changeType: data.change_type ?? changeType,
+          newDay: data.new_anchor_day ?? selectedDay,
+        });
+        setOpen(false);
+      }
+    } catch (err) {
+      setSaveErr(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setSaving(false);
+    }
+  }, [member.id, selectedDay, changeType]);
+
+  if (member.planType !== 'eft' || !member.stripeSubscriptionId) return null;
+
+  const currentDay = member.billingAnchorDay;
+  const currentDayLabel = currentDay ? `${currentDay}${['th','st','nd','rd'][((currentDay % 100 - 20) % 10)] ?? ['th','st','nd','rd'][currentDay % 100] ?? 'th'} of each month` : '—';
+
+  if (result) {
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const d = new Date(result.effectiveDate + 'T00:00:00');
+    const dateStr = isNaN(d.getTime()) ? result.effectiveDate : `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    const newDayOrdinal = `${result.newDay}${['th','st','nd','rd'][((result.newDay % 100 - 20) % 10)] ?? ['th','st','nd','rd'][result.newDay % 100] ?? 'th'}`;
+    const origDay = member.billingAnchorDay ?? result.newDay;
+    const origDayOrdinal = `${origDay}${['th','st','nd','rd'][((origDay % 100 - 20) % 10)] ?? ['th','st','nd','rd'][origDay % 100] ?? 'th'}`;
+    return (
+      <div>
+        <SectionHeader title="Billing Date" />
+        <OCard style={{ padding: 14, borderLeft: `4px solid ${brand.success}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Calendar size={16} color={brand.success} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: brand.success }}>
+              Billing date updated
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 6, lineHeight: 1.6 }}>
+            {result.changeType === 'permanent'
+              ? `Billing date changed to the ${newDayOrdinal} of each month, effective ${dateStr}.`
+              : `Next payment moved to ${dateStr}. Future payments will continue on the ${origDayOrdinal} as normal.`}
+          </div>
+          <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 4 }}>
+            A confirmation email has been sent to the parent.
+          </div>
+        </OCard>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <SectionHeader title="Billing Date" />
+      <OCard style={{ padding: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <Calendar size={14} color={brand.gold} />
+          <span style={{ fontSize: 11, color: brand.textMuted, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 1 }}>
+            Current anchor
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: brand.text, marginLeft: 4 }}>
+            {currentDayLabel}
+          </span>
+        </div>
+
+        {!open ? (
+          <button
+            onClick={handleOpen}
+            style={{
+              width: '100%', padding: '7px 0', borderRadius: 6,
+              border: `1px solid ${brand.border}`, background: 'transparent',
+              color: brand.textMuted, fontSize: 11, fontWeight: 700,
+              cursor: 'pointer', letterSpacing: 0.5,
+            }}
+          >
+            Change billing date
+          </button>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' as const, marginBottom: 4 }}>
+                New billing day (1–28)
+              </div>
+              <select
+                ref={selectRef}
+                value={selectedDay}
+                onChange={e => setSelectedDay(Number(e.target.value))}
+                style={{
+                  width: '100%', padding: '7px 10px', borderRadius: 6,
+                  border: `1px solid ${brand.border}`, background: brand.surfaceAlt,
+                  color: brand.text, fontSize: 13, fontWeight: 700, outline: 'none',
+                }}
+              >
+                {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' as const, marginBottom: 4 }}>
+                Applies to
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {(['permanent', 'one_time'] as const).map(opt => (
+                  <label
+                    key={opt}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}
+                  >
+                    <input
+                      type="radio"
+                      name="change_type"
+                      value={opt}
+                      checked={changeType === opt}
+                      onChange={() => setChangeType(opt)}
+                      style={{ marginTop: 2, accentColor: brand.gold }}
+                    />
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: brand.text }}>
+                        {opt === 'permanent' ? 'All future payments' : 'Next payment only'}
+                      </div>
+                      <div style={{ fontSize: 10, color: brand.textMuted }}>
+                        {opt === 'permanent'
+                          ? 'Permanently shifts the billing anchor to the new day.'
+                          : 'Moves just the next charge; billing returns to the current day after that.'}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {saveErr && (
+              <div style={{
+                padding: '8px 10px', background: brand.dangerBg, borderRadius: 6,
+                fontSize: 12, color: brand.danger,
+              }}>
+                {saveErr}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <OButton
+                variant="gold"
+                size="sm"
+                onClick={handleSubmit}
+                disabled={saving}
+                style={{ flex: 1 }}
+              >
+                {saving ? 'Saving…' : 'Confirm change'}
+              </OButton>
+              <OButton
+                variant="secondary"
+                size="sm"
+                onClick={() => { setOpen(false); setSaveErr(null); }}
+                disabled={saving}
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </OButton>
+            </div>
+            <div style={{ fontSize: 10, color: brand.textMuted }}>
+              A confirmation email will be sent to the parent.
+            </div>
           </div>
         )}
       </OCard>
@@ -1081,6 +1286,13 @@ export function MemberDetailContent({ member: m }: Props) {
           {/* Weekly credit usage — EFT limited members only */}
           {!demo && (
             <EftWeeklyCreditsSection member={m as MemberDetail} />
+          )}
+
+          {/* Billing date change — EFT with active subscription only */}
+          {!demo && (m as MemberDetail).planType === 'eft' &&
+           (m as MemberDetail).stripeSubscriptionId &&
+           (m as MemberDetail).subscriptionStatus !== 'paused' && (
+            <ChangeBillingDateSection member={m as MemberDetail} />
           )}
 
           {/* Subscription (Phase 3) */}

@@ -27,7 +27,11 @@ function formatDate(isoDate: string): string {
   return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-function nextBillingDate(anchorDay: number | null): string {
+function nextBillingDate(anchorDay: number | null, nextBillingAt: string | null): string {
+  if (nextBillingAt) {
+    const d = new Date(nextBillingAt);
+    if (!isNaN(d.getTime()) && d > new Date()) return formatDate(d.toISOString().slice(0, 10));
+  }
   if (!anchorDay) return '—';
   const now = new Date();
   const thisMonth = new Date(now.getFullYear(), now.getMonth(), anchorDay);
@@ -124,7 +128,7 @@ export default function MembershipDetailsScreen() {
               value={
                 isPaused
                   ? (membership.pause_end ? `Resumes ${formatDate(membership.pause_end)}` : '—')
-                  : nextBillingDate(membership.billing_anchor_day)
+                  : nextBillingDate(membership.billing_anchor_day, membership.next_billing_at)
               }
             />
           )}

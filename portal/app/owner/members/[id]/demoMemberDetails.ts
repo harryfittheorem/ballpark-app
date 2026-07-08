@@ -67,6 +67,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 4, 280, 'failed', 'Visa ·0001'), pmt('p2', 35, 280, 'paid', 'Visa ·0001')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d01: {
     id: 'd01', kidId: 'k01', name: 'Jake Martinez', age: '12U', parent: 'Carlos Martinez',
@@ -85,6 +86,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 5, 280, 'paid', 'Visa ·4242'), pmt('p2', 35, 280, 'paid', 'Visa ·4242'), pmt('p3', 65, 280, 'paid', 'Visa ·4242')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d02: {
     id: 'd02', kidId: 'k02', name: 'Tyler Johnson', age: '14U', parent: 'Brad Johnson',
@@ -103,6 +105,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 10, 450, 'paid', 'Visa ·8891'), pmt('p2', 40, 450, 'paid', 'Visa ·8891')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d03: {
     id: 'd03', kidId: 'k03', name: 'Marcus Williams', age: '10U', parent: 'Darius Williams',
@@ -121,6 +124,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 3, 280, 'failed', 'Visa ·3310'), pmt('p2', 33, 280, 'paid', 'Visa ·3310')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d04: {
     id: 'd04', kidId: 'k04', name: 'Ryan Chen', age: '11U', parent: 'David Chen',
@@ -138,6 +142,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 21, 640, 'paid', 'Visa ·5544')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d05: {
     id: 'd05', kidId: 'k05', name: 'Ethan Brooks', age: '13U', parent: 'Kevin Brooks',
@@ -156,6 +161,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 8, 120, 'paid', 'MC ·7731'), pmt('p2', 38, 120, 'paid', 'MC ·7731')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d06: {
     id: 'd06', kidId: 'k06', name: 'Noah Patel', age: '11U', parent: 'Raj Patel',
@@ -173,6 +179,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 5, 280, 'paid', 'Visa ·6612'), pmt('p2', 35, 280, 'paid', 'Visa ·6612')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d07: {
     id: 'd07', kidId: 'k07', name: 'Logan Scott', age: '9U', parent: 'James Scott',
@@ -189,6 +196,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 30, 320, 'paid', 'Visa ·9901')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d08: {
     id: 'd08', kidId: 'k08', name: 'Aiden Torres', age: '12U', parent: 'Maria Torres',
@@ -206,6 +214,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 7, 450, 'paid', 'Visa ·2278'), pmt('p2', 37, 450, 'paid', 'Visa ·2278')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d09: {
     id: 'd09', kidId: 'k09', name: 'Caleb Nguyen', age: '13U', parent: 'Linh Nguyen',
@@ -223,6 +232,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 6, 280, 'paid', 'MC ·4488'), pmt('p2', 36, 280, 'paid', 'MC ·4488')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d10: {
     id: 'd10', kidId: 'k10', name: 'Jaxon Rivera', age: '10U', parent: 'Sofia Rivera',
@@ -239,6 +249,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 8, 120, 'paid', 'Visa ·1190'), pmt('p2', 38, 120, 'paid', 'Visa ·1190')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d11: {
     id: 'd11', kidId: 'k11', name: 'Owen Murphy', age: '15U', parent: 'Patrick Murphy',
@@ -255,6 +266,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 40, 225, 'refunded', 'Visa ·7723')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d12: {
     id: 'd12', kidId: 'k12', name: 'Liam Perez', age: '11U', parent: 'Ana Perez',
@@ -271,6 +283,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 25, 480, 'paid', 'MC ·5567')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d13: {
     id: 'd13', kidId: 'k13', name: 'Zane Harris', age: '14U', parent: 'Terry Harris',
@@ -287,6 +300,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 8, 280, 'paid', 'Visa ·8843'), pmt('p2', 38, 280, 'paid', 'Visa ·8843')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d14: {
     id: 'd14', kidId: 'k14', name: 'Carter Simmons', age: '12U', parent: 'Gina Simmons',
@@ -303,6 +317,7 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 55, 320, 'failed', 'Visa ·4422')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
   d15: {
     id: 'd15', kidId: 'k15', name: 'Hunter Davis', age: '13U', parent: 'Todd Davis',
@@ -319,5 +334,6 @@ export const DEMO_MEMBER_DETAILS: Record<string, DemoMemberDetail> = {
     ],
     recentPayments: [pmt('p1', 11, 120, 'paid', 'Visa ·3355'), pmt('p2', 41, 120, 'paid', 'Visa ·3355')],
     cancelAt: null,
+    billingAnchorDay: null,
   },
 };
