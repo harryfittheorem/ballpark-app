@@ -7,8 +7,8 @@ echo "[post-merge] npm install --legacy-peer-deps"
 npm install --legacy-peer-deps --no-audit --no-fund
 
 if [ -d "supabase/migrations" ] && ls supabase/migrations/*.sql >/dev/null 2>&1; then
-  echo "[post-merge] supabase db push (non-interactive)"
-  npx --yes supabase db push --yes || {
+  echo "[post-merge] supabase db push (non-interactive, --include-all)"
+  npx --yes supabase db push --yes --include-all || {
     echo "[post-merge] WARN: supabase db push failed (may be no new migrations or env not configured); continuing"
   }
 fi
@@ -85,6 +85,7 @@ if [ -d "supabase/functions" ]; then
   deploy_fn request-membership-upgrade
   deploy_fn resume-paused-memberships
   deploy_fn enforce-payment-pause
+  deploy_fn collect-scheduled-charges
   deploy_fn process-membership-cancellations
   deploy_fn notify-cancel-requested
   deploy_fn notify-waiver-signed

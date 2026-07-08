@@ -16,20 +16,26 @@ CREATE TABLE IF NOT EXISTS public.membership_billing_date_changes (
 ALTER TABLE public.membership_billing_date_changes ENABLE ROW LEVEL SECURITY;
 
 -- Owners/admins may read all changes for memberships in their tenant.
-CREATE POLICY "owner_read_billing_date_changes"
-  ON public.membership_billing_date_changes
-  FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1
-      FROM public.memberships m
-      WHERE m.id = membership_billing_date_changes.membership_id
-        AND m.tenant_id = (
-          (current_setting('request.jwt.claims', true))::jsonb ->> 'tenant_id'
-        )::uuid
-    )
-  );
+DO $$
+BEGIN
+  CREATE POLICY "owner_read_billing_date_changes"
+    ON public.membership_billing_date_changes
+    FOR SELECT
+    TO authenticated
+    USING (
+      EXISTS (
+        SELECT 1
+        FROM public.memberships m
+        WHERE m.id = membership_billing_date_changes.membership_id
+          AND m.tenant_id = (
+            (current_setting('request.jwt.claims', true))::jsonb ->> 'tenant_id'
+          )::uuid
+      )
+    );
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END;
+$$;
 
 -- Service role bypasses RLS (used by webhook + portal API).
 -- No explicit policy needed — service_role always bypasses.
