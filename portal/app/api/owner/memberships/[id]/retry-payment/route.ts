@@ -206,6 +206,25 @@ export async function POST(
     return err(502, msg);
   }
 
+  // Finalizing a $0 invoice (e.g. fully offset by customer balance credit)
+  // auto-marks it paid under charge_automatically — calling /pay afterward
+  // would then fail with "invoice already paid" even though nothing is
+  // actually wrong. Check status first and short-circuit in that case.
+  const { ok: checkOk, data: checkData } = await stripeGet(
+    `invoices/${invoiceId}`,
+    stripeKey,
+    stripeAccountId,
+  );
+  if (checkOk && checkData.status === 'paid') {
+    console.log(`[retry-payment] membership=${membershipId} invoice=${invoiceId} already paid (no charge required)`);
+    return NextResponse.json({
+      ok: true,
+      invoice_id: invoiceId,
+      status: 'paid',
+      message: `Invoice ${invoiceId} was already paid (no balance due).`,
+    });
+  }
+
   const { ok: payOk, data: payData } = await stripePost(
     `invoices/${invoiceId}/pay`,
     {},
