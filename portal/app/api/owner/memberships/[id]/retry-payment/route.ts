@@ -110,10 +110,26 @@ async function resolveInvoiceToPay(
     }
   }
 
-  // 3. No outstanding invoice — create one, then finalize it
+  // 3. No outstanding invoice — create one, then finalize it.
+  // Stripe requires `customer` on invoice creation (subscription alone is not
+  // sufficient), so look it up from the subscription first.
+  const { ok: subOk, data: subData } = await stripeGet(
+    `subscriptions/${encodeURIComponent(subId)}`,
+    secretKey,
+    stripeAccountId,
+  );
+  if (!subOk) {
+    const msg = (subData.error as { message?: string } | undefined)?.message ?? 'Stripe error';
+    throw new Error(`Failed to look up subscription ${subId}: ${msg}`);
+  }
+  const customerId = subData.customer as string | undefined;
+  if (!customerId) {
+    throw new Error(`Subscription ${subId} has no associated customer`);
+  }
+
   const { ok: createOk, data: createData } = await stripePost(
     'invoices',
-    { subscription: subId, auto_advance: 'false' },
+    { subscription: subId, customer: customerId, auto_advance: 'false' },
     secretKey,
     stripeAccountId,
   );
