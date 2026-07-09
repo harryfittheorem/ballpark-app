@@ -5,13 +5,373 @@ import { OButton, PageHeader, SectionHeader, OCard, Chip } from '@/components/ow
 import {
   Calendar, MessageCircle, Edit2, Activity, Clock,
   CheckCircle, XCircle, CreditCard, Star, Zap, TrendingUp,
-  AlertCircle, PauseCircle, PlayCircle, Package, Phone, Mail,
+  AlertCircle, PauseCircle, PlayCircle, Package, Phone, Mail, X,
 } from 'lucide-react';
 import { useState, useCallback, useRef } from 'react';
-import type { MemberDetail } from '@/lib/supabase/ownerQueries';
+import type { MemberDetail, BookingFormOptions } from '@/lib/supabase/ownerQueries';
 import type { DemoMemberDetail } from './demoMemberDetails';
 
-type Props = { member: MemberDetail | DemoMemberDetail };
+type Props = { member: MemberDetail | DemoMemberDetail; bookingOptions: BookingFormOptions };
+
+const modalInputStyle: React.CSSProperties = {
+  width: '100%', padding: '9px 12px', border: `1px solid ${brand.border}`,
+  borderRadius: 7, fontSize: 13, color: brand.text, background: brand.surface,
+  fontFamily: fonts.body, outline: 'none', boxSizing: 'border-box',
+};
+
+const modalLabelStyle: React.CSSProperties = {
+  fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5,
+  textTransform: 'uppercase', marginBottom: 5, display: 'block',
+};
+
+function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ width: 480, maxHeight: '90vh', overflowY: 'auto', background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: `1px solid ${brand.border}` }}>
+          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>{title}</div>
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+            <X size={16} color={brand.textMuted} />
+          </button>
+        </div>
+        <div style={{ padding: 24 }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function MessageModal({ member, onClose }: { member: MemberDetail | DemoMemberDetail; onClose: () => void }) {
+  const [subject, setSubject] = useState(`A message from Infinite Hitting about ${member.name}`);
+  const [messageText, setMessageText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageText.trim()) return;
+    setSending(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/owner/members/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parentEmail: member.parentEmail,
+          parentName: member.parent,
+          kidName: member.name,
+          subject,
+          message: messageText,
+        }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? `Error ${res.status}`);
+      } else {
+        setSent(true);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <ModalShell title="Message Sent" onClose={onClose}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: brand.success, fontWeight: 700, fontSize: 13 }}>
+          <CheckCircle size={16} />
+          Message sent to {member.parentEmail}
+        </div>
+        <div style={{ marginTop: 16, textAlign: 'right' }}>
+          <OButton variant="secondary" onClick={onClose}>Close</OButton>
+        </div>
+      </ModalShell>
+    );
+  }
+
+  return (
+    <ModalShell title={`Message ${member.parent}`} onClose={onClose}>
+      <form onSubmit={handleSend}>
+        <div style={{ marginBottom: 16 }}>
+          <label style={modalLabelStyle}>To</label>
+          <div style={{ fontSize: 13, color: brand.text }}>{member.parentEmail || '—'}</div>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={modalLabelStyle}>Subject</label>
+          <input required style={modalInputStyle} value={subject} onChange={e => setSubject(e.target.value)} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={modalLabelStyle}>Message</label>
+          <textarea
+            required
+            rows={5}
+            style={{ ...modalInputStyle, resize: 'vertical', fontFamily: fonts.body }}
+            value={messageText}
+            onChange={e => setMessageText(e.target.value)}
+            placeholder={`Write a note to ${member.parent}...`}
+          />
+        </div>
+        {error && (
+          <div style={{ padding: '8px 10px', background: brand.dangerBg, borderRadius: 6, fontSize: 12, color: brand.danger, marginBottom: 12 }}>
+            {error}
+          </div>
+        )}
+        {!member.parentEmail && (
+          <div style={{ fontSize: 11, color: brand.textMuted, marginBottom: 12 }}>
+            No email on file for this family — sending will fail until one is added.
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <OButton type="button" variant="secondary" onClick={onClose} disabled={sending}>Cancel</OButton>
+          <OButton type="submit" variant="gold" disabled={sending || !member.parentEmail}>{sending ? 'Sending…' : 'Send Message'}</OButton>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+function EditMemberModal({ member, onClose, onSaved }: {
+  member: MemberDetail | DemoMemberDetail;
+  onClose: () => void;
+  onSaved: (updates: { parentFirstName: string; parentLastName: string | null; parentEmail: string; parentPhone: string | null; program: string }) => void;
+}) {
+  const nameParts = member.parent.split(' ');
+  const [firstName, setFirstName] = useState(member.parentFirstName ?? nameParts[0] ?? '');
+  const [lastName, setLastName] = useState(member.parentLastName ?? nameParts.slice(1).join(' ') ?? '');
+  const [email, setEmail] = useState(member.parentEmail ?? '');
+  const [phone, setPhone] = useState(member.parentPhone ?? '');
+  const [program, setProgram] = useState(member.program);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isDemoMember = isDemo(member);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    if (isDemoMember) {
+      onSaved({ parentFirstName: firstName, parentLastName: lastName || null, parentEmail: email, parentPhone: phone || null, program });
+      setSaving(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/owner/memberships/${member.id}/update`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parent_first_name: firstName,
+          parent_last_name: lastName || null,
+          parent_email: email,
+          parent_phone: phone || null,
+          plan_name: program,
+        }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? `Error ${res.status}`);
+      } else {
+        onSaved({ parentFirstName: firstName, parentLastName: lastName || null, parentEmail: email, parentPhone: phone || null, program });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ModalShell title={`Edit ${member.name}`} onClose={onClose}>
+      <form onSubmit={handleSave}>
+        {isDemoMember && (
+          <div style={{ fontSize: 11, color: brand.textMuted, marginBottom: 12, fontStyle: 'italic' }}>
+            This is a demo record — changes will not be saved.
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div>
+            <label style={modalLabelStyle}>Parent First Name</label>
+            <input required style={modalInputStyle} value={firstName} onChange={e => setFirstName(e.target.value)} />
+          </div>
+          <div>
+            <label style={modalLabelStyle}>Parent Last Name</label>
+            <input style={modalInputStyle} value={lastName} onChange={e => setLastName(e.target.value)} />
+          </div>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={modalLabelStyle}>Parent Email</label>
+          <input required type="email" style={modalInputStyle} value={email} onChange={e => setEmail(e.target.value)} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={modalLabelStyle}>Parent Phone</label>
+          <input style={modalInputStyle} value={phone} onChange={e => setPhone(e.target.value)} placeholder="(312) 555-0100" />
+        </div>
+        <div style={{ marginBottom: 24 }}>
+          <label style={modalLabelStyle}>Program</label>
+          <input required style={modalInputStyle} value={program} onChange={e => setProgram(e.target.value)} />
+        </div>
+        {error && (
+          <div style={{ padding: '8px 10px', background: brand.dangerBg, borderRadius: 6, fontSize: 12, color: brand.danger, marginBottom: 12 }}>
+            {error}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <OButton type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</OButton>
+          <OButton type="submit" variant="gold" disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</OButton>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+const HOURS = ['9 AM','10 AM','11 AM','12 PM','1 PM','2 PM','3 PM','4 PM','5 PM','6 PM','7 PM','8 PM','9 PM','10 PM'];
+
+function BookSessionModal({ member, bookingOptions, onClose }: {
+  member: MemberDetail | DemoMemberDetail;
+  bookingOptions: BookingFormOptions;
+  onClose: () => void;
+}) {
+  const { coaches, sessionTypes, locations } = bookingOptions;
+  const [coachId, setCoachId] = useState(coaches[0]?.id ?? '');
+  const [sessionTypeId, setSessionTypeId] = useState(sessionTypes[0]?.id ?? '');
+  const [locationId, setLocationId] = useState(locations[0]?.id ?? '');
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [startHour, setStartHour] = useState('9');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const kidId = (member as MemberDetail).kidId;
+  const isDemoMember = isDemo(member);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!kidId || !coachId || !sessionTypeId || !locationId) return;
+    const [y, mo, d] = date.split('-').map(Number);
+    const hourNum = parseInt(startHour, 10);
+    const start = new Date(y, mo - 1, d, hourNum, 0, 0, 0);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/owner/bookings/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kid_id: kidId,
+          coach_id: coachId,
+          session_type_id: sessionTypeId,
+          location_id: locationId,
+          scheduled_start: start.toISOString(),
+          scheduled_end: end.toISOString(),
+          notes: notes.trim() || null,
+        }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? `Error ${res.status}`);
+      } else {
+        setSaved(true);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (saved) {
+    return (
+      <ModalShell title="Session Booked" onClose={onClose}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: brand.success, fontWeight: 700, fontSize: 13 }}>
+          <CheckCircle size={16} />
+          Booked for {member.name} on {date} at {HOURS[parseInt(startHour, 10) - 9] ?? `${startHour}:00`}
+        </div>
+        <div style={{ marginTop: 16, textAlign: 'right' }}>
+          <OButton variant="secondary" onClick={onClose}>Close</OButton>
+        </div>
+      </ModalShell>
+    );
+  }
+
+  return (
+    <ModalShell title={`Book Session for ${member.name}`} onClose={onClose}>
+      {isDemoMember ? (
+        <div style={{ fontSize: 13, color: brand.textMuted }}>
+          This is a demo record and cannot have real bookings created for it.
+          <div style={{ marginTop: 16, textAlign: 'right' }}>
+            <OButton variant="secondary" onClick={onClose}>Close</OButton>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSave}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={modalLabelStyle}>Session Type</label>
+              <select required style={{ ...modalInputStyle, appearance: 'auto' }} value={sessionTypeId} onChange={e => setSessionTypeId(e.target.value)}>
+                {sessionTypes.length === 0 && <option value="">No session types configured</option>}
+                {sessionTypes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={modalLabelStyle}>Coach</label>
+              <select required style={{ ...modalInputStyle, appearance: 'auto' }} value={coachId} onChange={e => setCoachId(e.target.value)}>
+                {coaches.length === 0 && <option value="">No coaches available</option>}
+                {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={modalLabelStyle}>Date</label>
+              <input type="date" required style={modalInputStyle} value={date} onChange={e => setDate(e.target.value)} />
+            </div>
+            <div>
+              <label style={modalLabelStyle}>Start Time</label>
+              <select style={{ ...modalInputStyle, appearance: 'auto' }} value={startHour} onChange={e => setStartHour(e.target.value)}>
+                {HOURS.map((h, i) => <option key={h} value={String(9 + i)}>{h}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={modalLabelStyle}>Location</label>
+            <select required style={{ ...modalInputStyle, appearance: 'auto' }} value={locationId} onChange={e => setLocationId(e.target.value)}>
+              {locations.length === 0 && <option value="">No locations configured</option>}
+              {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            <label style={modalLabelStyle}>Notes (optional)</label>
+            <textarea rows={3} style={{ ...modalInputStyle, resize: 'vertical', fontFamily: fonts.body }} value={notes} onChange={e => setNotes(e.target.value)} />
+          </div>
+          {error && (
+            <div style={{ padding: '8px 10px', background: brand.dangerBg, borderRadius: 6, fontSize: 12, color: brand.danger, marginBottom: 12 }}>
+              {error}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <OButton type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</OButton>
+            <OButton type="submit" variant="gold" disabled={saving || coaches.length === 0 || sessionTypes.length === 0 || locations.length === 0}>
+              {saving ? 'Booking…' : 'Book Session'}
+            </OButton>
+          </div>
+        </form>
+      )}
+    </ModalShell>
+  );
+}
 
 function isDemo(m: MemberDetail | DemoMemberDetail): m is DemoMemberDetail {
   return 'bestVeloMph' in m;
@@ -1021,7 +1381,10 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
   );
 }
 
-export function MemberDetailContent({ member: m }: Props) {
+export function MemberDetailContent({ member: initialMember, bookingOptions }: Props) {
+  const [m, setM] = useState(initialMember);
+  const [activeModal, setActiveModal] = useState<'message' | 'edit' | 'book' | null>(null);
+
   const demo = isDemo(m) ? m : null;
   const mo = demo ? demo.memberForMonths : monthsAgo(m.joinedDate);
 
@@ -1039,12 +1402,37 @@ export function MemberDetailContent({ member: m }: Props) {
         subtitle={`${m.age} · ${m.program} · Member for ${mo} months · ${m.bookingCount} total sessions · LTV $${m.lifetime.toLocaleString()}`}
         actions={
           <>
-            <OButton variant="secondary" icon={MessageCircle}>Message</OButton>
-            <OButton variant="secondary" icon={Edit2}>Edit</OButton>
-            <OButton variant="gold" icon={Calendar}>Book Session</OButton>
+            <OButton variant="secondary" icon={MessageCircle} onClick={() => setActiveModal('message')}>Message</OButton>
+            <OButton variant="secondary" icon={Edit2} onClick={() => setActiveModal('edit')}>Edit</OButton>
+            <OButton variant="gold" icon={Calendar} onClick={() => setActiveModal('book')}>Book Session</OButton>
           </>
         }
       />
+
+      {activeModal === 'message' && (
+        <MessageModal member={m} onClose={() => setActiveModal(null)} />
+      )}
+      {activeModal === 'edit' && (
+        <EditMemberModal
+          member={m}
+          onClose={() => setActiveModal(null)}
+          onSaved={updates => {
+            setM(prev => ({
+              ...prev,
+              parent: [updates.parentFirstName, updates.parentLastName].filter(Boolean).join(' '),
+              parentFirstName: updates.parentFirstName,
+              parentLastName: updates.parentLastName,
+              parentEmail: updates.parentEmail,
+              parentPhone: updates.parentPhone ?? '',
+              program: updates.program,
+            }));
+            setActiveModal(null);
+          }}
+        />
+      )}
+      {activeModal === 'book' && (
+        <BookSessionModal member={m} bookingOptions={bookingOptions} onClose={() => setActiveModal(null)} />
+      )}
 
       <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
         {/* ── Left column ── */}

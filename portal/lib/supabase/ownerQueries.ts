@@ -1422,7 +1422,61 @@ export type ScheduledChargeRow = {
   failure_reason: string | null;
 };
 
+export type BookingFormCoach = { id: string; name: string };
+export type BookingFormSessionType = { id: string; name: string; category: string };
+export type BookingFormLocation = { id: string; name: string };
+
+export type BookingFormOptions = {
+  coaches: BookingFormCoach[];
+  sessionTypes: BookingFormSessionType[];
+  locations: BookingFormLocation[];
+};
+
+export async function getBookingFormOptions(
+  supabase: SupabaseClient,
+  tenantId: string,
+): Promise<BookingFormOptions> {
+  const [coachesRes, sessionTypesRes, locationsRes] = await Promise.all([
+    supabase
+      .from('coaches')
+      .select('id, first_name, last_name')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .order('first_name'),
+    supabase
+      .from('session_types')
+      .select('id, name, type_category')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .order('name'),
+    supabase
+      .from('locations')
+      .select('id, name')
+      .eq('tenant_id', tenantId)
+      .order('name'),
+  ]);
+
+  const coaches: BookingFormCoach[] = (coachesRes.data ?? []).map(c => ({
+    id: c.id as string,
+    name: [c.first_name, c.last_name].filter(Boolean).join(' '),
+  }));
+  const sessionTypes: BookingFormSessionType[] = (sessionTypesRes.data ?? []).map(s => ({
+    id: s.id as string,
+    name: s.name as string,
+    category: s.type_category as string,
+  }));
+  const locations: BookingFormLocation[] = (locationsRes.data ?? []).map(l => ({
+    id: l.id as string,
+    name: l.name as string,
+  }));
+
+  return { coaches, sessionTypes, locations };
+}
+
 export type MemberDetail = OwnerMember & {
+  familyId: string;
+  parentFirstName: string;
+  parentLastName: string | null;
   bookingCount: number;
   hittraxSessionCount: number;
   pointsBalance: number;
@@ -1674,6 +1728,9 @@ export async function getMemberDetail(
   return {
     id: mem.id,
     kidId: kid.id,
+    familyId: mem.family_id as string,
+    parentFirstName: fam.parent_first_name,
+    parentLastName: fam.parent_last_name ?? null,
     name: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
     age: kid.age_group ?? '—',
     parent: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),

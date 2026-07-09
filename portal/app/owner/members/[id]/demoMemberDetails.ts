@@ -5,8 +5,12 @@ export type DemoMemberDetail = Omit<MemberDetail,
   'pauseStart' | 'pauseEnd' | 'pausedAt' |
   'cardLast4' | 'cardBrand' | 'cardExpMonth' | 'cardExpYear' |
   'sessionsRemaining' | 'sessionsTotal' |
-  'weeklySessionsUsed' | 'weeklyTotal' | 'weeklyPeriodStart'
+  'weeklySessionsUsed' | 'weeklyTotal' | 'weeklyPeriodStart' |
+  'familyId' | 'parentFirstName' | 'parentLastName'
 > & {
+  familyId?: string;
+  parentFirstName?: string;
+  parentLastName?: string | null;
   memberForMonths: number;
   bestVeloMph: number;
   homeworkScore: number;
