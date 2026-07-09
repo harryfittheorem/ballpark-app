@@ -38,12 +38,12 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { readAppRole, readTenantId } from '@/lib/auth';
+import { buildEmailSender, sendResendEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const STRIPE_VERSION = '2024-06-20';
-const RESEND_API = 'https://api.resend.com/emails';
 
 function err(status: number, message: string) {
   return NextResponse.json({ error: message }, { status });
@@ -61,11 +61,12 @@ async function sendPaymentScheduledEmail(opts: {
   chargeDate: string;
   cardBrand: string | null;
   cardLast4: string | null;
+  businessName: string;
+  replyToEmail: string | null;
 }) {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return;
 
-  const resendFrom = process.env.RESEND_FROM_EMAIL ?? 'noreply@infinitehitting.com';
   const amountLabel = `$${(opts.amountCents / 100).toFixed(2)}`;
   const cardNote = opts.cardBrand && opts.cardLast4
     ? `<span style="color:#A8A3A0;font-size:12px;">${opts.cardBrand.toUpperCase()} ending ···· ${opts.cardLast4}</span>`
@@ -117,16 +118,15 @@ async function sendPaymentScheduledEmail(opts: {
     </div>
   `;
 
-  await fetch(RESEND_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}` },
-    body: JSON.stringify({
-      from: resendFrom,
-      to: opts.parentEmail,
-      subject: `Payment of ${amountLabel} scheduled for ${opts.chargeDate} — ${opts.planName}`,
-      html: emailHtml,
-    }),
-  }).catch(e => console.warn('[attach-payment] payment scheduled email failed:', e));
+  const sender = buildEmailSender({ businessName: opts.businessName, replyToEmail: opts.replyToEmail });
+  const result = await sendResendEmail({
+    to: opts.parentEmail,
+    subject: `Payment of ${amountLabel} scheduled for ${opts.chargeDate} — ${opts.planName}`,
+    text: `Payment of ${amountLabel} scheduled for ${opts.chargeDate} — ${opts.planName}`,
+    html: emailHtml,
+    ...sender,
+  }).catch(e => ({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+  if (!result.ok) console.warn('[attach-payment] payment scheduled email failed:', result.error);
 }
 
 async function sendWelcomeEmail(opts: {
@@ -141,11 +141,12 @@ async function sendWelcomeEmail(opts: {
   resetLink: string | null;
   splitBalanceCents?: number | null;
   splitDueDate?: string | null;
+  businessName: string;
+  replyToEmail: string | null;
 }) {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return;
 
-  const resendFrom = process.env.RESEND_FROM_EMAIL ?? 'noreply@infinitehitting.com';
   const depositPaid = opts.splitBalanceCents != null
     ? `$${(opts.amountCents / 100).toFixed(2)} deposit`
     : opts.amountCents > 0
@@ -190,16 +191,15 @@ async function sendWelcomeEmail(opts: {
     </div>
   `;
 
-  await fetch(RESEND_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}` },
-    body: JSON.stringify({
-      from: resendFrom,
-      to: opts.parentEmail,
-      subject: `Welcome to Infinite Hitting, ${opts.parentFirstName}! Your membership is active.`,
-      html: emailHtml,
-    }),
-  }).catch(e => console.warn('[attach-payment] welcome email failed:', e));
+  const sender = buildEmailSender({ businessName: opts.businessName, replyToEmail: opts.replyToEmail });
+  const result = await sendResendEmail({
+    to: opts.parentEmail,
+    subject: `Welcome to Infinite Hitting, ${opts.parentFirstName}! Your membership is active.`,
+    text: `Welcome to Infinite Hitting, ${opts.parentFirstName}! Your membership is active.`,
+    html: emailHtml,
+    ...sender,
+  }).catch(e => ({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+  if (!result.ok) console.warn('[attach-payment] welcome email failed:', result.error);
 }
 
 export async function POST(req: NextRequest) {
@@ -305,17 +305,26 @@ export async function POST(req: NextRequest) {
   const primaryLocationId = (familyRow as { primary_location_id?: string }).primary_location_id ?? null;
 
   let connectedAccountId: string | null = null;
+  let locationReplyToEmail: string | null = null;
   if (primaryLocationId) {
     const { data: location } = await serviceClient
       .from('locations')
-      .select('stripe_account_id, stripe_onboarding_status')
+      .select('stripe_account_id, stripe_onboarding_status, email')
       .eq('id', primaryLocationId)
       .single();
-    const loc = location as { stripe_account_id?: string; stripe_onboarding_status?: string } | null;
+    const loc = location as { stripe_account_id?: string; stripe_onboarding_status?: string; email?: string | null } | null;
     if (loc?.stripe_onboarding_status === 'connected') {
       connectedAccountId = loc.stripe_account_id ?? null;
     }
+    locationReplyToEmail = loc?.email ?? null;
   }
+
+  const { data: tenantRow } = await serviceClient
+    .from('tenants')
+    .select('name')
+    .eq('id', tenantId)
+    .single();
+  const businessName = (tenantRow as { name?: string } | null)?.name ?? 'Your facility';
 
   if (!connectedAccountId) {
     return err(422, 'Stripe account not configured for this location. Complete Stripe Connect onboarding before enrolling members.');
@@ -461,6 +470,8 @@ export async function POST(req: NextRequest) {
         chargeDate: deferred_charge_date,
         cardBrand: cardDetails?.brand ?? null,
         cardLast4: cardDetails?.last4 ?? null,
+        businessName,
+        replyToEmail: locationReplyToEmail,
       });
 
       return NextResponse.json({ ok: true, activated: true });
@@ -682,6 +693,8 @@ export async function POST(req: NextRequest) {
     resetLink,
     splitBalanceCents: isSplit ? splitBalanceCents : null,
     splitDueDate: isSplit ? split_due_date : null,
+    businessName,
+    replyToEmail: locationReplyToEmail,
   });
 
   return NextResponse.json({ ok: true, activated: true });

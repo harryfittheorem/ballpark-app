@@ -34,9 +34,9 @@
 // =============================================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
 const STRIPE_VERSION = '2024-06-20';
-const RESEND_API = 'https://api.resend.com/emails';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -49,30 +49,39 @@ async function sendEmail(opts: {
   to: string;
   subject: string;
   html: string;
-  resendKey: string;
-  resendFrom: string;
+  businessName?: string | null;
+  replyToEmail?: string | null;
 }) {
-  try {
-    const res = await fetch(RESEND_API, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${opts.resendKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: opts.resendFrom,
-        to: opts.to,
-        subject: opts.subject,
-        html: opts.html,
-      }),
-    });
-    if (!res.ok) {
-      const t = await res.text();
-      console.error(`[collect-scheduled-charges] Email failed ${res.status}: ${t}`);
-    }
-  } catch (e) {
-    console.error('[collect-scheduled-charges] Email exception:', e);
+  const sender = buildEmailSender({ businessName: opts.businessName, replyToEmail: opts.replyToEmail });
+  const result = await sendBrandedEmail({
+    to: opts.to,
+    subject: opts.subject,
+    html: opts.html,
+    text: opts.subject,
+    ...sender,
+  });
+  if (!result.ok) {
+    console.error(`[collect-scheduled-charges] Email failed: ${result.error}`);
   }
+}
+
+async function resolveSender(
+  supabase: ReturnType<typeof createClient>,
+  tenantId: string | null | undefined,
+  locationId: string | null | undefined,
+): Promise<{ businessName: string | null; replyToEmail: string | null }> {
+  const [tenantRes, locationRes] = await Promise.all([
+    tenantId
+      ? supabase.from('tenants').select('name').eq('id', tenantId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    locationId
+      ? supabase.from('locations').select('email').eq('id', locationId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  return {
+    businessName: (tenantRes.data as { name: string } | null)?.name ?? null,
+    replyToEmail: (locationRes.data as { email: string | null } | null)?.email ?? null,
+  };
 }
 
 function receiptEmailHtml(opts: {
@@ -175,7 +184,6 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
   const resendKey = Deno.env.get('RESEND_API_KEY');
-  const resendFrom = Deno.env.get('RESEND_FROM_EMAIL') ?? 'noreply@infinitehitting.com';
 
   if (!stripeKey) {
     console.error('[collect-scheduled-charges] STRIPE_SECRET_KEY not set');
@@ -192,8 +200,8 @@ Deno.serve(async (req) => {
     const { data: upcoming } = await supabase
       .from('scheduled_charges')
       .select(`
-        id, amount_cents, charge_date, membership_id,
-        families!inner(parent_email, parent_first_name, parent_last_name),
+        id, amount_cents, charge_date, membership_id, tenant_id,
+        families!inner(parent_email, parent_first_name, parent_last_name, primary_location_id),
         memberships!inner(plan_name)
       `)
       .eq('status', 'pending')
@@ -204,9 +212,11 @@ Deno.serve(async (req) => {
         parent_email: string;
         parent_first_name: string;
         parent_last_name: string | null;
+        primary_location_id: string | null;
       };
       const mem = charge.memberships as unknown as { plan_name: string };
       const parentName = [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' ');
+      const { businessName, replyToEmail } = await resolveSender(supabase, charge.tenant_id, fam.primary_location_id);
 
       await sendEmail({
         to: fam.parent_email,
@@ -217,8 +227,8 @@ Deno.serve(async (req) => {
           planName: mem.plan_name,
           chargeDate: charge.charge_date,
         }),
-        resendKey,
-        resendFrom,
+        businessName,
+        replyToEmail,
       });
     }
   }
@@ -301,6 +311,7 @@ Deno.serve(async (req) => {
       // 4. Send failure email
       if (resendKey) {
         const parentName2 = [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' ');
+        const { businessName, replyToEmail } = await resolveSender(supabase, charge.tenant_id, fam.primary_location_id);
         await sendEmail({
           to: fam.parent_email,
           subject: `Balance payment failed — action required`,
@@ -310,8 +321,8 @@ Deno.serve(async (req) => {
             planName: mem.plan_name,
             failureReason: reason,
           }),
-          resendKey,
-          resendFrom,
+          businessName,
+          replyToEmail,
         });
       }
 
@@ -430,6 +441,7 @@ Deno.serve(async (req) => {
 
       // Send receipt email
       if (resendKey) {
+        const { businessName, replyToEmail } = await resolveSender(supabase, charge.tenant_id, fam.primary_location_id);
         await sendEmail({
           to: fam.parent_email,
           subject: `Payment received — $${(charge.amount_cents / 100).toFixed(2)}`,
@@ -439,8 +451,8 @@ Deno.serve(async (req) => {
             planName: mem.plan_name,
             chargeDate: charge.charge_date,
           }),
-          resendKey,
-          resendFrom,
+          businessName,
+          replyToEmail,
         });
       }
 

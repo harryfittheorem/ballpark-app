@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { readAppRole } from '@/lib/auth';
+import { readAppRole, readTenantId } from '@/lib/auth';
+import { getTenantName } from '@/lib/supabase/ownerQueries';
+import { buildEmailSender, sendResendEmail } from '@/lib/email';
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -31,12 +33,14 @@ export async function POST(req: Request) {
   }
 
   const resendKey = process.env.RESEND_API_KEY;
-  const resendFrom = process.env.RESEND_FROM_EMAIL ?? 'noreply@infinitehitting.com';
 
   if (!resendKey) {
     console.warn('[send-renewal-reminder] RESEND_API_KEY not configured — skipping email delivery');
     return NextResponse.json({ skipped: true });
   }
+
+  const tenantId = readTenantId(session);
+  const businessName = tenantId ? await getTenantName(supabase, tenantId) : 'Your facility';
 
   const hasExpiry  = !!expiresAtLabel;
   const hasBalance = sessionsRemaining != null;
@@ -73,21 +77,11 @@ export async function POST(req: Request) {
     </div>
   `;
 
-  const sendRes = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${resendKey}`,
-    },
-    body: JSON.stringify({ from: resendFrom, to: parentEmail, subject, html }),
-  });
+  const sender = buildEmailSender({ businessName });
+  const result = await sendResendEmail({ to: parentEmail, subject, text: subject, html, ...sender });
 
-  if (!sendRes.ok) {
-    const err = await sendRes.json().catch(() => ({})) as { message?: string };
-    return NextResponse.json(
-      { error: `Email delivery failed: ${err.message ?? sendRes.statusText}` },
-      { status: 502 },
-    );
+  if (!result.ok) {
+    return NextResponse.json({ error: `Email delivery failed: ${result.error}` }, { status: 502 });
   }
 
   return NextResponse.json({ success: true });

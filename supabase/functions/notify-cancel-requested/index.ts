@@ -22,11 +22,11 @@
 // =============================================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
 const SUPABASE_URL            = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY          = Deno.env.get("RESEND_API_KEY") ?? "";
-const RESEND_FROM_EMAIL       = Deno.env.get("RESEND_FROM_EMAIL") ?? "onboarding@resend.dev";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -48,27 +48,23 @@ async function sendResendEmail(opts: {
   to: string;
   subject: string;
   html: string;
+  businessName?: string | null;
+  replyToEmail?: string | null;
 }): Promise<void> {
   if (!RESEND_API_KEY) {
     console.warn("[notify-cancel-requested] RESEND_API_KEY not set — skipping email");
     return;
   }
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: RESEND_FROM_EMAIL,
-      to: [opts.to],
-      subject: opts.subject,
-      html: opts.html,
-    }),
+  const sender = buildEmailSender({ businessName: opts.businessName, replyToEmail: opts.replyToEmail });
+  const result = await sendBrandedEmail({
+    to: opts.to,
+    subject: opts.subject,
+    text: opts.subject,
+    html: opts.html,
+    ...sender,
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.error(`[notify-cancel-requested] Resend error ${res.status}: ${body.slice(0, 300)}`);
+  if (!result.ok) {
+    console.error(`[notify-cancel-requested] Resend error: ${result.error}`);
   }
 }
 
@@ -109,8 +105,8 @@ Deno.serve(async (req) => {
   const { data: mem, error: memErr } = await supabase
     .from("memberships")
     .select(`
-      id, plan_name, cancel_requested_at, cancel_effective_at,
-      families!inner(parent_email, parent_first_name)
+      id, plan_name, cancel_requested_at, cancel_effective_at, tenant_id,
+      families!inner(parent_email, parent_first_name, primary_location_id)
     `)
     .eq("id", membership_id)
     .maybeSingle();
@@ -124,7 +120,18 @@ Deno.serve(async (req) => {
     return json({ ok: true, skipped: "not_found" });
   }
 
-  const fam = mem.families as unknown as { parent_email: string; parent_first_name: string };
+  const fam = mem.families as unknown as { parent_email: string; parent_first_name: string; primary_location_id: string | null };
+
+  let businessName: string | null = null;
+  let replyToEmail: string | null = null;
+  if (mem.tenant_id) {
+    const { data: tenant } = await supabase.from("tenants").select("name").eq("id", mem.tenant_id as string).maybeSingle();
+    businessName = (tenant as { name?: string } | null)?.name ?? null;
+  }
+  if (fam.primary_location_id) {
+    const { data: loc } = await supabase.from("locations").select("email").eq("id", fam.primary_location_id).maybeSingle();
+    replyToEmail = (loc as { email?: string | null } | null)?.email ?? null;
+  }
 
   const parentEmail    = fam.parent_email;
   const parentFirst    = fam.parent_first_name ?? "there";
@@ -201,6 +208,8 @@ Deno.serve(async (req) => {
     to: parentEmail,
     subject: `Your ${planName} cancellation is confirmed — access ends ${effectiveDate}`,
     html,
+    businessName,
+    replyToEmail,
   });
 
   console.log(`[notify-cancel-requested] email sent to ${parentEmail} for membership ${membership_id}`);

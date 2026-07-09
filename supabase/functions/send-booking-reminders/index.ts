@@ -70,14 +70,12 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const RESEND_FROM_EMAIL =
-  Deno.env.get("RESEND_FROM_EMAIL") ?? "onboarding@resend.dev";
 
-const RESEND_URL = "https://api.resend.com/emails";
 const RESEND_TIMEOUT_MS = 10_000;
 const FN_BASE = `${SUPABASE_URL}/functions/v1`;
 
@@ -221,42 +219,23 @@ async function sendEmail(opts: {
   to: string;
   subject: string;
   html: string;
+  businessName?: string | null;
+  replyToEmail?: string | null;
 }): Promise<void> {
   if (!RESEND_API_KEY) {
     console.error("send-booking-reminders missing RESEND_API_KEY — skipping email");
     return;
   }
-
-  const controller = new AbortController();
-  const timeoutHandle = setTimeout(() => controller.abort(), RESEND_TIMEOUT_MS);
-
-  try {
-    const r = await fetch(RESEND_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: RESEND_FROM_EMAIL,
-        to: [opts.to],
-        subject: opts.subject,
-        html: opts.html,
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutHandle);
-    if (!r.ok) {
-      try { await r.text(); } catch { /* swallow PII */ }
-      console.error(`send-booking-reminders email resend_error status=${r.status}`);
-    }
-  } catch (err) {
-    clearTimeout(timeoutHandle);
-    if ((err as Error)?.name === "AbortError") {
-      console.error("send-booking-reminders email resend_timeout");
-    } else {
-      console.error("send-booking-reminders email resend_unreachable", err);
-    }
+  const sender = buildEmailSender({ businessName: opts.businessName, replyToEmail: opts.replyToEmail });
+  const result = await sendBrandedEmail({
+    to: opts.to,
+    subject: opts.subject,
+    html: opts.html,
+    text: opts.subject,
+    ...sender,
+  });
+  if (!result.ok) {
+    console.error(`send-booking-reminders email resend_error: ${result.error}`);
   }
 }
 
@@ -400,7 +379,7 @@ serve(async (req) => {
       `id, scheduled_start, scheduled_end, status, tenant_id,
        kid:kids(id, first_name, family_id),
        coach:coaches(id, first_name),
-       location:locations(id, name, timezone, address, city, state, zip),
+       location:locations(id, name, timezone, address, city, state, zip, email),
        session_type:session_types(id, name)`,
     )
     .eq("status", "confirmed")
@@ -477,6 +456,16 @@ serve(async (req) => {
     });
   }
 
+  const uniqueTenantIds = [...new Set(toSend.map((b) => b.tenant_id as string))];
+  const { data: tenants } = await adminClient
+    .from("tenants")
+    .select("id, name")
+    .in("id", uniqueTenantIds);
+  const tenantNameById = new Map<string, string>();
+  for (const t of tenants ?? []) {
+    tenantNameById.set(t.id, t.name);
+  }
+
   // ---- 6. Per-booking: atomic claim → send → done --------------------------
   // Idempotency pattern: INSERT log row FIRST (ON CONFLICT DO NOTHING).
   // If the insert returns a row, we won the race and must send.
@@ -496,6 +485,7 @@ serve(async (req) => {
       city: string | null;
       state: string | null;
       zip: string | null;
+      email: string | null;
     } | null;
     const sessionType = booking.session_type as { id: string; name: string } | null;
 
@@ -609,7 +599,13 @@ serve(async (req) => {
         },
       }),
       family.parent_email
-        ? sendEmail({ to: family.parent_email, subject, html: emailHtml })
+        ? sendEmail({
+            to: family.parent_email,
+            subject,
+            html: emailHtml,
+            businessName: tenantNameById.get(booking.tenant_id as string) ?? null,
+            replyToEmail: location.email,
+          })
         : Promise.resolve(),
     ]);
 

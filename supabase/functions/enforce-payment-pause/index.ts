@@ -33,10 +33,10 @@
 // =============================================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
 const STRIPE_API_VERSION = '2024-06-20';
 const RESEND_API_KEY     = Deno.env.get('RESEND_API_KEY') ?? '';
-const RESEND_FROM_EMAIL  = Deno.env.get('RESEND_FROM_EMAIL') ?? 'onboarding@resend.dev';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -73,6 +73,8 @@ async function sendPaymentPausedEmail(
   parentEmail: string,
   parentFirst: string,
   planName: string,
+  businessName?: string | null,
+  replyToEmail?: string | null,
 ): Promise<void> {
   if (!RESEND_API_KEY) return;
   const appDeepLink = 'ballpark://me/payment-method';
@@ -120,22 +122,16 @@ async function sendPaymentPausedEmail(
   </table>
 </body></html>`;
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: RESEND_FROM_EMAIL,
-      to: [parentEmail],
-      subject: `Your ${planName} has been paused — update payment to reactivate`,
-      html,
-    }),
+  const sender = buildEmailSender({ businessName, replyToEmail });
+  const result = await sendBrandedEmail({
+    to: parentEmail,
+    subject: `Your ${planName} has been paused — update payment to reactivate`,
+    text: `Your ${planName} has been paused — update payment to reactivate`,
+    html,
+    ...sender,
   });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    console.error(`[enforce-payment-pause] Resend error ${res.status}: ${txt.slice(0, 200)}`);
+  if (!result.ok) {
+    console.error(`[enforce-payment-pause] Resend error: ${result.error}`);
   }
 }
 
@@ -175,7 +171,7 @@ Deno.serve(async (req) => {
   const { data: toPause, error: queryErr } = await supabase
     .from('memberships')
     .select(`
-      id, plan_name, stripe_subscription_id,
+      id, plan_name, stripe_subscription_id, tenant_id,
       families!inner(primary_location_id, parent_email, parent_first_name, parent_user_id)
     `)
     .not('payment_pause_scheduled_at', 'is', null)
@@ -201,12 +197,21 @@ Deno.serve(async (req) => {
   )];
   const { data: locations } = await supabase
     .from('locations')
-    .select('id, stripe_account_id')
+    .select('id, stripe_account_id, email')
     .in('id', locationIds);
 
   const accountByLocation: Record<string, string | null> = {};
+  const emailByLocation: Record<string, string | null> = {};
   for (const loc of (locations ?? [])) {
     accountByLocation[loc.id] = loc.stripe_account_id as string | null;
+    emailByLocation[loc.id] = (loc.email as string | null) ?? null;
+  }
+
+  const tenantIds = [...new Set(toPause.map(m => m.tenant_id as string).filter(Boolean))];
+  const { data: tenants } = await supabase.from('tenants').select('id, name').in('id', tenantIds);
+  const nameByTenant: Record<string, string | null> = {};
+  for (const t of (tenants ?? [])) {
+    nameByTenant[t.id] = (t as { name?: string }).name ?? null;
   }
 
   let paused = 0;
@@ -249,7 +254,13 @@ Deno.serve(async (req) => {
 
       const planName = (mem.plan_name as string) ?? 'your membership';
       Promise.allSettled([
-        sendPaymentPausedEmail(fam.parent_email, fam.parent_first_name ?? 'there', planName),
+        sendPaymentPausedEmail(
+          fam.parent_email,
+          fam.parent_first_name ?? 'there',
+          planName,
+          nameByTenant[mem.tenant_id as string] ?? null,
+          emailByLocation[fam.primary_location_id] ?? null,
+        ),
         fam.parent_user_id ? fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
           method: 'POST',
           headers: {

@@ -22,10 +22,10 @@
 // =============================================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
 const STRIPE_API_VERSION = '2024-06-20';
 const RESEND_API_KEY     = Deno.env.get('RESEND_API_KEY') ?? '';
-const RESEND_FROM_EMAIL  = Deno.env.get('RESEND_FROM_EMAIL') ?? 'onboarding@resend.dev';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -89,6 +89,8 @@ async function sendPauseEmail(
   planName: string,
   pauseStart: string,
   pauseEnd: string,
+  businessName?: string | null,
+  replyToEmail?: string | null,
 ): Promise<void> {
   if (!RESEND_API_KEY) return;
   const html = `
@@ -139,22 +141,16 @@ async function sendPauseEmail(
   </table>
 </body></html>`;
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: RESEND_FROM_EMAIL,
-      to: [parentEmail],
-      subject: `Your ${planName} is paused — resumes ${formatDateLong(pauseEnd)}`,
-      html,
-    }),
+  const sender = buildEmailSender({ businessName, replyToEmail });
+  const result = await sendBrandedEmail({
+    to: parentEmail,
+    subject: `Your ${planName} is paused — resumes ${formatDateLong(pauseEnd)}`,
+    text: `Your ${planName} is paused — resumes ${formatDateLong(pauseEnd)}`,
+    html,
+    ...sender,
   });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    console.error(`[pause-membership] Resend error ${res.status}: ${txt.slice(0, 200)}`);
+  if (!result.ok) {
+    console.error(`[pause-membership] Resend error: ${result.error}`);
   }
 }
 
@@ -324,11 +320,18 @@ Deno.serve(async (req) => {
   // ── Resolve Stripe connected account ──────────────────────────────────────
   const { data: location } = await supabase
     .from('locations')
-    .select('stripe_account_id')
+    .select('stripe_account_id, email')
     .eq('id', fam.primary_location_id)
     .single();
 
   const connectedAccountId = location?.stripe_account_id as string | null;
+  const replyToEmail = (location?.email as string | null) ?? null;
+
+  let businessName: string | null = null;
+  if (mem.tenant_id) {
+    const { data: tenant } = await supabase.from('tenants').select('name').eq('id', mem.tenant_id as string).maybeSingle();
+    businessName = (tenant as { name?: string } | null)?.name ?? null;
+  }
 
   // ── Pause Stripe subscription (only when one is linked) ──────────────────
   const pauseEndStr    = pause_end.slice(0, 10);
@@ -386,7 +389,7 @@ Deno.serve(async (req) => {
   const planName = mem.plan_name as string ?? 'your membership';
 
   Promise.allSettled([
-    sendPauseEmail(fam.parent_email, fam.parent_first_name ?? 'there', planName, pauseStartStr, resolvedPauseEnd),
+    sendPauseEmail(fam.parent_email, fam.parent_first_name ?? 'there', planName, pauseStartStr, resolvedPauseEnd, businessName, replyToEmail),
     fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
       method: 'POST',
       headers: {

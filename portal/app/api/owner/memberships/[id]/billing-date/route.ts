@@ -24,6 +24,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { readAppRole, readTenantId } from '@/lib/auth';
+import { buildEmailSender, sendResendEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -94,10 +95,10 @@ async function sendBillingDateEmail(opts: {
   newDay: number;
   oldDay: number;
   effectiveDate: Date;
-  resendKey: string;
-  resendFrom: string;
-}) {
-  const { toEmail, parentName, planName, changeType, newDay, oldDay, effectiveDate, resendKey, resendFrom } = opts;
+  businessName: string;
+  replyToEmail: string | null;
+}): Promise<{ ok: boolean; error?: string }> {
+  const { toEmail, parentName, planName, changeType, newDay, oldDay, effectiveDate, businessName, replyToEmail } = opts;
   const newDayOrdinal = ordinal(newDay);
   const oldDayOrdinal = ordinal(oldDay);
   const effectiveDateStr = formatDate(effectiveDate);
@@ -156,19 +157,13 @@ async function sendBillingDateEmail(opts: {
         </div>
       </div>`;
 
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${resendKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: resendFrom,
-      to: toEmail,
-      subject,
-      text: bodyText,
-      html: bodyHtml,
-    }),
+  const sender = buildEmailSender({ businessName, replyToEmail });
+  return sendResendEmail({
+    to: toEmail,
+    subject,
+    text: bodyText,
+    html: bodyHtml,
+    ...sender,
   });
 }
 
@@ -217,7 +212,8 @@ export async function POST(
       families!inner(
         id, stripe_connected_customer_id, primary_location_id,
         parent_first_name, parent_last_name, parent_email
-      )
+      ),
+      tenants!inner(id, name)
     `)
     .eq('id', membershipId)
     .eq('tenant_id', tenantId)
@@ -245,13 +241,15 @@ export async function POST(
 
   const { data: location, error: locErr } = await supabase
     .from('locations')
-    .select('stripe_account_id')
+    .select('stripe_account_id, name, email')
     .eq('id', fam.primary_location_id)
     .single();
 
   if (locErr || !location?.stripe_account_id) {
     return clientErr(422, 'Location Stripe account not configured');
   }
+
+  const tenant = mem.tenants as unknown as { id: string; name: string };
 
   const connectedAccountId = location.stripe_account_id as string;
   const oldAnchorDay = (mem.billing_anchor_day as number | null) ?? 1;
@@ -322,11 +320,8 @@ export async function POST(
     return clientErr(500, `Billing date was updated on Stripe but audit log failed to save: ${auditErr.message}`);
   }
 
-  const resendKey = process.env.RESEND_API_KEY;
-  const resendFrom = process.env.RESEND_FROM_EMAIL ?? 'noreply@infinitehitting.com';
-
-  if (resendKey && fam.parent_email) {
-    await sendBillingDateEmail({
+  if (fam.parent_email) {
+    const emailResult = await sendBillingDateEmail({
       toEmail: fam.parent_email,
       parentName: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' ') || 'there',
       planName: mem.plan_name,
@@ -334,9 +329,13 @@ export async function POST(
       newDay: newAnchorDay,
       oldDay: oldAnchorDay,
       effectiveDate,
-      resendKey,
-      resendFrom,
-    }).catch(err => console.error('[billing-date] email error:', err));
+      businessName: tenant?.name ?? 'Your facility',
+      replyToEmail: (location.email as string | null) ?? null,
+    }).catch(err => ({ ok: false, error: err instanceof Error ? err.message : String(err) }));
+
+    if (!emailResult.ok) {
+      console.error(`[billing-date] email failed to send to ${fam.parent_email}: ${emailResult.error}`);
+    }
   }
 
   console.log(`[billing-date] membership=${membershipId} change_type=${changeType} new_day=${newAnchorDay} old_day=${oldAnchorDay} effective=${effectiveDate.toISOString()}`);

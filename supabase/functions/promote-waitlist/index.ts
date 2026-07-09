@@ -22,12 +22,11 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const RESEND_FROM_EMAIL =
-  Deno.env.get("RESEND_FROM_EMAIL") ?? "onboarding@resend.dev";
 
 const CLAIM_WINDOW_HOURS = 2;
 const RESEND_TIMEOUT_MS = 10_000;
@@ -108,7 +107,7 @@ serve(async (req) => {
     .select(`
       id, tenant_id, session_slot_key, kid_id, family_id, coach_id,
       session_type_id, location_id, scheduled_start, scheduled_end, position,
-      families!inner(parent_user_id, contact_email),
+      families!inner(parent_user_id, contact_email, primary_location_id),
       kids!inner(first_name),
       session_types!inner(name)
     `)
@@ -151,6 +150,7 @@ serve(async (req) => {
   const familyRow = entry.families as unknown as {
     parent_user_id: string;
     contact_email: string | null;
+    primary_location_id: string | null;
   } | null;
   const kidRow = entry.kids as unknown as { first_name: string } | null;
   const stRow = entry.session_types as unknown as { name: string } | null;
@@ -160,6 +160,15 @@ serve(async (req) => {
   const kidFirst = kidRow?.first_name ?? "Your athlete";
   const sessionName = stRow?.name ?? "session";
   const sessionTime = formatTime(entry.scheduled_start);
+
+  let businessName: string | null = null;
+  let replyToEmail: string | null = null;
+  const { data: tenantRow } = await adminClient.from("tenants").select("name").eq("id", tenantId).maybeSingle();
+  businessName = (tenantRow as { name?: string } | null)?.name ?? null;
+  if (familyRow?.primary_location_id) {
+    const { data: locRow } = await adminClient.from("locations").select("email").eq("id", familyRow.primary_location_id).maybeSingle();
+    replyToEmail = (locRow as { email?: string | null } | null)?.email ?? null;
+  }
 
   // ── Best-effort: push + email ──────────────────────────────────────────────
   const results = await Promise.allSettled([
@@ -208,30 +217,16 @@ serve(async (req) => {
 </body>
 </html>`;
 
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), RESEND_TIMEOUT_MS);
-          try {
-            const r = await fetch("https://api.resend.com/emails", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${RESEND_API_KEY}`,
-              },
-              body: JSON.stringify({
-                from: RESEND_FROM_EMAIL,
-                to: [parentEmail],
-                subject: `Spot available! Claim ${sessionName} for ${kidFirst}`,
-                html: emailHtml,
-              }),
-              signal: controller.signal,
-            });
-            clearTimeout(timeout);
-            if (!r.ok) {
-              console.error("[promote-waitlist] Resend error:", r.status, await r.text());
-            }
-          } catch (e) {
-            clearTimeout(timeout);
-            console.error("[promote-waitlist] email fetch failed:", e);
+          const sender = buildEmailSender({ businessName, replyToEmail });
+          const result = await sendBrandedEmail({
+            to: parentEmail,
+            subject: `Spot available! Claim ${sessionName} for ${kidFirst}`,
+            text: `Spot available! Claim ${sessionName} for ${kidFirst}`,
+            html: emailHtml,
+            ...sender,
+          });
+          if (!result.ok) {
+            console.error("[promote-waitlist] Resend error:", result.error);
           }
         })()
       : Promise.resolve(null),

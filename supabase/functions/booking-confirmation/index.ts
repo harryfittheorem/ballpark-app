@@ -23,16 +23,12 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const RESEND_FROM_EMAIL =
-  Deno.env.get("RESEND_FROM_EMAIL") ?? "onboarding@resend.dev";
-
-const RESEND_URL = "https://api.resend.com/emails";
-const RESEND_TIMEOUT_MS = 10_000;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -78,40 +74,23 @@ async function sendResendEmail(opts: {
   subject: string;
   html: string;
   text: string;
+  businessName?: string | null;
+  replyToEmail?: string | null;
 }): Promise<void> {
   if (!RESEND_API_KEY) {
     console.log("booking-confirmation: RESEND_API_KEY not configured — skipping email");
     return;
   }
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), RESEND_TIMEOUT_MS);
-  try {
-    const r = await fetch(RESEND_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: RESEND_FROM_EMAIL,
-        to: [opts.to],
-        subject: opts.subject,
-        html: opts.html,
-        text: opts.text,
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(t);
-    if (!r.ok) {
-      console.error(`booking-confirmation resend_error status=${r.status}`);
-    }
-  } catch (err) {
-    clearTimeout(t);
-    if ((err as Error)?.name === "AbortError") {
-      console.error("booking-confirmation resend_timeout");
-    } else {
-      console.error("booking-confirmation resend_unreachable", err);
-    }
+  const sender = buildEmailSender({ businessName: opts.businessName, replyToEmail: opts.replyToEmail });
+  const result = await sendBrandedEmail({
+    to: opts.to,
+    subject: opts.subject,
+    html: opts.html,
+    text: opts.text,
+    ...sender,
+  });
+  if (!result.ok) {
+    console.error(`booking-confirmation resend_error: ${result.error}`);
   }
 }
 
@@ -310,7 +289,7 @@ serve(async (req) => {
       `id, scheduled_start, tenant_id,
        session_type:session_types(name),
        coach:coaches(first_name, last_name),
-       location:locations(name, timezone),
+       location:locations(name, timezone, email),
        kid:kids(first_name, family:families(parent_first_name, parent_email))`
     )
     .eq("id", bookingId)
@@ -331,7 +310,7 @@ serve(async (req) => {
     tenant_id: string;
     session_type: { name: string } | null;
     coach: { first_name: string; last_name: string } | null;
-    location: { name: string; timezone: string } | null;
+    location: { name: string; timezone: string; email: string | null } | null;
     kid: {
       first_name: string;
       family: { parent_first_name: string; parent_email: string } | null;
@@ -378,6 +357,8 @@ serve(async (req) => {
     subject: `Booking confirmed: ${emailOpts.sessionTypeName} on ${timeLabel}`,
     html: buildConfirmationHtml(emailOpts),
     text: buildConfirmationText(emailOpts),
+    businessName: tenantName,
+    replyToEmail: bk.location?.email ?? null,
   });
 
   return addCors(jsonOk({ ok: true }));

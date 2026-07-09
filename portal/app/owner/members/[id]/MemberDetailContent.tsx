@@ -7,7 +7,7 @@ import {
   CheckCircle, XCircle, CreditCard, Star, Zap, TrendingUp,
   AlertCircle, PauseCircle, PlayCircle, Package, Phone, Mail, X,
 } from 'lucide-react';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { MemberDetail, BookingFormOptions } from '@/lib/supabase/ownerQueries';
 import type { DemoMemberDetail } from './demoMemberDetails';
@@ -1304,6 +1304,17 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
               {effectiveCancelDone ? '—' : formatNextBilling(nextBillingAt)}
             </span>
           </div>
+          {!effectiveCancelDone && nextBillingAt && member.billingAnchorDay
+            && new Date(nextBillingAt + 'T00:00:00').getUTCDate() !== member.billingAnchorDay && (
+            <div style={{
+              fontSize: 10, color: brand.textMuted, background: brand.surfaceAlt,
+              borderRadius: 6, padding: '6px 8px', lineHeight: 1.5,
+            }}>
+              One-time override: this next charge only. Future payments resume on the{' '}
+              {member.billingAnchorDay}
+              {['th','st','nd','rd'][((member.billingAnchorDay % 100 - 20) % 10)] ?? ['th','st','nd','rd'][member.billingAnchorDay % 100] ?? 'th'} as usual.
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: brand.textMuted }}>Stripe sub</span>
             <span style={{
@@ -1398,6 +1409,10 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
 export function MemberDetailContent({ member: initialMember, bookingOptions }: Props) {
   const [m, setM] = useState(initialMember);
   const [activeModal, setActiveModal] = useState<'message' | 'edit' | 'book' | null>(null);
+
+  useEffect(() => {
+    setM(initialMember);
+  }, [initialMember]);
 
   const demo = isDemo(m) ? m : null;
   const mo = demo ? demo.memberForMonths : monthsAgo(m.joinedDate);

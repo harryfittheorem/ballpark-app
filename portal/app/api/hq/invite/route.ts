@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { readAppRole } from '@/lib/auth';
+import { buildEmailSender, sendResendEmail } from '@/lib/email';
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -73,7 +74,6 @@ export async function POST(req: Request) {
   };
 
   const resendKey = process.env.RESEND_API_KEY;
-  const resendFrom = process.env.RESEND_FROM_EMAIL ?? 'noreply@infinitehitting.com';
 
   let createdUserId: string | null = null;
 
@@ -101,33 +101,26 @@ export async function POST(req: Request) {
     createdUserId = linkBody.id ?? null;
 
     const roleLabel = role === 'coach' ? 'Coach' : role === 'admin' ? 'Admin' : 'Owner';
-    const sendRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${resendKey}`,
-      },
-      body: JSON.stringify({
-        from: resendFrom,
-        to: email,
-        subject: `You've been invited to Ballpark — ${tenant.name}`,
-        html: `
+    const inviteSubject = `You've been invited to Ballpark — ${tenant.name}`;
+    const inviteHtml = `
           <p>Hi ${firstName},</p>
           <p>You've been invited to join <strong>${tenant.name}</strong> on Ballpark as a <strong>${roleLabel}</strong>.</p>
           <p>Click the link below to set your password and activate your account:</p>
           <p><a href="${linkBody.action_link}" style="background:#F1E5AD;color:#2D2B2A;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;">Accept Invitation</a></p>
           <p>This link expires in 24 hours.</p>
           <p>— The Ballpark Team</p>
-        `,
-      }),
+        `;
+    const sender = buildEmailSender({ businessName: tenant.name });
+    const sendResult = await sendResendEmail({
+      to: email,
+      subject: inviteSubject,
+      text: inviteSubject,
+      html: inviteHtml,
+      ...sender,
     });
 
-    if (!sendRes.ok) {
-      const sendErr = await sendRes.json().catch(() => ({})) as { message?: string };
-      return NextResponse.json(
-        { error: `Email delivery failed: ${sendErr.message ?? sendRes.statusText}` },
-        { status: 502 },
-      );
+    if (!sendResult.ok) {
+      return NextResponse.json({ error: `Email delivery failed: ${sendResult.error}` }, { status: 502 });
     }
   } else {
     // No Resend configured — use Supabase's built-in invite email (sends automatically).

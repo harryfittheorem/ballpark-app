@@ -34,15 +34,11 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const RESEND_FROM_EMAIL =
-  Deno.env.get("RESEND_FROM_EMAIL") ?? "onboarding@resend.dev";
-
-const RESEND_URL = "https://api.resend.com/emails";
-const RESEND_TIMEOUT_MS = 10_000;
 
 type ErrorCode =
   | "method_not_allowed"
@@ -166,7 +162,7 @@ serve(async (req) => {
   const [familyRes, kidRes, coachRes] = await Promise.all([
     adminClient
       .from("families")
-      .select("id, parent_email, parent_first_name, parent_user_id")
+      .select("id, parent_email, parent_first_name, parent_user_id, tenant_id, primary_location_id")
       .eq("id", msg.recipient_family_id)
       .maybeSingle(),
     adminClient
@@ -206,6 +202,19 @@ serve(async (req) => {
     return jsonError(502, "resend_error", "Resend not configured");
   }
 
+  let businessName: string | null = null;
+  let replyToEmail: string | null = null;
+  const [tenantRes, locationRes] = await Promise.all([
+    family.tenant_id
+      ? adminClient.from("tenants").select("name").eq("id", family.tenant_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    family.primary_location_id
+      ? adminClient.from("locations").select("email").eq("id", family.primary_location_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  businessName = (tenantRes.data as { name: string } | null)?.name ?? null;
+  replyToEmail = (locationRes.data as { email: string | null } | null)?.email ?? null;
+
   // ---- 4. Build + send the email -----------------------------------------
   const coachFirst = coach?.first_name ?? "Your coach";
   const kidFirst = kid.first_name;
@@ -234,57 +243,24 @@ serve(async (req) => {
     </div>
   `;
 
-  const controller = new AbortController();
-  const timeoutHandle = setTimeout(() => controller.abort(), RESEND_TIMEOUT_MS);
+  const sender = buildEmailSender({ businessName, replyToEmail });
+  const result = await sendBrandedEmail({
+    to: family.parent_email,
+    subject,
+    html,
+    text: subject,
+    ...sender,
+  });
 
-  let res: Response;
-  try {
-    res = await fetch(RESEND_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: RESEND_FROM_EMAIL,
-        to: [family.parent_email],
-        subject,
-        html,
-      }),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeoutHandle);
-    if ((err as Error)?.name === "AbortError") {
-      console.error(`send-coach-video-notification video_id=${videoId} resend_timeout`);
-      return jsonError(504, "resend_timeout", "Resend request timed out");
-    }
-    console.error(`send-coach-video-notification video_id=${videoId} resend_unreachable`, err);
-    return jsonError(502, "resend_unreachable", "Failed to reach Resend");
-  }
-  clearTimeout(timeoutHandle);
-
-  if (!res.ok) {
-    // Drain the body but DO NOT log it — Resend echoes recipient address
-    // and other context on errors, which would leak PII into function logs.
-    try { await res.text(); } catch { /* ignore */ }
+  if (!result.ok) {
     console.error(
-      `send-coach-video-notification video_id=${videoId} resend_error status=${res.status}`,
+      `send-coach-video-notification video_id=${videoId} resend_error: ${result.error}`,
     );
-    return jsonError(502, "resend_error", `Resend returned status ${res.status}`);
-  }
-
-  let messageId: string | undefined;
-  try {
-    const j = (await res.json()) as { id?: string };
-    messageId = typeof j?.id === "string" ? j.id : undefined;
-  } catch {
-    console.error(`send-coach-video-notification video_id=${videoId} resend_bad_response`);
-    return jsonError(502, "resend_bad_response", "Malformed Resend response");
+    return jsonError(502, "resend_error", "Failed to send email via Resend");
   }
 
   console.log(
-    `send-coach-video-notification video_id=${videoId} resend_id=${messageId ?? "?"} status=${res.status} ms=${Date.now() - startedAt}`,
+    `send-coach-video-notification video_id=${videoId} sent=true ms=${Date.now() - startedAt}`,
   );
-  return jsonOk({ ok: true, message_id: messageId });
+  return jsonOk({ ok: true });
 });

@@ -44,6 +44,7 @@
 // =============================================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
 const REPLAY_TOLERANCE_SECONDS = 300;
 
@@ -126,8 +127,8 @@ async function sendDunningEmail(opts: {
   parentName: string;
   planName: string;
   amountCents: number;
-  resendApiKey: string;
-  resendFromEmail: string;
+  businessName?: string | null;
+  replyToEmail?: string | null;
 }) {
   const amountStr = `$${(opts.amountCents / 100).toFixed(2)}`;
   // Deep link opens the Payment Method screen directly in the Ballpark app
@@ -149,12 +150,8 @@ async function sendDunningEmail(opts: {
     'Questions? Reply to this email or contact your facility directly.',
   ].join('\n');
 
-  const body = {
-    from: opts.resendFromEmail,
-    to: opts.toEmail,
-    subject: 'Action required: update your payment method',
-    text: plainText,
-    html: `
+  const sender = buildEmailSender({ businessName: opts.businessName, replyToEmail: opts.replyToEmail });
+  const html = `
       <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; color: #1a1a1a;">
         <div style="background: #1a1a1a; padding: 24px; border-radius: 8px 8px 0 0;">
           <h1 style="color: #d4a843; font-size: 22px; margin: 0; font-weight: 700; letter-spacing: 1px;">
@@ -192,27 +189,39 @@ async function sendDunningEmail(opts: {
           </p>
         </div>
       </div>
-    `,
-  };
+    `;
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${opts.resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`[stripe-webhook] Resend dunning email failed: ${res.status} ${errText}`);
-    } else {
-      console.log(`[stripe-webhook] Dunning email sent to ${opts.toEmail}`);
-    }
-  } catch (err) {
-    console.error('[stripe-webhook] Resend dunning email exception:', err);
+  const result = await sendBrandedEmail({
+    to: opts.toEmail,
+    subject: 'Action required: update your payment method',
+    text: plainText,
+    html,
+    ...sender,
+  });
+  if (!result.ok) {
+    console.error(`[stripe-webhook] Resend dunning email failed: ${result.error}`);
+  } else {
+    console.log(`[stripe-webhook] Dunning email sent to ${opts.toEmail}`);
   }
+}
+
+async function resolveSender(
+  supabase: ReturnType<typeof createClient>,
+  tenantId: string | null | undefined,
+  locationId: string | null | undefined,
+): Promise<{ businessName: string | null; replyToEmail: string | null }> {
+  const [tenantRes, locationRes] = await Promise.all([
+    tenantId
+      ? supabase.from('tenants').select('name').eq('id', tenantId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    locationId
+      ? supabase.from('locations').select('email').eq('id', locationId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  return {
+    businessName: (tenantRes.data as { name: string } | null)?.name ?? null,
+    replyToEmail: (locationRes.data as { email: string | null } | null)?.email ?? null,
+  };
 }
 
 // ─── Escalation email (failure #2) via Resend ────────────────────────────────
@@ -222,8 +231,8 @@ async function sendEscalationEmail(opts: {
   parentName: string;
   planName: string;
   amountCents: number;
-  resendApiKey: string;
-  resendFromEmail: string;
+  businessName?: string | null;
+  replyToEmail?: string | null;
 }) {
   const amountStr = `$${(opts.amountCents / 100).toFixed(2)}`;
   const appDeepLink = 'ballpark://me/payment-method';
@@ -241,12 +250,8 @@ async function sendEscalationEmail(opts: {
     'Questions? Reply to this email or contact your facility directly.',
   ].join('\n');
 
-  const body = {
-    from: opts.resendFromEmail,
-    to: opts.toEmail,
-    subject: 'Second failed payment — update your card within 7 days',
-    text: plainText,
-    html: `
+  const sender = buildEmailSender({ businessName: opts.businessName, replyToEmail: opts.replyToEmail });
+  const html = `
       <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; color: #1a1a1a;">
         <div style="background: #1a1a1a; padding: 24px; border-radius: 8px 8px 0 0;">
           <h1 style="color: #d4a843; font-size: 22px; margin: 0; font-weight: 700; letter-spacing: 1px;">
@@ -281,26 +286,19 @@ async function sendEscalationEmail(opts: {
           </p>
         </div>
       </div>
-    `,
-  };
+    `;
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${opts.resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`[stripe-webhook] Resend escalation email failed: ${res.status} ${errText}`);
-    } else {
-      console.log(`[stripe-webhook] Escalation email sent to ${opts.toEmail}`);
-    }
-  } catch (err) {
-    console.error('[stripe-webhook] Resend escalation email exception:', err);
+  const result = await sendBrandedEmail({
+    to: opts.toEmail,
+    subject: 'Second failed payment — update your card within 7 days',
+    text: plainText,
+    html,
+    ...sender,
+  });
+  if (!result.ok) {
+    console.error(`[stripe-webhook] Resend escalation email failed: ${result.error}`);
+  } else {
+    console.log(`[stripe-webhook] Escalation email sent to ${opts.toEmail}`);
   }
 }
 
@@ -311,8 +309,8 @@ async function sendFinalNoticeEmail(opts: {
   parentName: string;
   planName: string;
   amountCents: number;
-  resendApiKey: string;
-  resendFromEmail: string;
+  businessName?: string | null;
+  replyToEmail?: string | null;
 }) {
   const amountStr = `$${(opts.amountCents / 100).toFixed(2)}`;
   const appDeepLink = 'ballpark://me/payment-method';
@@ -330,12 +328,8 @@ async function sendFinalNoticeEmail(opts: {
     'Questions? Reply to this email or contact your facility directly.',
   ].join('\n');
 
-  const body = {
-    from: opts.resendFromEmail,
-    to: opts.toEmail,
-    subject: 'Final notice: membership will be paused in 24 hours',
-    text: plainText,
-    html: `
+  const sender = buildEmailSender({ businessName: opts.businessName, replyToEmail: opts.replyToEmail });
+  const html = `
       <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; color: #1a1a1a;">
         <div style="background: #1a1a1a; padding: 24px; border-radius: 8px 8px 0 0;">
           <h1 style="color: #d4a843; font-size: 22px; margin: 0; font-weight: 700; letter-spacing: 1px;">
@@ -371,26 +365,19 @@ async function sendFinalNoticeEmail(opts: {
           </p>
         </div>
       </div>
-    `,
-  };
+    `;
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${opts.resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`[stripe-webhook] Resend final-notice email failed: ${res.status} ${errText}`);
-    } else {
-      console.log(`[stripe-webhook] Final-notice email sent to ${opts.toEmail}`);
-    }
-  } catch (err) {
-    console.error('[stripe-webhook] Resend final-notice email exception:', err);
+  const result = await sendBrandedEmail({
+    to: opts.toEmail,
+    subject: 'Final notice: membership will be paused in 24 hours',
+    text: plainText,
+    html,
+    ...sender,
+  });
+  if (!result.ok) {
+    console.error(`[stripe-webhook] Resend final-notice email failed: ${result.error}`);
+  } else {
+    console.log(`[stripe-webhook] Final-notice email sent to ${opts.toEmail}`);
   }
 }
 
@@ -400,9 +387,10 @@ async function sendReactivationEmail(opts: {
   toEmail: string;
   parentName: string;
   planName: string;
-  resendApiKey: string;
-  resendFromEmail: string;
+  businessName?: string | null;
+  replyToEmail?: string | null;
 }) {
+  const sender = buildEmailSender({ businessName: opts.businessName, replyToEmail: opts.replyToEmail });
   const html = `
     <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; color: #1a1a1a;">
       <div style="background: #1a1a1a; padding: 24px; border-radius: 8px 8px 0 0;">
@@ -429,28 +417,17 @@ async function sendReactivationEmail(opts: {
     </div>
   `;
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${opts.resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: opts.resendFromEmail,
-        to: opts.toEmail,
-        subject: `Your ${opts.planName} has been reactivated`,
-        html,
-      }),
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`[stripe-webhook] Resend reactivation email failed: ${res.status} ${errText}`);
-    } else {
-      console.log(`[stripe-webhook] Reactivation email sent to ${opts.toEmail}`);
-    }
-  } catch (err) {
-    console.error('[stripe-webhook] Resend reactivation email exception:', err);
+  const result = await sendBrandedEmail({
+    to: opts.toEmail,
+    subject: `Your ${opts.planName} has been reactivated`,
+    html,
+    text: `Your ${opts.planName} membership has been reactivated. Payment was received successfully.`,
+    ...sender,
+  });
+  if (!result.ok) {
+    console.error(`[stripe-webhook] Resend reactivation email failed: ${result.error}`);
+  } else {
+    console.log(`[stripe-webhook] Reactivation email sent to ${opts.toEmail}`);
   }
 }
 
@@ -1085,8 +1062,6 @@ Deno.serve(async (req) => {
     // ── Reactivation notification (Task #554) ────────────────────────────────
     // Send email + push if membership previously had payment failures.
     if (previousFailureCount > 0) {
-      const resendApiKey = Deno.env.get('RESEND_API_KEY');
-      const resendFromEmail = Deno.env.get('RESEND_FROM_EMAIL');
       const { data: famReact } = await supabase
         .from('families')
         .select('parent_first_name, parent_email, parent_user_id')
@@ -1094,14 +1069,16 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       const reactPromises: Promise<unknown>[] = [];
-      if (resendApiKey && resendFromEmail && famReact?.parent_email) {
+      if (famReact?.parent_email) {
+        const memLocationId = (mem as unknown as { families?: { primary_location_id?: string } }).families?.primary_location_id;
+        const sender = await resolveSender(supabase, mem.tenant_id as string | undefined, memLocationId);
         reactPromises.push(
           sendReactivationEmail({
             toEmail: famReact.parent_email,
             parentName: famReact.parent_first_name ?? 'there',
             planName: (mem as unknown as { plan_name: string }).plan_name,
-            resendApiKey,
-            resendFromEmail,
+            businessName: sender.businessName,
+            replyToEmail: sender.replyToEmail,
           }).catch(err => console.error('[stripe-webhook] sendReactivationEmail error:', err)),
         );
       }
@@ -1244,8 +1221,8 @@ Deno.serve(async (req) => {
         .in('status', ['active', 'payment_overdue']);
 
       // Fan-out: push + email — best-effort via Promise.allSettled, never fail the webhook
-      const resendApiKey = Deno.env.get('RESEND_API_KEY');
-      const resendFromEmail = Deno.env.get('RESEND_FROM_EMAIL');
+      const failLocationId = (mem.families as unknown as { primary_location_id?: string } | undefined)?.primary_location_id;
+      const failSender = await resolveSender(supabase, mem.tenant_id as string | undefined, failLocationId);
 
       const { data: family } = await supabase
         .from('families')
@@ -1277,14 +1254,14 @@ Deno.serve(async (req) => {
         );
       }
 
-      if (resendApiKey && resendFromEmail && family?.parent_email) {
+      if (family?.parent_email) {
         const emailOpts = {
           toEmail: family.parent_email,
           parentName: family.parent_first_name ?? 'there',
           planName: mem.plan_name,
           amountCents: invoice.amount_due,
-          resendApiKey,
-          resendFromEmail,
+          businessName: failSender.businessName,
+          replyToEmail: failSender.replyToEmail,
         };
         if (newCount === 1) {
           fanOutPromises.push(

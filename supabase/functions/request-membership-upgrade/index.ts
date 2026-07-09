@@ -15,11 +15,9 @@
 // =============================================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
-const RESEND_FROM_EMAIL =
-  Deno.env.get('RESEND_FROM_EMAIL') ?? 'onboarding@resend.dev';
-const RESEND_URL = 'https://api.resend.com/emails';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -150,8 +148,8 @@ Deno.serve(async (req) => {
     .eq('id', fam.id)
     .single();
 
-  const adminEmail    = tenant?.contact_email ?? RESEND_FROM_EMAIL;
   const tenantName    = tenant?.name ?? 'Your facility';
+  const adminEmail    = tenant?.contact_email ?? null;
   const parentName    = profile ? `${profile.first_name} ${profile.last_name}` : 'A parent';
   const parentEmail   = profile?.email ?? '(email not on file)';
   const currentPlan   = mem.plan_name;
@@ -159,19 +157,9 @@ Deno.serve(async (req) => {
   const requestedAmt  = `$${(plan.amount_cents / 100).toFixed(2)}/mo`;
 
   // ── Send email to tenant admin ─────────────────────────────────────────────
-  if (RESEND_API_KEY) {
-    try {
-      await fetch(RESEND_URL, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from:    RESEND_FROM_EMAIL,
-          to:      [adminEmail],
-          subject: `Membership upgrade request — ${parentName}`,
-          html: `
+  if (RESEND_API_KEY && adminEmail) {
+    const sender = buildEmailSender({ businessName: tenantName, replyToEmail: parentEmail !== '(email not on file)' ? parentEmail : null });
+    const html = `
 <p>Hi ${tenantName} team,</p>
 <p><strong>${parentName}</strong> (${parentEmail}) has submitted a membership upgrade request through the Ballpark app.</p>
 <table cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-family:sans-serif;font-size:14px;">
@@ -180,14 +168,21 @@ Deno.serve(async (req) => {
 </table>
 <p>Please reach out to the family to confirm availability and process the change in your billing system.</p>
 <p style="color:#999;font-size:12px;">This request was generated automatically by the Ballpark app.</p>
-          `.trim(),
-        }),
-      });
-    } catch (emailErr) {
-      console.error('[request-membership-upgrade] email error:', emailErr);
+    `.trim();
+    const result = await sendBrandedEmail({
+      to: adminEmail,
+      subject: `Membership upgrade request — ${parentName}`,
+      text: `Membership upgrade request from ${parentName} (${parentEmail}): ${currentPlan} → ${requestedPlan} (${requestedAmt})`,
+      html,
+      ...sender,
+    });
+    if (!result.ok) {
+      console.error('[request-membership-upgrade] email error:', result.error);
     }
-  } else {
+  } else if (!RESEND_API_KEY) {
     console.warn('[request-membership-upgrade] RESEND_API_KEY not set — skipping email');
+  } else {
+    console.warn('[request-membership-upgrade] tenant has no contact_email — skipping email');
   }
 
   console.log(

@@ -21,10 +21,10 @@
 // =============================================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
 const STRIPE_API_VERSION  = '2024-06-20';
 const RESEND_API_KEY      = Deno.env.get('RESEND_API_KEY') ?? '';
-const RESEND_FROM_EMAIL   = Deno.env.get('RESEND_FROM_EMAIL') ?? 'onboarding@resend.dev';
 const SUPABASE_URL_ENV    = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
@@ -59,6 +59,8 @@ async function sendCancellationEffectiveEmail(
   parentEmail: string,
   parentFirst: string,
   planName: string,
+  businessName?: string | null,
+  replyToEmail?: string | null,
 ): Promise<void> {
   if (!RESEND_API_KEY) return;
   const today = formatDateLong(new Date().toISOString());
@@ -95,22 +97,16 @@ async function sendCancellationEffectiveEmail(
   </table>
 </body></html>`;
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: RESEND_FROM_EMAIL,
-      to: [parentEmail],
-      subject: `Your ${planName} membership has been cancelled`,
-      html,
-    }),
+  const sender = buildEmailSender({ businessName, replyToEmail });
+  const result = await sendBrandedEmail({
+    to: parentEmail,
+    subject: `Your ${planName} membership has been cancelled`,
+    text: `Your ${planName} membership has been cancelled`,
+    html,
+    ...sender,
   });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    console.error(`[process-membership-cancellations] Resend error ${res.status}: ${txt.slice(0, 200)}`);
+  if (!result.ok) {
+    console.error(`[process-membership-cancellations] Resend error: ${result.error}`);
   }
 }
 
@@ -194,18 +190,26 @@ Deno.serve(async (req) => {
   for (const mem of memberships) {
     try {
       let stripeAccountId: string | null = null;
+      let replyToEmail: string | null = null;
       const fam = mem.families as unknown as { id: string; primary_location_id: string; parent_email: string; parent_first_name: string };
 
+      if (fam?.primary_location_id) {
+        const { data: loc } = await supabase
+          .from('locations')
+          .select('stripe_account_id, email')
+          .eq('id', fam.primary_location_id)
+          .single();
+        stripeAccountId = (loc?.stripe_account_id as string | null) ?? null;
+        replyToEmail = (loc?.email as string | null) ?? null;
+      }
+
+      let businessName: string | null = null;
+      if (mem.tenant_id) {
+        const { data: tenant } = await supabase.from('tenants').select('name').eq('id', mem.tenant_id as string).maybeSingle();
+        businessName = (tenant as { name?: string } | null)?.name ?? null;
+      }
+
       if (mem.stripe_subscription_id && stripeKey) {
-        // Resolve connected Stripe account for this location
-        if (fam?.primary_location_id) {
-          const { data: loc } = await supabase
-            .from('locations')
-            .select('stripe_account_id')
-            .eq('id', fam.primary_location_id)
-            .single();
-          stripeAccountId = (loc?.stripe_account_id as string | null) ?? null;
-        }
 
         // Cancel the Stripe subscription immediately
         await stripeDel(
@@ -238,7 +242,7 @@ Deno.serve(async (req) => {
       cancelled++;
       console.log(`[process-membership-cancellations] membership ${mem.id} → cancelled`);
       // Best-effort cancellation-effective email to parent
-      sendCancellationEffectiveEmail(fam.parent_email, fam.parent_first_name, mem.plan_name as string)
+      sendCancellationEffectiveEmail(fam.parent_email, fam.parent_first_name, mem.plan_name as string, businessName, replyToEmail)
         .catch(e => console.error(`[process-membership-cancellations] email failed for ${mem.id}:`, (e as Error).message));
     } catch (err) {
       const e = err as Error;
