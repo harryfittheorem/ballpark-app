@@ -6,3 +6,5 @@
 - [Supabase CLI project link](supabase-cli-link.md) — CLI is linked to local "workspace" not production; always re-link before db push; use management API for schema verification.
 - [JWT claims vs app_metadata](jwt-claims-app-metadata.md) — Custom Access Token Hook injects claims into JWT payload only, never into raw_app_meta_data; edge functions must decode the JWT to read tenant_id/app_role.
 - [Owner layout auth pattern](owner-layout-auth.md) — auth checks must use cookie-based createClient(), never createServiceClient() (no cookie adapter, always returns null user).
+- [Stripe Connect capability vs charges_enabled](stripe-capability-vs-charges-enabled.md) — charges_enabled/payouts_enabled can be true with zero payment capabilities active; always check capabilities.card_payments explicitly.
+- [Testing payment webhook logic without real Stripe capability](webhook-logic-test-without-stripe-capability.md) — send signed synthetic webhook events directly to the Edge Function instead of chasing real Stripe KYC/capability unlocks.

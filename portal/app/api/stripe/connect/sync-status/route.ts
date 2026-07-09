@@ -22,9 +22,19 @@ function err(status: number, message: string) {
 function deriveOnboardingStatus(account: {
   charges_enabled?: boolean;
   payouts_enabled?: boolean;
+  capabilities?: { card_payments?: string; transfers?: string };
   requirements?: { disabled_reason?: string | null };
 }): 'pending' | 'connected' | 'restricted' {
-  if (account.charges_enabled && account.payouts_enabled) return 'connected';
+  // `charges_enabled`/`payouts_enabled` can be true even when the account only
+  // has the `transfers` capability active — card_payments must be checked
+  // explicitly, or the UI falsely reports "card payments enabled".
+  if (
+    account.charges_enabled &&
+    account.payouts_enabled &&
+    account.capabilities?.card_payments === 'active'
+  ) {
+    return 'connected';
+  }
   if (account.requirements?.disabled_reason) return 'restricted';
   return 'pending';
 }
@@ -122,6 +132,7 @@ export async function POST(req: NextRequest) {
   const acctData = await accountRes.json() as {
     charges_enabled?: boolean;
     payouts_enabled?: boolean;
+    capabilities?: { card_payments?: string; transfers?: string };
     business_profile?: { name?: string };
     settings?: {
       dashboard?: { display_name?: string };
