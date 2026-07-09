@@ -260,13 +260,16 @@ export async function POST(
 
   try {
     if (changeType === 'permanent') {
+      // Stripe's subscription-update endpoint only accepts billing_cycle_anchor
+      // values of 'now' or 'unchanged' — an arbitrary future timestamp is
+      // rejected. To move the anchor to a future date, defer the next invoice
+      // via trial_end (same mechanism as the one-time path); once that invoice
+      // is billed, Stripe recalculates subsequent cycles from that date, so
+      // the shift is effectively permanent since we never revert it.
       await stripePatch(
         `subscriptions/${mem.stripe_subscription_id}`,
         stripeKey,
-        {
-          billing_cycle_anchor: anchorTs,
-          proration_behavior: 'none',
-        },
+        { trial_end: anchorTs },
         connectedAccountId,
       );
 

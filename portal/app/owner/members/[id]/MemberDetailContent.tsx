@@ -865,6 +865,17 @@ function ChangeBillingDateSection({ member }: { member: MemberDetail }) {
           <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 4 }}>
             A confirmation email has been sent to the parent.
           </div>
+          <button
+            onClick={() => { setResult(null); handleOpen(); }}
+            style={{
+              width: '100%', padding: '7px 0', borderRadius: 6, marginTop: 10,
+              border: `1px solid ${brand.border}`, background: 'transparent',
+              color: brand.textMuted, fontSize: 11, fontWeight: 700,
+              cursor: 'pointer', letterSpacing: 0.5,
+            }}
+          >
+            Change billing date again
+          </button>
         </OCard>
       </div>
     );

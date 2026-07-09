@@ -1037,6 +1037,10 @@ Deno.serve(async (req) => {
           const enc = (k: string, v: string | number) =>
             `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`;
 
+          // Stripe's subscription-update endpoint only accepts billing_cycle_anchor
+          // values of 'now' or 'unchanged' — an arbitrary future timestamp is
+          // rejected. Use trial_end (same mechanism the owner-portal route uses)
+          // to defer the next invoice back to the original anchor day.
           const revertRes = await fetch(
             `https://api.stripe.com/v1/subscriptions/${subId}`,
             {
@@ -1047,10 +1051,7 @@ Deno.serve(async (req) => {
                 'Stripe-Version': '2024-06-20',
                 'Stripe-Account': locRevert.stripe_account_id as string,
               },
-              body: [
-                enc('billing_cycle_anchor', revertTs),
-                enc('proration_behavior', 'none'),
-              ].join('&'),
+              body: enc('trial_end', revertTs),
             },
           );
 
