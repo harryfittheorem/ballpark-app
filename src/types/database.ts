@@ -1111,6 +1111,51 @@ export type Database = {
           },
         ]
       }
+      membership_admin_events: {
+        Row: {
+          created_at: string
+          created_by: string
+          event_type: string
+          id: string
+          membership_id: string
+          note: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          event_type: string
+          id?: string
+          membership_id: string
+          note?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          event_type?: string
+          id?: string
+          membership_id?: string
+          note?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_admin_events_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_admin_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membership_billing_date_changes: {
         Row: {
           change_type: string
@@ -1274,6 +1319,7 @@ export type Database = {
           cancelled_at: string | null
           contract_url: string | null
           created_at: string
+          expires_at: string | null
           family_id: string
           id: string
           kid_id: string
@@ -1282,6 +1328,9 @@ export type Database = {
           pause_start: string | null
           paused_at: string | null
           payment_failed_at: string | null
+          payment_failure_count: number
+          payment_pause_scheduled_at: string | null
+          payment_paused_reason: string | null
           plan_name: string
           plan_type: string
           sessions_per_week: number | null
@@ -1305,6 +1354,7 @@ export type Database = {
           cancelled_at?: string | null
           contract_url?: string | null
           created_at?: string
+          expires_at?: string | null
           family_id: string
           id?: string
           kid_id: string
@@ -1313,6 +1363,9 @@ export type Database = {
           pause_start?: string | null
           paused_at?: string | null
           payment_failed_at?: string | null
+          payment_failure_count?: number
+          payment_pause_scheduled_at?: string | null
+          payment_paused_reason?: string | null
           plan_name: string
           plan_type: string
           sessions_per_week?: number | null
@@ -1336,6 +1389,7 @@ export type Database = {
           cancelled_at?: string | null
           contract_url?: string | null
           created_at?: string
+          expires_at?: string | null
           family_id?: string
           id?: string
           kid_id?: string
@@ -1344,6 +1398,9 @@ export type Database = {
           pause_start?: string | null
           paused_at?: string | null
           payment_failed_at?: string | null
+          payment_failure_count?: number
+          payment_pause_scheduled_at?: string | null
+          payment_paused_reason?: string | null
           plan_name?: string
           plan_type?: string
           sessions_per_week?: number | null
@@ -1797,6 +1854,70 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "promo_codes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_charges: {
+        Row: {
+          amount_cents: number
+          charge_date: string
+          created_at: string
+          failure_reason: string | null
+          family_id: string
+          id: string
+          membership_id: string
+          status: string
+          stripe_payment_intent_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          charge_date: string
+          created_at?: string
+          failure_reason?: string | null
+          family_id: string
+          id?: string
+          membership_id: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          charge_date?: string
+          created_at?: string
+          failure_reason?: string | null
+          family_id?: string
+          id?: string
+          membership_id?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_charges_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_charges_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_charges_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -2392,6 +2513,16 @@ export type Database = {
       _video_is_parent_upload: {
         Args: { p_tenant_id: string; p_user_id: string; p_video_id: string }
         Returns: boolean
+      }
+      activate_membership_with_scheduled_charge: {
+        Args: {
+          p_amount_cents: number
+          p_charge_date: string
+          p_family_id: string
+          p_membership_id: string
+          p_tenant_id: string
+        }
+        Returns: undefined
       }
       book_session_with_friend: {
         Args: {
