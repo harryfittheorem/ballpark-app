@@ -8,6 +8,7 @@ import {
   AlertCircle, PauseCircle, PlayCircle, Package, Phone, Mail, X,
 } from 'lucide-react';
 import { useState, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import type { MemberDetail, BookingFormOptions } from '@/lib/supabase/ownerQueries';
 import type { DemoMemberDetail } from './demoMemberDetails';
 
@@ -783,6 +784,7 @@ function EftWeeklyCreditsSection({ member }: { member: MemberDetail }) {
 }
 
 function ChangeBillingDateSection({ member }: { member: MemberDetail }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number>(member.billingAnchorDay ?? 1);
   const [changeType, setChangeType] = useState<'permanent' | 'one_time'>('permanent');
@@ -824,13 +826,14 @@ function ChangeBillingDateSection({ member }: { member: MemberDetail }) {
           newDay: data.new_anchor_day ?? selectedDay,
         });
         setOpen(false);
+        router.refresh();
       }
     } catch (err) {
       setSaveErr(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setSaving(false);
     }
-  }, [member.id, selectedDay, changeType]);
+  }, [member.id, selectedDay, changeType, router]);
 
   if (member.planType !== 'eft' || !member.stripeSubscriptionId) return null;
 
