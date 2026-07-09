@@ -108,6 +108,23 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// Stripe API versions >= 2025-XX-XX ("...dahlia" and later) moved the invoice's
+// linked subscription from the top-level `subscription` field to
+// `parent.subscription_details.subscription`. Read both so this keeps working
+// regardless of which API version the connected account's events are sent in.
+function extractInvoiceSubscriptionId(invoice: {
+  subscription?: string | null;
+  parent?: {
+    subscription_details?: { subscription?: string | null } | null;
+  } | null;
+}): string | null {
+  return (
+    invoice.subscription ??
+    invoice.parent?.subscription_details?.subscription ??
+    null
+  );
+}
+
 // ─── Onboarding status mapping ───────────────────────────────────────────────
 
 function deriveOnboardingStatus(account: {
@@ -851,14 +868,17 @@ Deno.serve(async (req) => {
     const invoice = event.data.object as {
       id: string;
       subscription?: string;
+      parent?: { subscription_details?: { subscription?: string | null } | null } | null;
       customer: string;
       amount_paid: number;
       currency: string;
       period_end?: number;
     };
 
+    const invoiceSubscriptionId = extractInvoiceSubscriptionId(invoice);
+
     // Only care about subscription invoices
-    if (!invoice.subscription) {
+    if (!invoiceSubscriptionId) {
       console.log(`[stripe-webhook] invoice.payment_succeeded: no subscription, ignoring`);
       return json({ ok: true, ignored: true });
     }
@@ -868,7 +888,7 @@ Deno.serve(async (req) => {
     const { data: mem, error: memErr } = await supabase
       .from('memberships')
       .select('id, tenant_id, family_id, plan_name, status, payment_failure_count, payment_paused_reason, stripe_subscription_id, families!inner(primary_location_id)')
-      .eq('stripe_subscription_id', invoice.subscription)
+      .eq('stripe_subscription_id', invoiceSubscriptionId)
       .maybeSingle();
 
     if (memErr) {
@@ -877,7 +897,7 @@ Deno.serve(async (req) => {
     }
 
     if (!mem) {
-      console.log(`[stripe-webhook] invoice.payment_succeeded: no membership for sub=${invoice.subscription}, ignoring`);
+      console.log(`[stripe-webhook] invoice.payment_succeeded: no membership for sub=${invoiceSubscriptionId}, ignoring`);
       return json({ ok: true, ignored: true });
     }
 
@@ -1130,6 +1150,7 @@ Deno.serve(async (req) => {
     const invoice = event.data.object as {
       id: string;
       subscription?: string;
+      parent?: { subscription_details?: { subscription?: string | null } | null } | null;
       customer: string;
       amount_due: number;
       currency: string;
@@ -1137,7 +1158,9 @@ Deno.serve(async (req) => {
       next_payment_attempt?: number | null;
     };
 
-    if (!invoice.subscription) {
+    const invoiceSubscriptionId = extractInvoiceSubscriptionId(invoice);
+
+    if (!invoiceSubscriptionId) {
       console.log(`[stripe-webhook] invoice.payment_failed: no subscription, ignoring`);
       return json({ ok: true, ignored: true });
     }
@@ -1148,7 +1171,7 @@ Deno.serve(async (req) => {
     const { data: mem, error: memErr } = await supabase
       .from('memberships')
       .select('id, tenant_id, family_id, plan_name, status, payment_failure_count, payment_pause_scheduled_at, families!inner(primary_location_id)')
-      .eq('stripe_subscription_id', invoice.subscription)
+      .eq('stripe_subscription_id', invoiceSubscriptionId)
       .maybeSingle();
 
     if (memErr) {
@@ -1157,7 +1180,7 @@ Deno.serve(async (req) => {
     }
 
     if (!mem) {
-      console.log(`[stripe-webhook] invoice.payment_failed: no membership for sub=${invoice.subscription}, ignoring`);
+      console.log(`[stripe-webhook] invoice.payment_failed: no membership for sub=${invoiceSubscriptionId}, ignoring`);
       return json({ ok: true, ignored: true });
     }
 
