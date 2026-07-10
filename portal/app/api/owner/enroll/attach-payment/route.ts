@@ -660,6 +660,31 @@ export async function POST(req: NextRequest) {
         return err(500, `Could not activate membership: ${activateErr.message}`);
       }
     }
+
+    // ── Record the payment that was just captured ──────────────────────────
+    // Without this, the deposit/full-payment charge that just succeeded never
+    // shows up in payment_events — which is what revenue reports, MRR, the
+    // billing KPI cards, and the family's payment-history timeline all read
+    // from. Only collect-scheduled-charges (the cron for later balance/deferred
+    // charges) was writing payment_events; the initial in-app payment was not.
+    const capturedAmountCents = isSplit ? split_deposit_cents! : amountCents;
+    const { error: paymentEventErr } = await serviceClient
+      .from('payment_events')
+      .insert({
+        tenant_id: tenantId,
+        family_id,
+        membership_id,
+        amount_cents: capturedAmountCents,
+        status: 'paid',
+        payment_method: 'card',
+        stripe_payment_intent_id: stripe_intent_id,
+      });
+
+    if (paymentEventErr) {
+      // Non-fatal: the membership is already active and the charge already
+      // succeeded on Stripe — don't fail the enrollment over a bookkeeping row.
+      console.error('[enroll/attach-payment] payment_events insert failed:', paymentEventErr.message);
+    }
   }
 
   // ── Send welcome email now that membership is confirmed active ────────────
