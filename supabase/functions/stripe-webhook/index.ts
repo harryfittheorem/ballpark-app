@@ -873,6 +873,7 @@ Deno.serve(async (req) => {
       amount_paid: number;
       currency: string;
       period_end?: number;
+      lines?: { data?: Array<{ period?: { start?: number; end?: number } }> };
     };
 
     const invoiceSubscriptionId = extractInvoiceSubscriptionId(invoice);
@@ -951,7 +952,20 @@ Deno.serve(async (req) => {
 
     // ── Full recovery — runs for both fresh and re-delivered paid events ──────
     // mem now includes all fields needed; no second round-trip required.
-    const nextBillingAt = invoice.period_end
+    // NOTE: `invoice.period_end` is NOT reliable here. For a renewal invoice,
+    // Stripe sets the top-level invoice.period_start/period_end to the billing
+    // period that JUST ELAPSED (the one this invoice is settling), not the new
+    // period the subscription enters after this payment. The line item's own
+    // `period.end` (the subscription line) is the authoritative "when does the
+    // NEW period end" value — verified empirically against a live test-clock
+    // renewal where invoice.period_end stayed pinned to the old cycle boundary
+    // while lines[0].period.end correctly advanced to the new one. Falling back
+    // to invoice.period_end only if no line period is present (defensive; should
+    // not happen for real subscription invoices).
+    const lineItemPeriodEnd = invoice.lines?.data?.[0]?.period?.end;
+    const nextBillingAt = lineItemPeriodEnd
+      ? new Date(lineItemPeriodEnd * 1000).toISOString()
+      : invoice.period_end
       ? new Date(invoice.period_end * 1000).toISOString()
       : null;
 

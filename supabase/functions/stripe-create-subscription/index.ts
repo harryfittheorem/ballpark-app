@@ -425,7 +425,62 @@ async function handleRequest(req: Request): Promise<Response> {
     subParams['proration_behavior'] = 'none';
   }
 
-  const subscription = await stripePost('subscriptions', stripeKey, subParams, connectedAccountId);
+  let subscription = await stripePost('subscriptions', stripeKey, subParams, connectedAccountId);
+
+  // ── Confirm the first invoice's PaymentIntent (off-session) ────────────────
+  // `payment_behavior: 'default_incomplete'` intentionally does NOT auto-charge —
+  // Stripe leaves the invoice's PaymentIntent in `requires_confirmation` and waits
+  // for an explicit confirm call. `off_session: true` is a PaymentIntent-confirm
+  // parameter, not a Subscription-create parameter, so setting it on `subParams`
+  // above has no effect on Stripe's side. Without this explicit confirm step the
+  // subscription would sit in `incomplete` status forever (until Stripe auto-voids
+  // it ~23h later) and the family would never actually be charged.
+  //
+  // We confirm off-session using the customer's saved default payment method,
+  // matching how a renewal is charged automatically. If the card requires
+  // authentication (3DS) or is declined, the PaymentIntent surfaces that via its
+  // status/last_payment_error and we leave the subscription in its Stripe-reported
+  // state — the invoice.payment_failed webhook (or a future invoice cycle) reconciles
+  // further, exactly as documented below for post-creation states.
+  const latestInvoice = subscription.latest_invoice as {
+    id: string;
+    payment_intent?: { id: string; status: string } | string | null;
+  } | undefined;
+  const latestInvoicePaymentIntent = latestInvoice?.payment_intent;
+  const paymentIntentId = typeof latestInvoicePaymentIntent === 'string'
+    ? latestInvoicePaymentIntent
+    : latestInvoicePaymentIntent?.id;
+  const paymentIntentStatus = typeof latestInvoicePaymentIntent === 'object'
+    ? latestInvoicePaymentIntent?.status
+    : undefined;
+
+  if (paymentIntentId && paymentIntentStatus === 'requires_confirmation') {
+    // No `payment_method` param — Stripe uses the invoice's default payment
+    // method, which falls back to the customer's `invoice_settings.default_payment_method`
+    // (the card saved during the SetupIntent step). Same resolution Stripe uses
+    // for automatic renewal charges, so this mirrors real renewal behavior.
+    try {
+      await stripePost(
+        `payment_intents/${paymentIntentId}/confirm`,
+        stripeKey,
+        { off_session: 'true' },
+        connectedAccountId,
+      );
+    } catch (confirmErr) {
+      // Confirmation failure (decline, requires_action, etc.) is a legitimate
+      // outcome — do not throw. Re-fetch the subscription below to pick up the
+      // resulting Stripe-reported status (e.g. `past_due`/`incomplete`) so the DB
+      // write below reflects reality; invoice.payment_failed will also fire.
+      console.log(`[stripe-create-subscription] initial confirm failed (expected for declines): ${(confirmErr as Error).message}`);
+    }
+
+    // Re-fetch the subscription to get the post-confirm status/period-end.
+    subscription = await stripeGet(
+      `subscriptions/${subscription.id}?expand[0]=latest_invoice.payment_intent`,
+      stripeKey,
+      connectedAccountId,
+    ).catch(() => subscription);
+  }
 
   const currentPeriodEnd = subscription.current_period_end as number;
   const nextBillingAt = new Date(currentPeriodEnd * 1000).toISOString();

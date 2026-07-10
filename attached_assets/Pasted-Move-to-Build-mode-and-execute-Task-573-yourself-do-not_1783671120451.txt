@@ -1,0 +1,51 @@
+Move to Build mode and execute Task #573 yourself (do not delegate it to a task agent), since you already have the full context from Task #572 and the Stripe Connect setup.
+
+Before making any production changes, first verify the architectural observation you found:
+
+Determine whether the missing customer.subscription.created and customer.subscription.updated webhook subscriptions are intentionally unnecessary or whether they should be enabled.
+If the current implementation already performs all required state updates synchronously, document why those webhook events are not needed.
+If enabling them would improve the production system without introducing duplicate processing, implement the change and explain the production impact.
+
+Then execute the recurring subscription validation using the actual production implementation and real Stripe test-mode objects against the Frisco Academy connected account.
+
+Validate and document, in order:
+
+Initial recurring subscription creation.
+Successful renewal (invoice.payment_succeeded / invoice.paid).
+Failed renewal (invoice.payment_failed).
+Stripe retry/dunning behavior (or clearly document any Stripe test-mode limitations if automatic retries cannot be reproduced).
+Webhook idempotency by replaying the same success and failure events and confirming there are no duplicate payment_events, membership updates, emails, invoices, or MRR/revenue records.
+Subscription cancellation through the normal production flow, including webhook processing, membership status transitions, future invoice suppression, payment history, and MRR/revenue updates.
+Verify owner portal reporting, including MRR, revenue reports, billing history, and KPIs after every scenario.
+
+Use the real production code paths wherever possible:
+
+stripe-create-subscription
+stripe-webhook
+Enrollment and attach-payment routes
+Production RPCs
+Edge Functions
+Database logic
+
+Do not use manual database updates or test-only workarounds to simulate payment outcomes. Manual fixture creation and cleanup is acceptable, but all payment state transitions must come from the production application logic in response to real Stripe test-mode events.
+
+Please provide incremental progress updates after each major scenario instead of only a final report. For every scenario include:
+
+Subscription ID
+Invoice ID
+PaymentIntent ID (if applicable)
+Stripe Event ID(s)
+Webhook event received
+Membership status transition
+payment_events changes
+MRR/revenue reporting impact
+PASS/FAIL
+
+If any production bug is discovered:
+
+Explain the root cause.
+Apply the minimal production fix (no test-only code).
+Re-run the affected scenario.
+Include the commit hash and modified files.
+
+Finally, provide a comprehensive validation report and explicitly state whether the entire recurring subscription/EFT payment system is production-ready or identify any remaining blockers.
