@@ -86,10 +86,19 @@ export async function POST(req: NextRequest) {
   let stripeAccountId = location.stripe_account_id as string | null;
 
   if (!stripeAccountId) {
+    // Explicitly request the capabilities we need. Without this, Express
+    // accounts on this platform were only granted `transfers` by default —
+    // `card_payments` stayed status="unrequested" forever, so no card charge
+    // (deposit, split-payment, subscription renewal, etc.) could ever
+    // succeed on the connected account regardless of onboarding completion.
     const createRes = await fetch('https://api.stripe.com/v1/accounts', {
       method: 'POST',
       headers: stripeHeaders,
-      body: new URLSearchParams({ type: 'express' }).toString(),
+      body: new URLSearchParams({
+        type: 'express',
+        'capabilities[card_payments][requested]': 'true',
+        'capabilities[transfers][requested]': 'true',
+      }).toString(),
       cache: 'no-store',
     });
 
