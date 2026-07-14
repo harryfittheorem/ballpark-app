@@ -12,9 +12,14 @@ import {
 import type { MembershipPlan } from '@/app/api/owner/membership-plans/route';
 import type SignatureCanvasType from 'react-signature-canvas';
 
-// Dynamically import SignatureCanvas (requires DOM canvas API)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const SignatureCanvas = dynamic(() => import('react-signature-canvas') as any, { ssr: false }) as React.ComponentType<{
+// Dynamically import SignatureCanvas (requires DOM canvas API).
+// Explicitly resolve .default so Next.js dev-mode ESM resolution works the
+// same as production — without this, the module object is returned unwrapped
+// in dev and the component renders null, collapsing the canvas container.
+const SignatureCanvas = dynamic(
+  () => import('react-signature-canvas').then(mod => mod.default ?? (mod as unknown as typeof mod.default)),
+  { ssr: false },
+) as React.ComponentType<{
   ref?: React.Ref<SignatureCanvasType>;
   penColor?: string;
   canvasProps?: React.CanvasHTMLAttributes<HTMLCanvasElement>;
@@ -486,7 +491,7 @@ function Step3({
         <div style={{
           border: `2px solid ${hasInk ? brand.gold : brand.border}`, borderRadius: 8,
           background: brand.darkest, overflow: 'hidden', cursor: 'crosshair',
-          transition: 'border-color 0.2s',
+          transition: 'border-color 0.2s', minHeight: 160,
         }}>
           <SignatureCanvas
             ref={sigCanvasRef}
