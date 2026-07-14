@@ -478,8 +478,14 @@ export async function POST(req: NextRequest) {
     }
 
     // ── EFT: Activate membership via activate endpoint ─────────────────────
-    const host = req.headers.get('host') ?? 'localhost:3000';
-    const proto = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    // Use x-forwarded-proto (set by Replit's proxy) to determine the correct
+    // scheme for this server-to-server call. Fall back to https for any
+    // non-localhost host so the call works on both dev (Replit proxy, HTTPS
+    // only) and production. NODE_ENV alone is not sufficient — dev on Replit
+    // is behind an HTTPS proxy even though NODE_ENV is 'development'.
+    const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'localhost:5000';
+    const forwardedProto = req.headers.get('x-forwarded-proto');
+    const proto = forwardedProto ?? (host.includes('localhost') ? 'http' : 'https');
     const activateRes = await fetch(`${proto}://${host}/api/memberships/activate`, {
       method: 'POST',
       headers: {
