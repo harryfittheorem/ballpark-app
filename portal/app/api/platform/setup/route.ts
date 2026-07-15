@@ -24,6 +24,18 @@ function fail(status: number, message: string) {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    return await handlePost(req);
+  } catch (err) {
+    console.error('[platform/setup] unhandled error:', err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Internal server error' },
+      { status: 500 },
+    );
+  }
+}
+
+async function handlePost(req: NextRequest) {
   const ip = getClientIp(req);
   const rl = checkRateLimit(`platform-setup:${ip}`, 5, 15 * 60_000);
   if (!rl.allowed) {
@@ -92,7 +104,11 @@ export async function POST(req: NextRequest) {
   const createBody = await createRes.json() as { id?: string; error?: string; msg?: string };
 
   if (!createRes.ok || !createBody.id) {
-    return fail(500, createBody.error ?? createBody.msg ?? 'Failed to create auth user');
+    console.error('[platform/setup] auth user creation failed:', createRes.status, createBody);
+    const msg = createBody.error ?? createBody.msg ?? 'Failed to create auth user';
+    // Supabase returns 422 when the email is already registered.
+    const status = createRes.status === 422 ? 409 : 500;
+    return fail(status, status === 409 ? `An account with ${email} already exists` : msg);
   }
 
   const userId = createBody.id;

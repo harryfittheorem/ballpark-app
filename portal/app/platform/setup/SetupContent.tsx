@@ -122,6 +122,16 @@ export function SetupContent() {
         </div>
 
         <form onSubmit={handleSubmit} style={{ padding: '20px 32px 32px' }}>
+          {error && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 8,
+              background: brand.dangerBg, color: brand.danger,
+              fontSize: 13, marginBottom: 20, lineHeight: 1.5,
+            }}>
+              {error}
+            </div>
+          )}
+
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Full Name *</label>
             <input
@@ -157,16 +167,6 @@ export function SetupContent() {
               placeholder="Repeat password"
             />
           </div>
-
-          {error && (
-            <div style={{
-              padding: '10px 14px', borderRadius: 8,
-              background: brand.dangerBg, color: brand.danger,
-              fontSize: 13, marginBottom: 18,
-            }}>
-              {error}
-            </div>
-          )}
 
           <button
             type="submit" disabled={loading}
