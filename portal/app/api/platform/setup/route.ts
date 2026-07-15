@@ -119,10 +119,15 @@ export async function POST(req: NextRequest) {
     .insert({ user_id: userId, name: name.trim(), email });
 
   if (saError) {
-    await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
-      method: 'DELETE',
-      headers: adminHeaders,
-    });
+    // Compensate: delete auth user AND remove the platform_init row so the
+    // bootstrap page re-opens and the operator can try again.
+    await Promise.allSettled([
+      fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: adminHeaders,
+      }),
+      serviceClient.from('platform_init').delete().eq('id', 1),
+    ]);
     return fail(500, `Failed to create super admin record: ${saError.message}`);
   }
 

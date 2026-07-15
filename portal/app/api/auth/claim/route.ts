@@ -142,10 +142,17 @@ export async function POST(req: NextRequest) {
   }
 
   // Mark invite as claimed — single-use enforcement.
-  await serviceClient
+  const { error: claimError } = await serviceClient
     .from('hq_invites')
     .update({ status: 'claimed', claimed_at: new Date().toISOString(), claimed_by_user_id: userId })
     .eq('id', invite.id);
+
+  if (claimError) {
+    // The user account was created successfully and is usable — log the failure
+    // but don't block the response. The invite will still show as pending for
+    // admins (cosmetic only; the email uniqueness check prevents reuse).
+    console.error('[auth/claim] failed to mark invite claimed:', claimError.message);
+  }
 
   // Audit log.
   await serviceClient
