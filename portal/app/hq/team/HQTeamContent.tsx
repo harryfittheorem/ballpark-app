@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
-import { Users, Plus, Shield, UserCog, Crown, Pencil } from 'lucide-react';
-import type { HQTeamMember, HQLocation } from '@/lib/supabase/hqQueries';
+import { Users, Plus, Shield, UserCog, Crown, Pencil, Mail, X, Loader2 } from 'lucide-react';
+import type { HQTeamMember, HQLocation, HQPendingInvite } from '@/lib/supabase/hqQueries';
 import { HQInviteModal } from './HQInviteModal';
 import { HQEditTeamMemberModal } from './HQEditTeamMemberModal';
 
 interface Props {
   team: HQTeamMember[];
   locations: HQLocation[];
+  pendingInvites: HQPendingInvite[];
 }
 
 const roleConfig: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
@@ -38,8 +40,7 @@ function RoleChip({ role }: { role: string }) {
 function formatLastSignIn(ts: string | null) {
   if (!ts) return 'Never';
   const d = new Date(ts);
-  const diffMs = Date.now() - d.getTime();
-  const diffDays = Math.floor(diffMs / 86_400_000);
+  const diffDays = Math.floor((Date.now() - d.getTime()) / 86_400_000);
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return '1d ago';
   if (diffDays < 30) return `${diffDays}d ago`;
@@ -53,15 +54,26 @@ function formatJoined(ts: string) {
   return `${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+function formatExpiry(ts: string) {
+  const d = new Date(ts);
+  const diffMs = d.getTime() - Date.now();
+  const diffHrs = Math.ceil(diffMs / 3_600_000);
+  if (diffHrs <= 0) return 'Expired';
+  if (diffHrs < 24) return `${diffHrs}h`;
+  return `${Math.ceil(diffHrs / 24)}d`;
+}
+
 function initials(name: string) {
   const parts = name.trim().split(' ');
   return (parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '');
 }
 
-export function HQTeamContent({ team, locations }: Props) {
+export function HQTeamContent({ team, locations, pendingInvites }: Props) {
+  const router = useRouter();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [editMember, setEditMember] = useState<HQTeamMember | null>(null);
   const [filter, setFilter] = useState<FilterRole>('all');
+  const [revokingId, setRevokingId] = useState<string | null>(null);
 
   const filtered = filter === 'all' ? team : team.filter(m => m.role === filter);
 
@@ -72,6 +84,23 @@ export function HQTeamContent({ team, locations }: Props) {
     { key: 'admin', label: 'Admins' },
     { key: 'coach', label: 'Coaches' },
   ];
+
+  async function handleRevoke(inviteId: string) {
+    if (!confirm('Revoke this invitation? The link will stop working immediately.')) return;
+    setRevokingId(inviteId);
+    try {
+      const res = await fetch(`/api/hq/invite/${inviteId}/revoke`, { method: 'POST' });
+      if (!res.ok) {
+        const b = await res.json() as { error?: string };
+        throw new Error(b.error ?? 'Failed to revoke');
+      }
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to revoke invite');
+    } finally {
+      setRevokingId(null);
+    }
+  }
 
   return (
     <div style={{ padding: 28 }}>
@@ -122,8 +151,8 @@ export function HQTeamContent({ team, locations }: Props) {
         ))}
       </div>
 
-      {/* Table */}
-      <div style={{ background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, overflow: 'hidden' }}>
+      {/* Team table */}
+      <div style={{ background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, overflow: 'hidden', marginBottom: 28 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: brand.surfaceAlt, borderBottom: `1px solid ${brand.border}` }}>
@@ -202,6 +231,104 @@ export function HQTeamContent({ team, locations }: Props) {
           </tbody>
         </table>
       </div>
+
+      {/* Pending HQ Admin Invites */}
+      {pendingInvites.length > 0 && (
+        <div>
+          <h2 style={{
+            fontFamily: fonts.display, fontSize: 16, fontWeight: 700,
+            color: brand.text, margin: '0 0 12px', letterSpacing: 0.3,
+          }}>
+            Pending HQ Admin Invitations
+            <span style={{
+              marginLeft: 8, padding: '2px 9px', borderRadius: 12,
+              background: brand.goldDeep + '18', color: brand.goldDeep,
+              fontSize: 11, fontWeight: 700,
+            }}>
+              {pendingInvites.length}
+            </span>
+          </h2>
+          <div style={{
+            background: brand.surface, borderRadius: 12,
+            border: `1px solid ${brand.border}`, overflow: 'hidden',
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: brand.surfaceAlt, borderBottom: `1px solid ${brand.border}` }}>
+                  {['Email', 'Invited By', 'Expires In', 'Sent', ''].map(h => (
+                    <th key={h} style={{
+                      padding: '10px 16px', textAlign: 'left',
+                      fontSize: 11, fontWeight: 700, color: brand.textMuted,
+                      letterSpacing: 0.8, textTransform: 'uppercase', fontFamily: fonts.display,
+                    }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pendingInvites.map((inv, i) => (
+                  <tr key={inv.id} style={{
+                    borderBottom: i < pendingInvites.length - 1 ? `1px solid ${brand.border}` : 'none',
+                  }}>
+                    <td style={{ padding: '11px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{
+                          width: 28, height: 28, borderRadius: 6,
+                          background: brand.goldDeep + '18',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <Mail size={12} color={brand.goldDeep} />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, color: brand.text }}>{inv.email}</div>
+                          <div style={{ fontSize: 11, color: brand.goldDeep }}>HQ Admin</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '11px 16px', color: brand.textMuted, fontSize: 12 }}>
+                      {inv.invitedByName ?? '—'}
+                    </td>
+                    <td style={{ padding: '11px 16px' }}>
+                      <span style={{
+                        padding: '3px 9px', borderRadius: 12, fontSize: 11, fontWeight: 600,
+                        background: brand.warningBg, color: brand.warning,
+                      }}>
+                        {formatExpiry(inv.expiresAt)}
+                      </span>
+                    </td>
+                    <td style={{ padding: '11px 16px', color: brand.textMuted, fontSize: 12 }}>
+                      {formatJoined(inv.createdAt)}
+                    </td>
+                    <td style={{ padding: '11px 16px' }}>
+                      <button
+                        onClick={() => handleRevoke(inv.id)}
+                        disabled={revokingId === inv.id}
+                        title="Revoke invitation"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          padding: '5px 10px', borderRadius: 6,
+                          border: `1px solid ${brand.danger}40`,
+                          background: brand.dangerBg,
+                          color: brand.danger, fontSize: 11, fontWeight: 600,
+                          cursor: revokingId === inv.id ? 'not-allowed' : 'pointer',
+                          opacity: revokingId === inv.id ? 0.6 : 1,
+                        }}
+                      >
+                        {revokingId === inv.id
+                          ? <Loader2 size={10} />
+                          : <X size={10} />
+                        }
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {showInviteModal && <HQInviteModal onClose={() => setShowInviteModal(false)} locations={locations} />}
       {editMember && <HQEditTeamMemberModal member={editMember} onClose={() => setEditMember(null)} />}

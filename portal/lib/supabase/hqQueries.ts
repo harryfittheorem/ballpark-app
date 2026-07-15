@@ -517,3 +517,48 @@ export async function getHQRecentTransactions(supabase: SupabaseClient, limit = 
     };
   });
 }
+
+// ─── HQ Invites ──────────────────────────────────────────────────────────────
+
+export type HQPendingInvite = {
+  id: string;
+  email: string;
+  role: string;
+  invitedByUserId: string | null;
+  invitedByName: string | null;
+  expiresAt: string;
+  createdAt: string;
+};
+
+export async function getHQPendingInvites(
+  supabase: SupabaseClient,
+): Promise<HQPendingInvite[]> {
+  const { data, error } = await supabase
+    .from('hq_invites')
+    .select('id, email, role, invited_by, expires_at, created_at')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error || !data) return [];
+
+  const inviterIds = [...new Set(data.map((r) => r.invited_by).filter(Boolean))] as string[];
+  let inviterMap = new Map<string, string>();
+
+  if (inviterIds.length > 0) {
+    const { data: admins } = await supabase
+      .from('super_admins')
+      .select('user_id, name')
+      .in('user_id', inviterIds);
+    for (const a of (admins ?? [])) inviterMap.set(a.user_id, a.name);
+  }
+
+  return data.map((r) => ({
+    id: r.id,
+    email: r.email,
+    role: r.role,
+    invitedByUserId: r.invited_by ?? null,
+    invitedByName: r.invited_by ? (inviterMap.get(r.invited_by) ?? null) : null,
+    expiresAt: r.expires_at,
+    createdAt: r.created_at,
+  }));
+}
