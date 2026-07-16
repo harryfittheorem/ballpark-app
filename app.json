@@ -3,7 +3,7 @@
     "name": "Ballpark",
     "slug": "ballpark-app",
     "scheme": "ballpark",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -22,10 +22,49 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.fittheorem.ballpark",
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": ["C617.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+            "NSPrivacyAccessedAPITypeReasons": ["35F9.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ],
+        "NSPrivacyCollectedDataTypes": [
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeName",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeDeviceID",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          }
+        ],
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": []
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "Ballpark needs camera access so coaches can record video messages for their athletes.",
         "NSMicrophoneUsageDescription": "Ballpark needs microphone access so the audio in coach video messages is recorded.",
-        "NSPhotoLibraryUsageDescription": "Ballpark needs photo library access so coaches can pick existing videos to send to athletes."
+        "NSPhotoLibraryUsageDescription": "Ballpark needs photo library access to let you pick videos to send to your coach and to save Share Card images to your camera roll.",
+        "NSPhotoLibraryAddUsageDescription": "Ballpark needs permission to save Share Card images to your camera roll."
       }
     },
     "android": {
@@ -71,7 +110,7 @@
         {
           "cameraPermission": "Ballpark needs camera access so coaches can record video messages for their athletes.",
           "microphonePermission": "Ballpark needs microphone access so the audio in coach video messages is recorded.",
-          "photosPermission": "Ballpark needs photo library access so coaches can pick existing videos to send to athletes."
+          "photosPermission": "Ballpark needs photo library access to let you pick videos to send to your coach and to save Share Card images to your camera roll."
         }
       ],
       [

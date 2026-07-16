@@ -24,6 +24,36 @@ uri = "file://assets/favicon.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "oAG5FusqvP1aVwpElj3Em"
+uri = "file://app-store-screenshots/iphone/01-home.png"
+type = "image"
+title = "ballpark home dashboard screenshot"
+
+[[generated]]
+id = "VX9F8w2CNIrOgjJwFz39l"
+uri = "file://app-store-screenshots/iphone/02-book.png"
+type = "image"
+title = "ballpark book session clean"
+
+[[generated]]
+id = "ABYPx0uB4sQUlBr8ui8Xr"
+uri = "file://app-store-screenshots/iphone/03-coach-video.png"
+type = "image"
+title = "ballpark coach messages screenshot"
+
+[[generated]]
+id = "zAR4CCnIMWWcKVZ8HoEQy"
+uri = "file://app-store-screenshots/iphone/04-earn.png"
+type = "image"
+title = "ballpark earn rewards clean"
+
+[[generated]]
+id = "0gYOCn4zgThAyJEizrcIK"
+uri = "file://app-store-screenshots/iphone/05-profile.png"
+type = "image"
+title = "ballpark profile stats screenshot"
+
 [[outputs]]
 id = "9T3Es1MHr1wGjxOVrjtb3"
 uri = "file://artifacts/pitch-deck/ballpark-pitch-deck.pdf"
@@ -35,3 +65,33 @@ id = "IuMI-7dc_xBMxu3_B16Xc"
 uri = "file://codebase-extract.txt"
 type = "text"
 title = "Ballpark — Full Codebase Extract"
+
+[[outputs]]
+id = "8p_5jn6gHzgXFnl443X8c"
+uri = "file://app-store-screenshots/iphone/01-home.png"
+type = "image"
+title = "1 — Home Dashboard (1242×2688)"
+
+[[outputs]]
+id = "YydJSB64nmhZ9_aZN0xbi"
+uri = "file://app-store-screenshots/iphone/02-book.png"
+type = "image"
+title = "2 — Book Sessions (1242×2688)"
+
+[[outputs]]
+id = "AEQsVjrflrsicARzz-j_s"
+uri = "file://app-store-screenshots/iphone/03-coach-video.png"
+type = "image"
+title = "3 — Coach Messages (1242×2688)"
+
+[[outputs]]
+id = "0QpVmdFKXxAL3FFgigOzV"
+uri = "file://app-store-screenshots/iphone/04-earn.png"
+type = "image"
+title = "4 — Earn & Rewards (1242×2688)"
+
+[[outputs]]
+id = "h3qa0mXleF0uYUvKdEF6l"
+uri = "file://app-store-screenshots/iphone/05-profile.png"
+type = "image"
+title = "5 — Profile & Stats (1242×2688)"

@@ -31,6 +31,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Public legal / support pages — no auth required (Apple App Store review).
+  if (path === "/privacy" || path === "/support") {
+    return NextResponse.next();
+  }
+
   return await updateSession(request);
 }
 

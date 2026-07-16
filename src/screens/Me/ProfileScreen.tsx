@@ -23,6 +23,8 @@ import {
   BookCheck,
   Activity,
   UserPlus,
+  Shield,
+  HelpCircle,
 } from 'lucide-react-native';
 import { useMemo } from 'react';
 import {
@@ -33,6 +35,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { deleteAccount } from '@/api/account';
@@ -403,6 +406,24 @@ export default function ProfileScreen({ navigation }: Props) {
                   : 'muted'
           }
           onPress={() => navigation.navigate('ConnectHitTrax')}
+        />
+        <Row
+          icon={Shield}
+          label="Privacy Policy"
+          onPress={() =>
+            WebBrowser.openBrowserAsync(
+              `${process.env.EXPO_PUBLIC_PORTAL_URL ?? 'https://ballpark-app.replit.app'}/privacy`,
+            )
+          }
+        />
+        <Row
+          icon={HelpCircle}
+          label="Support"
+          onPress={() =>
+            WebBrowser.openBrowserAsync(
+              `${process.env.EXPO_PUBLIC_PORTAL_URL ?? 'https://ballpark-app.replit.app'}/support`,
+            )
+          }
         />
 
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
