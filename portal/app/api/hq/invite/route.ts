@@ -100,13 +100,28 @@ export async function POST(req: Request) {
 
     createdUserId = linkBody.id ?? null;
 
+    // Rewrite the action_link origin to the real public portal URL.
+    // Supabase generate_link uses its configured SITE_URL (often localhost),
+    // so we replace just the origin, preserving the path + token fragments.
+    let inviteLink = linkBody.action_link;
+    try {
+      const portalOrigin = (
+        process.env.NEXT_PUBLIC_PORTAL_URL?.replace(/\/$/, '') ??
+        (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null)
+      );
+      if (portalOrigin) {
+        const parsed = new URL(inviteLink);
+        inviteLink = portalOrigin + parsed.pathname + parsed.search + parsed.hash;
+      }
+    } catch { /* leave as-is if URL parse fails */ }
+
     const roleLabel = role === 'coach' ? 'Coach' : role === 'admin' ? 'Admin' : 'Owner';
     const inviteSubject = `You've been invited to Ballpark — ${tenant.name}`;
     const inviteHtml = `
           <p>Hi ${firstName},</p>
           <p>You've been invited to join <strong>${tenant.name}</strong> on Ballpark as a <strong>${roleLabel}</strong>.</p>
           <p>Click the link below to set your password and activate your account:</p>
-          <p><a href="${linkBody.action_link}" style="background:#F1E5AD;color:#2D2B2A;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;">Accept Invitation</a></p>
+          <p><a href="${inviteLink}" style="background:#F1E5AD;color:#2D2B2A;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;">Accept Invitation</a></p>
           <p>This link expires in 24 hours.</p>
           <p>— The Ballpark Team</p>
         `;
