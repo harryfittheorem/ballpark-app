@@ -133,7 +133,7 @@ export function HQInviteModal({ onClose, locations }: Props) {
             padding: 40,
             display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
           }}>
-            <CheckCircle2 size={48} color={brand.success} style={{ marginBottom: 16, flexShrink: 0 }} />
+            <CheckCircle2 size={48} color={brand.success} style={{ display: 'block', marginBottom: 16, flexShrink: 0, alignSelf: 'center' }} />
             <h3 style={{ fontFamily: fonts.display, fontSize: 18, fontWeight: 800, color: brand.text, margin: '0 0 8px' }}>
               Invite sent!
             </h3>

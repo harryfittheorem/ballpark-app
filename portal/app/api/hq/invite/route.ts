@@ -91,12 +91,11 @@ export async function POST(req: Request) {
         type: 'invite',
         email,
         data: userMeta,
-        redirect_to: (() => {
-          const origin =
-            process.env.NEXT_PUBLIC_PORTAL_URL?.replace(/\/$/, '') ??
-            (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
-          return `${origin}/auth/accept-invite`;
-        })(),
+        redirect_to: `${
+          process.env.NODE_ENV !== 'production'
+            ? (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000')
+            : (process.env.NEXT_PUBLIC_PORTAL_URL?.replace(/\/$/, '') ?? 'http://localhost:5000')
+        }/auth/accept-invite`,
       }),
     });
     const linkBody = await linkRes.json() as {
@@ -110,15 +109,30 @@ export async function POST(req: Request) {
 
     createdUserId = linkBody.id ?? null;
 
-    // The action_link from generate_link goes to Supabase's /auth/v1/verify endpoint.
-    // If Supabase is configured with localhost as site URL, fix the origin to point
-    // at the real Supabase auth server so the verification request reaches Supabase.
+    // Supabase generate_link uses the project's configured Site URL as origin.
+    // When Site URL is localhost we must fix the origin before emailing the link.
+    // Two formats are possible:
+    //   (a) Hash-fragment session: localhost:3000/#access_token=...
+    //       → replace origin with the portal URL so the browser SDK can exchange tokens
+    //   (b) Verify endpoint:       localhost:3000/auth/v1/verify?token=...
+    //       → replace origin with the Supabase project URL (that's where verify lives)
     let inviteLink = linkBody.action_link;
     try {
       const parsed = new URL(inviteLink);
       if (parsed.hostname === 'localhost') {
-        const supabaseOrigin = new URL(supabaseUrl).origin;
-        inviteLink = supabaseOrigin + parsed.pathname + parsed.search + parsed.hash;
+        const portalOrigin =
+          process.env.NODE_ENV !== 'production'
+            ? (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000')
+            : (process.env.NEXT_PUBLIC_PORTAL_URL?.replace(/\/$/, '') ?? 'http://localhost:5000');
+
+        if (parsed.pathname.startsWith('/auth/v1/')) {
+          // (b) Verify endpoint — must reach Supabase auth server
+          const supabaseOrigin = new URL(supabaseUrl).origin;
+          inviteLink = supabaseOrigin + parsed.pathname + parsed.search + parsed.hash;
+        } else {
+          // (a) Hash-fragment session — send to portal's accept-invite callback page
+          inviteLink = portalOrigin + '/auth/accept-invite' + parsed.hash;
+        }
       }
     } catch { /* leave as-is if URL parse fails */ }
 
