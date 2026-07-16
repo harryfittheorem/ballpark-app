@@ -20,7 +20,11 @@ export default function AcceptInvitePage() {
     // hash-fragment tokens (access_token / refresh_token) that Supabase
     // appended to this URL after verifying the invite token.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        // Ignore INITIAL_SESSION — that's the pre-existing browser session (e.g. a
+        // super_admin already logged in). We only care about the new SIGNED_IN event
+        // that fires when the SDK exchanges the hash-fragment tokens from this URL.
+        if (event !== 'SIGNED_IN') return;
         if (!session) return;
         subscription.unsubscribe();
 
@@ -28,6 +32,7 @@ export default function AcceptInvitePage() {
         if (role === 'owner') router.replace('/owner');
         else if (role === 'admin') router.replace('/admin');
         else if (role === 'coach') router.replace('/coach');
+        else if (role === 'super_admin') router.replace('/hq');
         else router.replace('/login');
       },
     );
