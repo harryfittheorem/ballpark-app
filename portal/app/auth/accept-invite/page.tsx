@@ -11,45 +11,48 @@ export default function AcceptInvitePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
+    async function handle() {
+      // createBrowserClient is cookie-based. When a cookie session already exists
+      // it reads that for INITIAL_SESSION and then skips URL hash processing entirely.
+      // So we parse the hash fragment ourselves and call setSession() explicitly —
+      // this works regardless of any pre-existing session.
+      const hash = window.location.hash.slice(1); // strip leading '#'
+      const params = new URLSearchParams(hash);
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
 
-    // onAuthStateChange fires as soon as the Supabase SDK exchanges the
-    // hash-fragment tokens (access_token / refresh_token) that Supabase
-    // appended to this URL after verifying the invite token.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        // Ignore INITIAL_SESSION — that's the pre-existing browser session (e.g. a
-        // super_admin already logged in). When the SDK exchanges the hash-fragment
-        // tokens it may emit SIGNED_IN or TOKEN_REFRESHED depending on whether a
-        // prior session was stored, so we allow all events except INITIAL_SESSION.
-        if (event === 'INITIAL_SESSION') return;
-        if (!session) return;
-        subscription.unsubscribe();
+      if (!accessToken || !refreshToken) {
+        setError('No tokens found in this invite link. Please request a new invite.');
+        return;
+      }
 
-        const role = session.user.user_metadata?.app_role as string | undefined;
-        if (role === 'owner') router.replace('/owner');
-        else if (role === 'admin') router.replace('/admin');
-        else if (role === 'coach') router.replace('/coach');
-        else if (role === 'super_admin') router.replace('/hq');
-        else router.replace('/login');
-      },
-    );
-
-    // Fallback: if no auth event fires within 8s, show an error.
-    const timeout = setTimeout(() => {
-      subscription.unsubscribe();
-      setError(
-        'Could not establish your session. The invite link may have expired — please request a new invite.',
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       );
-    }, 8000);
 
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
+      const { data, error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (sessionError || !data.session) {
+        setError(
+          sessionError?.message ??
+          'Could not establish your session. The invite link may have expired — please request a new invite.',
+        );
+        return;
+      }
+
+      const role = data.session.user.user_metadata?.app_role as string | undefined;
+      if (role === 'owner') router.replace('/owner');
+      else if (role === 'admin') router.replace('/admin');
+      else if (role === 'coach') router.replace('/coach');
+      else if (role === 'super_admin') router.replace('/hq');
+      else router.replace('/login');
+    }
+
+    handle();
   }, [router]);
 
   if (error) {
