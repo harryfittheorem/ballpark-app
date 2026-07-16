@@ -22,9 +22,10 @@ export default function AcceptInvitePage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         // Ignore INITIAL_SESSION — that's the pre-existing browser session (e.g. a
-        // super_admin already logged in). We only care about the new SIGNED_IN event
-        // that fires when the SDK exchanges the hash-fragment tokens from this URL.
-        if (event !== 'SIGNED_IN') return;
+        // super_admin already logged in). When the SDK exchanges the hash-fragment
+        // tokens it may emit SIGNED_IN or TOKEN_REFRESHED depending on whether a
+        // prior session was stored, so we allow all events except INITIAL_SESSION.
+        if (event === 'INITIAL_SESSION') return;
         if (!session) return;
         subscription.unsubscribe();
 
