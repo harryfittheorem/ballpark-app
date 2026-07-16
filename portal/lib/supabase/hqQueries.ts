@@ -542,7 +542,7 @@ export async function getHQPendingInvites(
   if (error || !data) return [];
 
   const inviterIds = [...new Set(data.map((r) => r.invited_by).filter(Boolean))] as string[];
-  let inviterMap = new Map<string, string>();
+  const inviterMap = new Map<string, string>();
 
   if (inviterIds.length > 0) {
     const { data: admins } = await supabase

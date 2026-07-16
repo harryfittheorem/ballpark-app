@@ -17,14 +17,19 @@ import type SignatureCanvasType from 'react-signature-canvas';
 // same as production — without this, the module object is returned unwrapped
 // in dev and the component renders null, collapsing the canvas container.
 const SignatureCanvas = dynamic(
-  () => import('react-signature-canvas').then(mod => mod.default ?? (mod as unknown as typeof mod.default)),
+  async () => {
+    const { default: SC } = await import('react-signature-canvas');
+    return {
+      default: SC as unknown as React.ComponentType<{
+        ref?: React.Ref<SignatureCanvasType>;
+        penColor?: string;
+        canvasProps?: React.CanvasHTMLAttributes<HTMLCanvasElement>;
+        onEnd?: () => void;
+      }>,
+    };
+  },
   { ssr: false },
-) as React.ComponentType<{
-  ref?: React.Ref<SignatureCanvasType>;
-  penColor?: string;
-  canvasProps?: React.CanvasHTMLAttributes<HTMLCanvasElement>;
-  onEnd?: () => void;
-}>;
+);
 
 // Dynamically import Stripe Elements (requires browser env)
 import { loadStripe } from '@stripe/stripe-js';

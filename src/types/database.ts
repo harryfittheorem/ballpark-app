@@ -811,6 +811,75 @@ export type Database = {
           },
         ]
       }
+      hq_audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          ip: string | null
+          metadata: Json | null
+          target_email: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          ip?: string | null
+          metadata?: Json | null
+          target_email?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          ip?: string | null
+          metadata?: Json | null
+          target_email?: string | null
+        }
+        Relationships: []
+      }
+      hq_invites: {
+        Row: {
+          claimed_at: string | null
+          claimed_by_user_id: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          role: string
+          status: string
+          token_hash: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by_user_id?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+          status?: string
+          token_hash: string
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by_user_id?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+          status?: string
+          token_hash?: string
+        }
+        Relationships: []
+      }
       kid_achievements: {
         Row: {
           achievement_id: string
@@ -998,7 +1067,7 @@ export type Database = {
           first_name: string
           id: string
           jersey_number: number | null
-          last_name: string
+          last_name: string | null
           points_balance: number
           primary_position: string | null
           updated_at: string
@@ -1013,7 +1082,7 @@ export type Database = {
           first_name: string
           id?: string
           jersey_number?: number | null
-          last_name: string
+          last_name?: string | null
           points_balance?: number
           primary_position?: string | null
           updated_at?: string
@@ -1028,7 +1097,7 @@ export type Database = {
           first_name?: string
           id?: string
           jersey_number?: number | null
-          last_name?: string
+          last_name?: string | null
           points_balance?: number
           primary_position?: string | null
           updated_at?: string
@@ -1051,6 +1120,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          is_active: boolean
           name: string
           phone: string | null
           state: string | null
@@ -1070,6 +1140,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_active?: boolean
           name: string
           phone?: string | null
           state?: string | null
@@ -1089,6 +1160,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_active?: boolean
           name?: string
           phone?: string | null
           state?: string | null
@@ -1689,6 +1761,24 @@ export type Database = {
           },
         ]
       }
+      platform_init: {
+        Row: {
+          id: number
+          initialized_at: string
+          initialized_by_user_id: string | null
+        }
+        Insert: {
+          id?: number
+          initialized_at?: string
+          initialized_by_user_id?: string | null
+        }
+        Update: {
+          id?: number
+          initialized_at?: string
+          initialized_by_user_id?: string | null
+        }
+        Relationships: []
+      }
       points_ledger: {
         Row: {
           balance_after: number
@@ -2102,6 +2192,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      super_admins: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       swings: {
         Row: {
