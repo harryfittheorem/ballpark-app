@@ -39,5 +39,18 @@ The Management API field is `uri_allow_list` (NOT `additional_redirect_urls`).
 
 ## accept-invite page
 
-Use `onAuthStateChange` (not `getSession` + timeout) — it fires as soon as the
-Supabase SDK exchanges the hash-fragment tokens that Supabase appends after verify.
+Do NOT use `onAuthStateChange`. `createBrowserClient` (cookie-based) skips URL
+hash processing entirely when a cookie session already exists — INITIAL_SESSION
+fires once and no further events come through.
+
+Instead, parse the hash manually and call `setSession()` directly:
+
+```typescript
+const hash = window.location.hash.slice(1);
+const params = new URLSearchParams(hash);
+const { data, error } = await supabase.auth.setSession({
+  access_token: params.get('access_token')!,
+  refresh_token: params.get('refresh_token')!,
+});
+// then route based on data.session.user.user_metadata?.app_role
+```
