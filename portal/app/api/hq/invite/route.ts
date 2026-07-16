@@ -99,42 +99,66 @@ export async function POST(req: Request) {
       }),
     });
     const linkBody = await linkRes.json() as {
-      action_link?: string; id?: string; error?: string; msg?: string;
+      action_link?: string;
+      hashed_token?: string;
+      verification_type?: string;
+      id?: string;
+      error?: string;
+      msg?: string;
     };
 
-    if (!linkRes.ok || !linkBody.action_link) {
+    console.log('[hq/invite] generate_link response keys:', Object.keys(linkBody));
+    console.log('[hq/invite] action_link:', linkBody.action_link);
+    console.log('[hq/invite] hashed_token present:', !!linkBody.hashed_token);
+    console.log('[hq/invite] REPLIT_DEV_DOMAIN:', process.env.REPLIT_DEV_DOMAIN);
+    console.log('[hq/invite] NODE_ENV:', process.env.NODE_ENV);
+
+    if (!linkRes.ok || (!linkBody.action_link && !linkBody.hashed_token)) {
       const errMsg = linkBody.error ?? linkBody.msg ?? 'Failed to generate invite link';
       return NextResponse.json({ error: errMsg }, { status: 500 });
     }
 
     createdUserId = linkBody.id ?? null;
 
-    // Supabase generate_link uses the project's configured Site URL as origin.
-    // When Site URL is localhost we must fix the origin before emailing the link.
-    // Two formats are possible:
-    //   (a) Hash-fragment session: localhost:3000/#access_token=...
-    //       → replace origin with the portal URL so the browser SDK can exchange tokens
-    //   (b) Verify endpoint:       localhost:3000/auth/v1/verify?token=...
-    //       → replace origin with the Supabase project URL (that's where verify lives)
-    let inviteLink = linkBody.action_link;
-    try {
-      const parsed = new URL(inviteLink);
-      if (parsed.hostname === 'localhost') {
-        const portalOrigin =
-          process.env.NODE_ENV !== 'production'
-            ? (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000')
-            : (process.env.NEXT_PUBLIC_PORTAL_URL?.replace(/\/$/, '') ?? 'http://localhost:5000');
+    // Build the portal callback origin (dev uses Replit dev domain, prod uses NEXT_PUBLIC_PORTAL_URL).
+    const portalOrigin =
+      process.env.NODE_ENV !== 'production'
+        ? (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000')
+        : (process.env.NEXT_PUBLIC_PORTAL_URL?.replace(/\/$/, '') ?? 'http://localhost:5000');
+    const redirectTo = `${portalOrigin}/auth/accept-invite`;
 
-        if (parsed.pathname.startsWith('/auth/v1/')) {
-          // (b) Verify endpoint — must reach Supabase auth server
-          const supabaseOrigin = new URL(supabaseUrl).origin;
-          inviteLink = supabaseOrigin + parsed.pathname + parsed.search + parsed.hash;
-        } else {
-          // (a) Hash-fragment session — send to portal's accept-invite callback page
-          inviteLink = portalOrigin + '/auth/accept-invite' + parsed.hash;
+    // Build a clean /auth/v1/verify URL using hashed_token.
+    // This avoids two issues with action_link:
+    //   1. action_link origin may be "localhost" (Supabase Site URL misconfigured)
+    //   2. Implicit-flow action_links contain tokens in the URL hash which many
+    //      email clients strip, breaking the link entirely.
+    // The verify endpoint always receives the token as a query param (not hash),
+    // survives email delivery, and lets Supabase redirect to our portal page
+    // with the session in the hash — where the browser (not the email client) handles it.
+    let inviteLink: string;
+    if (linkBody.hashed_token) {
+      const params = new URLSearchParams({
+        token: linkBody.hashed_token,
+        type: 'invite',
+        redirect_to: redirectTo,
+      });
+      inviteLink = `${new URL(supabaseUrl).origin}/auth/v1/verify?${params.toString()}`;
+    } else {
+      // Fallback: fix action_link origin if it points at localhost.
+      inviteLink = linkBody.action_link ?? '';
+      try {
+        const parsed = new URL(inviteLink);
+        if (parsed.hostname === 'localhost') {
+          if (parsed.pathname.startsWith('/auth/v1/')) {
+            inviteLink = new URL(supabaseUrl).origin + parsed.pathname + parsed.search + parsed.hash;
+          } else {
+            inviteLink = redirectTo + parsed.hash;
+          }
         }
-      }
-    } catch { /* leave as-is if URL parse fails */ }
+      } catch { /* leave as-is */ }
+    }
+
+    console.log('[hq/invite] final inviteLink:', inviteLink);
 
     const roleLabel = role === 'coach' ? 'Coach' : role === 'admin' ? 'Admin' : 'Owner';
     const inviteSubject = `You've been invited to Ballpark — ${tenant.name}`;

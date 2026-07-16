@@ -16,26 +16,34 @@ export default function AcceptInvitePage() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     );
 
-    async function handle() {
-      // Allow the Supabase SDK to process URL hash tokens (access_token, etc.)
-      await new Promise(r => setTimeout(r, 600));
+    // onAuthStateChange fires as soon as the Supabase SDK exchanges the
+    // hash-fragment tokens (access_token / refresh_token) that Supabase
+    // appended to this URL after verifying the invite token.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!session) return;
+        subscription.unsubscribe();
 
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const role = session.user.user_metadata?.app_role as string | undefined;
+        if (role === 'owner') router.replace('/owner');
+        else if (role === 'admin') router.replace('/admin');
+        else if (role === 'coach') router.replace('/coach');
+        else router.replace('/login');
+      },
+    );
 
-      if (sessionError || !session) {
-        setError('Could not establish your session. The invite link may have expired — please request a new invite.');
-        return;
-      }
+    // Fallback: if no auth event fires within 8s, show an error.
+    const timeout = setTimeout(() => {
+      subscription.unsubscribe();
+      setError(
+        'Could not establish your session. The invite link may have expired — please request a new invite.',
+      );
+    }, 8000);
 
-      const role = session.user.user_metadata?.app_role as string | undefined;
-
-      if (role === 'owner') router.replace('/owner');
-      else if (role === 'admin') router.replace('/admin');
-      else if (role === 'coach') router.replace('/coach');
-      else router.replace('/login');
-    }
-
-    handle();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [router]);
 
   if (error) {
