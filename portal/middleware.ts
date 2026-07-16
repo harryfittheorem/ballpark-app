@@ -26,6 +26,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // /auth/accept-invite is the callback page for owner/admin/coach invite links.
+  if (path.startsWith("/auth/accept-invite")) {
+    return NextResponse.next();
+  }
+
   return await updateSession(request);
 }
 

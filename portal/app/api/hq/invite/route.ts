@@ -87,7 +87,17 @@ export async function POST(req: Request) {
         apikey: serviceKey,
         Authorization: `Bearer ${serviceKey}`,
       },
-      body: JSON.stringify({ type: 'invite', email, data: userMeta }),
+      body: JSON.stringify({
+        type: 'invite',
+        email,
+        data: userMeta,
+        redirect_to: (() => {
+          const origin =
+            process.env.NEXT_PUBLIC_PORTAL_URL?.replace(/\/$/, '') ??
+            (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
+          return `${origin}/auth/accept-invite`;
+        })(),
+      }),
     });
     const linkBody = await linkRes.json() as {
       action_link?: string; id?: string; error?: string; msg?: string;
@@ -100,18 +110,15 @@ export async function POST(req: Request) {
 
     createdUserId = linkBody.id ?? null;
 
-    // Rewrite the action_link origin to the real public portal URL.
-    // Supabase generate_link uses its configured SITE_URL (often localhost),
-    // so we replace just the origin, preserving the path + token fragments.
+    // The action_link from generate_link goes to Supabase's /auth/v1/verify endpoint.
+    // If Supabase is configured with localhost as site URL, fix the origin to point
+    // at the real Supabase auth server so the verification request reaches Supabase.
     let inviteLink = linkBody.action_link;
     try {
-      const portalOrigin = (
-        process.env.NEXT_PUBLIC_PORTAL_URL?.replace(/\/$/, '') ??
-        (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null)
-      );
-      if (portalOrigin) {
-        const parsed = new URL(inviteLink);
-        inviteLink = portalOrigin + parsed.pathname + parsed.search + parsed.hash;
+      const parsed = new URL(inviteLink);
+      if (parsed.hostname === 'localhost') {
+        const supabaseOrigin = new URL(supabaseUrl).origin;
+        inviteLink = supabaseOrigin + parsed.pathname + parsed.search + parsed.hash;
       }
     } catch { /* leave as-is if URL parse fails */ }
 

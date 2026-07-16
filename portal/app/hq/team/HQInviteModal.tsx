@@ -129,17 +129,20 @@ export function HQInviteModal({ onClose, locations }: Props) {
         </div>
 
         {success ? (
-          <div style={{ padding: 40, textAlign: 'center' }}>
-            <CheckCircle2 size={48} color={brand.success} style={{ marginBottom: 16 }} />
+          <div style={{
+            padding: 40,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+          }}>
+            <CheckCircle2 size={48} color={brand.success} style={{ marginBottom: 16, flexShrink: 0 }} />
             <h3 style={{ fontFamily: fonts.display, fontSize: 18, fontWeight: 800, color: brand.text, margin: '0 0 8px' }}>
               Invite sent!
             </h3>
-            <p style={{ color: brand.textMuted, fontSize: 13, margin: '0 0 24px' }}>
-              An email has been sent to <strong>{form.email}</strong> with instructions to activate their account.
+            <p style={{ fontFamily: fonts.body, color: brand.textMuted, fontSize: 13, margin: '0 0 24px', lineHeight: 1.5 }}>
+              An email has been sent to <strong style={{ color: brand.text }}>{form.email}</strong> with instructions to activate their account.
             </p>
             <button
               onClick={onClose}
-              style={{ padding: '9px 24px', borderRadius: 8, border: 'none', background: brand.gold, color: brand.darker, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+              style={{ padding: '9px 24px', borderRadius: 8, border: 'none', background: brand.gold, color: brand.darker, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: fonts.display }}
             >
               Done
             </button>
