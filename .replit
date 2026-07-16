@@ -90,7 +90,7 @@ expertMode = true
 EXPO_PUBLIC_SUPABASE_URL = "https://exjcwvvglthnxerzpukw.supabase.co"
 EXPO_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_xyXVBy2HN2pvbDTZC15jQQ_et3pskXc"
 EXPO_PUBLIC_TENANT_SLUG = "infinitehitting"
-RESEND_FROM_EMAIL = "onboarding@resend.dev"
+RESEND_FROM_EMAIL = "noreply@email.fittcoaching.ai"
 PORTAL_TENANT_ID = "00000000-0000-0000-0000-000000000001"
 
 [userenv.production]

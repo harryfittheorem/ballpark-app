@@ -120,6 +120,13 @@ export async function POST(req: Request) {
     });
 
     if (!sendResult.ok) {
+      // Roll back: delete the auth user so the same email can be re-invited cleanly.
+      if (createdUserId) {
+        await fetch(`${supabaseUrl}/auth/v1/admin/users/${createdUserId}`, {
+          method: 'DELETE',
+          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+        }).catch(() => { /* best-effort cleanup */ });
+      }
       return NextResponse.json({ error: `Email delivery failed: ${sendResult.error}` }, { status: 502 });
     }
   } else {
