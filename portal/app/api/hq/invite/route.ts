@@ -107,12 +107,6 @@ export async function POST(req: Request) {
       msg?: string;
     };
 
-    console.log('[hq/invite] generate_link response keys:', Object.keys(linkBody));
-    console.log('[hq/invite] action_link:', linkBody.action_link);
-    console.log('[hq/invite] hashed_token present:', !!linkBody.hashed_token);
-    console.log('[hq/invite] REPLIT_DEV_DOMAIN:', process.env.REPLIT_DEV_DOMAIN);
-    console.log('[hq/invite] NODE_ENV:', process.env.NODE_ENV);
-
     if (!linkRes.ok || (!linkBody.action_link && !linkBody.hashed_token)) {
       const errMsg = linkBody.error ?? linkBody.msg ?? 'Failed to generate invite link';
       return NextResponse.json({ error: errMsg }, { status: 500 });
@@ -157,8 +151,6 @@ export async function POST(req: Request) {
         }
       } catch { /* leave as-is */ }
     }
-
-    console.log('[hq/invite] final inviteLink:', inviteLink);
 
     const roleLabel = role === 'coach' ? 'Coach' : role === 'admin' ? 'Admin' : 'Owner';
     const inviteSubject = `You've been invited to Ballpark — ${tenant.name}`;
