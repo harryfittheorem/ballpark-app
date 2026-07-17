@@ -66,7 +66,8 @@ export type TenantCoach = {
 export async function listTenantCoachesForParent(): Promise<TenantCoach[]> {
   const { data, error } = await supabase
     .from('coaches')
-    .select('user_id, first_name, last_name, avatar_url');
+    .select('user_id, first_name, last_name, avatar_url')
+    .eq('is_active', true);
   if (error) throw error;
   return (data ?? [])
     .filter((c): c is typeof c & { user_id: string } => !!c.user_id)

@@ -521,26 +521,29 @@ console.log('  Marcus distance_ft personal best: 382 ft');
 console.log('  HitTrax Performance leaderboard will be non-empty on first demo run');
 
 // =============================================================================
-// Step 7 — Placeholder videos (ready status + fake Mux IDs so app renders
-//           the coach message card and drill video frame correctly)
+// Step 7 — Demo videos (ready status + real public Mux playback IDs)
 //
 // The coach message card on HomeScreen renders "processing" unless
 // video.status === 'ready' && video.muxPlaybackId is set (HomeScreen line 117).
-// We seed placeholder rows that satisfy this check without needing a real upload.
+// We seed rows using Mux's public demo playback IDs so thumbnails and
+// playback work without a real upload.
+//
+// MUX_COACH_MSG_PB  = DS00Spx1CV902MCtPj5WknGlR102V5HFkDe  (Mux "For Bigger Blazes" demo)
+// MUX_DRILL_PB      = qxb01i6T202jljcD1kG6bmTAe0FGCskx0100RKa002lLK8  (Mux Tears of Steel demo)
 //
 // coach_messages trigger: checks purpose='parent_to_coach' → ours is
 // 'coach_message' → trigger returns early. No achievement side-effect.
 // =============================================================================
 
-console.log('\n─── PLACEHOLDER VIDEOS ───────────────────────────────────────────────');
+console.log('\n─── DEMO VIDEOS ──────────────────────────────────────────────────────');
 
 await restInsert('videos', [
   {
     id:                   COACH_MSG_VIDEO_ID,
     tenant_id:            TENANT_ID,
     uploaded_by_user_id:  coachMikeUserId,
-    mux_asset_id:         'demo-asset-coach-msg-2026-01',
-    mux_playback_id:      'demo-pb-coach-msg-2026-01',
+    mux_asset_id:         'demo-real-coach-mux-asset-2026',
+    mux_playback_id:      'DS00Spx1CV902MCtPj5WknGlR102V5HFkDe',
     duration_seconds:     47,
     status:               'ready',
     purpose:              'coach_message',
@@ -550,15 +553,15 @@ await restInsert('videos', [
     id:                   DRILL_VIDEO_ID,
     tenant_id:            TENANT_ID,
     uploaded_by_user_id:  coachMikeUserId,
-    mux_asset_id:         'demo-asset-drill-2026-01',
-    mux_playback_id:      'demo-pb-drill-2026-01',
+    mux_asset_id:         'demo-real-drill-mux-asset-2026',
+    mux_playback_id:      'qxb01i6T202jljcD1kG6bmTAe0FGCskx0100RKa002lLK8',
     duration_seconds:     93,
     status:               'ready',
     purpose:              'drill',
     title:                'Plate Coverage — Low & Away (Demo)',
   },
 ]);
-console.log('  2 placeholder video rows seeded (ready, fake Mux IDs)');
+console.log('  2 demo video rows seeded (ready, real public Mux IDs)');
 console.log('  coach_message video: "This week\'s focus 🎯" (47s)');
 console.log('  drill video: "Plate Coverage — Low & Away (Demo)" (93s)');
 
