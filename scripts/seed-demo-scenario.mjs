@@ -529,7 +529,7 @@ console.log('  HitTrax Performance leaderboard will be non-empty on first demo r
 // playback work without a real upload.
 //
 // MUX_COACH_MSG_PB  = DS00Spx1CV902MCtPj5WknGlR102V5HFkDe  (Mux "For Bigger Blazes" demo)
-// MUX_DRILL_PB      = qxb01i6T202jljcD1kG6bmTAe0FGCskx0100RKa002lLK8  (Mux Tears of Steel demo)
+// MUX_DRILL_PB      = VZtzUzGRv02OhRnZCxcNg49OilvolTqdnFLEqBsTwaxU  (Mux public demo — verified 200)
 //
 // coach_messages trigger: checks purpose='parent_to_coach' → ours is
 // 'coach_message' → trigger returns early. No achievement side-effect.
@@ -553,8 +553,8 @@ await restInsert('videos', [
     id:                   DRILL_VIDEO_ID,
     tenant_id:            TENANT_ID,
     uploaded_by_user_id:  coachMikeUserId,
-    mux_asset_id:         'demo-real-drill-mux-asset-2026',
-    mux_playback_id:      'qxb01i6T202jljcD1kG6bmTAe0FGCskx0100RKa002lLK8',
+    mux_asset_id:         'demo-real-drill-mux-asset-vztz-2026',
+    mux_playback_id:      'VZtzUzGRv02OhRnZCxcNg49OilvolTqdnFLEqBsTwaxU',
     duration_seconds:     93,
     status:               'ready',
     purpose:              'drill',
