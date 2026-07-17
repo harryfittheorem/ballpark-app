@@ -2,10 +2,7 @@ portal/
 artifacts/
 docs/
 scripts/
-supabase/
 .git/
 .local/
 attached_assets/
 codebase-extract.txt
-*.md
-!README.md

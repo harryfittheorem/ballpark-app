@@ -1,0 +1,55 @@
+~/workspace$ eas build --platform ios --profile production-infinitehitting
+Resolved "production" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+Environment variables with visibility "Plain text" and "Sensitive" loaded from the "production" environment on EAS: EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY, EXPO_PUBLIC_SUPABASE_ANON_KEY, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_TENANT_SLUG.
+Environment variables loaded from the "production-infinitehitting" build profile "env" configuration: EXPO_PUBLIC_TENANT_SLUG.
+The following environment variables are defined in both the "production-infinitehitting" build profile "env" configuration and the "production" environment on EAS: EXPO_PUBLIC_TENANT_SLUG. The values from the build profile configuration will be used.
+
+✔ Incremented buildNumber from 10 to 11.
+
+
+✔ Using remote iOS credentials (Expo server)
+
+If you provide your Apple account credentials we will be able to generate all necessary build credentials and fully validate them.
+This is optional, but without Apple account access you will need to provide all the missing values manually and we can only run minimal validation on them.
+✔ Do you want to log in to your Apple account? … no
+No problem! 👌 If any of the next steps will require Apple account access we will ask you again about it.
+Skipping Distribution Certificate validation on Apple Servers because we aren't authenticated.
+Skipping Provisioning Profile validation on Apple Servers because we aren't authenticated.
+
+Project Credentials Configuration
+
+Project                   @harjinderharry/ballpark-app
+Bundle Identifier         com.fittheorem.ballpark
+                          
+App Store Configuration   
+                          
+Distribution Certificate  
+Serial Number             2471CA8EB525312BBE7B933126E1D3A8
+Expiration Date           Fri, 09 Oct 2026 16:08:31 UTC
+Apple Team                PQG46KBF26 (FIT THEOREM INC (Company/Organization))
+Updated                   9 months ago
+                          
+Provisioning Profile      
+Developer Portal ID       Y6GX7KV85H
+Status                    active
+Expiration                Fri, 09 Oct 2026 16:08:31 UTC
+Apple Team                PQG46KBF26 (FIT THEOREM INC (Company/Organization))
+Updated                   1 month ago
+                          
+All credentials are ready to build @harjinderharry/ballpark-app (com.fittheorem.ballpark)
+
+✔ Push Notifications are set up
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+✔ Compressed project files 20s (68.2 MB)
+✔ Uploaded to EAS 1s
+✔ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/harjinderharry/projects/ballpark-app/builds/edcab073-f95b-41df-a04c-fb1cd4aa2a29
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+✖ Build failed
+
+🍏 iOS build failed:
+Unknown error. See logs of the Bundle JavaScript build phase for more information.
+~/workspace$ 
