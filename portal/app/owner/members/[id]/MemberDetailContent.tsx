@@ -12,7 +12,12 @@ import { useRouter } from 'next/navigation';
 import type { MemberDetail, BookingFormOptions } from '@/lib/supabase/ownerQueries';
 import type { DemoMemberDetail } from './demoMemberDetails';
 
-type Props = { member: MemberDetail | DemoMemberDetail; bookingOptions: BookingFormOptions };
+type Props = {
+  member: MemberDetail | DemoMemberDetail;
+  bookingOptions: BookingFormOptions;
+  waiverStatus?: 'signed' | 'unsigned' | 'outdated' | null;
+  waiverSignedAt?: string | null;
+};
 
 const modalInputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px', border: `1px solid ${brand.border}`,
@@ -1406,7 +1411,7 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
   );
 }
 
-export function MemberDetailContent({ member: initialMember, bookingOptions }: Props) {
+export function MemberDetailContent({ member: initialMember, bookingOptions, waiverStatus, waiverSignedAt }: Props) {
   const [m, setM] = useState(initialMember);
   const [activeModal, setActiveModal] = useState<'message' | 'edit' | 'book' | null>(null);
 
@@ -1606,6 +1611,47 @@ export function MemberDetailContent({ member: initialMember, bookingOptions }: P
                     <div style={{ fontSize: 13, color: brand.textMuted }}>—</div>
                   )}
                 </div>
+              </div>
+            </OCard>
+          </div>
+
+          {/* Membership Agreement */}
+          <div>
+            <SectionHeader title="Membership Agreement" />
+            <OCard style={{ padding: 14 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {waiverStatus === 'signed' ? (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <CheckCircle size={13} color={brand.success} />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: brand.success }}>Signed</span>
+                    </div>
+                    {waiverSignedAt && (
+                      <div style={{ fontSize: 11, color: brand.textMuted }}>
+                        {new Date(waiverSignedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </div>
+                    )}
+                    {!isDemo(m) && (
+                      <a
+                        href={`/api/admin/waivers/${m.familyId}/pdf`}
+                        download
+                        style={{ fontSize: 12, color: brand.gold, textDecoration: 'underline', fontWeight: 600 }}
+                      >
+                        Download PDF
+                      </a>
+                    )}
+                  </>
+                ) : waiverStatus === 'outdated' ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <AlertCircle size={13} color={brand.warning} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: brand.warning }}>Outdated — re-sign needed</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <XCircle size={13} color={brand.danger} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: brand.danger }}>Not signed</span>
+                  </div>
+                )}
               </div>
             </OCard>
           </div>

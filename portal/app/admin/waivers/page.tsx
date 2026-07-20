@@ -2,8 +2,8 @@
  * /admin/waivers — family waiver status dashboard.
  *
  * Shows every family in the tenant with their signed / unsigned / outdated
- * status for the active waiver version. Includes filter controls and CSV
- * export (handled in the WaiversClient island).
+ * status for the active waiver version. Includes filter controls, CSV
+ * export, contract editor, PDF download, and send-reminder (WaiversClient).
  *
  * Uses the service-role client for family_waivers reads so tenant-admin
  * RLS policies don't need to cover this cross-family read path.
@@ -29,41 +29,35 @@ export default async function WaiversPage() {
   const tenantId = readTenantId(session);
   if (!tenantId) redirect("/logout?reason=no-tenant");
 
-  // Use service client for cross-family reads (bypasses RLS)
   const svc = createServiceClient();
 
-  // Active waiver for this tenant
   const { data: activeWaiver } = await svc
     .from("waivers")
-    .select("id, version")
+    .select("id, version, body_text, effective_date")
     .eq("tenant_id", tenantId)
     .eq("is_active", true)
     .maybeSingle();
 
-  // All families in this tenant
   const { data: families } = await svc
     .from("families")
     .select("id, parent_first_name, parent_last_name, parent_email")
     .eq("tenant_id", tenantId)
     .order("parent_last_name", { ascending: true });
 
-  // All family_waivers records for the active waiver
-  const { data: activeSignedRecords } =
-    activeWaiver
-      ? await svc
-          .from("family_waivers")
-          .select("family_id, signed_at, app_version, waiver:waiver_id(version)")
-          .eq("waiver_id", activeWaiver.id)
-      : { data: [] };
+  const { data: activeSignedRecords } = activeWaiver
+    ? await svc
+        .from("family_waivers")
+        .select("family_id, signed_at, app_version, waiver:waiver_id(version)")
+        .eq("waiver_id", activeWaiver.id)
+    : { data: [] };
 
-  // All other (older) waiver ids for this tenant — to detect "outdated" families
-  const { data: allWaivers } = await svc
+  const { data: allOldWaivers } = await svc
     .from("waivers")
     .select("id")
     .eq("tenant_id", tenantId)
     .eq("is_active", false);
 
-  const oldWaiverIds = (allWaivers ?? []).map((w) => w.id);
+  const oldWaiverIds = (allOldWaivers ?? []).map((w) => w.id);
 
   const { data: oldSignedRecords } =
     oldWaiverIds.length > 0
@@ -132,6 +126,8 @@ export default async function WaiversPage() {
       <WaiversClient
         rows={rows}
         activeVersion={activeWaiver?.version ?? null}
+        activeWaiverBodyText={activeWaiver?.body_text ?? null}
+        activeWaiverEffectiveDate={activeWaiver?.effective_date ?? null}
       />
     </div>
   );
