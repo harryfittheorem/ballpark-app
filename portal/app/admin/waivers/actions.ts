@@ -11,13 +11,12 @@ import { createServiceClient } from "@/lib/supabase/serviceClient";
 /**
  * Publish a new waiver version.
  *
- * Atomic ordering guarantee:
- *   1. INSERT the new row (is_active = true) first.
- *   2. Only if insert succeeds, deactivate all other rows.
- *
- * This means the tenant is NEVER left with zero active waivers.  The worst
- * transient state is two active rows (new + old) for a few milliseconds,
- * which client code handles by taking the highest version.
+ * Atomicity guarantee:
+ *   The actual deactivate+insert work is delegated to the
+ *   `publish_waiver_version` PL/pgSQL function, which runs both steps inside
+ *   a single DB transaction.  This means the unique partial index
+ *   idx_waivers_one_active_per_tenant is never violated and the tenant is
+ *   never left with zero active waivers — even under transient failures.
  */
 export async function publishNewWaiverVersion(
   _prev: unknown,
@@ -44,60 +43,26 @@ export async function publishNewWaiverVersion(
 
   const svc = createServiceClient();
 
-  const { data: maxRow } = await svc
-    .from("waivers")
-    .select("version")
-    .eq("tenant_id", tenantId)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { data, error } = await svc.rpc("publish_waiver_version", {
+    p_tenant_id: tenantId,
+    p_body_text: bodyText,
+    p_effective_date: effectiveDate,
+  });
 
-  const nextVersion = (maxRow?.version ?? 0) + 1;
+  if (error) return { error: error.message };
 
-  // Step 1: insert the new version first.
-  const { data: inserted, error: insertError } = await svc
-    .from("waivers")
-    .insert({
-      tenant_id: tenantId,
-      version: nextVersion,
-      body_text: bodyText,
-      effective_date: effectiveDate,
-      is_active: true,
-    })
-    .select("id")
-    .single();
-
-  if (insertError || !inserted?.id) {
-    return { error: insertError?.message ?? "Failed to insert new waiver version." };
-  }
-
-  // Step 2: deactivate all other rows now that the new one is live.
-  const { error: deactivateError } = await svc
-    .from("waivers")
-    .update({ is_active: false })
-    .eq("tenant_id", tenantId)
-    .eq("is_active", true)
-    .neq("id", inserted.id);
-
-  if (deactivateError) {
-    // Non-fatal — the new version is already active. Log the inconsistency
-    // but do not roll back; having two "active" rows is recoverable, zero is not.
-    console.error(
-      "[publishNewWaiverVersion] failed to deactivate old rows:",
-      deactivateError.message,
-    );
-  }
+  const newVersion = (data as Array<{ new_version: number }>)?.[0]?.new_version;
 
   revalidatePath("/admin/waivers");
-  return { ok: true, version: nextVersion };
+  return { ok: true, version: newVersion };
 }
 
 /**
  * Send a waiver-reminder email to a family.
  *
  * The email body includes:
- *   - A Ballpark deep-link (ballpark:///) so iOS/Android opens the app directly.
- *   - A fallback note for families who haven't installed the app yet.
+ *   - A Ballpark deep-link (ballpark:///) that opens the app directly.
+ *   - App store fallback instructions for families without the app.
  */
 export async function sendWaiverReminder(
   familyId: string,
@@ -133,8 +98,8 @@ export async function sendWaiverReminder(
 
   const businessName = (tenant?.name as string | null) ?? "Ballpark";
 
-  // Deep link that opens the app.  iOS and Android will route it to the waiver
-  // prompt on the Me tab if the family is unsigned/outdated.
+  // Deep link that opens the Ballpark app on iOS and Android.
+  // The app routes unsigned/outdated families to the waiver prompt from the home screen.
   const deepLink = "ballpark:///";
 
   const { from } = buildEmailSender({ businessName });
@@ -167,9 +132,9 @@ export async function sendWaiverReminder(
 </p>
 <p style="font-size:13px;color:#666;">
   The button above opens the Ballpark app directly.
-  If it doesn't work, open the app manually and look for the agreement prompt on the home screen.
-  Don't have the app yet? Search <strong>Ballpark</strong> on the App Store or Google Play,
-  then sign in with this email address.
+  If it doesn't work, open the app manually — the agreement prompt will appear on your home screen.
+  Don't have the app yet? Search <strong>Ballpark</strong> on the App Store or Google Play
+  and sign in with this email address.
 </p>
 <p>If you have any questions, just reply to this email.</p>
 <p>Thank you,<br/>${businessName}</p>
