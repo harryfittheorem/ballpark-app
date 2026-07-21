@@ -105,7 +105,7 @@ function ContractEditor({
             </p>
             <p className="mt-0.5 text-xs text-text-light">
               Publishing a new version marks all previously-signed families as
-              "Outdated" — they will be prompted to re-sign in the app.
+              &ldquo;Outdated&rdquo; &mdash; they will be prompted to re-sign in the app.
             </p>
           </div>
 
