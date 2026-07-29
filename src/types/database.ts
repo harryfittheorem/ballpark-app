@@ -2895,6 +2895,18 @@ export type Database = {
         Args: { p_membership_id: string; p_pause_end: string }
         Returns: Json
       }
+      publish_waiver_version: {
+        Args: {
+          p_body_text: string
+          p_effective_date: string
+          p_tenant_id: string
+        }
+        Returns: {
+          new_effective_date: string
+          new_id: string
+          new_version: number
+        }[]
+      }
       record_training_view: {
         Args: { p_kid_id: string; p_video_id: string }
         Returns: boolean
