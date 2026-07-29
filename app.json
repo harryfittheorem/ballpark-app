@@ -128,9 +128,7 @@
       ],
       [
         "@stripe/stripe-react-native",
-        {
-          "merchantIdentifier": "merchant.com.ballpark.app"
-        }
+        {}
       ]
     ],
     "extra": {

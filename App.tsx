@@ -40,7 +40,7 @@ export default function App() {
   }
 
   const inner = (
-    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.fittheorem.ballpark">
+    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
       <GestureHandlerRootView style={styles.flex}>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
