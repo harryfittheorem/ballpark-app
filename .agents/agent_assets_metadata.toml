@@ -59,39 +59,46 @@ id = "9T3Es1MHr1wGjxOVrjtb3"
 uri = "file://artifacts/pitch-deck/ballpark-pitch-deck.pdf"
 type = "pdf"
 title = "Ballpark Pitch Deck (15 slides)"
+logical_id = "63155588-6bd6-4e7a-9a32-bcc36253e967"
 
 [[outputs]]
 id = "IuMI-7dc_xBMxu3_B16Xc"
 uri = "file://codebase-extract.txt"
 type = "text"
 title = "Ballpark — Full Codebase Extract"
+logical_id = "79dac43d-9b3d-447a-aa74-898e1fb31dde"
 
 [[outputs]]
 id = "8p_5jn6gHzgXFnl443X8c"
 uri = "file://app-store-screenshots/iphone/01-home.png"
 type = "image"
 title = "1 — Home Dashboard (1242×2688)"
+logical_id = "4f517197-68fe-4100-88f4-589b94233ab3"
 
 [[outputs]]
 id = "YydJSB64nmhZ9_aZN0xbi"
 uri = "file://app-store-screenshots/iphone/02-book.png"
 type = "image"
 title = "2 — Book Sessions (1242×2688)"
+logical_id = "dad20a2e-809d-4cb7-a71f-37af0961f320"
 
 [[outputs]]
 id = "AEQsVjrflrsicARzz-j_s"
 uri = "file://app-store-screenshots/iphone/03-coach-video.png"
 type = "image"
 title = "3 — Coach Messages (1242×2688)"
+logical_id = "625d81fe-addc-467a-b751-346b8bdcd4cd"
 
 [[outputs]]
 id = "0QpVmdFKXxAL3FFgigOzV"
 uri = "file://app-store-screenshots/iphone/04-earn.png"
 type = "image"
 title = "4 — Earn & Rewards (1242×2688)"
+logical_id = "603db05b-6934-4c8e-8ea9-a0fd55c26706"
 
 [[outputs]]
 id = "h3qa0mXleF0uYUvKdEF6l"
 uri = "file://app-store-screenshots/iphone/05-profile.png"
 type = "image"
 title = "5 — Profile & Stats (1242×2688)"
+logical_id = "c2593f10-f162-4c16-a727-772a2becaa0d"
