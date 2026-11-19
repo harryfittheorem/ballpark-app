@@ -102,3 +102,17 @@ uri = "file://app-store-screenshots/iphone/05-profile.png"
 type = "image"
 title = "5 — Profile & Stats (1242×2688)"
 logical_id = "c2593f10-f162-4c16-a727-772a2becaa0d"
+
+[[outputs]]
+id = "i10k4W8Rk_B9qMs-iPXt1"
+uri = "file://.local/tasks/leadership-change-review.md"
+type = "text"
+title = "Leadership review specification"
+description = "Full consolidated requirements and decisions from the call, uploaded review documents, and follow-up clarifications."
+logical_id = "046a5f94-7add-42d7-aab0-d7813cccd172"
+content_hash = "sha256:94b83421e90712d22436de7900d57082db83fd705eca61c6b46051243abfb84f"
+size = 35900
+mtime_ms = 1795045317506
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/046a5f94-7add-42d7-aab0-d7813cccd172/1b675d0f-2c7c-4b09-b1d2-111962f5ea39"
+storage_version_token = "1795100450594252"
+content_type = "text/markdown"
