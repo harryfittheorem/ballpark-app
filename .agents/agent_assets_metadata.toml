@@ -132,6 +132,20 @@ storage_version_token = "1795145471399846"
 content_type = "text/markdown"
 
 [[outputs]]
+id = "flQxMmpd-RvjUDb_COK7D"
+uri = "file://docs/leadership-change-specification.md"
+type = "text"
+title = "Approved leadership scope baseline"
+description = "Creator approval recorded. All 57 website items and 10 updated sections are traced; financial, permission, billing and integration decision gates remain in force."
+logical_id = "9545a012-f102-4e28-a5eb-943161cba941"
+content_hash = "sha256:38f72e208a1d1a7a08d3e947fff5bfd79ff0a5ccde084d4ea0f6e893a7b9374f"
+size = 61046
+mtime_ms = 1795047049717
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/9545a012-f102-4e28-a5eb-943161cba941/d9fe1e85-8680-41e0-8f37-3aa1a7096b81"
+storage_version_token = "1795047059535918"
+content_type = "text/markdown"
+
+[[outputs]]
 id = "0e7g9FZPNZgVrRAankico"
 uri = "file://research/crm-scope-review.html"
 type = "html"
