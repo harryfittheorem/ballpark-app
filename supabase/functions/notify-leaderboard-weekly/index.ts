@@ -137,7 +137,7 @@ serve(async (req) => {
         body: JSON.stringify({
           user_ids: [parentUserId],
           title: `${(kid as { first_name?: string }).first_name ?? "Your athlete"} cracked the Top 10!`,
-          body: "Open Ballpark to see this week's leaderboard.",
+          body: "Open Infinite Hitting to see this week's leaderboard.",
           data: { kind: "leaderboard_top_10", tenant_id: tenant.id, kid_id: kid.id },
         }),
       }).catch((err) => {

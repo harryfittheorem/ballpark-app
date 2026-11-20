@@ -133,7 +133,7 @@ async function fanOutCoachVideoNotifications(videoId: string): Promise<void> {
           body: JSON.stringify({
             user_ids: [parentUserId],
             title: `Coach ${coachFirst} sent ${kidFirst} a new video`,
-            body: "Tap to watch in Ballpark",
+            body: "Tap to watch in Infinite Hitting",
             data: {
               kind: "coach_message",
               video_id: videoId,

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Clubhouse",
+    "name": "Infinite Hitting",
     "slug": "ballpark-app",
     "scheme": "ballpark",
     "version": "1.0.0",
@@ -74,10 +74,10 @@
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Clubhouse needs camera access so coaches can record video messages for their athletes.",
-        "NSMicrophoneUsageDescription": "Clubhouse needs microphone access so the audio in coach video messages is recorded.",
-        "NSPhotoLibraryUsageDescription": "Clubhouse needs photo library access to let you pick videos to send to your coach and to save Share Card images to your camera roll.",
-        "NSPhotoLibraryAddUsageDescription": "Clubhouse needs permission to save Share Card images to your camera roll."
+        "NSCameraUsageDescription": "Infinite Hitting needs camera access so coaches can record video messages for their athletes.",
+        "NSMicrophoneUsageDescription": "Infinite Hitting needs microphone access so the audio in coach video messages is recorded.",
+        "NSPhotoLibraryUsageDescription": "Infinite Hitting needs photo library access to let you pick videos to send to your coach and to save Share Card images to your camera roll.",
+        "NSPhotoLibraryAddUsageDescription": "Infinite Hitting needs permission to save Share Card images to your camera roll."
       }
     },
     "android": {
@@ -121,9 +121,9 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Clubhouse needs camera access so coaches can record video messages for their athletes.",
-          "microphonePermission": "Clubhouse needs microphone access so the audio in coach video messages is recorded.",
-          "photosPermission": "Clubhouse needs photo library access to let you pick videos to send to your coach and to save Share Card images to your camera roll."
+          "cameraPermission": "Infinite Hitting needs camera access so coaches can record video messages for their athletes.",
+          "microphonePermission": "Infinite Hitting needs microphone access so the audio in coach video messages is recorded.",
+          "photosPermission": "Infinite Hitting needs photo library access to let you pick videos to send to your coach and to save Share Card images to your camera roll."
         }
       ],
       [
