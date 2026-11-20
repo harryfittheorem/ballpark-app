@@ -1,8 +1,7 @@
-import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
-import { readTenantId } from '@/lib/auth';
 import { getRevenueReportsData, getRevenueTransactions } from '@/lib/supabase/ownerQueries';
 import { RevenueReportsContent } from './RevenueReportsContent';
+import { requireOwnerContext } from '@/lib/ownerAccess';
 
 export default async function RevenueReportsPage({
   searchParams,
@@ -10,10 +9,8 @@ export default async function RevenueReportsPage({
   searchParams: Promise<{ start?: string; end?: string }>;
 }) {
   const params = await searchParams;
-  const _userClient = await createClient();
+  const { tenantId } = await requireOwnerContext();
   const supabase = createServiceClient();
-  const { data: { session } } = await _userClient.auth.getSession();
-  const tenantId = readTenantId(session) ?? process.env.PORTAL_TENANT_ID ?? '';
 
   const now = new Date();
   const twelveMonthsAgo = new Date(now.getTime() - 365 * 86_400_000);

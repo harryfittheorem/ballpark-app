@@ -4,7 +4,8 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, SectionHeader, OCard, Chip } from '@/components/owner/ui';
-import { Calendar, DollarSign, Users, UserCog, Clock, ChevronRight } from 'lucide-react';
+import { Calendar, DollarSign, Users, Clock, ChevronRight } from 'lucide-react';
+import { PlayerLink } from '@/components/owner/PlayerLink';
 import type { TodayAtAGlanceData, TodayBooking, UpcomingBooking } from '@/lib/supabase/ownerQueries';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ function BookingRow({ b }: { b: TodayBooking }) {
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           textDecoration: isCancelled ? 'line-through' : 'none',
         }}>
-          {b.kidName}
+          <PlayerLink name={b.kidName} reference={b} />
         </div>
         <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 1 }}>
           {b.coachName}{b.cage ? ` · ${b.cage}` : ''}
@@ -108,7 +109,7 @@ function UpcomingRow({ b }: { b: UpcomingBooking }) {
     }}>
       <div style={{ width: 4, height: 32, borderRadius: 2, background: typeColor, flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: brand.text }}>{b.kidName}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: brand.text }}><PlayerLink name={b.kidName} reference={b} /></div>
         <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 1 }}>
           {b.sessionType} · {b.coachName}
         </div>
@@ -166,7 +167,7 @@ export function TodayDashboardContent({ data, tenantName }: Props) {
       <div style={{ padding: 24 }}>
 
         {/* ── Quick Stats bar ────────────────────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
+        <div className="owner-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16, marginBottom: 28 }}>
           <KPICard
             label="Today's Sessions"
             value={stats.sessionsToday}
@@ -177,27 +178,20 @@ export function TodayDashboardContent({ data, tenantName }: Props) {
           <KPICard
             label="Revenue Today"
             value={stats.revenueToday > 0 ? `$${stats.revenueToday.toLocaleString()}` : '$0'}
-            deltaLabel="from confirmed sessions"
+            deltaLabel="Scheduled value of confirmed and completed sessions, not collected payments"
             icon={DollarSign}
             color={stats.revenueToday > 0 ? 'success' : 'default'}
           />
           <KPICard
             label="Active Members"
             value={stats.activeMembers}
-            deltaLabel="current memberships"
+            deltaLabel="Distinct families with an active membership"
             icon={Users}
-          />
-          <KPICard
-            label="Coaches On Today"
-            value={stats.coachesToday}
-            deltaLabel={stats.coachesToday > 0 ? 'scheduled today' : 'none scheduled'}
-            icon={UserCog}
-            color={stats.coachesToday > 0 ? 'default' : 'warning'}
           />
         </div>
 
         {/* ── Two-column layout ──────────────────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
+        <div className="owner-today-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: 20, alignItems: 'start' }}>
 
           {/* ── Left: Today's Schedule ──────────────────────────────────── */}
           <div>

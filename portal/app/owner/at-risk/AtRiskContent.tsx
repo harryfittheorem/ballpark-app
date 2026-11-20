@@ -1,4 +1,5 @@
 'use client';
+import { PlayerLink } from '@/components/owner/PlayerLink';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -193,7 +194,7 @@ export function AtRiskContent({ members: rawMembers }: Props) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{ fontSize: 15, fontWeight: 700 }}>{m.name}</div>
+                            <div style={{ fontSize: 15, fontWeight: 700 }}><PlayerLink name={m.name} reference={{ kidId: m.kidId, membershipId: m.id }} /></div>
                             <Chip color={m.churnRisk === 'high' ? 'danger' : 'warning'}>{m.churnRisk.toUpperCase()} RISK</Chip>
                           </div>
                           <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 4 }}>{m.age} · {m.program} · ${m.mrr}/mo · LTV ${m.lifetime.toLocaleString()}</div>

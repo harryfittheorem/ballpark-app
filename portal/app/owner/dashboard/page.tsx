@@ -1,18 +1,15 @@
-import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
-import { readTenantId } from '@/lib/auth';
 import { getTodayAtAGlanceData, getTenantName } from '@/lib/supabase/ownerQueries';
 import { TodayDashboardContent } from './TodayDashboardContent';
+import { requireOwnerContext } from '@/lib/ownerAccess';
 
 export const metadata = {
-  title: 'Today at a Glance — Ballpark',
+  title: 'Today — Clubhouse by Infinite Hitting',
 };
 
 export default async function TodayDashboardPage() {
-  const _userClient = await createClient();
+  const { tenantId } = await requireOwnerContext();
   const supabase = createServiceClient();
-  const { data: { session } } = await _userClient.auth.getSession();
-  const tenantId = readTenantId(session) ?? process.env.PORTAL_TENANT_ID ?? '';
 
   const [data, tenantName] = await Promise.all([
     getTodayAtAGlanceData(supabase, tenantId),

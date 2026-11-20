@@ -8,6 +8,7 @@ import type { TableColumn } from '@/components/owner/ui';
 import { XCircle, DollarSign, Package, Download, Phone, Mail } from 'lucide-react';
 import type { CancelledMembership } from '@/lib/supabase/ownerQueries';
 import { exportCsv } from '@/lib/exportCsv';
+import Link from 'next/link';
 
 type Props = {
   memberships: CancelledMembership[];
@@ -24,7 +25,7 @@ const columns: TableColumn<CancelledMembership & Record<string, unknown>>[] = [
           {(r.kidName as string).charAt(0)}
         </div>
         <div>
-          <div style={{ fontWeight: 700 }}>{r.kidName as string}</div>
+          <Link href={`/owner/members/${r.id}?section=package-history#package-history`} style={{ fontWeight: 700, textDecoration: 'underline' }}>{r.kidName as string}</Link>
           <div style={{ fontSize: 11, color: brand.textMuted }}>{r.parentName as string}</div>
         </div>
       </div>
@@ -147,7 +148,7 @@ export function CancellationsContent({ memberships: raw, activePreset, sinceIso 
         {/* Date range filter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           {presets.map(p => (
-            <div
+            <button type="button" aria-pressed={activePreset === p.id}
               key={p.id}
               onClick={() => handlePreset(p.id)}
               style={{
@@ -159,7 +160,7 @@ export function CancellationsContent({ memberships: raw, activePreset, sinceIso 
               }}
             >
               {p.label}
-            </div>
+            </button>
           ))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
             <span style={{ fontSize: 11, color: brand.textMuted, fontWeight: 600 }}>Custom:</span>

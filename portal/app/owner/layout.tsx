@@ -1,73 +1,22 @@
-import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { PortalShell } from '@/components/PortalShell';
-import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
-import { readTenantId, readAppRole, type AppRole } from '@/lib/auth';
-import { getTenantName, getTenantNameBySlug, getPaymentPausedCount } from '@/lib/supabase/ownerQueries';
+import { requireOwnerContext } from '@/lib/ownerAccess';
+import { getTenantName, getPaymentPausedCount } from '@/lib/supabase/ownerQueries';
 
-export const metadata = {
-  title: 'Owner Portal — Ballpark',
-};
+export const metadata = { title: 'Owner Portal — Clubhouse by Infinite Hitting' };
 
 export default async function OwnerLayout({ children }: { children: ReactNode }) {
-  const _userClient = await createClient();
+  const { user, tenantId } = await requireOwnerContext();
   const supabase = createServiceClient();
-
-  // Auth check must use the cookie-based client, NOT the service client.
-  // The service client has persistSession:false and no cookie adapter so
-  // auth.getUser() always returns null there.
-  const { data: { session } } = await _userClient.auth.getSession();
-  if (!session) redirect('/login?reason=unauthenticated');
-  const user = session.user;
-
-  // Decode JWT role; fall back to app_metadata for tokens that predate the
-  // Custom Access Token Hook (same pattern used in admin/layout.tsx).
-  let role = readAppRole(session);
-  if (role === 'parent' && user.app_metadata?.app_role) {
-    const meta = user.app_metadata.app_role as string;
-    const known: AppRole[] = ['owner', 'admin', 'super_admin', 'coach', 'parent'];
-    if (known.includes(meta as AppRole)) role = meta as AppRole;
-  }
-
-  if (role === 'coach') redirect('/coach/inbox');
-  if (role === 'admin' || role === 'super_admin') redirect('/admin');
-  if (role !== 'owner') redirect('/login?reason=unauthenticated');
-
-  const tenantId = readTenantId(session);
-
-  let locationName = 'Your Location';
-  let paymentPausedCount = 0;
-  if (tenantId) {
-    [locationName, paymentPausedCount] = await Promise.all([
-      getTenantName(supabase, tenantId),
-      getPaymentPausedCount(supabase, tenantId),
-    ]);
-  } else {
-    const slug = session?.user?.user_metadata?.tenant_slug as string | undefined;
-    if (slug) {
-      const serviceClient = createServiceClient();
-      locationName = await getTenantNameBySlug(serviceClient, slug);
-    }
-  }
-
-  const rawFullName = session?.user?.user_metadata?.full_name;
-  const userName =
-    (typeof rawFullName === 'string' && rawFullName.length > 0 ? rawFullName : undefined)
-    ?? session?.user?.email
-    ?? 'Owner';
-
-  return (
-    <PortalShell
-      role="owner"
-      email={user?.email ?? null}
-      userName={userName}
-      locationName={locationName}
-      paymentPausedCount={paymentPausedCount}
-    >
-      <div style={{ color: '#FAF6E8' }}>
-        {children}
-      </div>
-    </PortalShell>
-  );
+  const [locationName, paymentPausedCount] = await Promise.all([
+    getTenantName(supabase, tenantId),
+    getPaymentPausedCount(supabase, tenantId),
+  ]);
+  const fullName = user.user_metadata?.full_name;
+  const userName = typeof fullName === 'string' && fullName ? fullName : user.email ?? 'Owner';
+  return <PortalShell role="owner" email={user.email ?? null} userName={userName}
+    locationName={locationName} paymentPausedCount={paymentPausedCount}>
+    <div className="owner-responsive-content" style={{ color: '#FAF6E8' }}>{children}</div>
+  </PortalShell>;
 }

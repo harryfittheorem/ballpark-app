@@ -139,7 +139,7 @@ export function HQSettingsContent({ settings, tenants }: Props) {
         </h1>
       </div>
       <p style={{ color: brand.textMuted, fontSize: 14, marginBottom: 32 }}>
-        Global HQ configuration for the Ballpark network.
+        Global HQ configuration for the Clubhouse by Infinite Hitting network.
       </p>
 
       {/* Network Branding */}

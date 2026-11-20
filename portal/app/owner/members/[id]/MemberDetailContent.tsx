@@ -31,18 +31,38 @@ const modalLabelStyle: React.CSSProperties = {
 };
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    const controls = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]',
+    ) ?? []).filter(el => el.getClientRects().length > 0);
+    (controls()[0] ?? dialog)?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+      if (e.key !== 'Tab') return;
+      const items = controls();
+      if (!items.length) { e.preventDefault(); return; }
+      if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items.at(-1)?.focus(); }
+      else if (!e.shiftKey && document.activeElement === items.at(-1)) { e.preventDefault(); items[0].focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('keydown', onKey); previous?.focus(); };
+  }, [onClose]);
   return (
     <div
       onClick={onClose}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
     >
       <div
+        ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}
         onClick={e => e.stopPropagation()}
-        style={{ width: 480, maxHeight: '90vh', overflowY: 'auto', background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)' }}
+        style={{ width: 'min(480px, calc(100vw - 32px))', maxHeight: '90dvh', overflowY: 'auto', background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: `1px solid ${brand.border}` }}>
-          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>{title}</div>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>{title}</div>
+          <button type="button" aria-label="Close dialog" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 12 }}>
             <X size={16} color={brand.textMuted} />
           </button>
         </div>
@@ -1174,7 +1194,7 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
           <div style={{ fontSize: 12, color: brand.textMuted, marginBottom: 12 }}>
             No Stripe subscription linked yet. Activating will mark the membership active
             and automatically start recurring billing on Stripe — provided the family has
-            saved a payment card in the Ballpark app (Me → Payment Method).
+            saved a payment card in Clubhouse by Infinite Hitting (Me → Payment Method).
           </div>
 
           {/* ── Promo code input ───────────────────────────────────────── */}

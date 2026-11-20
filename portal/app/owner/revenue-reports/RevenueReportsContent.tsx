@@ -7,6 +7,7 @@ import { OButton, PageHeader, SectionHeader, OCard } from '@/components/owner/ui
 import { Download, FileText, CreditCard, DollarSign } from 'lucide-react';
 import type { RevenueReportsData, RevenueTransaction } from '@/lib/supabase/ownerQueries';
 import { exportCsv } from '@/lib/exportCsv';
+import { PlayerLink } from '@/components/owner/PlayerLink';
 
 type Props = {
   data: RevenueReportsData;
@@ -461,7 +462,7 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
             </div>
           </OCard>
         ) : (
-          <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, overflow: 'hidden' }}>
+          <div role="region" aria-label="Revenue transactions" tabIndex={0} style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: brand.surfaceAlt, borderBottom: `1px solid ${brand.border}` }}>
@@ -490,7 +491,7 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
                 {transactions.map((t, i) => (
                   <tr key={t.id} style={{ borderBottom: i < transactions.length - 1 ? `1px solid ${brand.border}` : 'none' }}>
                     <td style={{ padding: '13px 16px', fontSize: 12, fontFamily: fonts.mono, color: brand.textMuted, whiteSpace: 'nowrap' }}>{t.date}</td>
-                    <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 700, color: brand.text }}>{t.memberName}</td>
+                    <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 700, color: brand.text }}><PlayerLink name={t.memberName} reference={t} section="payment-history" /></td>
                     <td style={{ padding: '13px 16px', fontSize: 12, color: brand.text }}>{t.planName}</td>
                     <td style={{ padding: '13px 16px', fontSize: 11, fontFamily: fonts.mono, color: brand.textMuted }}>{t.planType}</td>
                     <td style={{ padding: '13px 16px', fontSize: 13, fontFamily: fonts.mono, fontWeight: 700, color: brand.text, textAlign: 'right' }}>

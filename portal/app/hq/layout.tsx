@@ -6,7 +6,7 @@ import { HQShell } from "@/components/hq/HQShell";
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "HQ — Ballpark",
+  title: "HQ — Clubhouse by Infinite Hitting",
 };
 
 export default async function HQLayout({ children }: { children: ReactNode }) {

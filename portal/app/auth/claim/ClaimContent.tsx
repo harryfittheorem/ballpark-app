@@ -116,7 +116,7 @@ export function ClaimContent({ email, token }: Props) {
               Accept Invitation
             </h1>
             <p style={{ margin: 0, fontSize: 12, color: brand.textMuted }}>
-              Set up your Ballpark HQ Admin account
+              Set up your Clubhouse by Infinite Hitting HQ Admin account
             </p>
           </div>
         </div>

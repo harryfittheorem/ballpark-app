@@ -8,6 +8,7 @@ import type { TableColumn } from '@/components/owner/ui';
 import { Download, Plus, Filter, X, CreditCard, AlertTriangle, UserPlus, Phone } from 'lucide-react';
 import type { OwnerMember } from '@/lib/supabase/ownerQueries';
 import { exportCsv } from '@/lib/exportCsv';
+import { PlayerLink } from '@/components/owner/PlayerLink';
 
 type Props = { members: OwnerMember[] };
 
@@ -107,7 +108,7 @@ const columns: TableColumn<OwnerMember & Record<string, unknown>>[] = [
             {(r.name as string).charAt(0)}
           </div>
           <div>
-            <div style={{ fontWeight: 700 }}>{r.name as string}</div>
+            <div style={{ fontWeight: 700 }}><PlayerLink name={r.name} reference={{ kidId: r.kidId, membershipId: r.id }} /></div>
             <div style={{ fontSize: 11, color: brand.textMuted }}>{r.age as string} · {r.parent as string}</div>
             {phone && (
               <a
@@ -215,7 +216,7 @@ const labelStyle: React.CSSProperties = {
 
 export function MembersContent({ members }: Props) {
   const router  = useRouter();
-  const source  = [...DEMO_MEMBERS, ...members];
+  const source = members;
   const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'pending-cancel' | 'at-risk' | 'card-expiring'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [toast, setToast]   = useState<string | null>(null);
@@ -309,12 +310,12 @@ export function MembersContent({ members }: Props) {
       />
 
       <div style={{ padding: 24 }}>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div className="portal-sticky-controls owner-member-controls" aria-label="Member filters" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           {tabs.map(f => {
             const isCardTab = f.id === 'card-expiring';
             const isActive = filter === f.id;
             return (
-              <div
+              <button type="button" aria-pressed={isActive}
                 key={f.id}
                 onClick={() => setFilter(f.id as typeof filter)}
                 style={{
@@ -328,11 +329,14 @@ export function MembersContent({ members }: Props) {
               >
                 {isCardTab && f.count > 0 && !isActive && <AlertTriangle size={11} color="#FFC107" />}
                 {f.label} <span style={{ opacity: 0.7, marginLeft: 4 }}>{f.count}</span>
-              </div>
+              </button>
             );
           })}
           <div style={{ flex: 1 }} />
-          <OButton variant="secondary" size="sm" icon={Filter}>More Filters</OButton>
+          <details style={{ fontSize: 12, padding: 8 }}>
+            <summary>About member filters</summary>
+            <p>Choose a status, engagement risk or payment-card category above. Counts reflect the recorded memberships in this location’s tenant.</p>
+          </details>
         </div>
 
         <OTable
@@ -350,7 +354,7 @@ export function MembersContent({ members }: Props) {
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ width: 480, background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)', overflow: 'hidden' }}
+            style={{ width: 'min(480px, calc(100vw - 32px))', maxHeight: '90dvh', overflowY: 'auto', background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: `1px solid ${brand.border}` }}>
               <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>Add New Member</div>

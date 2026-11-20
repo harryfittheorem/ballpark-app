@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 
 import { useState, useEffect } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
@@ -35,7 +36,7 @@ function makeColumns(onReminder: (pack: LowBalancePack) => void, loadingIds: Set
             {(r.kidName as string).charAt(0)}
           </div>
           <div>
-            <div style={{ fontWeight: 700 }}>{r.kidName as string}</div>
+            <Link href={`/owner/members/${r.id}?section=package-history#package-history`} style={{ fontWeight: 700, textDecoration: 'underline' }}>{r.kidName as string}</Link>
             <div style={{ fontSize: 11, color: brand.textMuted }}>{r.parentName as string}</div>
           </div>
         </div>

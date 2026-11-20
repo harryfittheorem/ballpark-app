@@ -1,69 +1,24 @@
-import { createClient } from '@/lib/supabase/server';
-import { createServiceClient } from '@/lib/supabase/serviceClient';
-import { readTenantId } from '@/lib/auth';
-import { getMemberDetail, getBookingFormOptions } from '@/lib/supabase/ownerQueries';
-import { MemberDetailContent } from './MemberDetailContent';
-import { DEMO_MEMBER_DETAILS } from './demoMemberDetails';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { requireOwnerContext } from '@/lib/ownerAccess';
+import { getScopedPlayer } from '@/lib/supabase/playerProfile';
+import { playerHref } from '@/lib/playerLinks';
 
-export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
+/** Legacy membership URLs remain valid, but every context uses one player route. */
+export default async function MemberDetailPage({ params, searchParams }: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ section?: string }>;
+}) {
   const { id } = await params;
-  const _userClient = await createClient();
-  const supabase = createServiceClient();
-  const { data: { session } } = await _userClient.auth.getSession();
-  const tenantId = readTenantId(session) ?? process.env.PORTAL_TENANT_ID ?? '';
-
-  const [detail, bookingOptions] = await Promise.all([
-    getMemberDetail(supabase, tenantId, id),
-    getBookingFormOptions(supabase, tenantId),
-  ]);
-
-  if (detail) {
-    const { data: activeWaiver } = await supabase
-      .from('waivers')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    let waiverStatus: 'signed' | 'unsigned' | 'outdated' | null = null;
-    let waiverSignedAt: string | null = null;
-
-    if (activeWaiver?.id) {
-      const { data: signedRecord } = await supabase
-        .from('family_waivers')
-        .select('signed_at')
-        .eq('family_id', detail.familyId)
-        .eq('waiver_id', activeWaiver.id)
-        .maybeSingle();
-
-      if (signedRecord) {
-        waiverStatus = 'signed';
-        waiverSignedAt = signedRecord.signed_at;
-      } else {
-        const { data: anyRecord } = await supabase
-          .from('family_waivers')
-          .select('id')
-          .eq('family_id', detail.familyId)
-          .limit(1)
-          .maybeSingle();
-
-        waiverStatus = anyRecord ? 'outdated' : 'unsigned';
-      }
-    }
-
-    return (
-      <MemberDetailContent
-        member={detail}
-        bookingOptions={bookingOptions}
-        waiverStatus={waiverStatus}
-        waiverSignedAt={waiverSignedAt}
-      />
-    );
-  }
-
-  const demo = DEMO_MEMBER_DETAILS[id];
-  if (demo) return <MemberDetailContent member={demo} bookingOptions={bookingOptions} />;
-
-  return notFound();
+  const { client, tenantId } = await requireOwnerContext();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
+  const result = await client.from('memberships').select('id, kid_id, family_id')
+    .eq('tenant_id', tenantId).eq('id', id).maybeSingle();
+  if (result.error) throw new Error('Unable to load membership. Please retry.');
+  const membership = result.data;
+  if (!membership) notFound();
+  const player = await getScopedPlayer(client, tenantId, membership.kid_id);
+  if (!player || !player.memberships.some(m => m.id === id)) notFound();
+  const section = (await searchParams)?.section;
+  redirect(playerHref({ kidId: membership.kid_id, membershipId: id },
+    section === 'payment-history' || section === 'package-history' ? section : undefined)!);
 }

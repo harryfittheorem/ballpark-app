@@ -24,3 +24,4 @@
 - [Enrollment recovery](enrollment-recovery.md) — reserve identity before Auth creation; card setup is not first-invoice payment, and recovery must reuse the original subscription.
 - [Mobile enrollment scope](mobile-enrollment-parity.md) — keep location on screen 2; fix functional compatibility without relocating fields to match the web layout.
 - [Training replacement scope](training-replacement-scope.md) — web Operations module requested; plan first, preserve existing Trainual content and videos before transition.
+- [Portal route compatibility](portal-route-compatibility.md) — preserve historical Today links; never resolve player identity from a name or an arbitrary family child.

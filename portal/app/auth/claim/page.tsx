@@ -5,7 +5,7 @@ import { ClaimError } from './ClaimError';
 import crypto from 'crypto';
 import type { ReactNode } from 'react';
 
-export const metadata = { title: 'Accept Invitation — Ballpark' };
+export const metadata = { title: 'Accept Invitation — Clubhouse by Infinite Hitting' };
 
 interface SearchParams {
   token?: string;

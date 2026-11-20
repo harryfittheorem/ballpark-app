@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ReactNode, CSSProperties } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import {
@@ -33,6 +33,21 @@ const kpiColors: Record<KPIColor, { bg: string; border: string; iconBg: string; 
   warning: { bg: brand.warningBg, border: brand.warning, iconBg: `${brand.warning}22`, iconColor: brand.warning },
 };
 
+const metricDescriptions: Record<string, string> = {
+  'MRR': 'Monthly recurring revenue from the existing billing report. This is not a bank payout or cash balance.',
+  'Collected (MTD)': 'Recorded collections since the start of the current month. Open transaction history to inspect individual payments.',
+  'Auto-Pay Rate': 'The existing billing report’s automatic-payment metric. This is not a guarantee that future charges will succeed.',
+  'Past Due': 'Outstanding failed payments in the existing billing report. Open Failed Payments to review available recovery actions.',
+  'Revenue Today': 'Scheduled base value of confirmed and completed sessions today, not cash collected today.',
+  "Today's Sessions": 'Bookings scheduled for today, including cancelled sessions and no-shows. Open the schedule for each booking’s status.',
+  'Active Members': 'Current active membership summary for this view; Today counts distinct families with active memberships.',
+  'Total Cancelled': 'Recorded cancelled memberships within the selected cancellation-date period.',
+  'Lost MRR (EFT)': 'Recurring monthly plan value of the cancelled EFT memberships in the selected period, not a refund total.',
+  'Unused Sessions': 'Remaining pack sessions recorded on cancelled packages. Missing balances are not estimated.',
+  'Revenue at Risk': 'Recorded failed payment amounts awaiting review. This is not a prediction of future collections.',
+  'Accounts Affected': 'Failed payment records shown in this view. A family may have more than one failed payment.',
+};
+
 export function KPICard({ label, value, unit, delta, deltaLabel, deltaInvert = false, icon: Icon, color = 'default' }: KPICardProps) {
   const c = kpiColors[color];
   const rawPositive = (delta ?? 0) >= 0;
@@ -59,6 +74,16 @@ export function KPICard({ label, value, unit, delta, deltaLabel, deltaInvert = f
           <span style={{ color: brand.textMuted, fontWeight: 500, marginLeft: 4 }}>{deltaLabel || 'vs last month'}</span>
         </div>
       )}
+      {deltaLabel && delta === undefined && (
+        <div style={{ fontSize: 11, color: brand.textMuted, fontWeight: 600 }}>{deltaLabel}</div>
+      )}
+      <details className="portal-kpi-explanation">
+        <summary aria-label={`About ${label}`} title={`About ${label}`}>About this metric</summary>
+        <p>{metricDescriptions[label] ?? `${label} summarizes the records shown in this view. Open the related list to inspect individual records.`}
+          {deltaLabel ? ` ${deltaLabel}.` : ''}
+          {delta !== undefined ? ` Change: ${isPositive ? 'up' : 'down'} ${Math.abs(delta)} percent ${deltaLabel || 'versus last month'}.` : ''}
+        </p>
+      </details>
     </div>
   );
 }
@@ -154,17 +179,31 @@ export function PageHeader({ title, subtitle, actions, breadcrumb }: {
   actions?: ReactNode;
   breadcrumb?: string;
 }) {
+  const headerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const header = headerRef.current;
+    const main = header?.closest('main');
+    if (!header || !main) return;
+    const measure = () => main.style.setProperty('--portal-page-header-height', `${header.getBoundingClientRect().height}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      main.style.removeProperty('--portal-page-header-height');
+    };
+  }, []);
   return (
-    <div style={{ padding: '24px 32px 20px', borderBottom: `1px solid ${brand.border}`, background: brand.surface }}>
+    <div ref={headerRef} className="portal-page-header" style={{ padding: '24px 32px 20px', borderBottom: `1px solid ${brand.border}`, background: brand.surface }}>
       {breadcrumb && (
         <div style={{ fontSize: 11, color: brand.textMuted, marginBottom: 6, fontWeight: 600, letterSpacing: 0.5 }}>{breadcrumb}</div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+      <div className="portal-page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 700, fontFamily: fonts.display, letterSpacing: -0.5, color: brand.text, margin: 0 }}>{title}</h1>
           {subtitle && <div style={{ fontSize: 13, color: brand.textMuted, marginTop: 4 }}>{subtitle}</div>}
         </div>
-        {actions && <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>{actions}</div>}
+        {actions && <div className="portal-page-header-actions" style={{ display: 'flex', gap: 8, flexShrink: 0 }}>{actions}</div>}
       </div>
     </div>
   );
@@ -239,34 +278,35 @@ export function OTable<T extends Record<string, unknown>>({
     : rows;
 
   return (
-    <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, overflow: 'hidden' }}>
+    <div className="portal-table-scroll" role="region" aria-label="Data table. Scroll horizontally to view all columns." tabIndex={0} style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ background: brand.surfaceAlt, borderBottom: `1px solid ${brand.border}` }}>
             {columns.map((col, i) => (
               <th
                 key={i}
-                onClick={col.sortable ? () => handleSort(String(col.key)) : undefined}
+                aria-sort={col.sortable && sortKey === String(col.key) ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                 style={{
                   padding: '12px 16px',
                   textAlign: col.align || 'left',
                   fontSize: 10, fontWeight: 800, color: sortKey === String(col.key) ? brand.goldDeep : brand.textMuted,
                   letterSpacing: 1, textTransform: 'uppercase', fontFamily: fonts.display, whiteSpace: 'nowrap',
-                  cursor: col.sortable ? 'pointer' : 'default',
                   userSelect: 'none',
                 }}
               >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  {col.label}
-                  {col.sortable && (
+                {col.sortable ? (
+                  <button type="button" className="portal-sort-button" onClick={() => handleSort(String(col.key))}
+                    aria-label={`Sort by ${col.label}${sortKey === String(col.key) ? `, currently ${sortDir === 'asc' ? 'ascending' : 'descending'}` : ''}`}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0 4px', border: 0, background: 'transparent', color: 'inherit', font: 'inherit', textTransform: 'inherit', letterSpacing: 'inherit', cursor: 'pointer' }}>
+                    {col.label}
                     <span style={{ opacity: sortKey === String(col.key) ? 1 : 0.3, display: 'inline-flex' }}>
                       {sortKey === String(col.key) && sortDir === 'desc'
                         ? <ChevronDown size={10} />
                         : <ChevronUp size={10} />
                       }
                     </span>
-                  )}
-                </span>
+                  </button>
+                ) : col.label}
               </th>
             ))}
           </tr>
@@ -276,6 +316,14 @@ export function OTable<T extends Record<string, unknown>>({
             <tr
               key={i}
               onClick={() => onRowClick?.(row)}
+              tabIndex={onRowClick ? 0 : undefined}
+              aria-label={onRowClick ? `Open row ${i + 1}` : undefined}
+              onKeyDown={onRowClick ? (event) => {
+                if ((event.key === 'Enter' || event.key === ' ') && event.target === event.currentTarget) {
+                  event.preventDefault();
+                  onRowClick(row);
+                }
+              } : undefined}
               style={{ borderBottom: i < sorted.length - 1 ? `1px solid ${brand.border}` : 'none', cursor: onRowClick ? 'pointer' : 'default' }}
               onMouseEnter={(e) => { if (onRowClick) (e.currentTarget as HTMLTableRowElement).style.background = brand.surfaceAlt; }}
               onMouseLeave={(e) => { if (onRowClick) (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'; }}

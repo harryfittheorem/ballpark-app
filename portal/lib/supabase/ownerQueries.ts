@@ -132,6 +132,7 @@ export type OwnerCoach = {
 
 export type FailedPayment = {
   id: string;
+  kidId?: string | null;
   membershipId: string | null;
   member: string;
   parent: string;
@@ -666,22 +667,26 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   // ── Membership payment failures (recurring billing) ───────────────────────
-  const { data: membershipFailures } = await supabase
+  const { data: membershipFailures, error: membershipError } = await supabase
     .from('payment_events')
     .select(`
       id, amount_cents, error_code, created_at,
       membership_id,
       memberships!inner(plan_name, status, payment_failure_count, payment_paused_reason, kid_id, family_id,
-        kids!inner(first_name, last_name),
+        kids!inner(first_name, last_name, families!inner(tenant_id)),
         families!inner(parent_first_name, parent_last_name)
       )
     `)
     .eq('tenant_id', tenantId)
+    .eq('memberships.tenant_id', tenantId)
+    .eq('memberships.kids.families.tenant_id', tenantId)
+    .eq('memberships.families.tenant_id', tenantId)
     .eq('status', 'failed')
     .order('created_at', { ascending: false });
 
   const membershipRows: FailedPayment[] = (membershipFailures ?? []).map((row, i) => {
     const mem = row.memberships as unknown as {
+      kid_id: string | null;
       plan_name: string;
       payment_failure_count?: number;
       payment_paused_reason?: string | null;
@@ -698,6 +703,7 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
 
     return {
       id: row.id,
+      kidId: mem.kid_id,
       membershipId: row.membership_id ?? null,
       member: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
       parent: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),
@@ -715,20 +721,23 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
   });
 
   // ── Store order card payment failures ─────────────────────────────────────
-  const { data: orderFailures } = await supabase
+  const { data: orderFailures, error: ordersError } = await supabase
     .from('orders')
     .select(`
       id, amount_paid_cents, created_at, failure_reason,
       kid_id,
-      kids!inner(first_name, last_name),
+      kids!inner(first_name, last_name, families!inner(tenant_id)),
       families!inner(parent_first_name, parent_last_name),
       products!inner(name)
     `)
     .eq('tenant_id', tenantId)
+    .eq('kids.families.tenant_id', tenantId)
+    .eq('families.tenant_id', tenantId)
     .eq('payment_method', 'card')
     .eq('status', 'payment_failed')
     .order('created_at', { ascending: false });
 
+  if (membershipError || ordersError) throw new Error('Unable to load failed payment history. Please retry.');
   const orderRows: FailedPayment[] = (orderFailures ?? []).map((row) => {
     const kid = row.kids as unknown as { first_name: string; last_name: string | null };
     const fam = row.families as unknown as { parent_first_name: string; parent_last_name: string | null };
@@ -739,6 +748,7 @@ export async function getFailedPayments(supabase: SupabaseClient, tenantId: stri
 
     return {
       id: row.id,
+      kidId: row.kid_id,
       membershipId: null,
       member: [kid.first_name, kid.last_name].filter(Boolean).join(' '),
       parent: [fam.parent_first_name, fam.parent_last_name].filter(Boolean).join(' '),
@@ -903,6 +913,8 @@ export async function getMissingInAction(supabase: SupabaseClient, tenantId: str
 
 export type RecentTransaction = {
   id: string;
+  kidId?: string | null;
+  membershipId?: string | null;
   date: string;
   member: string;
   package: string;
@@ -935,37 +947,46 @@ export async function getBillingData(supabase: SupabaseClient, tenantId: string)
     getMembershipPackages(supabase, tenantId),
   ]);
 
-  const { data: events } = await supabase
+  const { data: events, error: eventsError } = await supabase
     .from('payment_events')
     .select(`
       id, amount_cents, payment_method, status, created_at,
-      memberships(plan_name, kids(first_name, last_name))
+      memberships(id, kid_id, tenant_id, plan_name, kids(first_name, last_name, families!inner(tenant_id)))
     `)
     .eq('tenant_id', tenantId)
+    .eq('memberships.tenant_id', tenantId)
+    .eq('memberships.kids.families.tenant_id', tenantId)
     .order('created_at', { ascending: false })
     .limit(50);
+
+  if (eventsError) throw new Error('Unable to load billing history. Please retry.');
 
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   const recentTransactions: RecentTransaction[] = (events ?? []).map(e => {
     const mem = e.memberships as unknown as {
+      id: string;
+      kid_id: string;
+      tenant_id: string;
       plan_name: string;
       kids: { first_name: string; last_name: string | null } | Array<{ first_name: string; last_name: string | null }> | null;
     } | null;
     // kids may be returned as an array (when the join is one-to-many) or as an
     // object (when selected via memberships→kids as a nested relation). Guard for both.
-    const kidsObj = Array.isArray(mem?.kids) ? mem?.kids[0] ?? null : mem?.kids ?? null;
+    const kidsObj = Array.isArray(mem?.kids) ? (mem.kids.length === 1 ? mem.kids[0] : null) : mem?.kids ?? null;
     const d = new Date(e.created_at);
     const memberName = kidsObj
       ? [kidsObj.first_name, kidsObj.last_name].filter(Boolean).join(' ')
       : '—';
     return {
       id: e.id,
+      membershipId: mem?.tenant_id === tenantId ? mem.id : null,
+      kidId: kidsObj && mem?.tenant_id === tenantId ? mem.kid_id : null,
       date: `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`,
       member: memberName,
       package: mem?.plan_name ?? '—',
       amount: e.amount_cents / 100,
-      method: e.payment_method.toUpperCase(),
+      method: (e.payment_method ?? 'Unavailable').toUpperCase(),
       status: e.status as 'paid' | 'failed' | 'refunded',
     };
   });
@@ -1518,6 +1539,7 @@ export async function getMemberDetail(
   tenantId: string,
   membershipId: string,
 ): Promise<MemberDetail | null> {
+  if (!tenantId || !/^[0-9a-f-]{36}$/i.test(membershipId)) return null;
   const { data: mem, error: memErr } = await supabase
     .from('memberships')
     .select(`
@@ -1548,6 +1570,7 @@ export async function getMemberDetail(
     `)
     .eq('tenant_id', tenantId)
     .eq('id', membershipId)
+    .eq('families.tenant_id', tenantId)
     .single();
 
   if (memErr || !mem) return null;
@@ -1626,6 +1649,9 @@ export async function getMemberDetail(
   if (recentBookingsRes.error) console.error('[getMemberDetail] recentBookings:', recentBookingsRes.error.message);
   if (paymentsRes.error) console.error('[getMemberDetail] payments:', paymentsRes.error.message);
   if (lastBookingRes.error) console.error('[getMemberDetail] lastBooking:', lastBookingRes.error.message);
+  if ([bookingCountRes, sessionsRes, recentBookingsRes, paymentsRes, lastBookingRes].some(r => r.error)) {
+    throw new Error('Unable to load complete player history. Please retry.');
+  }
 
   // Build unified timeline: merge recent bookings + payment events, sort descending
   const knownBookingStatuses = new Set<BookingStatus>(['completed','cancelled','confirmed','pending','no_show']);
@@ -1828,6 +1854,8 @@ export async function getCoachHours(
 
 export type RevenueTransaction = {
   id: string;
+  kidId?: string | null;
+  membershipId?: string | null;
   date: string;
   memberName: string;
   planName: string;
@@ -1847,30 +1875,38 @@ export async function getRevenueTransactions(
     .from('payment_events')
     .select(`
       id, amount_cents, payment_method, status, created_at,
-      memberships(plan_name, plan_type, kids(first_name, last_name))
+      memberships(id, kid_id, tenant_id, plan_name, plan_type, kids(first_name, last_name, families!inner(tenant_id)))
     `)
     .eq('tenant_id', tenantId)
+    .eq('memberships.tenant_id', tenantId)
+    .eq('memberships.kids.families.tenant_id', tenantId)
     .gte('created_at', new Date(startDate).toISOString())
     .lt('created_at', new Date(new Date(endDate).getTime() + 86_400_000).toISOString())
     .order('created_at', { ascending: false });
 
   if (error) {
     console.error('[getRevenueTransactions]', error.message);
-    return [];
+    throw new Error('Unable to load transaction history. Please retry.');
   }
 
   return (data ?? []).map(e => {
     const mem = e.memberships as unknown as {
+      id: string;
+      kid_id: string;
+      tenant_id: string;
       plan_name: string;
       plan_type: string;
-      kids: { first_name: string; last_name: string | null } | null;
+      kids: { first_name: string; last_name: string | null } | Array<{ first_name: string; last_name: string | null }> | null;
     } | null;
     const d = new Date(e.created_at);
-    const memberName = mem?.kids
-      ? [mem.kids.first_name, mem.kids.last_name].filter(Boolean).join(' ')
+    const kid = Array.isArray(mem?.kids) ? (mem.kids.length === 1 ? mem.kids[0] : null) : mem?.kids;
+    const memberName = kid
+      ? [kid.first_name, kid.last_name].filter(Boolean).join(' ')
       : '—';
     return {
       id:            e.id,
+      membershipId: mem?.tenant_id === tenantId ? mem.id : null,
+      kidId: kid && mem?.tenant_id === tenantId ? mem.kid_id : null,
       date:          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,
       memberName,
       planName:      mem?.plan_name ?? '—',
@@ -1933,7 +1969,8 @@ export async function getLocationsStripeStatus(
     .eq('tenant_id', tenantId)
     .order('name');
 
-  if (error || !data) return [];
+  if (error) throw new Error('Unable to load payment connection status. Please retry.');
+  if (!data) return [];
 
   return data.map(row => ({
     id: row.id as string,
@@ -1958,6 +1995,7 @@ export async function getLocationStripeStatus(
 
 export type TodayBooking = {
   id: string;
+  kidId?: string | null;
   kidName: string;
   coachId: string | null;
   coachName: string;
@@ -1996,7 +2034,7 @@ export async function getTodayAtAGlanceData(
   const next48hEnd = new Date(todayEnd.getTime() + 48 * 3_600_000);
 
   const BOOKING_SELECT = `
-    id, scheduled_start, scheduled_end, cage_number, status, coach_id,
+    id, kid_id, scheduled_start, scheduled_end, cage_number, status, coach_id,
     session_types(name, base_price_cents),
     kids(first_name, last_name),
     coaches(first_name, last_name)
@@ -2026,8 +2064,13 @@ export async function getTodayAtAGlanceData(
       .eq('status', 'active'),
   ]);
 
+  if ([bookingsTodayRes, upcomingRes, membershipsRes].some(r => r.error)) {
+    throw new Error('Unable to load today’s activity. Please retry.');
+  }
+
   type RawBookingRow = {
     id: string;
+    kid_id: string | null;
     scheduled_start: string;
     scheduled_end: string | null;
     cage_number: string | number | null;
@@ -2044,6 +2087,7 @@ export async function getTodayAtAGlanceData(
     const st    = b.session_types as { name: string; base_price_cents: number } | null;
     return {
       id:             b.id,
+      kidId:          b.kid_id,
       kidName:        kid   ? [kid.first_name,   kid.last_name  ].filter(Boolean).join(' ') : 'Unknown',
       coachId:        b.coach_id ?? null,
       coachName:      coach ? [coach.first_name, coach.last_name].filter(Boolean).join(' ') : '—',
@@ -2124,15 +2168,18 @@ export async function getCancelledMemberships(
     .from('memberships')
     .select(`
       id, plan_name, plan_type, amount_cents, cancelled_at, sessions_remaining,
-      kids!inner(first_name, last_name),
+      kids!inner(first_name, last_name, families!inner(tenant_id)),
       families!inner(parent_first_name, parent_last_name, parent_email, parent_phone)
     `)
     .eq('tenant_id', tenantId)
+    .eq('kids.families.tenant_id', tenantId)
+    .eq('families.tenant_id', tenantId)
     .eq('status', 'cancelled')
     .gte('cancelled_at', since.toISOString())
     .order('cancelled_at', { ascending: false });
 
-  if (error || !data) return [];
+  if (error) throw new Error('Unable to load cancellation history. Please retry.');
+  if (!data) return [];
 
   return data.map(r => {
     const kid = r.kids as unknown as { first_name: string; last_name: string | null };

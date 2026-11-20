@@ -33,7 +33,7 @@ export default async function LoginPage({
               className="inline-block h-2.5 w-2.5 rounded-full bg-gold shadow-[0_0_14px_rgba(241,229,173,0.7)]"
             />
             <span className="font-display text-3xl font-semibold uppercase tracking-[0.22em] text-cream-light">
-              Ball<span className="text-gold">park</span>
+              Clubhouse<span className="block text-xs text-gold tracking-normal">by Infinite Hitting</span>
             </span>
           </div>
           <p className="text-sm text-text-light">
@@ -48,7 +48,7 @@ export default async function LoginPage({
         </Card>
 
         <p className="text-center text-xs text-text-light">
-          Parents — open the Ballpark mobile app instead.{" "}
+          Parents — open the Clubhouse by Infinite Hitting mobile app instead.{" "}
           <Link
             href="/"
             className="text-gold underline-offset-2 hover:underline"

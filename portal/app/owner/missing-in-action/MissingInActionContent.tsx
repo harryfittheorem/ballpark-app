@@ -1,4 +1,5 @@
 'use client';
+import { PlayerLink } from '@/components/owner/PlayerLink';
 
 import { useState } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
@@ -48,7 +49,7 @@ const columns: TableColumn<OwnerMember & Record<string, unknown>>[] = [
           {(r.name as string).charAt(0)}
         </div>
         <div>
-          <div style={{ fontWeight: 700 }}>{r.name as string}</div>
+          <div style={{ fontWeight: 700 }}><PlayerLink name={r.name} reference={{ kidId: r.kidId, membershipId: r.id }} /></div>
           <div style={{ fontSize: 11, color: brand.textMuted }}>{r.age as string} · {r.parent as string}</div>
         </div>
       </div>
@@ -112,7 +113,7 @@ export function MissingInActionContent({ groups: rawGroups }: Props) {
   const [tab, setTab] = useState<'7' | '14' | '30'>('7');
 
   const hasLiveData = rawGroups.sevenDay.length > 0 || rawGroups.fourteenDay.length > 0 || rawGroups.thirtyDay.length > 0;
-  const groups = hasLiveData ? rawGroups : DEMO_GROUPS;
+  const groups = rawGroups;
 
   const current = groups[tab === '7' ? 'sevenDay' : tab === '14' ? 'fourteenDay' : 'thirtyDay'];
 

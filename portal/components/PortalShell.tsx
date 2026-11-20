@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -65,6 +65,7 @@ const OWNER_NAV: NavSection[] = [
   {
     label: 'Operations',
     items: [
+      { label: 'Dashboard', href: '/owner', icon: LayoutDashboard },
       { label: 'Today',     href: '/owner/dashboard',  icon: LayoutDashboard },
       { label: 'Members',   href: '/owner/members',    icon: Users },
       { label: 'Schedule',  href: '/owner/schedule',   icon: Calendar },
@@ -122,6 +123,7 @@ const FRANCHISOR_NAV: NavSection[] = [
 
 function isActive(pathname: string, href: string): boolean {
   if (href === '/owner') return pathname === '/owner';
+  if (href === '/owner/members' && pathname.startsWith('/owner/players/')) return true;
   if (href === '/owner/franchisor') return pathname === '/owner/franchisor';
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -149,13 +151,51 @@ export function PortalShell({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileTriggerRef = useRef<HTMLButtonElement>(null);
+  const mobileDialogRef = useRef<HTMLDivElement>(null);
+  const previousPathRef = useRef(pathname);
   const [ownerSubRole, setOwnerSubRole] = useState<'owner' | 'franchisor'>(
     pathname?.startsWith('/owner/franchisor') ? 'franchisor' : 'owner',
   );
 
   useEffect(() => {
     setMobileOpen(false);
+    if (previousPathRef.current !== pathname) {
+      previousPathRef.current = pathname;
+      mobileTriggerRef.current?.focus();
+    }
   }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    setCollapsed(false);
+    const dialog = mobileDialogRef.current;
+    const getFocusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ) ?? []).filter(element => element.getClientRects().length > 0);
+    getFocusable()?.[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMobileOpen(false);
+        mobileTriggerRef.current?.focus();
+      } else if (event.key === 'Tab') {
+        const items = Array.from(getFocusable() ?? []);
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [mobileOpen]);
 
   const baseOwnerNav: NavSection[] = role === 'owner' ? OWNER_NAV.map(section => ({
     ...section,
@@ -186,7 +226,7 @@ export function PortalShell({
     <div
       className={[
         'flex h-full flex-col bg-darker border-r border-border-gold transition-[width] duration-200 overflow-hidden',
-        collapsed ? 'w-[68px]' : 'w-[220px]',
+        collapsed ? 'w-[68px]' : 'w-[250px]',
       ].join(' ')}
     >
       {/* Logo */}
@@ -196,11 +236,12 @@ export function PortalShell({
           collapsed ? 'justify-center px-3 py-4' : 'gap-2.5 px-4 py-5',
         ].join(' ')}
       >
-        <Link href={homeHref} className="flex items-center gap-2.5 group">
+        <Link href={homeHref} aria-label="Clubhouse by Infinite Hitting home" className="flex items-center gap-2.5 group">
           <span className="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full bg-gold shadow-[0_0_12px_rgba(241,229,173,0.7)] transition-transform group-hover:scale-110" />
           {!collapsed && (
             <span className="font-display text-xl font-semibold uppercase tracking-[0.18em] text-cream-light whitespace-nowrap">
-              Ball<span className="text-gold">park</span>
+              <span className="block text-[15px] leading-tight tracking-[0.12em]">Clubhouse</span>
+              <span className="block text-[9px] leading-tight tracking-[0.14em] text-gold">BY INFINITE HITTING</span>
             </span>
           )}
         </Link>
@@ -238,7 +279,7 @@ export function PortalShell({
       )}
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 min-h-0">
+      <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto overflow-x-hidden py-2 min-h-0">
         {sections.map((section, si) => (
           <div key={si} className="mb-4">
             {section.label && !collapsed && (
@@ -252,8 +293,11 @@ export function PortalShell({
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-label={item.label}
+                  aria-current={active ? 'page' : undefined}
+                  title={collapsed ? item.label : undefined}
                   className={[
-                    'flex items-center gap-2.5 border-l-[3px] py-2.5 transition-all',
+                    'portal-nav-link flex items-center gap-2.5 border-l-[3px] py-2.5 transition-all',
                     collapsed ? 'justify-center px-[22px]' : 'px-5',
                     active
                       ? 'border-gold bg-gold/10 text-gold'
@@ -288,6 +332,7 @@ export function PortalShell({
       {/* Collapse toggle (desktop only) */}
       <button
         type="button"
+        aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
         onClick={() => setCollapsed((c) => !c)}
         className="hidden md:flex items-center justify-center gap-1.5 border-t border-border-gold px-3 py-3 text-[11px] text-text-light hover:text-cream-light transition-colors flex-shrink-0"
       >
@@ -304,7 +349,7 @@ export function PortalShell({
   );
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-darkest">
+    <div className="flex min-h-[100dvh] h-[100dvh] w-full overflow-hidden bg-darkest">
       {/* Desktop sidebar */}
       <div className="hidden md:flex h-full flex-col flex-shrink-0">
         {SidebarContent}
@@ -312,12 +357,16 @@ export function PortalShell({
 
       {/* Mobile sidebar overlay */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div id="portal-mobile-navigation" ref={mobileDialogRef} className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Mobile navigation">
           <div
             className="absolute inset-0 bg-black/60"
-            onClick={() => setMobileOpen(false)}
+            onClick={() => { setMobileOpen(false); mobileTriggerRef.current?.focus(); }}
+            aria-hidden="true"
           />
-          <div className="relative flex h-full w-[220px] flex-col">
+          <div className="relative flex h-full w-[min(86vw,280px)] flex-col">
+            <button type="button" onClick={() => { setMobileOpen(false); mobileTriggerRef.current?.focus(); }} aria-label="Close navigation" className="absolute right-2 top-2 z-10 flex h-11 w-11 items-center justify-center rounded-lg text-text-light hover:bg-darkest hover:text-cream-light">
+              <X size={20} />
+            </button>
             {SidebarContent}
           </div>
         </div>
@@ -326,14 +375,18 @@ export function PortalShell({
       {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
         {/* Top bar */}
-        <div className="flex h-14 flex-shrink-0 items-center justify-between gap-3 border-b border-border-gold bg-darker px-4">
+        <div className="portal-topbar flex flex-shrink-0 items-center justify-between gap-3 border-b border-border-gold bg-darker px-4">
           {/* Hamburger (mobile only) */}
           <button
+            ref={mobileTriggerRef}
             type="button"
-            onClick={() => setMobileOpen((o) => !o)}
-            className="md:hidden rounded-lg p-1.5 text-text-light hover:text-cream-light transition-colors"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open navigation"
+            aria-expanded={mobileOpen}
+            aria-controls="portal-mobile-navigation"
+            className="md:hidden flex h-11 w-11 items-center justify-center rounded-lg text-text-light hover:text-cream-light transition-colors"
           >
-            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+            <Menu size={20} />
           </button>
 
           <div className="flex-1" />
@@ -370,7 +423,8 @@ export function PortalShell({
         </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto min-h-0">
+        <main id="portal-main" tabIndex={-1} className="flex-1 overflow-y-auto min-h-0 scroll-smooth">
+          <a className="portal-skip-link" href="#portal-main">Skip to main content</a>
           {children}
         </main>
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { PageHeader, SectionHeader, OCard, OButton, Chip } from '@/components/owner/ui';
@@ -56,10 +57,10 @@ export function PaymentsContent({ locations }: Props) {
           l => l.stripe_onboarding_status === 'connected' && l.stripe_account_id,
         );
         setFlash({
-          type: 'success',
+          type: alreadyConnected ? 'success' : 'error',
           text: alreadyConnected
             ? 'Stripe account connected and verified! Card payments are now enabled.'
-            : 'Stripe account connected! Stripe is verifying your details — status will update automatically via webhook.',
+            : 'The return link could not confirm a connected account. Check the location status below or sync from Stripe.',
         });
         return;
       }
@@ -77,6 +78,10 @@ export function PaymentsContent({ locations }: Props) {
             .catch(() => ({ ok: false as const, status: undefined, error: 'Network error' })),
         ),
       ).then(results => {
+        if (results.some(r => !r.ok || !r.status)) {
+          setFlash({ type: 'error', text: 'Could not confirm every Stripe account status. Use Sync from Stripe to retry.' });
+          return;
+        }
         const statuses = results.map(r => r.status);
         const anyConnected = statuses.some(s => s === 'connected');
         const allConnected = statuses.every(s => s === 'connected');
@@ -90,13 +95,13 @@ export function PaymentsContent({ locations }: Props) {
         }
         router.refresh();
       }).catch(() => {
-        setFlash({ type: 'success', text: 'Stripe account connected! Stripe is verifying your details — status will update automatically via webhook.' });
+        setFlash({ type: 'error', text: 'Unable to verify the connection. Use Sync from Stripe to retry.' });
       });
     }
 
     const err = searchParams.get('error');
     if (err) {
-      setFlash({ type: 'error', text: `Connection failed: ${decodeURIComponent(err)}` });
+      setFlash({ type: 'error', text: `Connection failed: ${err}` });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -184,13 +189,24 @@ export function PaymentsContent({ locations }: Props) {
     <div>
       <PageHeader
         title="Payments"
-        subtitle="Connect each location to Stripe to enable card payments"
+        subtitle="Clubhouse by Infinite Hitting · Payment setup and existing billing tools"
       />
 
       <div style={{ padding: 24, maxWidth: 820 }}>
+        <nav aria-label="Payment tools" className="owner-payment-tools">
+          <Link href="/owner/billing#transaction-history">Payment history</Link>
+          <Link href="/owner/failed-payments">Failed payments and existing recovery actions</Link>
+          <Link href="/owner/members">Player billing and package history</Link>
+          <Link href="/owner/revenue-reports">Transaction reports</Link>
+          <a href="#payment-connections">Connection settings</a>
+        </nav>
+        <p style={{ fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>
+          History uses the existing billing records. Open a linked player for their payment and package history.
+          Merchant identity is shown per location below; Clubhouse branding does not change the connected merchant.
+        </p>
         {/* Flash message */}
         {flash && (
-          <div style={{
+          <div role={flash.type === 'error' ? 'alert' : 'status'} style={{
             marginBottom: 20,
             padding: '12px 16px',
             borderRadius: 8,
@@ -247,6 +263,7 @@ export function PaymentsContent({ locations }: Props) {
         )}
 
         {/* Per-location cards */}
+        <h2 id="payment-connections" style={{ fontSize: 18, marginBottom: 16 }}>Payment connections</h2>
         {locations.length === 0 && (
           <OCard>
             <div style={{ textAlign: 'center', padding: '24px 0', color: brand.textMuted, fontSize: 13 }}>
@@ -287,10 +304,11 @@ export function PaymentsContent({ locations }: Props) {
                         </div>
                       )}
                       {loc.stripe_account_id && (
-                        <div style={{ fontSize: 11, color: brand.textLight, fontFamily: fonts.mono, marginBottom: 2 }}>
+                        <div style={{ fontSize: 12, color: brand.textMuted, fontFamily: fonts.mono, marginBottom: 2, overflowWrap: 'anywhere' }}>
                           {loc.stripe_account_id}
                         </div>
                       )}
+                      {!loc.stripe_account_name && <p style={{ fontSize: 12 }}>Merchant name unavailable — verify in Stripe.</p>}
                       {isConnected && loc.stripe_payout_interval && (
                         <div style={{ fontSize: 12, color: brand.textMuted }}>
                           Payout schedule: <strong style={{ color: brand.text }}>{loc.stripe_payout_interval}</strong>
@@ -410,7 +428,7 @@ export function PaymentsContent({ locations }: Props) {
                 {
                   step: '1',
                   title: 'Click "Connect Stripe Account"',
-                  body: 'A new tab opens with Stripe\'s secure onboarding. Stripe handles identity verification (KYC) directly — Ballpark never sees your banking details.',
+                  body: 'A new tab opens with Stripe’s secure onboarding. Stripe handles identity verification directly — Clubhouse by Infinite Hitting never sees your banking details.',
                 },
                 {
                   step: '2',
@@ -420,7 +438,7 @@ export function PaymentsContent({ locations }: Props) {
                 {
                   step: '3',
                   title: 'Card payments go live',
-                  body: 'When status shows "Connected", parents can pay by card in the Ballpark app. Ballpark\'s 2.5% platform fee is deducted automatically on each transaction. Your net payout is 97.5% of each charge (standard Stripe processing fees also apply).',
+                  body: 'When Stripe confirms card payments are enabled, parents can pay through Clubhouse by Infinite Hitting. Review actual transactions and payouts in the connected merchant account.',
                 },
               ].map((item, i, arr) => (
                 <div
@@ -455,7 +473,7 @@ export function PaymentsContent({ locations }: Props) {
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <Info size={15} color={brand.info} style={{ flexShrink: 0, marginTop: 1 }} />
               <div style={{ fontSize: 12, color: brand.textMuted, lineHeight: 1.6 }}>
-                <strong style={{ color: brand.text }}>Platform fee:</strong> Ballpark automatically deducts a 2.5% application fee from each card transaction. This fee covers platform maintenance, support, and royalty collection. Standard Stripe payment processing fees (typically 2.9% + 30¢) also apply and are charged separately by Stripe.
+                <strong style={{ color: brand.text }}>Fees and payouts:</strong> Check the connected account’s Stripe records and your agreement for actual platform fees, processing fees and payout amounts. This setup page does not calculate net proceeds or initiate charges.
               </div>
             </div>
           </OCard>

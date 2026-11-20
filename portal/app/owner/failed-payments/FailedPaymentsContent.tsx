@@ -5,6 +5,7 @@ import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, SectionHeader, OCard } from '@/components/owner/ui';
 import { AlertCircle, Users, TrendingUp, CreditCard, Mail, Phone, MessageCircle, Send, ShoppingBag, RefreshCw, RotateCcw, PauseCircle } from 'lucide-react';
 import type { FailedPayment } from '@/lib/supabase/ownerQueries';
+import { PlayerLink } from '@/components/owner/PlayerLink';
 
 type Props = { payments: FailedPayment[] };
 
@@ -16,7 +17,7 @@ const DEMO_PAYMENTS: FailedPayment[] = [
 ];
 
 export function FailedPaymentsContent({ payments: rawPayments }: Props) {
-  const payments    = rawPayments.length ? rawPayments : DEMO_PAYMENTS;
+  const payments = rawPayments;
   const totalAtRisk = payments.reduce((s, f) => s + f.amount, 0);
   const membershipFailures = payments.filter(p => p.source === 'membership');
   const storeFailures      = payments.filter(p => p.source === 'store_order');
@@ -233,7 +234,9 @@ function FailedPaymentCard({ f, onToast }: { f: FailedPayment; onToast: (msg: st
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 15, fontWeight: 700 }}>{f.member}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>
+                    <PlayerLink name={f.member} reference={f} section="payment-history" />
+                  </div>
                   {isStoreOrder && (
                     <span style={{ fontSize: 10, fontWeight: 700, background: '#2a2000', color: brand.gold, borderRadius: 4, padding: '2px 6px', textTransform: 'uppercase', letterSpacing: 1 }}>Store</span>
                   )}

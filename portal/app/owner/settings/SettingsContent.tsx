@@ -163,7 +163,7 @@ export function SettingsContent() {
               Cancellation Policy
             </div>
             <div style={{ fontSize: 12, color: brand.textMuted, marginBottom: 20 }}>
-              These settings apply to all parents booking through the Ballpark app.
+              These settings apply to all parents booking through Clubhouse by Infinite Hitting.
               Changes take effect immediately — no redeploy required.
             </div>
 

@@ -86,7 +86,7 @@ export function InboxList({ conversations, coachUserId }: Props) {
   if (conversations.length === 0) {
     return (
       <p className="text-sm text-text-light">
-        No messages yet. Use the Ballpark mobile app to record a video for a
+        No messages yet. Use the Clubhouse by Infinite Hitting mobile app to record a video for a
         family — it will show up here.
       </p>
     );

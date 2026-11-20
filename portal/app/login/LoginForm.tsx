@@ -25,7 +25,7 @@ function getRoleDestination(accessToken: string, userMeta: Record<string, unknow
   const metaRole = userMeta?.app_role as string | undefined;
   const role = (jwtRole && jwtRole !== "parent") ? jwtRole : (metaRole ?? "parent");
 
-  if (role === "owner") return "/owner/dashboard";
+  if (role === "owner") return "/owner";
   if (role === "admin") return "/admin";
   if (role === "super_admin") return "/hq";
   if (role === "coach") return "/coach/inbox";

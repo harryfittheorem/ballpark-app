@@ -22,7 +22,7 @@ export function SiteHeader({
               className="inline-block h-2.5 w-2.5 rounded-full bg-gold shadow-[0_0_12px_rgba(241,229,173,0.7)] transition-transform group-hover:scale-110"
             />
             <span className="font-display text-2xl font-semibold uppercase tracking-[0.18em] text-cream-light">
-              Ball<span className="text-gold">park</span>
+              Clubhouse<span className="block text-xs text-gold tracking-normal">by Infinite Hitting</span>
             </span>
           </Link>
           <span className="hidden rounded-full border border-border-gold-strong bg-darkest px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gold sm:inline-flex">

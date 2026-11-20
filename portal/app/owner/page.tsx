@@ -1,6 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
-import { readTenantId } from '@/lib/auth';
 import {
   getOwnerMembers,
   getOwnerKPIs,
@@ -10,12 +8,11 @@ import {
   getLocationStripeStatus,
 } from '@/lib/supabase/ownerQueries';
 import { DashboardContent } from './DashboardContent';
+import { requireOwnerContext } from '@/lib/ownerAccess';
 
 export default async function OwnerDashboardPage() {
-  const _userClient = await createClient();
+  const { tenantId } = await requireOwnerContext();
   const supabase = createServiceClient();
-  const { data: { session } } = await _userClient.auth.getSession();
-  const tenantId = readTenantId(session) ?? process.env.PORTAL_TENANT_ID ?? '';
 
   const [members, kpis, revenueMonthly, packages, tenantName, locationStripe] = await Promise.all([
     getOwnerMembers(supabase, tenantId),

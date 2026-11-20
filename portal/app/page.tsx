@@ -21,7 +21,7 @@ export default async function Root() {
   if (role === "super_admin") redirect("/hq");
   if (role === "coach") redirect("/coach/inbox");
   if (role === "admin") redirect("/admin");
-  if (role === "owner") redirect("/owner/dashboard");
+  if (role === "owner") redirect("/owner");
   // Parent: route through /logout so cookies are actually cleared (a
   // Server Component can't write cookies, a Route Handler can).
   redirect("/logout?reason=parent");

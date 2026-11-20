@@ -162,7 +162,7 @@ export function HQInviteModal({ onClose, locations }: Props) {
                 </div>
                 <div style={{ fontSize: 12, color: brand.textMuted, lineHeight: 1.5 }}>
                   This role gives <strong>{form.firstName} {form.lastName}</strong> complete access to all
-                  franchise locations, financial data, and administrative controls across the entire Ballpark network.
+                  franchise locations, financial data, and administrative controls across the entire Clubhouse by Infinite Hitting network.
                 </div>
               </div>
             </div>
@@ -244,7 +244,7 @@ export function HQInviteModal({ onClose, locations }: Props) {
                 background: brand.goldDeep + '14', border: `1px solid ${brand.goldDeep}30`,
                 fontSize: 12, color: brand.goldDeep, lineHeight: 1.5,
               }}>
-                HQ Admin gives full access to all franchise locations and the entire Ballpark network.
+                HQ Admin gives full access to all franchise locations and the entire Clubhouse by Infinite Hitting network.
                 A confirmation step will follow.
               </div>
             )}

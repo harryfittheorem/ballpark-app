@@ -8,6 +8,7 @@ import type { TableColumn } from '@/components/owner/ui';
 import { DollarSign, CheckCircle2, Activity, AlertCircle, Download, FileText } from 'lucide-react';
 import type { BillingData, RecentTransaction, MembershipPackage } from '@/lib/supabase/ownerQueries';
 import { exportCsv } from '@/lib/exportCsv';
+import { PlayerLink } from '@/components/owner/PlayerLink';
 
 type Props = { data: BillingData };
 
@@ -48,7 +49,7 @@ const DEMO_TRANSACTIONS: RecentTransaction[] = [
 
 const txColumns: TableColumn<RecentTransaction & Record<string, unknown>>[] = [
   { label: 'Date',    key: 'date' },
-  { label: 'Member',  key: 'member',  render: (r) => <span style={{ fontWeight: 700 }}>{r.member as string}</span> },
+  { label: 'Member',  key: 'member',  render: (r) => <PlayerLink name={r.member} reference={r} section="payment-history" /> },
   { label: 'Package', key: 'package' },
   { label: 'Amount',  key: 'amount',  align: 'right', render: (r) => <span style={{ fontFamily: fonts.mono, fontWeight: 700 }}>${(r.amount as number).toLocaleString()}</span> },
   { label: 'Method',  key: 'method' },
@@ -67,16 +68,11 @@ export function BillingContent({ data }: Props) {
 
   const hasLiveData = data.kpis.mrr > 0 || data.packages.length > 0 || data.recentTransactions.length > 0;
 
-  const packages           = hasLiveData ? data.packages           : DEMO_PACKAGES;
-  const recentTransactions = hasLiveData ? data.recentTransactions : DEMO_TRANSACTIONS;
-  const paidCount          = hasLiveData ? data.paidCount          : DEMO_TRANSACTIONS.filter(t => t.status === 'paid').length;
-  const failedCount        = hasLiveData ? data.failedCount        : DEMO_TRANSACTIONS.filter(t => t.status === 'failed').length;
-
-  const kpis = hasLiveData ? data.kpis : {
-    ...data.kpis,
-    mrr: 80400, collectedMtd: 75800, autoPayRate: 94.7, pastDue: 1240,
-    failedPaymentsCount: 3, activeMembers: 147,
-  };
+  const packages = data.packages;
+  const recentTransactions = data.recentTransactions;
+  const paidCount = data.paidCount;
+  const failedCount = data.failedCount;
+  const kpis = data.kpis;
 
   const totalMrr       = packages.reduce((s, p) => s + p.mrr, 0) || kpis.mrr;
   const totalAttempted = paidCount + failedCount;
@@ -104,7 +100,7 @@ export function BillingContent({ data }: Props) {
       { label: 'Auto-Pay Rate',   value: `${kpis.autoPayRate}%` },
       { label: 'Past Due',        value: `$${kpis.pastDue.toLocaleString()}` },
       { label: 'Active Members',  value: String(kpis.activeMembers) },
-      { label: 'Success Rate',    value: `${successRate}%` },
+      { label: 'Success Rate',    value: totalAttempted > 0 ? `${successRate}%` : 'Unavailable — no payment attempts recorded' },
       { label: 'Failed Payments', value: String(kpis.failedPaymentsCount) },
     ] as { label: string; value: string }[];
 
@@ -167,13 +163,13 @@ export function BillingContent({ data }: Props) {
             <OCard>
               <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 16 }}>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <DonutChart data={[
+                  {totalAttempted > 0 && <DonutChart data={[
                     { value: Math.max(paidCount, 1), color: brand.success },
                     { value: Math.max(failedCount, 0.01), color: brand.danger },
-                  ]} size={120} />
-                  <div style={{ position: 'absolute', textAlign: 'center' }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, fontFamily: fonts.display, color: brand.success }}>{successRate}%</div>
-                    <div style={{ fontSize: 9, color: brand.textMuted, fontWeight: 700, letterSpacing: 0.5 }}>SUCCESS</div>
+                  ]} size={120} />}
+                  <div style={{ position: totalAttempted > 0 ? 'absolute' : 'relative', textAlign: 'center' }}>
+                    <div style={{ fontSize: 22, fontWeight: 700, fontFamily: fonts.display, color: totalAttempted > 0 ? brand.success : brand.textMuted }}>{totalAttempted > 0 ? `${successRate}%` : 'Unavailable'}</div>
+                    <div style={{ fontSize: 11, color: brand.textMuted, fontWeight: 700, letterSpacing: 0.5 }}>{totalAttempted > 0 ? 'SUCCESS' : 'No payment attempts recorded'}</div>
                   </div>
                 </div>
                 <div style={{ flex: 1 }}>
@@ -227,15 +223,18 @@ export function BillingContent({ data }: Props) {
           </div>
         </div>
 
+        <section id="transaction-history">
         <SectionHeader
           title="Recent Transactions"
           subtitle={data.fetchedAt ? `Refreshed ${formatFetchedAt(data.fetchedAt)}` : undefined}
-          action={<OButton variant="ghost" size="sm" onClick={handleExport}>View All →</OButton>}
+          action={<OButton variant="ghost" size="sm" onClick={() => router.push('/owner/revenue-reports')}>All transactions →</OButton>}
         />
         <OTable
           columns={txColumns as TableColumn<Record<string, unknown>>[]}
           rows={recentTransactions as unknown as Record<string, unknown>[]}
         />
+        {recentTransactions.length === 0 && <p role="status">No recorded transactions. Live payments will appear here when available.</p>}
+        </section>
       </div>
 
       {/* Toast */}

@@ -17,8 +17,8 @@ const oswald = Oswald({
 });
 
 export const metadata: Metadata = {
-  title: "Ballpark Portal",
-  description: "Coach + admin portal for Ballpark.",
+  title: "Clubhouse by Infinite Hitting",
+  description: "Operations portal for Clubhouse by Infinite Hitting.",
 };
 
 export default function RootLayout({

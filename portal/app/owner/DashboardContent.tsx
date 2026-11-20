@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import { PlayerLink } from '@/components/owner/PlayerLink';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import {
   KPICard, OButton, PageHeader, SectionHeader, OCard, BarChart, DonutChart, Chip,
@@ -79,10 +80,10 @@ export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMo
   }, [toast]);
 
   const hasLiveData    = rawKpis.mrr > 0 || rawKpis.activeMembers > 0;
-  const kpis           = hasLiveData        ? rawKpis    : DEMO_KPIS;
-  const members        = hasLiveData        ? rawMembers : DEMO_MEMBERS;
-  const revenueMonthly = rawRevenue.length  ? rawRevenue : DEMO_REVENUE;
-  const packages       = rawPackages.length ? rawPackages : DEMO_PACKAGES;
+  const kpis = rawKpis;
+  const members = rawMembers;
+  const revenueMonthly = rawRevenue;
+  const packages = rawPackages;
 
   const atRisk    = members.filter(m => m.status === 'active' && (m.churnRisk === 'high' || m.churnRisk === 'medium'));
   const atRiskMrr = atRisk.reduce((s, m) => s + m.mrr, 0);
@@ -302,7 +303,7 @@ export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMo
                   {atRisk.filter(m => m.churnRisk === 'high').slice(0, 3).map(m => (
                     <div key={m.id} style={{ padding: 8, background: brand.surface, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 28, height: 28, borderRadius: 14, background: brand.dark, color: brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>{m.name.charAt(0)}</div>
-                      <div style={{ flex: 1, fontSize: 12, fontWeight: 700 }}>{m.name}</div>
+                      <div style={{ flex: 1, fontSize: 12, fontWeight: 700 }}><PlayerLink name={m.name} reference={{ kidId: m.kidId, membershipId: m.id }} /></div>
                       <div style={{ fontSize: 10, color: brand.danger, fontWeight: 700 }}>{m.lastSession}</div>
                     </div>
                   ))}
