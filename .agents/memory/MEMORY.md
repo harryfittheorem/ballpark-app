@@ -16,3 +16,4 @@
 - [Stripe test-clock list endpoint lag](stripe-test-clock-list-endpoint-lag.md) — GET /v1/subscriptions?status=active can miss test-clock subscriptions that are genuinely active; cross-check with /search before assuming a code bug.
 - [Subscription.create off_session bug pattern](stripe-subscription-create-confirm.md) — passing off_session to Subscription.create doesn't confirm the invoice PaymentIntent; must explicitly confirm when status=requires_confirmation or new subs never activate.
 - [invoice.lines period vs invoice.period_end](stripe-invoice-period-fields.md) — on renewal invoices invoice.period_end is the just-elapsed period, not the new one; use invoice.lines.data[0].period.end for next_billing_at.
+- [CRM channel direction](crm-channel-direction.md) — Twilio proposed with a connector per location; Gmail suggested for email, with account ownership and final email choice still open.
