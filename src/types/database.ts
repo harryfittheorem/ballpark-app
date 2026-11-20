@@ -167,6 +167,149 @@ export type Database = {
           },
         ]
       }
+      booking_creation_requests: {
+        Row: {
+          actor_id: string
+          booking_id: string
+          payload: Json
+          request_id: string
+          tenant_id: string
+        }
+        Insert: {
+          actor_id: string
+          booking_id: string
+          payload: Json
+          request_id: string
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string
+          booking_id?: string
+          payload?: Json
+          request_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_creation_requests_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking_instructor_attribution"
+            referencedColumns: ["booking_id"]
+          },
+          {
+            foreignKeyName: "booking_creation_requests_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_creation_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_friend_requests: {
+        Row: {
+          actor_id: string
+          payload: Json
+          request_id: string
+          result: Json
+          tenant_id: string
+        }
+        Insert: {
+          actor_id: string
+          payload: Json
+          request_id: string
+          result: Json
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string
+          payload?: Json
+          request_id?: string
+          result?: Json
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_friend_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_instructor_history: {
+        Row: {
+          actor_id: string
+          actual_coach_id: string | null
+          booking_id: string
+          id: string
+          location_id: string
+          previous_coach_id: string | null
+          reason: string
+          recorded_at: string
+          tenant_id: string
+        }
+        Insert: {
+          actor_id: string
+          actual_coach_id?: string | null
+          booking_id: string
+          id?: string
+          location_id: string
+          previous_coach_id?: string | null
+          reason: string
+          recorded_at?: string
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string
+          actual_coach_id?: string | null
+          booking_id?: string
+          id?: string
+          location_id?: string
+          previous_coach_id?: string | null
+          reason?: string
+          recorded_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_instructor_history_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking_instructor_attribution"
+            referencedColumns: ["booking_id"]
+          },
+          {
+            foreignKeyName: "booking_instructor_history_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_instructor_history_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_instructor_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_reminder_log: {
         Row: {
           booking_id: string
@@ -194,7 +337,139 @@ export type Database = {
             foreignKeyName: "booking_reminder_log_booking_id_fkey"
             columns: ["booking_id"]
             isOneToOne: false
+            referencedRelation: "booking_instructor_attribution"
+            referencedColumns: ["booking_id"]
+          },
+          {
+            foreignKeyName: "booking_reminder_log_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
             referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_series: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          kid_id: string
+          location_id: string
+          request_id: string
+          session_type_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          kid_id: string
+          location_id: string
+          request_id: string
+          session_type_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          kid_id?: string
+          location_id?: string
+          request_id?: string
+          session_type_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_series_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_series_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_series_session_type_id_fkey"
+            columns: ["session_type_id"]
+            isOneToOne: false
+            referencedRelation: "session_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_series_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_series_occurrences: {
+        Row: {
+          booking_id: string
+          location_id: string
+          occurrence_number: number
+          original_start: string
+          series_id: string
+          tenant_id: string
+        }
+        Insert: {
+          booking_id: string
+          location_id: string
+          occurrence_number: number
+          original_start: string
+          series_id: string
+          tenant_id: string
+        }
+        Update: {
+          booking_id?: string
+          location_id?: string
+          occurrence_number?: number
+          original_start?: string
+          series_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_series_occurrences_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "booking_instructor_attribution"
+            referencedColumns: ["booking_id"]
+          },
+          {
+            foreignKeyName: "booking_series_occurrences_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_series_occurrences_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_series_occurrences_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "booking_series"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_series_occurrences_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -202,6 +477,7 @@ export type Database = {
       booking_waitlist: {
         Row: {
           claim_deadline: string | null
+          claimed_booking_id: string | null
           coach_id: string
           created_at: string
           family_id: string
@@ -220,6 +496,7 @@ export type Database = {
         }
         Insert: {
           claim_deadline?: string | null
+          claimed_booking_id?: string | null
           coach_id: string
           created_at?: string
           family_id: string
@@ -238,6 +515,7 @@ export type Database = {
         }
         Update: {
           claim_deadline?: string | null
+          claimed_booking_id?: string | null
           coach_id?: string
           created_at?: string
           family_id?: string
@@ -255,6 +533,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "booking_waitlist_claimed_booking_id_fkey"
+            columns: ["claimed_booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking_instructor_attribution"
+            referencedColumns: ["booking_id"]
+          },
+          {
+            foreignKeyName: "booking_waitlist_claimed_booking_id_fkey"
+            columns: ["claimed_booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "booking_waitlist_coach_id_fkey"
             columns: ["coach_id"]
@@ -301,11 +593,12 @@ export type Database = {
       }
       bookings: {
         Row: {
+          actual_coach_id: string | null
           attended_at: string | null
           cage_number: string | null
           cancellation_reason: string | null
           cancelled_at: string | null
-          coach_id: string
+          coach_id: string | null
           created_at: string
           guest_email: string | null
           guest_name: string | null
@@ -324,11 +617,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          actual_coach_id?: string | null
           attended_at?: string | null
           cage_number?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
-          coach_id: string
+          coach_id?: string | null
           created_at?: string
           guest_email?: string | null
           guest_name?: string | null
@@ -347,11 +641,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          actual_coach_id?: string | null
           attended_at?: string | null
           cage_number?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
-          coach_id?: string
+          coach_id?: string | null
           created_at?: string
           guest_email?: string | null
           guest_name?: string | null
@@ -400,6 +695,374 @@ export type Database = {
           },
           {
             foreignKeyName: "bookings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      camp_draft_receipts: {
+        Row: {
+          actor_id: string
+          event_id: string
+          payload: Json
+          request_id: string
+          tenant_id: string
+        }
+        Insert: {
+          actor_id: string
+          event_id: string
+          payload: Json
+          request_id: string
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string
+          event_id?: string
+          payload?: Json
+          request_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camp_draft_receipts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "camp_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_draft_receipts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      camp_enrollments: {
+        Row: {
+          confirmation_id: string
+          event_id: string
+          fulfilled_at: string
+          id: string
+          kid_id: string
+          location_id: string
+          tenant_id: string
+        }
+        Insert: {
+          confirmation_id: string
+          event_id: string
+          fulfilled_at?: string
+          id?: string
+          kid_id: string
+          location_id: string
+          tenant_id: string
+        }
+        Update: {
+          confirmation_id?: string
+          event_id?: string
+          fulfilled_at?: string
+          id?: string
+          kid_id?: string
+          location_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camp_enrollments_confirmation_id_fkey"
+            columns: ["confirmation_id"]
+            isOneToOne: true
+            referencedRelation: "camp_purchase_confirmations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_enrollments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "camp_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_enrollments_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_enrollments_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_enrollments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      camp_event_days: {
+        Row: {
+          cage_number: string | null
+          day_number: number
+          ends_at: string
+          event_id: string
+          id: string
+          location_id: string
+          starts_at: string
+          tenant_id: string
+        }
+        Insert: {
+          cage_number?: string | null
+          day_number: number
+          ends_at: string
+          event_id: string
+          id?: string
+          location_id: string
+          starts_at: string
+          tenant_id: string
+        }
+        Update: {
+          cage_number?: string | null
+          day_number?: number
+          ends_at?: string
+          event_id?: string
+          id?: string
+          location_id?: string
+          starts_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camp_event_days_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "camp_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_event_days_location_id_cage_number_fkey"
+            columns: ["location_id", "cage_number"]
+            isOneToOne: false
+            referencedRelation: "scheduling_resources"
+            referencedColumns: ["location_id", "cage_number"]
+          },
+          {
+            foreignKeyName: "camp_event_days_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_event_days_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      camp_events: {
+        Row: {
+          capacity: number
+          created_at: string
+          created_by: string
+          financial_policy_approved_at: string | null
+          financial_policy_approved_by: string | null
+          financial_policy_reference: string | null
+          id: string
+          location_id: string
+          name: string
+          offering_category: string
+          sales_enabled: boolean
+          session_type_id: string
+          status: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string
+          version: number
+        }
+        Insert: {
+          capacity: number
+          created_at?: string
+          created_by: string
+          financial_policy_approved_at?: string | null
+          financial_policy_approved_by?: string | null
+          financial_policy_reference?: string | null
+          id?: string
+          location_id: string
+          name: string
+          offering_category: string
+          sales_enabled?: boolean
+          session_type_id: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          updated_by: string
+          version?: number
+        }
+        Update: {
+          capacity?: number
+          created_at?: string
+          created_by?: string
+          financial_policy_approved_at?: string | null
+          financial_policy_approved_by?: string | null
+          financial_policy_reference?: string | null
+          id?: string
+          location_id?: string
+          name?: string
+          offering_category?: string
+          sales_enabled?: boolean
+          session_type_id?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camp_events_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_events_session_type_id_fkey"
+            columns: ["session_type_id"]
+            isOneToOne: false
+            referencedRelation: "session_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      camp_purchase_confirmations: {
+        Row: {
+          confirmed_at: string
+          event_id: string
+          external_reference: string
+          id: string
+          kid_id: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          confirmed_at?: string
+          event_id: string
+          external_reference: string
+          id?: string
+          kid_id: string
+          status: string
+          tenant_id: string
+        }
+        Update: {
+          confirmed_at?: string
+          event_id?: string
+          external_reference?: string
+          id?: string
+          kid_id?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camp_purchase_confirmations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "camp_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_purchase_confirmations_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_purchase_confirmations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      camp_roster_entries: {
+        Row: {
+          booking_id: string
+          day_id: string
+          enrollment_id: string
+          location_id: string
+          tenant_id: string
+        }
+        Insert: {
+          booking_id: string
+          day_id: string
+          enrollment_id: string
+          location_id: string
+          tenant_id: string
+        }
+        Update: {
+          booking_id?: string
+          day_id?: string
+          enrollment_id?: string
+          location_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camp_roster_entries_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "booking_instructor_attribution"
+            referencedColumns: ["booking_id"]
+          },
+          {
+            foreignKeyName: "camp_roster_entries_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_roster_entries_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "camp_event_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_roster_entries_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "camp_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_roster_entries_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_roster_entries_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1408,6 +2071,7 @@ export type Database = {
           sessions_per_week: number | null
           sessions_remaining: number | null
           sessions_total: number | null
+          staff_enrollment_request_id: string | null
           started_at: string
           status: string
           stripe_price_id: string | null
@@ -1443,6 +2107,7 @@ export type Database = {
           sessions_per_week?: number | null
           sessions_remaining?: number | null
           sessions_total?: number | null
+          staff_enrollment_request_id?: string | null
           started_at?: string
           status?: string
           stripe_price_id?: string | null
@@ -1478,6 +2143,7 @@ export type Database = {
           sessions_per_week?: number | null
           sessions_remaining?: number | null
           sessions_total?: number | null
+          staff_enrollment_request_id?: string | null
           started_at?: string
           status?: string
           stripe_price_id?: string | null
@@ -1500,6 +2166,13 @@ export type Database = {
             columns: ["kid_id"]
             isOneToOne: false
             referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_staff_enrollment_request_id_fkey"
+            columns: ["staff_enrollment_request_id"]
+            isOneToOne: true
+            referencedRelation: "staff_enrollment_requests"
             referencedColumns: ["id"]
           },
           {
@@ -2015,6 +2688,338 @@ export type Database = {
           },
         ]
       }
+      scheduling_capacity_history: {
+        Row: {
+          actor_id: string
+          changed_at: string
+          id: string
+          lesson_capacity: number
+          location_id: string
+          previous_lesson_capacity: number | null
+          previous_rental_capacity: number | null
+          rental_capacity: number
+          tenant_id: string
+        }
+        Insert: {
+          actor_id: string
+          changed_at?: string
+          id?: string
+          lesson_capacity: number
+          location_id: string
+          previous_lesson_capacity?: number | null
+          previous_rental_capacity?: number | null
+          rental_capacity: number
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string
+          changed_at?: string
+          id?: string
+          lesson_capacity?: number
+          location_id?: string
+          previous_lesson_capacity?: number | null
+          previous_rental_capacity?: number | null
+          rental_capacity?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduling_capacity_history_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduling_capacity_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduling_capacity_overrides: {
+        Row: {
+          capacity: number
+          category: string
+          ends_at: string
+          id: string
+          is_active: boolean
+          location_id: string
+          reason: string
+          starts_at: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          capacity: number
+          category: string
+          ends_at: string
+          id?: string
+          is_active?: boolean
+          location_id: string
+          reason: string
+          starts_at: string
+          tenant_id: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          capacity?: number
+          category?: string
+          ends_at?: string
+          id?: string
+          is_active?: boolean
+          location_id?: string
+          reason?: string
+          starts_at?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduling_capacity_overrides_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduling_capacity_overrides_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduling_location_rules: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          capacity_source: string
+          correction_roles: string[]
+          instructor_corrections_approved: boolean
+          lesson_capacity: number | null
+          location_id: string
+          rental_capacity: number | null
+          tenant_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          capacity_source?: string
+          correction_roles?: string[]
+          instructor_corrections_approved?: boolean
+          lesson_capacity?: number | null
+          location_id: string
+          rental_capacity?: number | null
+          tenant_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          capacity_source?: string
+          correction_roles?: string[]
+          instructor_corrections_approved?: boolean
+          lesson_capacity?: number | null
+          location_id?: string
+          rental_capacity?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduling_location_rules_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduling_location_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduling_override_history: {
+        Row: {
+          actor_id: string
+          category: string
+          changed_at: string
+          ends_at: string
+          id: string
+          location_id: string
+          new_capacity: number | null
+          override_id: string
+          previous_capacity: number | null
+          reason: string
+          starts_at: string
+          tenant_id: string
+        }
+        Insert: {
+          actor_id: string
+          category: string
+          changed_at?: string
+          ends_at: string
+          id?: string
+          location_id: string
+          new_capacity?: number | null
+          override_id: string
+          previous_capacity?: number | null
+          reason: string
+          starts_at: string
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string
+          category?: string
+          changed_at?: string
+          ends_at?: string
+          id?: string
+          location_id?: string
+          new_capacity?: number | null
+          override_id?: string
+          previous_capacity?: number | null
+          reason?: string
+          starts_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduling_override_history_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduling_override_history_override_id_fkey"
+            columns: ["override_id"]
+            isOneToOne: false
+            referencedRelation: "scheduling_capacity_overrides"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduling_override_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduling_resource_history: {
+        Row: {
+          actor_id: string
+          changed_at: string
+          id: string
+          is_active: boolean
+          location_id: string
+          previous_active: boolean | null
+          previous_purpose: string | null
+          purpose: string
+          reason: string
+          resource_id: string
+          tenant_id: string
+        }
+        Insert: {
+          actor_id: string
+          changed_at?: string
+          id?: string
+          is_active: boolean
+          location_id: string
+          previous_active?: boolean | null
+          previous_purpose?: string | null
+          purpose: string
+          reason: string
+          resource_id: string
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string
+          changed_at?: string
+          id?: string
+          is_active?: boolean
+          location_id?: string
+          previous_active?: boolean | null
+          previous_purpose?: string | null
+          purpose?: string
+          reason?: string
+          resource_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduling_resource_history_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduling_resource_history_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "scheduling_resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduling_resource_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduling_resources: {
+        Row: {
+          cage_number: string
+          id: string
+          is_active: boolean
+          location_id: string
+          purpose: string
+          tenant_id: string
+        }
+        Insert: {
+          cage_number: string
+          id?: string
+          is_active?: boolean
+          location_id: string
+          purpose: string
+          tenant_id: string
+        }
+        Update: {
+          cage_number?: string
+          id?: string
+          is_active?: boolean
+          location_id?: string
+          purpose?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduling_resources_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduling_resources_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_types: {
         Row: {
           base_price_cents: number
@@ -2128,6 +3133,13 @@ export type Database = {
             foreignKeyName: "sessions_booking_id_fkey"
             columns: ["booking_id"]
             isOneToOne: false
+            referencedRelation: "booking_instructor_attribution"
+            referencedColumns: ["booking_id"]
+          },
+          {
+            foreignKeyName: "sessions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
             referencedRelation: "bookings"
             referencedColumns: ["id"]
           },
@@ -2147,6 +3159,56 @@ export type Database = {
           },
           {
             foreignKeyName: "sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_enrollment_requests: {
+        Row: {
+          billing_intent: Json | null
+          completed: boolean
+          created_at: string
+          id: string
+          intent: Json | null
+          locked_until: string | null
+          operation_lock: string | null
+          parent_user_id: string
+          payload_hash: string
+          staff_user_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          billing_intent?: Json | null
+          completed?: boolean
+          created_at?: string
+          id: string
+          intent?: Json | null
+          locked_until?: string | null
+          operation_lock?: string | null
+          parent_user_id?: string
+          payload_hash: string
+          staff_user_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          billing_intent?: Json | null
+          completed?: boolean
+          created_at?: string
+          id?: string
+          intent?: Json | null
+          locked_until?: string | null
+          operation_lock?: string | null
+          parent_user_id?: string
+          payload_hash?: string
+          staff_user_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_enrollment_requests_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -3114,7 +4176,84 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      booking_instructor_attribution: {
+        Row: {
+          actual_coach_id: string | null
+          attended_at: string | null
+          booking_id: string | null
+          kid_id: string | null
+          location_id: string | null
+          scheduled_coach_id: string | null
+          scheduled_end: string | null
+          scheduled_start: string | null
+          session_type_id: string | null
+          status: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          actual_coach_id?: string | null
+          attended_at?: string | null
+          booking_id?: string | null
+          kid_id?: string | null
+          location_id?: string | null
+          scheduled_coach_id?: string | null
+          scheduled_end?: string | null
+          scheduled_start?: string | null
+          session_type_id?: string | null
+          status?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          actual_coach_id?: string | null
+          attended_at?: string | null
+          booking_id?: string | null
+          kid_id?: string | null
+          location_id?: string | null
+          scheduled_coach_id?: string | null
+          scheduled_end?: string | null
+          scheduled_start?: string | null
+          session_type_id?: string | null
+          status?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_coach_id_fkey"
+            columns: ["scheduled_coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_session_type_id_fkey"
+            columns: ["session_type_id"]
+            isOneToOne: false
+            referencedRelation: "session_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       _get_caller_tenant_family_ids: { Args: never; Returns: string[] }
@@ -3140,7 +4279,28 @@ export type Database = {
         }
         Returns: undefined
       }
+      archive_camp_draft: { Args: { p_event_id: string }; Returns: undefined }
+      assign_booking_cage: {
+        Args: { p_booking_id: string; p_cage_number: string }
+        Returns: undefined
+      }
       book_session_with_friend: {
+        Args: {
+          p_coach_id: string
+          p_guest_email?: string
+          p_guest_name: string
+          p_guest_phone?: string
+          p_kid_id: string
+          p_location_id: string
+          p_request_id?: string
+          p_scheduled_end: string
+          p_scheduled_start: string
+          p_session_type_id: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      book_session_with_friend_internal: {
         Args: {
           p_coach_id: string
           p_guest_email?: string
@@ -3155,11 +4315,43 @@ export type Database = {
         }
         Returns: Json
       }
+      booking_capacity_has_room: {
+        Args: {
+          p_add?: number
+          p_end: string
+          p_exclude?: string
+          p_location: string
+          p_rental: boolean
+          p_start: string
+          p_tenant: string
+        }
+        Returns: boolean
+      }
+      can_correct_booking_instructor: {
+        Args: { p_location_id: string; p_tenant_id: string }
+        Returns: boolean
+      }
+      can_manage_booking_location: {
+        Args: { p_location_id: string; p_tenant_id: string }
+        Returns: boolean
+      }
+      can_override_booking_capacity: {
+        Args: { p_location_id: string; p_tenant_id: string }
+        Returns: boolean
+      }
       cancel_assignment_for_coach: {
         Args: { p_assignment_id: string }
         Returns: string
       }
       cancel_booking: {
+        Args: { p_booking_id: string; p_override?: boolean; p_reason?: string }
+        Returns: Json
+      }
+      cancel_booking_authorized_internal: {
+        Args: { p_booking_id: string; p_override?: boolean; p_reason?: string }
+        Returns: Json
+      }
+      cancel_booking_policy_internal: {
         Args: { p_booking_id: string; p_override?: boolean; p_reason?: string }
         Returns: Json
       }
@@ -3185,11 +4377,23 @@ export type Database = {
         Args: { p_code: string; p_plan_name?: string }
         Returns: Json
       }
+      create_customer_booking: {
+        Args: {
+          p_coach_id?: string
+          p_kid_id: string
+          p_location_id: string
+          p_request_id: string
+          p_scheduled_start: string
+          p_session_type_id: string
+        }
+        Returns: Json
+      }
       create_public_booking: {
         Args: {
           p_coach_id: string
           p_kid_id: string
           p_location_id: string
+          p_request_id?: string
           p_scheduled_start: string
           p_session_type_id: string
           p_tenant_slug: string
@@ -3198,6 +4402,43 @@ export type Database = {
           booking_id: string
         }[]
       }
+      create_staff_booking: {
+        Args: {
+          p_cage_number?: string
+          p_coach_id?: string
+          p_kid_id: string
+          p_location_id: string
+          p_notes?: string
+          p_request_id?: string
+          p_scheduled_end: string
+          p_scheduled_start: string
+          p_session_type_id: string
+        }
+        Returns: Json
+      }
+      create_staff_booking_series: {
+        Args: {
+          p_cage_number?: string
+          p_kid_id: string
+          p_location_id: string
+          p_notes?: string
+          p_request_id?: string
+          p_session_type_id: string
+          p_starts: string[]
+        }
+        Returns: Json
+      }
+      create_staff_walkin: {
+        Args: {
+          p_cage_number?: string
+          p_kid_id: string
+          p_location_id: string
+          p_notes?: string
+          p_request_id?: string
+          p_session_type_id: string
+        }
+        Returns: Json
+      }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       deduct_session_credit: { Args: { p_booking_id: string }; Returns: number }
       deduct_session_credits: {
@@ -3205,7 +4446,23 @@ export type Database = {
         Returns: number
       }
       expire_stale_waitlist_entries: { Args: never; Returns: undefined }
+      fulfill_confirmed_camp_purchase: {
+        Args: { p_confirmation_id: string }
+        Returns: Json
+      }
       gen_redemption_code: { Args: never; Returns: string }
+      get_bookings_staff_checkin_roster: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
+      get_checkin_instructors: {
+        Args: { p_location_id: string }
+        Returns: {
+          first_name: string
+          id: string
+          last_name: string
+        }[]
+      }
       get_coach_hours: {
         Args: { p_end_date: string; p_start_date: string; p_tenant_id: string }
         Returns: {
@@ -3301,6 +4558,26 @@ export type Database = {
           slug: string
         }[]
       }
+      get_scoped_staff_checkin_roster: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
+      get_staff_checkin_roster: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
+      is_scheduling_resource_free: {
+        Args: {
+          p_cage: string
+          p_end: string
+          p_exclude_booking?: string
+          p_exclude_camp_day?: string
+          p_location: string
+          p_start: string
+          p_tenant: string
+        }
+        Returns: boolean
+      }
       join_waitlist: {
         Args: {
           p_coach_id: string
@@ -3312,6 +4589,7 @@ export type Database = {
         }
         Returns: {
           claim_deadline: string | null
+          claimed_booking_id: string | null
           coach_id: string
           created_at: string
           family_id: string
@@ -3409,6 +4687,15 @@ export type Database = {
           new_version: number
         }[]
       }
+      record_booking_attendance: {
+        Args: {
+          p_action: string
+          p_actual_coach_id?: string
+          p_booking_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       record_training_view: {
         Args: { p_kid_id: string; p_video_id: string }
         Returns: boolean
@@ -3423,6 +4710,10 @@ export type Database = {
       }
       register_device_token: {
         Args: { p_expo_push_token: string; p_platform: string }
+        Returns: undefined
+      }
+      remove_booking_capacity_override: {
+        Args: { p_override_id: string; p_reason: string }
         Returns: undefined
       }
       restore_session_credit: {
@@ -3459,6 +4750,49 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      save_camp_draft: {
+        Args: {
+          p_capacity: number
+          p_category: string
+          p_days: Json
+          p_event_id: string
+          p_expected_version?: number
+          p_location_id: string
+          p_name: string
+          p_request_id: string
+          p_session_type_id: string
+        }
+        Returns: string
+      }
+      set_booking_capacity_override: {
+        Args: {
+          p_capacity: number
+          p_category: string
+          p_end: string
+          p_location_id: string
+          p_reason: string
+          p_start: string
+        }
+        Returns: string
+      }
+      set_manual_location_capacity: {
+        Args: {
+          p_lesson_capacity: number
+          p_location_id: string
+          p_rental_capacity: number
+        }
+        Returns: undefined
+      }
+      set_scheduling_resource: {
+        Args: {
+          p_active: boolean
+          p_cage_number: string
+          p_location_id: string
+          p_purpose: string
+          p_reason: string
+        }
+        Returns: string
       }
       sign_waiver: {
         Args: { p_app_version?: string; p_waiver_id: string }
