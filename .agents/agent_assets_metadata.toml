@@ -172,3 +172,101 @@ mtime_ms = 1795167887024
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/95c11c1a-6d7a-4f2d-ba94-05332f327515/96036c0c-a831-4bd2-a07d-bc4b0db79cf5"
 storage_version_token = "1795167996024697"
 content_type = "image/png"
+
+[[outputs]]
+id = "FsRzzufI6NMiLUds_ovgi"
+uri = "file://generated-artifacts/migration-meeting/owner-meeting-pack.html"
+type = "html"
+title = "Infinite Hitting — Owner meeting pack"
+description = "Detailed briefing, operations workbook, vendor request drafts, acceptance gates, reconciliation controls and meeting agenda. Self-contained and print-friendly."
+logical_id = "441d1959-8af2-4eb3-848c-e7cb21d5e48a"
+content_hash = "sha256:4bc22de5fbf62669b160fa399b425e2980ab1f20ecfadbba11b27b73f1a2e3fe"
+size = 66858
+mtime_ms = 1794509630678
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/441d1959-8af2-4eb3-848c-e7cb21d5e48a/537e260f-6e0c-4c5c-b4d0-c8976546eb76"
+storage_version_token = "1794509746245426"
+content_type = "text/html"
+
+[[outputs]]
+id = "IFjKK8i_S9CX6K5lepJzf"
+uri = "file://generated-artifacts/migration-meeting/meeting-summary.html"
+type = "html"
+title = "Clearwater pilot — Short meeting summary"
+description = "Concise owner leave-behind with the limited approval request, conditional schedule and unresolved provider gates."
+logical_id = "31af9e30-1dcb-4594-90c0-e9af653cd229"
+content_hash = "sha256:fbbe1b81e685658c8338be14b55f1fb51181cddf5cda40736931e78022671c9e"
+size = 8236
+mtime_ms = 1794509630679
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/31af9e30-1dcb-4594-90c0-e9af653cd229/4715ff0f-3726-49e7-b133-fcbf148be9b5"
+storage_version_token = "1794509746809055"
+content_type = "text/html"
+
+[[outputs]]
+id = "fp6Lzxcqk8AputflUvlPJ"
+uri = "file://generated-artifacts/migration-meeting/internal-technical-appendix.html"
+type = "html"
+title = "Internal — Evidence and readiness backlog"
+description = "Current code references, Frisco test-mode evidence limits and existing-task references. Keep separate from owner distribution."
+logical_id = "d47ba817-eef3-48ab-88fd-629aea2932cd"
+content_hash = "sha256:6f6c395a42f4233a1a891e8d341962812834341fee9a337136eeb5034bbb6b3b"
+size = 16094
+mtime_ms = 1794509630680
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/d47ba817-eef3-48ab-88fd-629aea2932cd/c7bd5ac2-47e9-49d0-95d5-fed576a7293c"
+storage_version_token = "1794509747342701"
+content_type = "text/html"
+
+[[outputs]]
+id = "vFOGrGJtpwJm9BHjgW0ln"
+uri = "file://docs/migration-meeting/charging-authority-register.csv"
+type = "table"
+title = "Per-member charging-authority template"
+description = "Empty spreadsheet template for source/target mappings, next charges, old billing stop proof, retry ownership and approvals. Populate only in approved restricted storage."
+logical_id = "6e72a326-70ff-4a61-9a5d-b12a14e1a888"
+content_hash = "sha256:1b908dd037b0a739c8a2b0c9b534631e914cc7b2d3b8906028fbaef0ad6fded4"
+size = 691
+mtime_ms = 1794509554731
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/6e72a326-70ff-4a61-9a5d-b12a14e1a888/95129d73-d51f-47f7-af72-82b999aa2007"
+storage_version_token = "1794509747917366"
+content_type = "text/csv"
+
+[[outputs]]
+id = "fCi17qyYI8a4h4gHnwjfm"
+uri = "file://docs/migration-meeting/financial-reconciliation.csv"
+type = "table"
+title = "Location financial reconciliation template"
+description = "Empty spreadsheet template covering due obligations, attempts, collections, ledger variances, refunds, fees, payouts and bank reconciliation."
+logical_id = "21e8973e-2210-41bc-a570-0ce98a26ed08"
+content_hash = "sha256:fa5b0c7a64db4c52ea369c61632de608c76689691e4a8ad7a08cd81dd7f82986"
+size = 837
+mtime_ms = 1794509557539
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/21e8973e-2210-41bc-a570-0ce98a26ed08/ef0ada3c-c2a3-4be7-a7e1-b1bf7ce4a880"
+storage_version_token = "1794509748517303"
+content_type = "text/csv"
+
+[[outputs]]
+id = "Q0lulwS_JEfRMaNakIOZy"
+uri = "file://generated-artifacts/migration-meeting/infinite-hitting-migration-slides.pdf"
+type = "pdf"
+title = "Updated owner presentation — Transition roadmap"
+description = "Five-slide PDF with a proposed two-week stabilization stage, internal testing, owner/staff trial, one-week non-collecting Mindbody comparison, and a separately approved Clearwater pilot."
+logical_id = "92fe3ef1-7ba8-4e3f-814b-a539b3c646d5"
+content_hash = "sha256:0c00af8d27ef9cf4cfda7b5b93ca127a48a11b605248b74c5f03526817577ba6"
+size = 591308
+mtime_ms = 1794511291571
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/92fe3ef1-7ba8-4e3f-814b-a539b3c646d5/435f0af9-691c-45ea-a272-d8b7560622a8"
+storage_version_token = "1794511345355210"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "jynw3YwP4SgOTLbgh7cZ0"
+uri = "file://docs/migration-meeting/presentation.html"
+type = "html"
+title = "Updated browser presentation"
+description = "Five-slide offline presentation with keyboard navigation, phased transition roadmap and evidence-based owner approval checkpoints."
+logical_id = "b93f9368-d166-4e77-983a-2c88d0c79b24"
+content_hash = "sha256:8580252c0726383a48f8af6dba09161c2eaf3ccfb3a1ec5e87f666880a56877a"
+size = 29431
+mtime_ms = 1794511281343
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/b93f9368-d166-4e77-983a-2c88d0c79b24/b36d3a5d-e955-4e2e-9eb3-b9e1aa4521b1"
+storage_version_token = "1794511346125925"
+content_type = "text/html"

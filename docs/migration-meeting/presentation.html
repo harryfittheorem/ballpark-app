@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#112d36">
+  <link rel="icon" href="data:,">
+  <title>Infinite Hitting · Owner migration briefing</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #15343c;
+      --ink-soft: #35545a;
+      --paper: #f5f2e9;
+      --paper-deep: #ebe6d9;
+      --teal: #1d6970;
+      --teal-pale: #dcebe5;
+      --coral: #d66b4a;
+      --gold: #d8ac60;
+      --line: #cbd2c8;
+      --white: #fffdf7;
+      --font: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #102b33; font-family: var(--font); color: var(--ink); }
+    body { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 18px 18px 12px; }
+    button { font: inherit; }
+    .presentation { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .stage {
+      position: relative;
+      flex: 0 0 auto;
+      width: calc(1280px * var(--scale, 1));
+      height: calc(720px * var(--scale, 1));
+      overflow: hidden;
+      border-radius: 5px;
+      box-shadow: 0 28px 84px #06191f78, 0 2px 0 #ffffff24 inset;
+      background: var(--paper);
+    }
+    .deck { position: absolute; inset: 0 auto auto 0; width: 1280px; height: 720px; transform: scale(var(--scale, 1)); transform-origin: top left; }
+    .slide {
+      position: absolute;
+      inset: 0;
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      padding: 56px 76px 52px;
+      background: var(--paper);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(18px);
+      transition: opacity 220ms ease, transform 220ms ease, visibility 220ms;
+      isolation: isolate;
+    }
+    .slide::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      background-image: radial-gradient(#15343c0a .7px, transparent .7px);
+      background-size: 7px 7px;
+      opacity: .5;
+    }
+    .slide.active { opacity: 1; visibility: visible; transform: translateX(0); z-index: 1; }
+    .slide.dark { background: var(--ink); color: var(--paper); }
+    .slide.dark::before { background-image: radial-gradient(#ffffff0c .7px, transparent .7px); }
+    .topline { display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 2; }
+    .brand { display: flex; gap: 12px; align-items: center; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; font-weight: 750; }
+    .brand-mark { width: 30px; height: 30px; border: 1.5px solid currentColor; border-radius: 50%; display: grid; place-items: center; position: relative; }
+    .brand-mark::before, .brand-mark::after { content: ""; position: absolute; height: 21px; width: 1px; background: var(--coral); transform: rotate(35deg); }
+    .brand-mark::after { transform: rotate(-35deg); }
+    .slide-tag { font: 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; opacity: .72; }
+    .eyebrow { display: flex; align-items: center; gap: 11px; color: var(--teal); font: 700 13px var(--mono); letter-spacing: .12em; text-transform: uppercase; margin: 46px 0 14px; }
+    .dark .eyebrow { color: #9fcfc2; }
+    .eyebrow::before { content: ""; width: 28px; height: 2px; background: var(--coral); }
+    h1, h2, p { margin: 0; }
+    h1, h2 { font-weight: 680; letter-spacing: -.045em; line-height: 1.04; }
+    h1 { font-size: 64px; max-width: 890px; }
+    h2 { font-size: 50px; }
+    .intro { margin-top: 20px; color: var(--ink-soft); font-size: 22px; letter-spacing: -.01em; line-height: 1.4; max-width: 760px; }
+    .dark .intro { color: #c5d4cf; }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 9px; padding: 10px 13px;
+      border: 1px solid #d66b4a80; color: #9b482f; background: #f9e7dc;
+      font: 700 12px var(--mono); letter-spacing: .045em; text-transform: uppercase;
+    }
+    .status-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--coral); }
+    .hero-status { position: absolute; right: 77px; top: 150px; }
+    .feature-row { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 0; position: absolute; left: 76px; right: 76px; bottom: 150px; }
+    .feature { min-height: 126px; padding: 8px 30px 4px 0; }
+    .feature + .feature { border-left: 1px solid var(--line); padding-left: 28px; }
+    .feature-number { font: 13px var(--mono); color: var(--coral); margin-bottom: 17px; }
+    .feature h3 { margin: 0 0 8px; font-size: 21px; letter-spacing: -.025em; }
+    .feature p { max-width: 300px; font-size: 16px; line-height: 1.45; color: var(--ink-soft); }
+    .dark .feature p { color: #c5d4cf; }
+    .evidence {
+      position: absolute; bottom: 55px; left: 76px; right: 76px; display: flex; align-items: flex-start; gap: 12px;
+      border-top: 1px solid var(--line); padding-top: 13px; color: #53686a; font-size: 13px; line-height: 1.35;
+    }
+    .evidence strong { flex: 0 0 auto; font: 700 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--teal); }
+    .dark .evidence { border-color: #ffffff35; color: #c5d4cf; }
+    .dark .evidence strong { color: #9fcfc2; }
+    .layout-two { display: grid; grid-template-columns: 1fr 390px; gap: 68px; margin-top: 35px; align-items: start; }
+    .points { list-style: none; padding: 0; margin: 0; }
+    .points li { display: grid; grid-template-columns: 42px 1fr; gap: 18px; padding: 15px 0; border-top: 1px solid var(--line); }
+    .points li:last-child { border-bottom: 1px solid var(--line); }
+    .step-no { font: 700 14px var(--mono); color: var(--coral); padding-top: 3px; }
+    .points h3 { margin: 0 0 6px; font-size: 21px; letter-spacing: -.025em; }
+    .points p { max-width: 620px; font-size: 16px; line-height: 1.42; color: var(--ink-soft); }
+    .side-note { background: var(--teal-pale); padding: 25px 25px 23px; border-top: 3px solid var(--teal); }
+    .side-note .label { font: 700 11px var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--teal); margin-bottom: 15px; }
+    .side-note p { font-size: 16px; line-height: 1.48; color: var(--ink); }
+    .side-note strong { font-weight: 750; }
+    .metric-line { margin-top: 17px; padding-top: 14px; border-top: 1px solid #1d69704a; color: #426268; font-size: 13px; line-height: 1.4; }
+    .right-orbit { position: absolute; right: -100px; top: 78px; width: 460px; height: 460px; border: 1px solid #d8ac604a; border-radius: 50%; pointer-events: none; }
+    .right-orbit::before, .right-orbit::after { content: ""; position: absolute; inset: 38px; border: 1px solid #d8ac6038; border-radius: 50%; }
+    .right-orbit::after { inset: 82px; }
+    .orbit-dot { position: absolute; right: 259px; top: 97px; height: 13px; width: 13px; border-radius: 50%; background: var(--coral); box-shadow: 0 0 0 7px #d66b4a25; }
+    .three-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 17px; margin-top: 47px; }
+    .column-card { min-height: 222px; padding: 24px 23px 20px; background: #fffdf78c; border-top: 2px solid var(--teal); }
+    .column-card:nth-child(2) { background: #e7eee6; border-color: var(--coral); transform: translateY(18px); }
+    .column-card:nth-child(3) { background: #f0e8d8; border-color: var(--gold); }
+    .column-card .mini { font: 700 11px var(--mono); letter-spacing: .1em; color: var(--teal); text-transform: uppercase; }
+    .column-card h3 { margin: 17px 0 9px; font-size: 22px; letter-spacing: -.03em; }
+    .column-card p { font-size: 15px; line-height: 1.45; color: var(--ink-soft); }
+    .migration-rail { display: flex; align-items: center; gap: 11px; position: absolute; left: 76px; right: 76px; bottom: 143px; }
+    .rail-step { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; letter-spacing: .02em; }
+    .rail-step span { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%; color: var(--paper); background: var(--teal); font: 11px var(--mono); }
+    .rail-line { height: 1px; background: var(--line); flex: 1; }
+    .quote-box { margin-top: 32px; width: 650px; padding: 22px 24px; border-left: 3px solid var(--gold); background: #ffffff0d; }
+    .quote-box .label { color: #a9cfc3; font: 700 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 10px; }
+    .quote-box p { font-size: 16px; line-height: 1.48; color: #e5e9df; }
+    .sequence { display: flex; gap: 8px; margin-top: 21px; flex-wrap: wrap; }
+    .sequence span { padding: 8px 11px; border: 1px solid #ffffff3e; color: #e9e8dc; font: 12px var(--mono); }
+    .sequence b { color: var(--gold); font-weight: 400; padding-left: 5px; }
+    .approval { position: absolute; right: 76px; top: 260px; width: 365px; padding: 25px 25px 23px; color: var(--ink); background: var(--paper); }
+    .approval .label { color: #a14c33; font: 700 11px var(--mono); letter-spacing: .11em; text-transform: uppercase; margin-bottom: 13px; }
+    .approval h3 { margin: 0 0 12px; font-size: 24px; line-height: 1.1; letter-spacing: -.03em; }
+    .approval ul { list-style: none; padding: 0; margin: 0; }
+    .approval li { font-size: 14px; line-height: 1.42; padding: 9px 0; border-top: 1px solid #15343c24; }
+    .approval li::before { content: "—"; color: var(--coral); font-weight: 700; margin-right: 8px; }
+    .slide-roadmap h2 { font-size: 43px; letter-spacing: -.04em; }
+    .roadmap-intro { margin-top: 9px; font-size: 15px; line-height: 1.4; color: var(--ink-soft); }
+    .roadmap-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 11px; margin-top: 20px; }
+    .roadmap-card { min-height: 328px; padding: 18px 16px 16px; background: #fffdf7; border: 1px solid #cbd2c8; border-top: 3px solid var(--teal); position: relative; }
+    .roadmap-card:nth-child(2) { border-top-color: #438b86; }
+    .roadmap-card:nth-child(3) { border-top-color: var(--gold); }
+    .roadmap-card:nth-child(4) { background: #e7eee6; border-top-color: var(--coral); }
+    .roadmap-card:nth-child(5) { background: #f0e8d8; border-top-color: var(--gold); }
+    .roadmap-card-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 14px; }
+    .roadmap-number { display: grid; place-items: center; width: 27px; height: 27px; flex: 0 0 27px; border-radius: 50%; color: var(--paper); background: var(--ink); font: 12px var(--mono); }
+    .roadmap-time { color: #9b482f; font: 700 10px var(--mono); text-align: right; line-height: 1.2; }
+    .roadmap-card h3 { margin: 0 0 8px; font-size: 17px; letter-spacing: -.025em; line-height: 1.1; }
+    .roadmap-card p { color: var(--ink-soft); font-size: 14px; line-height: 1.35; }
+    .roadmap-exit { margin-top: 13px; padding-top: 10px; border-top: 1px solid #15343c25; color: var(--teal); font: 700 10px var(--mono); line-height: 1.35; letter-spacing: .015em; }
+    .slide-roadmap .evidence { font-size: 12px; padding-top: 10px; }
+    .approval { top: 248px; padding: 22px 23px 20px; }
+    .approval h3 { font-size: 22px; }
+    .approval li { font-size: 13px; line-height: 1.34; padding: 7px 0; }
+    .footer-links { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+    .footer-links a { color: inherit; text-decoration-color: #d66b4a; text-underline-offset: 2px; }
+    .footer-links a:hover { color: var(--coral); }
+    .controls { display: flex; align-items: center; gap: 13px; color: #e5e9df; font: 12px var(--mono); letter-spacing: .04em; }
+    .nav-button { height: 36px; width: 42px; display: grid; place-items: center; border: 1px solid #b8ccc4; border-radius: 2px; color: #edf1e7; background: transparent; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 150ms ease; }
+    .nav-button:hover:not(:disabled) { background: #e4eee5; color: var(--ink); transform: translateY(-1px); }
+    .nav-button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+    .nav-button:disabled { opacity: .36; cursor: not-allowed; }
+    .counter { min-width: 68px; text-align: center; }
+    .counter strong { color: var(--gold); font-weight: 700; }
+    .progress { height: 2px; width: 112px; background: #ffffff31; overflow: hidden; }
+    .progress i { display: block; height: 100%; background: var(--coral); transform-origin: left; transition: transform 180ms ease; }
+    .key-hint { margin-left: 8px; opacity: .62; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+    @media print {
+      @page { size: 13.333in 7.5in; margin: 0; }
+      html, body { width: 13.333in; height: auto; min-height: 0; padding: 0; margin: 0; background: white; display: block; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .presentation { display: block; width: auto; gap: 0; }
+      .stage { width: 1280px !important; height: auto !important; overflow: visible; box-shadow: none; border-radius: 0; }
+      .deck { position: static; width: 1280px; height: auto; transform: none !important; }
+      .slide, .slide.active { position: relative; display: block !important; visibility: visible !important; opacity: 1 !important; transform: none !important; width: 1280px; height: 720px; break-after: page; page-break-after: always; }
+      .slide:last-child { break-after: auto; page-break-after: auto; }
+      .controls { display: none !important; }
+      .slide::before { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      a { color: inherit; }
+    }
+  </style>
+</head>
+<body>
+  <main class="presentation" aria-label="Infinite Hitting owner migration presentation">
+    <div class="stage" id="stage">
+      <div class="deck" id="deck">
+        <section class="slide dark active" id="slide-1" aria-label="Slide 1 of 5: We already have the foundation">
+          <div class="topline">
+            <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Infinite Hitting</span></div>
+            <div class="slide-tag">Owner briefing · 12 Nov 2026</div>
+          </div>
+          <div class="eyebrow">01 / The foundation</div>
+          <h1>We are not<br>starting from scratch.</h1>
+          <p class="intro">The core features are built. Next: bring across the right data and stabilize the experience for Clearwater.</p>
+          <div class="status-pill hero-status">Code-built · test-mode only · not live certification</div>
+          <div class="feature-row">
+            <article class="feature">
+              <div class="feature-number">01 — FAMILY EXPERIENCE</div>
+              <h3>Training, connected</h3>
+              <p>Family accounts, athlete booking, coach messages and drills.</p>
+            </article>
+            <article class="feature">
+              <div class="feature-number">02 — ENGAGEMENT</div>
+              <h3>Reasons to return</h3>
+              <p>Points, rewards and rankings are built into the experience.</p>
+            </article>
+            <article class="feature">
+              <div class="feature-number">03 — OPERATIONS</div>
+              <h3>Tools for the team</h3>
+              <p>Staff and owner workflows, plus billing paths and import tools.</p>
+            </article>
+          </div>
+          <div class="evidence"><strong>Proof boundary</strong><span>Frisco Stripe test mode documents renewals, declines and retries. Real Mindbody exports and live Clearwater operations still need proof.</span></div>
+        </section>
+
+        <section class="slide" id="slide-2" aria-label="Slide 2 of 5: Why make the move">
+          <div class="topline">
+            <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Infinite Hitting</span></div>
+            <div class="slide-tag">The case for a purpose-built network</div>
+          </div>
+          <div class="eyebrow">02 / Why make the move?</div>
+          <h2>Built around how<br>our families train.</h2>
+          <div class="layout-two">
+            <ol class="points">
+              <li><span class="step-no">01</span><div><h3>Workflows shaped for us</h3><p>Adapt booking and coaching to our athletes, staff and locations—not the other way around.</p></div></li>
+              <li><span class="step-no">02</span><div><h3>One connected experience</h3><p>Bring booking, coaching and athlete engagement together; validate location reporting as we go.</p></div></li>
+              <li><span class="step-no">03</span><div><h3>Rewards can encourage return</h3><p>Attendance and drills can earn points, with rewards and rankings giving athletes a reason to come back.</p></div></li>
+            </ol>
+            <aside class="side-note">
+              <div class="label">The opportunity</div>
+              <p><strong>Reward-driven retention is a potential benefit—not a measured lift or a promise.</strong> The system is built; the business result still has to be learned.</p>
+              <div class="metric-line">Set a baseline, then watch repeat bookings, attendance, reward participation and renewal trends.</div>
+            </aside>
+          </div>
+          <div class="evidence"><strong>Owner lens</strong><span>Customization gives us roadmap control. No savings, retention percentage or guaranteed outcome is assumed.</span></div>
+        </section>
+
+        <section class="slide" id="slide-3" aria-label="Slide 3 of 5: What we need from Mindbody">
+          <div class="topline">
+            <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Infinite Hitting</span></div>
+            <div class="slide-tag">Owner-led discovery · provider-dependent</div>
+          </div>
+          <div class="eyebrow">03 / What we need from Mindbody</div>
+          <h2>Start with the source.<br>Keep billing safe.</h2>
+          <div class="three-columns">
+            <article class="column-card">
+              <div class="mini">01 · Owner access</div>
+              <h3>Confirm the setup</h3>
+              <p>Confirm site/vault ownership, fees and safe continued billing. Mindbody’s whole-site, cancellation-linked export rules may block a shared-site pilot.</p>
+            </article>
+            <article class="column-card">
+              <div class="mini">02 · Complete records</div>
+              <h3>Map the obligations</h3>
+              <p>Households, plans and prices, next charges, credits, bookings and history. Retrieve original agreements through approved channels.</p>
+            </article>
+            <article class="column-card">
+              <div class="mini">03 · Separate transfer</div>
+              <h3>Cards move securely</h3>
+              <p>Mindbody/payment custodian → Stripe’s approved secure process. Then verify customer/card mapping and recreate future billing.</p>
+            </article>
+          </div>
+          <div class="evidence">
+            <strong>Hard gates</strong>
+            <span>Old billing stays authoritative until verified handoff. No card re-entry is required, not proven. Never send card numbers or security codes through this app, workspace or email. Sources (accessed 12 Nov 2026): <span class="footer-links"><a href="https://support.mindbodyonline.com/s/article/I-need-to-export-my-Data-Subscriber-Data-Export?language=en_US" target="_blank" rel="noopener">Mindbody export FAQ</a><a href="https://docs.stripe.com/get-started/data-migrations/pan-import" target="_blank" rel="noopener">Stripe payment-data import</a></span>.</span>
+          </div>
+        </section>
+
+        <section class="slide slide-roadmap" id="slide-4" aria-label="Slide 4 of 5: Five-stage confidence roadmap">
+          <div class="topline">
+            <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Infinite Hitting</span></div>
+            <div class="slide-tag">Evidence before each next step</div>
+          </div>
+          <div class="eyebrow">04 / A five-stage confidence roadmap</div>
+          <h2>A clear plan, with checks before launch.</h2>
+          <p class="roadmap-intro">Move forward on evidence and owner signoff—not because a calendar date arrived.</p>
+          <div class="roadmap-grid">
+            <article class="roadmap-card">
+              <div class="roadmap-card-head"><span class="roadmap-number">01</span><span class="roadmap-time">ABOUT<br>2 WEEKS*</span></div>
+              <h3>Remove &amp;<br>stabilize</h3>
+              <p>Remove HitTrax linking, imports and related stats. Review dependent rewards/history; keep attendance, drills and non-sensor engagement. Stabilize core workflows.</p>
+              <div class="roadmap-exit">EXIT · scoped change + stable core</div>
+            </article>
+            <article class="roadmap-card">
+              <div class="roadmap-card-head"><span class="roadmap-number">02</span><span class="roadmap-time">EVIDENCE<br>GATE</span></div>
+              <h3>Internal<br>scenarios</h3>
+              <p>Test roles, bookings, credits, coaching, rewards, billing/retries, notices and reports. Use authorized test data and isolated export rehearsals.</p>
+              <div class="roadmap-exit">EXIT · results logged; no criticals; safe trial setup</div>
+            </article>
+            <article class="roadmap-card">
+              <div class="roadmap-card-head"><span class="roadmap-number">03</span><span class="roadmap-time">TIMEBOX WITH<br>THE TEAM</span></div>
+              <h3>Owner + staff<br>hands-on trial</h3>
+              <p>Let their team try real tasks. Collect feedback, fix issues and retest together. Any family trial needs separate approval and no collection.</p>
+              <div class="roadmap-exit">EXIT · agreed workflows completed + staff signoff</div>
+            </article>
+            <article class="roadmap-card">
+              <div class="roadmap-card-head"><span class="roadmap-number">04</span><span class="roadmap-time">ABOUT<br>1 WEEK*</span></div>
+              <h3>Shadow beside<br>Mindbody</h3>
+              <p>Mindbody stays authoritative. Compare bookings, balances, expected dues and reports daily. No new-app charges, live reservations, credit/reward use or duplicate notices; no auto-sync assumed.</p>
+              <div class="roadmap-exit">EXIT · differences reviewed + daily comparison accepted</div>
+            </article>
+            <article class="roadmap-card">
+              <div class="roadmap-card-head"><span class="roadmap-number">05</span><span class="roadmap-time">SEPARATE<br>GO / NO-GO</span></div>
+              <h3>Small cohort,<br>then monitor</h3>
+              <p>Owners, finance and operations approve only when migration checks pass. Switch a small Clearwater group, then monitor real renewals and settlements before expansion.</p>
+              <div class="roadmap-exit">EXIT · full-cycle review before expansion</div>
+            </article>
+          </div>
+          <div class="evidence"><strong>Timing</strong><span>*About two weeks for stage 1 and one week for stage 4 are conditional estimates. Testing, staff trial, fixes and provider delays add time; one shadow week is not monthly-cycle proof. No fixed 30-day cutover promise. HitTrax removal is planned, not done.</span></div>
+        </section>
+
+        <section class="slide dark" id="slide-5" aria-label="Slide 5 of 5: A familiar migration approach with clear safeguards">
+          <div class="right-orbit" aria-hidden="true"><span class="orbit-dot"></span></div>
+          <div class="topline">
+            <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Infinite Hitting</span></div>
+            <div class="slide-tag">Decision requested</div>
+          </div>
+          <div class="eyebrow">05 / A familiar approach—with clear safeguards</div>
+          <h2>Rehearse. Reconcile.<br>Switch only when ready.</h2>
+          <div class="quote-box">
+            <div class="label">Two vendor playbooks · not customer case studies</div>
+            <p><strong>HubSpot CRM guidance:</strong> map and clean data, rehearse away from production, validate users and reports, train, then stabilize.<br><br><strong>Stripe payment guidance:</strong> transfer saved methods securely; recreate subscriptions separately; preserve billing dates and review future schedules.</p>
+            <div class="sequence" aria-label="Our approach: rehearse, reconcile, approve, switch a controlled cohort, monitor">
+              <span>Rehearse<b>→</b></span><span>Reconcile<b>→</b></span><span>Approve<b>→</b></span><span>Switch cohort<b>→</b></span><span>Monitor</span>
+            </div>
+          </div>
+          <aside class="approval">
+            <div class="label">Approval requested</div>
+            <h3>Authorize discovery and a gated Clearwater pilot only.</h3>
+            <ul>
+              <li>Weekly test results: pass/fail, open issues and named owners. Staff signoff before shadow.</li>
+              <li>Shadow week: daily comparison of bookings, balances, expected dues and reports.</li>
+              <li>Owners can hold launch; a critical issue or unexplained variance means “not yet.”</li>
+              <li>Separate approved billing handoff only; no-card-re-entry gate must pass.</li>
+              <li>Old autopay/retries stopped before new collection. No automatic shutdown or network rollout.</li>
+            </ul>
+          </aside>
+          <div class="evidence">
+            <strong>Safeguard</strong>
+            <span>Vendor guidance describes a method, not our outcome or account approval. Sources (accessed 12 Nov 2026): <span class="footer-links"><a href="https://blog.hubspot.com/sales/crm-migration-guide" target="_blank" rel="noopener">HubSpot CRM migration guide</a><a href="https://docs.stripe.com/get-started/data-migrations/pan-import" target="_blank" rel="noopener">Stripe payment-data import</a><a href="https://docs.stripe.com/billing/subscriptions/import-subscriptions" target="_blank" rel="noopener">Stripe subscription import</a></span>.</span>
+          </div>
+        </section>
+      </div>
+    </div>
+    <nav class="controls" aria-label="Presentation navigation">
+      <button class="nav-button" id="previous" type="button" aria-label="Previous slide" title="Previous slide (←)">←</button>
+      <div class="counter" aria-live="polite"><strong id="current">1</strong> / <span id="total">5</span></div>
+      <button class="nav-button" id="next" type="button" aria-label="Next slide" title="Next slide (→)">→</button>
+      <div class="progress" aria-hidden="true"><i id="progress"></i></div>
+      <span class="key-hint">← → navigate · Home / End</span>
+    </nav>
+  </main>
+  <script>
+    (() => {
+      const slides = Array.from(document.querySelectorAll(".slide"));
+      const stage = document.getElementById("stage");
+      const current = document.getElementById("current");
+      const previous = document.getElementById("previous");
+      const next = document.getElementById("next");
+      const progress = document.getElementById("progress");
+      let active = 0;
+
+      function fitCanvas() {
+        const availableWidth = Math.max(260, window.innerWidth - 36);
+        const availableHeight = Math.max(160, window.innerHeight - 100);
+        const scale = Math.min(availableWidth / 1280, availableHeight / 720);
+        document.documentElement.style.setProperty("--scale", String(scale));
+      }
+      function showSlide(index, updateHash = true) {
+        active = Math.max(0, Math.min(slides.length - 1, index));
+        slides.forEach((slide, i) => {
+          slide.classList.toggle("active", i === active);
+          slide.setAttribute("aria-hidden", i === active ? "false" : "true");
+        });
+        current.textContent = String(active + 1);
+        previous.disabled = active === 0;
+        next.disabled = active === slides.length - 1;
+        progress.style.transform = `scaleX(${(active + 1) / slides.length})`;
+        if (updateHash && location.hash !== `#${active + 1}`) history.replaceState(null, "", `#${active + 1}`);
+      }
+      function fromHash() {
+        const match = location.hash.match(/^#([1-5])$/);
+        if (match) showSlide(Number(match[1]) - 1, false);
+      }
+      previous.addEventListener("click", () => showSlide(active - 1));
+      next.addEventListener("click", () => showSlide(active + 1));
+      window.addEventListener("resize", fitCanvas, { passive: true });
+      window.addEventListener("hashchange", fromHash);
+      window.addEventListener("keydown", (event) => {
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
+        if (event.key === "ArrowRight" || event.key === "PageDown") { event.preventDefault(); showSlide(active + 1); }
+        else if (event.key === "ArrowLeft" || event.key === "PageUp") { event.preventDefault(); showSlide(active - 1); }
+        else if (event.key === "Home") { event.preventDefault(); showSlide(0); }
+        else if (event.key === "End") { event.preventDefault(); showSlide(slides.length - 1); }
+      });
+      fitCanvas();
+      fromHash();
+      showSlide(active);
+      document.getElementById("total").textContent = String(slides.length);
+    })();
+  </script>
+</body>
+</html>
