@@ -1,0 +1,222 @@
+{
+  "researchDate": "2026-11-20",
+  "method": "Primary-source product-scope review; vendor documentation classified as Tier 3, regulator guidance as Tier 1; no independent comparative efficacy ranking.",
+  "sources": [
+    {
+      "key": "highlevel-02-pipelines-opportunities",
+      "title": "Pipelines in HighLevel | Manage Opportunities & Sales Stages : HighLevel Support Portal",
+      "url": "https://help.gohighlevel.com/support/solutions/articles/155000001982-understanding-pipelines",
+      "publicationDate": "Tue, 3 Feb, 2026 at 6:51 PM",
+      "tier": 3,
+      "evidencePath": "research/sources/highlevel-02-pipelines-opportunities.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "highlevel-03-workflow-basics",
+      "title": "Getting Started with Workflows in HighLevel : HighLevel Support Portal",
+      "url": "https://help.gohighlevel.com/support/solutions/articles/155000002288-getting-started-with-workflows",
+      "publicationDate": "Thu, 27 Aug, 2026 at 7:15 PM",
+      "tier": 3,
+      "evidencePath": "research/sources/highlevel-03-workflow-basics.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "highlevel-04-ai-builder",
+      "title": "Workflow AI Builder: Generate and Edit Workflows with AI : HighLevel Support Portal",
+      "url": "https://help.gohighlevel.com/support/solutions/articles/155000006100-ai-builder-overview",
+      "publicationDate": "Wed, 4 Nov, 2026 at 12:33 AM",
+      "tier": 3,
+      "evidencePath": "research/sources/highlevel-04-ai-builder.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "inbox-01-intercom-assignments",
+      "title": "Assign conversations to teammates and teams | Intercom Help",
+      "url": "https://www.intercom.com/help/en/articles/6561699-assign-conversations-to-teammates-and-teams",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/inbox-01-intercom-assignments.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "inbox-02-front-collision",
+      "title": "Front's real-time collision detection",
+      "url": "https://help.front.com/en/articles/2403",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/inbox-02-front-collision.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "inbox-04-front-copilot-summary",
+      "title": "Get real-time conversational assistance in your inbox with Copilot",
+      "url": "https://help.front.com/en/articles/4848832",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/inbox-04-front-copilot-summary.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "inbox-05-intercom-ai-inbox",
+      "title": "AI features available in the Inbox | Intercom Help",
+      "url": "https://www.intercom.com/help/en/articles/6955446-ai-features-available-in-the-inbox",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/inbox-05-intercom-ai-inbox.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "inbox-06-intercom-nov2026-update",
+      "title": "Merge repeat conversations in one go | Intercom Changelog & Release Notes | Product Updates",
+      "url": "https://www.intercom.com/changes/en/163642-merge-repeat-conversations-in-one-go",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/inbox-06-intercom-nov2026-update.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "crm-01-attio-data-model",
+      "title": "Define your data model: attributes, views, lists and objects | Attio Help Center",
+      "url": "https://attio.com/help/reference/attio-101/attios-data-model/define-your-data-model-objects-lists-and-views",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/crm-01-attio-data-model.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "crm-02-attio-record-summaries",
+      "title": "Record summaries | Attio Help Center",
+      "url": "https://attio.com/help/reference/managing-your-data/records/record-summaries",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/crm-02-attio-record-summaries.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "crm-03-hubspot-pipelines",
+      "title": "Set up and manage object pipelines",
+      "url": "https://knowledge.hubspot.com/object-settings/set-up-and-customize-pipelines",
+      "publicationDate": "November 17, 2026",
+      "tier": 3,
+      "evidencePath": "research/sources/crm-03-hubspot-pipelines.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "journeys-01-customerio-triggers",
+      "title": "Automation triggers, filters, and frequencies - Customer.io Documentation",
+      "url": "https://docs.customer.io/journeys/campaign-triggers/",
+      "publicationDate": "- When relevant events were last sent",
+      "tier": 3,
+      "evidencePath": "research/sources/journeys-01-customerio-triggers.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "journeys-02-customerio-exit-conditions",
+      "title": "Automation exit conditions - Customer.io Documentation",
+      "url": "https://docs.customer.io/journeys/campaign-exit-conditions/",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/journeys-02-customerio-exit-conditions.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "journeys-03-customerio-frequency-limits",
+      "title": "Set up message frequency limits - Customer.io Documentation",
+      "url": "https://docs.customer.io/messaging/send/timezones/message-limits",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/journeys-03-customerio-frequency-limits.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "journeys-04-customerio-sms-quiet-hours",
+      "title": "SMS: quiet hours - Customer.io Documentation",
+      "url": "https://docs.customer.io/messaging/channels/sms/quiet-hours/",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/journeys-04-customerio-sms-quiet-hours.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "journeys-05-hubspot-workflow-test",
+      "title": "Test your workflow",
+      "url": "https://knowledge.hubspot.com/workflows/test-your-workflow",
+      "publicationDate": "October 28, 2026",
+      "tier": 3,
+      "evidencePath": "research/sources/journeys-05-hubspot-workflow-test.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "journeys-09-hubspot-workflow-details",
+      "title": "Understand your workflow details page",
+      "url": "https://knowledge.hubspot.com/workflows/understand-your-workflow-details-page?facet1=crm",
+      "publicationDate": "October 26, 2026",
+      "tier": 3,
+      "evidencePath": "research/sources/journeys-09-hubspot-workflow-details.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "journeys-07-highlevel-test-workflow",
+      "title": "Test Workflow : HighLevel Support Portal",
+      "url": "https://help.gohighlevel.com/support/solutions/articles/155000009235-test-workflow",
+      "publicationDate": "Mon, 9 Nov, 2026 at 2:25 AM",
+      "tier": 3,
+      "evidencePath": "research/sources/journeys-07-highlevel-test-workflow.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "journeys-10-highlevel-builder",
+      "title": "Workflow Builder Walkthrough in HighLevel | Automation Guide : HighLevel Support Portal",
+      "url": "https://help.gohighlevel.com/support/solutions/articles/155000001254-workflow-builder-walkthrough",
+      "publicationDate": "Mon, 7 Sep, 2026 at 10:50 AM",
+      "tier": 3,
+      "evidencePath": "research/sources/journeys-10-highlevel-builder.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "journeys-11-cio-object-trigger",
+      "title": "A new object trigger that meets more of your needs - Customer.io Documentation",
+      "url": "https://docs.customer.io/release-notes/2026-11-02-new-object-trigger/",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/journeys-11-cio-object-trigger.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "journeys-08-customerio-nov-2026-experiments",
+      "title": "Run experiments in your automations - Customer.io Documentation",
+      "url": "https://docs.customer.io/release-notes/2026-11-09-experiments/",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 3,
+      "evidencePath": "research/sources/journeys-08-customerio-nov-2026-experiments.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "governance-01-twilio-messaging-policy",
+      "title": "Twilio Messaging Policy | Twilio",
+      "url": "https://www.twilio.com/en-us/legal/messaging-policy",
+      "publicationDate": "** April 13, 2026",
+      "tier": 3,
+      "evidencePath": "research/sources/governance-01-twilio-messaging-policy.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "governance-02-crtc-commercial-text-guidance",
+      "title": "Help centre | What emails and text messages are allowed under Canada’s Anti-Spam Legislation? | CRTC",
+      "url": "https://crtc.gc.ca/eng/contact/spam/q23.htm",
+      "publicationDate": "2026-11-04",
+      "tier": 1,
+      "evidencePath": "research/sources/governance-02-crtc-commercial-text-guidance.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    },
+    {
+      "key": "governance-03-ftc-coppa-faq",
+      "title": "Complying with COPPA: Frequently Asked Questions | Federal Trade Commission",
+      "url": "https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
+      "tier": 1,
+      "evidencePath": "research/sources/governance-03-ftc-coppa-faq.md",
+      "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
+    }
+  ]
+}

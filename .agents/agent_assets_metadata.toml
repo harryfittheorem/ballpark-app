@@ -116,3 +116,31 @@ mtime_ms = 1795045317506
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/046a5f94-7add-42d7-aab0-d7813cccd172/1b675d0f-2c7c-4b09-b1d2-111962f5ea39"
 storage_version_token = "1795100450594252"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "GkOYLY2vFQQMChU8ws4Tz"
+uri = "file://research/notes.md"
+type = "text"
+title = "CRM scope research notes"
+description = "Research questions, coverage and findings for the design-first CRM scope review."
+logical_id = "8fced8c4-0f50-4db2-82b3-063e9917e87d"
+content_hash = "sha256:518976de7f9019b0fa03d3faaf4dc173e00d8e81a96e9f9f43e9d527f5a0cd09"
+size = 2182
+mtime_ms = 1795145449460
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/8fced8c4-0f50-4db2-82b3-063e9917e87d/e0405ced-1890-46bc-b821-b573b2e6ff18"
+storage_version_token = "1795145471399846"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "0e7g9FZPNZgVrRAankico"
+uri = "file://research/crm-scope-review.html"
+type = "html"
+title = "Clubhouse CRM — Full Scope Review"
+description = "Leadership-readable review of HighLevel and modern CRM patterns, recommended functionality, AI boundaries, priorities and approval gates. Includes 24 cited primary sources."
+logical_id = "4a793923-3020-4cdb-8824-4a6ff2cb0af0"
+content_hash = "sha256:5a2bd854a07896429bdff9a25628bfe917a7f2f665711b5e29e02c59a65e2e98"
+size = 35392
+mtime_ms = 1795145769159
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/4a793923-3020-4cdb-8824-4a6ff2cb0af0/2008144e-0f4b-466d-821c-6514451ca63a"
+storage_version_token = "1795145799611173"
+content_type = "text/html"
