@@ -10,6 +10,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
+    "typecheck:mobile": "tsc --noEmit -p tsconfig.mobile.json",
+    "test:staff-enrollment": "node --test tests/staff-enrollment.test.cjs",
     "lint": "eslint . --ext .ts,.tsx",
     "pitch-deck:pdf": "node scripts/export-pitch-deck-pdf.mjs"
   },

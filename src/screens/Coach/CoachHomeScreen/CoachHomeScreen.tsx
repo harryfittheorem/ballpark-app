@@ -11,8 +11,8 @@
 
 import { useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, Dumbbell, Inbox, QrCode, Send, Video } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { ClipboardCheck, Dumbbell, Inbox, QrCode, Send, UserPlus, Video } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -26,6 +26,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { signOut } from '@/api/auth';
+import { hasStaffEnrollmentRole, refreshStaffEnrollmentAccess } from '@/api/staffEnrollment';
 import { useAuth } from '@/hooks/useAuth';
 import { coachKey, useCoach } from '@/hooks/useCoach';
 import type { CoachInboxStackScreenProps } from '@/navigation/types';
@@ -45,23 +46,56 @@ const PLACEHOLDER_UPCOMING_BOOKINGS = 3;
 
 export default function CoachHomeScreen() {
   const navigation = useNavigation<Nav>();
-  const { user, appRole } = useAuth();
+  const { user, appRole, session } = useAuth();
   const { firstName } = useCoach();
   const qc = useQueryClient();
 
   const [tab, setTab] = useState<TabKey>('home');
   const [refreshing, setRefreshing] = useState(false);
+  const [checkingEnrollment, setCheckingEnrollment] = useState(false);
+  const enrollmentCheck = useRef(false);
+  const checkedUser = useRef<string | null>(null);
+
+  // A role can change while a secure on-device session is still valid. Refresh
+  // once on Home without logging the owner out or exposing their access token.
+  useEffect(() => {
+    if (appRole !== 'admin' || !user || checkedUser.current === user.id) return;
+    checkedUser.current = user.id;
+    void refreshStaffEnrollmentAccess().catch(() => {
+      // A manual refresh/open below surfaces errors without interrupting Home.
+    });
+  }, [appRole, user]);
+
+  const openEnrollment = useCallback(async () => {
+    if (enrollmentCheck.current) return;
+    enrollmentCheck.current = true;
+    setCheckingEnrollment(true);
+    try {
+      await refreshStaffEnrollmentAccess();
+      navigation.navigate('StaffEnrollment');
+    } catch (err) {
+      Alert.alert('Enrollment access', errorMessage(err));
+    } finally {
+      enrollmentCheck.current = false;
+      setCheckingEnrollment(false);
+    }
+  }, [navigation]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       if (user) {
-        await qc.invalidateQueries({ queryKey: coachKey(user.id) });
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: coachKey(user.id) }),
+          ...(appRole === 'admin' ? [refreshStaffEnrollmentAccess()] : []),
+        ]);
       }
+    } catch (err) {
+      Alert.alert('Refresh failed', errorMessage(err));
     } finally {
       setRefreshing(false);
     }
-  }, [qc, user]);
+  }, [appRole, qc, user]);
 
   const handleSignOut = useCallback(() => {
     Alert.alert('Sign out?', 'You will need to sign in again to use Clubhouse.', [
@@ -156,6 +190,14 @@ export default function CoachHomeScreen() {
             />
             {appRole !== 'parent' && (
               <>
+                {hasStaffEnrollmentRole(session?.access_token) && (
+                  <CoachActionCard
+                    title="New Family Enrollment"
+                    subtitle={checkingEnrollment ? 'Checking your staff access…' : 'Enroll a parent and athlete at the front desk.'}
+                    icon={UserPlus}
+                    onPress={() => void openEnrollment()}
+                  />
+                )}
                 <CoachActionCard
                   title="Assign Drill"
                   subtitle="Send a kid a drill to practice this week."

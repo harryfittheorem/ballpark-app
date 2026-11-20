@@ -34,8 +34,9 @@
  *
  * Returns: { ok: true, activated: true } or { error: string } with 4xx/5xx
  */
-import { type NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { enrollmentAuth, isMobileEnrollment } from '@/lib/enrollmentAuth';
+import { POST as activateMembership } from '@/app/api/memberships/activate/route';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { readAppRole, readTenantId } from '@/lib/auth';
 import { buildEmailSender, sendResendEmail } from '@/lib/email';
@@ -203,8 +204,7 @@ async function sendWelcomeEmail(opts: {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { session } = await enrollmentAuth(req);
 
   if (!session) return err(401, 'Unauthorized');
 
@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
 
   const { data: membership } = await serviceClient
     .from('memberships')
-    .select('id, tenant_id, family_id, kid_id, plan_type, plan_name, amount_cents, status')
+    .select('id, tenant_id, family_id, kid_id, plan_type, plan_name, amount_cents, status, stripe_subscription_id')
     .eq('id', membership_id)
     .eq('tenant_id', tenantId)
     .single();
@@ -295,7 +295,7 @@ export async function POST(req: NextRequest) {
 
   const { data: familyRow } = await serviceClient
     .from('families')
-    .select('id, parent_user_id, parent_first_name, parent_last_name, parent_email, primary_location_id')
+    .select('id, parent_user_id, parent_first_name, parent_last_name, parent_email, primary_location_id, stripe_connected_customer_id')
     .eq('id', family_id)
     .eq('tenant_id', tenantId)
     .single();
@@ -363,6 +363,7 @@ export async function POST(req: NextRequest) {
     );
     const siData = await siRes.json() as {
       status?: string;
+      metadata?: { membership_id?: string };
       payment_method?: { id: string; card?: CardDetail };
       error?: { message?: string };
     };
@@ -371,9 +372,28 @@ export async function POST(req: NextRequest) {
       const msg = siData.error?.message ?? `SetupIntent not confirmed (status: ${siData.status ?? 'unknown'})`;
       return err(422, msg);
     }
+    if (siData.metadata?.membership_id !== membership_id) return err(422, 'Setup does not belong to this membership');
 
-    const pm = siData.payment_method;
+    let pm = siData.payment_method;
     if (!pm) return err(422, 'No payment method on SetupIntent');
+    if (isMobileEnrollment(req) && membership.stripe_subscription_id) {
+      // Recovery PaymentSheet can replace a declined card on the existing
+      // invoice. Keep that successfully charged card for future renewals, not
+      // the original (declined) card from the SetupIntent.
+      const invoiceRes = await fetch(
+        `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(membership.stripe_subscription_id as string)}?expand[]=latest_invoice.payment_intent.payment_method`,
+        { headers: stripeHeaders },
+      );
+      const invoiceSubscription = await invoiceRes.json() as {
+        metadata?: { membership_id?: string };
+        latest_invoice?: { payment_intent?: { status?: string; payment_method?: { id: string; card?: CardDetail } } };
+      };
+      if (!invoiceRes.ok || invoiceSubscription.metadata?.membership_id !== membership_id) {
+        return err(502, 'Could not verify recurring payment. Retry confirmation.');
+      }
+      const paidInvoice = invoiceSubscription.latest_invoice?.payment_intent;
+      if (paidInvoice?.status === 'succeeded' && paidInvoice.payment_method?.id) pm = paidInvoice.payment_method;
+    }
     cardDetails = pm.card ?? null;
 
     // Create Stripe customer on connected account
@@ -392,15 +412,19 @@ export async function POST(req: NextRequest) {
     custParams.append('metadata[family_id]', family_id);
     custParams.append('metadata[membership_id]', membership_id);
 
-    const custRes = await fetch('https://api.stripe.com/v1/customers', {
+    const savedCustomer = isMobileEnrollment(req) ? familyRow.stripe_connected_customer_id as string | null : null;
+    const custRes = savedCustomer ? null : await fetch('https://api.stripe.com/v1/customers', {
       method: 'POST',
-      headers: { ...stripeHeaders, 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        ...stripeHeaders, 'Content-Type': 'application/x-www-form-urlencoded',
+        ...(isMobileEnrollment(req) ? { 'Idempotency-Key': `mobile-enroll-customer-${membership_id}` } : {}),
+      },
       body: custParams.toString(),
     });
-    const custData = await custRes.json() as { id?: string; error?: { message?: string } };
+    const custData = savedCustomer ? { id: savedCustomer } : await custRes!.json() as { id?: string; error?: { message?: string } };
 
-    if (!custRes.ok || !custData.id) {
-      const msg = custData.error?.message ?? `Could not create Stripe customer (${custRes.status})`;
+    if ((!savedCustomer && !custRes!.ok) || !custData.id) {
+      const msg = custData.error?.message ?? `Could not create Stripe customer (${custRes?.status})`;
       return err(502, msg);
     }
     const customerId = custData.id;
@@ -424,14 +448,15 @@ export async function POST(req: NextRequest) {
     // Set as customer's default payment method
     const updateCustParams = new URLSearchParams();
     updateCustParams.append('invoice_settings[default_payment_method]', pm.id);
-    await fetch(`https://api.stripe.com/v1/customers/${encodeURIComponent(customerId)}`, {
+    const defaultRes = await fetch(`https://api.stripe.com/v1/customers/${encodeURIComponent(customerId)}`, {
       method: 'POST',
       headers: { ...stripeHeaders, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: updateCustParams.toString(),
     });
+    if (!defaultRes.ok) return err(502, 'Could not save the default card. Retry confirmation.');
 
     // Save card details + customer id to families row
-    await serviceClient
+    const { error: familyUpdateError } = await serviceClient
       .from('families')
       .update({
         stripe_connected_customer_id: customerId,
@@ -441,6 +466,7 @@ export async function POST(req: NextRequest) {
         card_exp_year: cardDetails?.exp_year ?? null,
       })
       .eq('id', family_id);
+    if (familyUpdateError) return err(500, 'Could not save the card to this family. Retry confirmation.');
 
     if (isDeferred && deferred_charge_date) {
       // ── Deferred OTC: vault complete — schedule full charge + activate membership ──
@@ -486,20 +512,36 @@ export async function POST(req: NextRequest) {
     const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'localhost:5000';
     const forwardedProto = req.headers.get('x-forwarded-proto');
     const proto = forwardedProto ?? (host.includes('localhost') ? 'http' : 'https');
-    const activateRes = await fetch(`${proto}://${host}/api/memberships/activate`, {
+    const activateRequest = new NextRequest(
+      isMobileEnrollment(req) ? req.url : `${proto}://${host}/api/memberships/activate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Cookie: req.headers.get('cookie') ?? '',
+        ...(req.headers.get('authorization') ? { Authorization: req.headers.get('authorization')! } : {}),
       },
       body: JSON.stringify({ membership_id }),
     });
+    const activateRes = await activateMembership(activateRequest);
 
     if (!activateRes.ok) {
       const activateData = await activateRes.json().catch(() => ({})) as { error?: string };
       const msg = activateData.error ?? `Activation failed (${activateRes.status})`;
       console.error('[enroll/attach-payment] EFT activation failed:', msg);
       return err(activateRes.status >= 500 ? 502 : 422, `Membership activation failed: ${msg}`);
+    }
+    if (isMobileEnrollment(req)) {
+      const activated = await activateRes.json() as {
+        subscription_status?: string;
+        recovery_intent?: { client_secret: string; connected_account_id: string; intent_type: 'payment' };
+      };
+      if (activated.subscription_status !== 'active' && activated.subscription_status !== 'trialing') {
+        if (activated.recovery_intent) return NextResponse.json({
+          error: 'Your card was saved, but the first membership payment needs attention. Use another card or authenticate the existing invoice payment.',
+          recovery_intent: activated.recovery_intent,
+        }, { status: 402 });
+        return err(422, 'Recurring billing was not activated. Retry confirmation or contact an administrator; do not create another family.');
+      }
     }
 
   } else {
@@ -511,6 +553,7 @@ export async function POST(req: NextRequest) {
     );
     const piData = await piRes.json() as {
       status?: string;
+      metadata?: { membership_id?: string };
       amount?: number;
       payment_method?: { id: string; card?: CardDetail };
       error?: { message?: string };
@@ -524,6 +567,7 @@ export async function POST(req: NextRequest) {
     if (piData.status !== 'succeeded') {
       return err(422, `Payment was not completed (status: ${piData.status ?? 'unknown'}). Please try again.`);
     }
+    if (piData.metadata?.membership_id !== membership_id) return err(422, 'Payment does not belong to this membership');
 
     // Amount tamper guard: for split, check against deposit; for full, check against plan amount
     const expectedAmount = isSplit ? split_deposit_cents! : amountCents;
@@ -553,7 +597,10 @@ export async function POST(req: NextRequest) {
 
     const otcCustRes = await fetch('https://api.stripe.com/v1/customers', {
       method: 'POST',
-      headers: { ...stripeHeaders, 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        ...stripeHeaders, 'Content-Type': 'application/x-www-form-urlencoded',
+        ...(isMobileEnrollment(req) ? { 'Idempotency-Key': `mobile-enroll-customer-${membership_id}` } : {}),
+      },
       body: otcCustParams.toString(),
     });
     const otcCustData = await otcCustRes.json() as { id?: string; error?: { message?: string } };
@@ -674,7 +721,9 @@ export async function POST(req: NextRequest) {
     // from. Only collect-scheduled-charges (the cron for later balance/deferred
     // charges) was writing payment_events; the initial in-app payment was not.
     const capturedAmountCents = isSplit ? split_deposit_cents! : amountCents;
-    const { error: paymentEventErr } = await serviceClient
+    const { data: recordedPayment } = await serviceClient.from('payment_events')
+      .select('id').eq('stripe_payment_intent_id', stripe_intent_id).limit(1).maybeSingle();
+    const { error: paymentEventErr } = recordedPayment ? { error: null } : await serviceClient
       .from('payment_events')
       .insert({
         tenant_id: tenantId,
@@ -690,6 +739,7 @@ export async function POST(req: NextRequest) {
       // Non-fatal: the membership is already active and the charge already
       // succeeded on Stripe — don't fail the enrollment over a bookkeeping row.
       console.error('[enroll/attach-payment] payment_events insert failed:', paymentEventErr.message);
+      if (isMobileEnrollment(req)) return err(500, 'Payment succeeded but its receipt could not be saved. Retry confirmation, not payment.');
     }
   }
 
@@ -706,8 +756,18 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({ type: 'recovery', email: parentEmail }),
     });
-    const resetBody = await resetRes.json() as { action_link?: string };
-    resetLink = resetBody.action_link ?? null;
+    const resetBody = await resetRes.json() as { action_link?: string; hashed_token?: string };
+    if (isMobileEnrollment(req) && resetRes.ok && resetBody.hashed_token) {
+      // A direct portal form avoids Auth's redirect allow-list/site-URL traps,
+      // and does not consume recovery proof until the parent submits a password.
+      const externalHost = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? req.nextUrl.host;
+      const externalProto = req.headers.get('x-forwarded-proto') ?? req.nextUrl.protocol.replace(':', '');
+      const link = new URL('/auth/enrollment-password', `${externalProto}://${externalHost}`);
+      link.searchParams.set('token_hash', resetBody.hashed_token);
+      resetLink = link.toString();
+    } else {
+      resetLink = resetBody.action_link ?? null;
+    }
   } catch {
     // reset link is best-effort; email still sends
   }

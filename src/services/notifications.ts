@@ -87,8 +87,6 @@ export async function registerForPushNotifications() {
     })
   ).data;
 
-  console.log("Expo Push Token:", token);
-
   // Persist to device_tokens so the server can fan a push out later. Don't
   // throw on failure — the token is still useful in-memory and the next
   // sign-in will retry.

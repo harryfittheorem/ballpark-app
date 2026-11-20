@@ -5,6 +5,7 @@
 - [Per-business branded sender email](per-business-sender-email.md) — shared buildEmailSender/sendResendEmail helper (duplicated portal+edge fns) replaces raw Resend fetch + flat RESEND_FROM_EMAIL everywhere.
 - [Supabase CLI project link](supabase-cli-link.md) — CLI is linked to local "workspace" not production; always re-link before db push; use management API for schema verification.
 - [JWT claims vs app_metadata](jwt-claims-app-metadata.md) — Custom Access Token Hook injects claims into JWT payload only, never into raw_app_meta_data; edge functions must decode the JWT to read tenant_id/app_role.
+- [Supabase auth callback locking](supabase-auth-callback-lock.md) — defer session-dependent work outside auth subscribers or permission refreshes can deadlock.
 - [Owner layout auth pattern](owner-layout-auth.md) — auth checks must use cookie-based createClient(), never createServiceClient() (no cookie adapter, always returns null user).
 - [Supabase invite redirect_to](supabase-invite-redirect.md) — use hashed_token to build /auth/v1/verify URL; add portal domain to uri_allow_list via Management API or redirect_to is silently ignored.
 - [Stripe Connect capability vs charges_enabled](stripe-capability-vs-charges-enabled.md) — charges_enabled/payouts_enabled can be true with zero payment capabilities active; always check capabilities.card_payments explicitly.
@@ -20,4 +21,6 @@
 - [CRM channel direction](crm-channel-direction.md) — Twilio proposed with a connector per location; Gmail suggested for email, with account ownership and final email choice still open.
 - [CRM design-first scope](crm-design-first.md) — finalize design before implementation; shared messaging, pipelines, configurable workflows and manual/workflow tagging are requested.
 - [Sandbox test port isolation](sandbox-test-ports.md) — middleware-mode Vite tests can register unwanted preview ports unless their WebSocket listener is disabled too.
+- [Enrollment recovery](enrollment-recovery.md) — reserve identity before Auth creation; card setup is not first-invoice payment, and recovery must reuse the original subscription.
+- [Mobile enrollment scope](mobile-enrollment-parity.md) — keep location on screen 2; fix functional compatibility without relocating fields to match the web layout.
 - [Training replacement scope](training-replacement-scope.md) — web Operations module requested; plan first, preserve existing Trainual content and videos before transition.

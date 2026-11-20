@@ -53,6 +53,7 @@ async function stripePost(
   secretKey: string,
   body: Record<string, unknown>,
   stripeAccountId?: string,
+  idempotencyKey?: string,
 ): Promise<Record<string, unknown>> {
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${secretKey}`,
@@ -60,6 +61,7 @@ async function stripePost(
     'Stripe-Version': STRIPE_API_VERSION,
   };
   if (stripeAccountId) headers['Stripe-Account'] = stripeAccountId;
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
 
   const res = await fetch(`https://api.stripe.com/v1/${path}`, {
     method: 'POST',
@@ -144,9 +146,14 @@ async function handleRequest(req: Request): Promise<Response> {
   }
 
   // Only admin/owner may create subscriptions
-  const userRole = (user.app_metadata?.app_role as string | undefined)
-    ?? (user.user_metadata?.app_role as string | undefined)
-    ?? '';
+  // Only signed custom claims are authoritative. user_metadata is editable by
+  // the account holder and must never grant privileged billing access.
+  let claims: Record<string, unknown> = {};
+  try {
+    const segment = callerToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    claims = JSON.parse(atob(segment.padEnd(Math.ceil(segment.length / 4) * 4, '=')));
+  } catch { /* invalid claims fail closed below */ }
+  const userRole = claims.app_role;
   if (userRole !== 'admin' && userRole !== 'owner') {
     return json({ error: { code: 'forbidden', message: 'Admin or owner role required' } }, 403);
   }
@@ -156,19 +163,7 @@ async function handleRequest(req: Request): Promise<Response> {
   // it is NOT stored in raw_app_meta_data, so auth.getUser() does NOT surface
   // it in user.app_metadata. Decode the token payload directly (signature was
   // already verified by auth.getUser() above).
-  const callerTenantId: string = (() => {
-    try {
-      const parts = callerToken.split('.');
-      if (parts.length < 2) return '';
-      const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const payload = JSON.parse(atob(b64)) as Record<string, unknown>;
-      return (payload.tenant_id as string | undefined)
-        ?? (user.app_metadata?.tenant_id as string | undefined)
-        ?? '';
-    } catch {
-      return (user.app_metadata?.tenant_id as string | undefined) ?? '';
-    }
-  })();
+  const callerTenantId = typeof claims.tenant_id === 'string' ? claims.tenant_id : '';
   if (!callerTenantId) {
     return json({ error: { code: 'forbidden', message: 'No tenant in token — re-authenticate' } }, 403);
   }
@@ -194,7 +189,7 @@ async function handleRequest(req: Request): Promise<Response> {
     .from('memberships')
     .select(`
       id, plan_name, plan_type, status, amount_cents, billing_anchor_day,
-      stripe_subscription_id, stripe_price_id, tenant_id, family_id, kid_id,
+      stripe_subscription_id, stripe_price_id, tenant_id, family_id, kid_id, staff_enrollment_request_id,
       families!inner(id, stripe_connected_customer_id, primary_location_id),
       kids(first_name, last_name)
     `)
@@ -274,16 +269,18 @@ async function handleRequest(req: Request): Promise<Response> {
     }
   }
 
-  // Idempotency: check existing subscription on Stripe
+  // Idempotency: recover the same subscription and its first invoice. An
+  // incomplete subscription is not success and must not be replaced.
+  let existingMobileSubscription: Record<string, unknown> | undefined;
   if (mem.stripe_subscription_id) {
     try {
       const existing = await stripeGet(
-        `subscriptions/${mem.stripe_subscription_id}`,
+        `subscriptions/${mem.stripe_subscription_id}?expand[]=latest_invoice.payment_intent`,
         stripeKey,
         connectedAccountId,
       );
       const subStatus = existing.status as string;
-      if (subStatus === 'active' || subStatus === 'trialing' || subStatus === 'past_due') {
+      if (subStatus === 'active' || subStatus === 'trialing' || (subStatus === 'past_due' && !mem.staff_enrollment_request_id)) {
         console.log(`[stripe-create-subscription] already active sub=${mem.stripe_subscription_id}`);
         return json({
           subscription_id: existing.id,
@@ -291,6 +288,7 @@ async function handleRequest(req: Request): Promise<Response> {
           current_period_end: existing.current_period_end,
         });
       }
+      if (mem.staff_enrollment_request_id) existingMobileSubscription = existing;
     } catch {
       // Subscription doesn't exist on Stripe; fall through to create a new one
     }
@@ -407,6 +405,9 @@ async function handleRequest(req: Request): Promise<Response> {
     'metadata[kid_name]': [kid.first_name, kid.last_name].filter(Boolean).join(' '),
     'expand[0]': 'latest_invoice.payment_intent',
   };
+  if (mem.staff_enrollment_request_id) {
+    subParams['payment_settings[save_default_payment_method]'] = 'on_subscription';
+  }
 
   // Apply promotion code if provided (Stripe PromotionCode id, not coupon id).
   // promotion_code applies the discount to the first billing period.
@@ -425,7 +426,28 @@ async function handleRequest(req: Request): Promise<Response> {
     subParams['proration_behavior'] = 'none';
   }
 
-  let subscription = await stripePost('subscriptions', stripeKey, subParams, connectedAccountId);
+  // A mobile retry must not start a second subscription if Stripe succeeded but
+  // the database write/HTTP response was lost (even after Stripe's key expires).
+  let recoveredSubscription = existingMobileSubscription;
+  if (mem.staff_enrollment_request_id && !recoveredSubscription) {
+    const existing = await stripeGet(
+      `subscriptions?customer=${encodeURIComponent(fam.stripe_connected_customer_id)}&status=all&limit=100`,
+      stripeKey, connectedAccountId,
+    );
+    recoveredSubscription = (existing.data as Array<Record<string, unknown>> | undefined)?.find(
+      subscription => (subscription.metadata as Record<string, unknown> | undefined)?.membership_id === mem.id,
+    );
+    if (recoveredSubscription) {
+      recoveredSubscription = await stripeGet(
+        `subscriptions/${recoveredSubscription.id}?expand[]=latest_invoice.payment_intent`,
+        stripeKey, connectedAccountId,
+      );
+    }
+  }
+  let subscription = recoveredSubscription ?? await stripePost(
+    'subscriptions', stripeKey, subParams, connectedAccountId,
+    mem.staff_enrollment_request_id ? `mobile-enroll-subscription-${mem.id}` : undefined,
+  );
 
   // ── Confirm the first invoice's PaymentIntent (off-session) ────────────────
   // `payment_behavior: 'default_incomplete'` intentionally does NOT auto-charge —
@@ -485,6 +507,16 @@ async function handleRequest(req: Request): Promise<Response> {
   const currentPeriodEnd = subscription.current_period_end as number;
   const nextBillingAt = new Date(currentPeriodEnd * 1000).toISOString();
   const stripeStatus = subscription.status as string;
+  const invoicePayment = (
+    subscription.latest_invoice as { payment_intent?: { id?: string; status?: string } } | undefined
+  )?.payment_intent;
+  if (mem.staff_enrollment_request_id && invoicePayment?.id && invoicePayment.status === 'requires_payment_method') {
+    // The replacement card collected on the existing invoice must remain
+    // reusable for renewals, including when the app is interrupted afterwards.
+    await stripePost(`payment_intents/${invoicePayment.id}`, stripeKey, {
+      setup_future_usage: 'off_session',
+    }, connectedAccountId);
+  }
 
   // Map Stripe subscription status → DB membership status.
   // We do NOT unconditionally force 'active' because the first invoice may be
@@ -525,5 +557,14 @@ async function handleRequest(req: Request): Promise<Response> {
     status: subscription.status,
     current_period_end: currentPeriodEnd,
     next_billing_at: nextBillingAt,
+    ...(mem.staff_enrollment_request_id && stripeStatus !== 'active' && stripeStatus !== 'trialing' ? {
+      payment_intent_client_secret: (
+        (subscription.latest_invoice as { payment_intent?: { client_secret?: string } } | undefined)?.payment_intent
+      )?.client_secret ?? null,
+      payment_intent_status: (
+        (subscription.latest_invoice as { payment_intent?: { status?: string } } | undefined)?.payment_intent
+      )?.status ?? null,
+      connected_account_id: connectedAccountId,
+    } : {}),
   });
 }

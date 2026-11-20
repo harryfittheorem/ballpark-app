@@ -125,30 +125,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       setSession(data.session);
       if (data.session?.user) {
-        void registerForPushNotifications();
+        void registerForPushNotifications().catch(err => {
+          console.warn("[push] registration failed", err);
+        });
       }
       initializedRef.current = true;
       setLoading(false);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
+      (event, newSession) => {
+        if (!mounted) return;
         setSession(newSession);
 
-        // Register push token after successful auth session
-        if (newSession?.user) {
-          try {
-            const token = await registerForPushNotifications();
-
-            if (token) {
-              console.log("[push] token registered", token);
-
-              // TODO:
-              // Save token to Supabase once push_tokens column exists.
+        // Auth awaits subscribers while holding its session lock. Push
+        // registration calls getSession(), so it must run on a later turn,
+        // never inside the callback or on every token refresh.
+        if (event === "SIGNED_IN" && newSession?.user) {
+          setTimeout(() => {
+            if (mounted) {
+              void registerForPushNotifications().catch(err => {
+                console.warn("[push] registration failed", err);
+              });
             }
-          } catch (err) {
-            console.warn("[push] registration failed", err);
-          }
+          }, 0);
         }
       },
     );

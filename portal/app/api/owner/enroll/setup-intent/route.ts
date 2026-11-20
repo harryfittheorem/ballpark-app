@@ -33,7 +33,7 @@
  * }
  */
 import { type NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { enrollmentAuth, isMobileEnrollment } from '@/lib/enrollmentAuth';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { readAppRole, readTenantId } from '@/lib/auth';
 
@@ -47,8 +47,7 @@ function err(status: number, message: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { session } = await enrollmentAuth(req);
 
   if (!session) return err(401, 'Unauthorized');
 
@@ -161,7 +160,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Fallback: search tenant for any connected location
-  if (!connectedAccountId) {
+  if (!connectedAccountId && !isMobileEnrollment(req)) {
     const { data: fallbackLocs } = await serviceClient
       .from('locations')
       .select('stripe_account_id')
@@ -184,6 +183,7 @@ export async function POST(req: NextRequest) {
     'Stripe-Version': STRIPE_VERSION,
   };
   if (connectedAccountId) stripeHeaders['Stripe-Account'] = connectedAccountId;
+  if (isMobileEnrollment(req)) stripeHeaders['Idempotency-Key'] = `mobile-enroll-intent-${membership_id}`;
 
   let clientSecret: string;
   // Deferred OTC uses a SetupIntent (vault only, charge fires later via cron)

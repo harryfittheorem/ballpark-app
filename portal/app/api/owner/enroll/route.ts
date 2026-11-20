@@ -20,7 +20,7 @@
  * Returns: { ok: true, family_id, kid_id, membership_id }
  */
 import { type NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { enrollmentAuth, isMobileEnrollment } from '@/lib/enrollmentAuth';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { readAppRole, readTenantId } from '@/lib/auth';
 
@@ -41,8 +41,7 @@ function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; mimeType: string } 
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { session } = await enrollmentAuth(req);
 
   if (!session) return err(401, 'Unauthorized');
 
@@ -64,6 +63,7 @@ export async function POST(req: NextRequest) {
     waiver_id?: string;
     signature_image_data?: string;
     location_id?: string;
+    request_id?: string;
   };
   try {
     body = await req.json() as typeof body;
@@ -84,10 +84,29 @@ export async function POST(req: NextRequest) {
   if (!plan_id) return err(422, 'plan_id required');
   if (!waiver_id) return err(422, 'waiver_id required');
   if (!signature_image_data) return err(422, 'signature_image_data required');
+  if (![parent_first_name, parent_last_name, parent_email, kid_first_name].every(
+    value => typeof value === 'string' && value.trim().length > 0 && value.length <= 254,
+  )) return err(422, 'Invalid parent or athlete details');
+  if (typeof parent_email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parent_email)) {
+    return err(422, 'Invalid parent email');
+  }
+  if (typeof signature_image_data !== 'string' ||
+      signature_image_data.length > 1_500_000 ||
+      !signature_image_data.startsWith('data:image/png;base64,')) {
+    return err(422, 'A PNG signature is required (maximum 1 MB)');
+  }
 
   const serviceClient = createServiceClient();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  let reservedUserId: string | null = null;
+  if (isMobileEnrollment(req)) {
+    const { data: journal, error: journalError } = await serviceClient
+      .from('staff_enrollment_requests').select('parent_user_id')
+      .eq('id', body.request_id).eq('tenant_id', tenantId).eq('staff_user_id', session.user.id).maybeSingle();
+    if (journalError || !journal?.parent_user_id) return err(500, 'Could not reserve the parent account. Retry this enrollment.');
+    reservedUserId = journal.parent_user_id as string;
+  }
 
   // ── 1. Load tenant slug (required by handle_new_user trigger) + verify plan
   //       + resolve primary_location_id ────────────────────────────────────────
@@ -125,11 +144,14 @@ export async function POST(req: NextRequest) {
   if (location_id) {
     const { data: specifiedLocation } = await serviceClient
       .from('locations')
-      .select('id')
+      .select('id, stripe_account_id, stripe_onboarding_status')
       .eq('id', location_id)
       .eq('tenant_id', tenantId)
       .maybeSingle();
     if (!specifiedLocation) return err(422, 'Invalid location_id for this tenant');
+    if (isMobileEnrollment(req) && (
+      specifiedLocation.stripe_onboarding_status !== 'connected' || !specifiedLocation.stripe_account_id
+    )) return err(422, 'Stripe is not connected for this location');
     primaryLocationId = specifiedLocation.id as string;
   } else {
     // Auto-pick: use the first connected location (may be null — enrollment proceeds;
@@ -147,16 +169,33 @@ export async function POST(req: NextRequest) {
     .select('id, tenant_id')
     .eq('id', waiver_id)
     .eq('tenant_id', tenantId)
+    .eq('is_active', true)
     .single();
 
   if (waiverErr || !waiver) return err(404, 'Waiver not found');
 
   // ── 3. Check for duplicate email ───────────────────────────────────────────
-  const listRes = await fetch(
+  // The reserved Auth ID plus service-only metadata is proof that a partial
+  // account belongs to this exact request. Never adopt an unrelated duplicate.
+  let resumedUserId: string | null = null;
+  if (reservedUserId) {
+    const { data, error } = await serviceClient.auth.admin.getUserById(reservedUserId);
+    if (error && error.status !== 404) return err(502, 'Could not check the reserved parent account. Retry this enrollment.');
+    if (data?.user) {
+      if (data.user.email?.toLowerCase() !== parent_email.toLowerCase() ||
+          data.user.app_metadata?.staff_enrollment_request_id !== body.request_id ||
+          data.user.app_metadata?.staff_enrollment_tenant_id !== tenantId) {
+        return err(409, 'Reserved parent identity belongs to another account. Contact an administrator.');
+      }
+      resumedUserId = data.user.id;
+    }
+  }
+  const listRes = resumedUserId ? null : await fetch(
     `${supabaseUrl}/auth/v1/admin/users?filter=${encodeURIComponent(parent_email)}`,
     { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } },
   );
-  const listBody = await listRes.json() as { users?: Array<{ email: string; id: string }> };
+  if (listRes && !listRes.ok) return err(502, 'Could not check existing accounts. Please retry.');
+  const listBody = listRes ? await listRes.json() as { users?: Array<{ email: string; id: string }> } : { users: [] };
   const existing = (listBody.users ?? []).find((u) => u.email?.toLowerCase() === parent_email.toLowerCase());
   if (existing) {
     return err(409, `An account with email ${parent_email} already exists. Use the invite flow to add them.`);
@@ -166,7 +205,7 @@ export async function POST(req: NextRequest) {
   const tempPassword = crypto.getRandomValues(new Uint8Array(16))
     .reduce((acc, b) => acc + b.toString(16).padStart(2, '0'), '');
 
-  const createUserRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+  const createUserRes = resumedUserId ? null : await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -174,6 +213,10 @@ export async function POST(req: NextRequest) {
       Authorization: `Bearer ${serviceKey}`,
     },
     body: JSON.stringify({
+      ...(reservedUserId ? {
+        id: reservedUserId,
+        app_metadata: { staff_enrollment_request_id: body.request_id, staff_enrollment_tenant_id: tenantId },
+      } : {}),
       email: parent_email,
       password: tempPassword,
       email_confirm: true,
@@ -186,11 +229,22 @@ export async function POST(req: NextRequest) {
     }),
   });
 
-  if (!createUserRes.ok) {
+  if (createUserRes && !createUserRes.ok) {
     const createErr = await createUserRes.json().catch(() => ({})) as { msg?: string; message?: string };
-    return err(502, createErr.msg ?? createErr.message ?? 'Failed to create user account');
+    const message = createErr.msg ?? createErr.message ?? 'Failed to create user account';
+    const duplicate = /already (?:been )?(?:registered|exists)/i.test(message);
+    if (reservedUserId && duplicate) {
+      const { data, error } = await serviceClient.auth.admin.getUserById(reservedUserId);
+      // If the reserved ID exists, this may be our interrupted create. Never
+      // tell the client to discard its request before the normal resume check.
+      if (data?.user || (error && error.status !== 404)) {
+        return err(502, 'The parent account may have been created. Retry this same enrollment to resume it.');
+      }
+      return err(409, `An account with email ${parent_email} already exists. Use the invite flow to add them.`);
+    }
+    return err(duplicate ? 409 : 502, message);
   }
-  const createdUser = await createUserRes.json() as { id: string };
+  const createdUser = resumedUserId ? { id: resumedUserId } : await createUserRes!.json() as { id: string };
   const userId = createdUser.id;
 
   try {
@@ -217,7 +271,7 @@ export async function POST(req: NextRequest) {
           parent_first_name,
           parent_last_name,
           parent_email,
-          parent_phone: parent_phone ?? null,
+          parent_phone: parent_phone || null,
           ...(primaryLocationId ? { primary_location_id: primaryLocationId } : {}),
         })
         .select('id')
@@ -229,27 +283,34 @@ export async function POST(req: NextRequest) {
       familyId = newFam.id;
     } else {
       // Update the trigger-created row with full details
-      await serviceClient
+      const { error: familyUpdateError } = await serviceClient
         .from('families')
         .update({
           parent_first_name,
           parent_last_name,
           parent_email,
-          parent_phone: parent_phone ?? null,
+          parent_phone: parent_phone || null,
           tenant_id: tenantId,
           ...(primaryLocationId ? { primary_location_id: primaryLocationId } : {}),
         })
         .eq('id', familyId);
+      if (familyUpdateError) throw new Error(`Failed to update family: ${familyUpdateError.message}`);
     }
 
     // ── 6. Create kid row ──────────────────────────────────────────────────
-    const { data: newKid, error: kidErr } = await serviceClient
+    const { data: priorKid, error: priorKidError } = isMobileEnrollment(req)
+      ? await serviceClient.from('kids').select('id').eq('family_id', familyId).limit(1).maybeSingle()
+      : { data: null, error: null };
+    if (priorKidError) throw new Error(`Could not resume athlete creation: ${priorKidError.message}`);
+    // Athletes inherit their home location through family_id. The kids table
+    // has no primary_location_id column; that assignment belongs on families.
+    const { data: newKid, error: kidErr } = priorKid ? { data: priorKid, error: null } : await serviceClient
       .from('kids')
       .insert({
         family_id: familyId,
         first_name: kid_first_name,
-        last_name: kid_last_name ?? null,
-        age_group: age_group ?? null,
+        last_name: kid_last_name || null,
+        age_group: age_group || null,
       })
       .select('id')
       .single();
@@ -286,13 +347,18 @@ export async function POST(req: NextRequest) {
     const signaturePath = storagePath;
 
     // ── 8. Insert family_waivers row — required for mobile waiver-skip ────
-    const { error: waiverInsertErr } = await serviceClient
+    const { data: priorWaiver, error: priorWaiverError } = isMobileEnrollment(req)
+      ? await serviceClient.from('family_waivers').select('id')
+        .eq('family_id', familyId).eq('waiver_id', waiver_id).maybeSingle()
+      : { data: null, error: null };
+    if (priorWaiverError) throw new Error(`Could not resume waiver signature: ${priorWaiverError.message}`);
+    const { error: waiverInsertErr } = priorWaiver ? { error: null } : await serviceClient
       .from('family_waivers')
       .insert({
         family_id: familyId,
         waiver_id,
         signature_image_path: signaturePath,
-        app_version: 'portal-kiosk',
+        app_version: isMobileEnrollment(req) ? 'mobile-staff' : 'portal-kiosk',
       });
 
     if (waiverInsertErr) {
@@ -318,7 +384,8 @@ export async function POST(req: NextRequest) {
         tenant_id: tenantId,
         plan_name: typedPlan.name,
         plan_type: typedPlan.plan_type,
-        status: 'active',
+        status: isMobileEnrollment(req) ? 'pending_enrollment' : 'active',
+        ...(isMobileEnrollment(req) ? { staff_enrollment_request_id: body.request_id } : {}),
         amount_cents: typedPlan.amount_cents,
         ...(isEft && typedPlan.sessions_per_week != null ? {
           sessions_per_week: typedPlan.sessions_per_week,

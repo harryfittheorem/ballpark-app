@@ -10,6 +10,20 @@ npm run typecheck    # tsc --noEmit
 npm run lint         # eslint
 ```
 
+### Mobile staff enrollment
+
+Owners and tenant admins can open **New Family Enrollment** from the mobile staff Home screen. Parents keep the separate Add Kid flow; coaches cannot enroll families.
+
+Home refreshes saved staff claims without signing out. Owners/admins can see the enrollment action even if their saved token lacks business scope; tapping it refreshes access and refuses navigation with an explicit error unless both owner/admin role and tenant scope are present. Pull-to-refresh also refreshes staff access. HQ-only admin aliases do not grant enrollment rights.
+
+- Mobile enrollment calls the portal's `/api/mobile/enroll` endpoints with the signed-in staff access token, not an admin key. Set `EXPO_PUBLIC_PORTAL_URL` to the portal origin when bundling the native app (development and production values are configured separately).
+- Apply `supabase/migrations/20261120110000_mobile_staff_enrollment.sql` before using the new flow, and include the updated `stripe-create-subscription` function in the normal post-merge setup. This task does not apply production changes from its fork.
+- New mobile memberships remain `pending_enrollment` until payment/billing activation succeeds. The request journal and on-device pending draft allow retries without creating another family or taking another payment.
+- The journal reserves an Auth identity before account creation, so a lost Auth response resumes the same partial family. A successful recurring card setup is not proof of a paid first invoice: declines use the existing invoice PaymentIntent for card replacement, and authentication uses the native Stripe next-action handler. Neither starts a second subscription.
+- The parent welcome email links to `/auth/enrollment-password`, which sets a password using recovery proof without replacing the staff member's session.
+- Run `npm run test:staff-enrollment` for offline integration checks of the actual mobile/portal handlers and billing function. Stripe, Supabase, and email I/O are simulated; this does not certify native PaymentSheet, real card processing, or email delivery.
+- `npm run typecheck:mobile` limits TypeScript checking to the native app. Existing unrelated mobile errors may still fail this check; `npm --prefix portal run typecheck` checks the portal separately.
+
 `npm install` requires `--legacy-peer-deps`. Real testing is on a physical phone via Expo Go. Replit Deployments are not used; production ships through Expo EAS.
 
 **Portal demo data:**

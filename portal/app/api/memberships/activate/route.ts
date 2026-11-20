@@ -29,8 +29,9 @@
  */
 
 import { type NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { enrollmentAuth } from '@/lib/enrollmentAuth';
 import { readAppRole, readTenantId } from '@/lib/auth';
+import { createServiceClient } from '@/lib/supabase/serviceClient';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -86,8 +87,7 @@ async function cancelStripeSubscription(
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { supabase, session } = await enrollmentAuth(req);
   if (!session) return err(401, 'Unauthorized');
 
   const role = readAppRole(session);
@@ -117,6 +117,10 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (memErr || !mem) return err(404, 'Membership not found or access denied');
+  // Authenticated staff have SELECT-only access to billing tables. Keep that
+  // boundary: after verified role/tenant and RLS-scoped membership lookup,
+  // perform narrowly tenant-scoped writes exclusively on the server.
+  const billingClient = createServiceClient();
 
   const fam = mem.families as unknown as { stripe_connected_customer_id: string | null };
   const hasPaymentMethod = Boolean(fam.stripe_connected_customer_id);
@@ -162,11 +166,13 @@ export async function POST(req: NextRequest) {
 
   if (!shouldCreateSubscription) {
     if (mem.status !== 'active') {
-      const { error: updateErr } = await supabase
+      const { error: updateErr } = await billingClient
         .from('memberships')
         .update({ status: 'active', updated_at: new Date().toISOString() })
         .eq('id', membership_id)
-        .eq('tenant_id', tenantId);
+        .eq('tenant_id', tenantId)
+        .select('id')
+        .single();
 
       if (updateErr) return err(500, `DB error: ${updateErr.message}`);
     }
@@ -186,6 +192,7 @@ export async function POST(req: NextRequest) {
   let subscriptionId: string;
   let nextBillingAt: string | null;
   let stripeStatus: string | null = null;
+  let recoveryIntent: { client_secret: string; connected_account_id: string; intent_type: 'payment'; payment_status?: string } | undefined;
 
   try {
     const fnBody: Record<string, unknown> = { membership_id };
@@ -204,6 +211,9 @@ export async function POST(req: NextRequest) {
       subscription_id?: string;
       next_billing_at?: string;
       status?: string;
+      payment_intent_client_secret?: string | null;
+      connected_account_id?: string;
+      payment_intent_status?: string;
       error?: { message?: string };
     };
 
@@ -224,6 +234,14 @@ export async function POST(req: NextRequest) {
     subscriptionId = fnData.subscription_id;
     nextBillingAt = fnData.next_billing_at ?? null;
     stripeStatus = fnData.status ?? null;
+    if (fnData.payment_intent_client_secret && fnData.connected_account_id) {
+      recoveryIntent = {
+        client_secret: fnData.payment_intent_client_secret,
+        connected_account_id: fnData.connected_account_id,
+        intent_type: 'payment',
+        payment_status: fnData.payment_intent_status,
+      };
+    }
   } catch (fetchErr) {
     const msg = fetchErr instanceof Error ? fetchErr.message : 'Unknown error';
     console.error('[memberships/activate] fetch error:', msg);
@@ -237,16 +255,21 @@ export async function POST(req: NextRequest) {
 
   // ── 5. Mark membership active ────────────────────────────────────────────────
   const stripeConfirmedActive = stripeStatus === 'active' || stripeStatus === 'trialing';
-  if (stripeConfirmedActive && mem.status !== 'active') {
-    const { error: updateErr } = await supabase
-      .from('memberships')
-      .update({ status: 'active', updated_at: new Date().toISOString() })
-      .eq('id', membership_id)
-      .eq('tenant_id', tenantId);
-
-    if (updateErr) {
-      console.error('[memberships/activate] DB activate update failed:', updateErr.message);
-    }
+  const { error: updateErr } = await billingClient
+    .from('memberships')
+    .update({
+      stripe_subscription_id: subscriptionId,
+      ...(nextBillingAt ? { next_billing_at: nextBillingAt } : {}),
+      ...(stripeConfirmedActive ? { status: 'active' } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', membership_id)
+    .eq('tenant_id', tenantId)
+    .select('id')
+    .single();
+  if (updateErr) {
+    console.error('[memberships/activate] DB activate update failed:', updateErr.message);
+    return err(500, 'Stripe billing was created but its membership link could not be saved. Retry confirmation, not a new enrollment.');
   }
 
   // ── 6. Atomically consume promo code (SELECT FOR UPDATE) ──────────────────────
@@ -298,5 +321,6 @@ export async function POST(req: NextRequest) {
     subscription_id: subscriptionId,
     next_billing_at: nextBillingAt,
     subscription_status: stripeStatus,
+    ...(recoveryIntent ? { recovery_intent: recoveryIntent } : {}),
   });
 }

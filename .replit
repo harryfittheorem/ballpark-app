@@ -99,6 +99,10 @@ PORTAL_TENANT_ID = "00000000-0000-0000-0000-000000000001"
 
 [userenv.production]
 NEXT_PUBLIC_PORTAL_URL = "https://ballpark-app.replit.app"
+EXPO_PUBLIC_PORTAL_URL = "https://ih.fittcoaching.ai"
+
+[userenv.development]
+EXPO_PUBLIC_PORTAL_URL = "https://4799229d-16d5-4596-8bee-aa8967d74d38-00-jk387h4icuwo-4mjbmbfq.riker.replit.dev"
 
 [postMerge]
 path = "scripts/post-merge.sh"
@@ -123,6 +127,14 @@ args = "Portal dev"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "Pitch Deck"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "staff-enrollment"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "portal-types"
 
 [[workflows.workflow]]
 name = "Expo dev (proxy)"
@@ -158,3 +170,25 @@ outputType = "console"
 task = "shell.exec"
 args = "cd artifacts/pitch-deck && ./node_modules/.bin/vite --config vite.config.ts --host 0.0.0.0 --port 3001"
 waitForPort = 3001
+
+[[workflows.workflow]]
+name = "staff-enrollment"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run test:staff-enrollment"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "portal-types"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm --prefix portal run typecheck"
+
+[workflows.workflow.metadata]
+isValidation = true
