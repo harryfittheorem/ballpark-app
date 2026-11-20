@@ -1,10 +1,10 @@
 ---
 name: CRM channel direction
-description: Creator-proposed per-location SMS connectors and optional connected Gmail for the native CRM.
+description: Approved independent facility Twilio ownership; live outreach and email remain separately gated.
 ---
 
-The creator proposed: "I think we should use Twilio, and each location will have its own Twilio connector." They also suggested Gmail for email as an alternative to email through Twilio's offerings.
+Each facility connects **its own Twilio account** and sender numbers. Parent-directed communication stays inside native Clubhouse; HighLevel is not the runtime. Gmail remains a suggestion, not an approved integration.
 
-**Why:** This is the creator's stated product direction, not approval to provision services or send communications.
+**Why:** The uploaded implementation handoff explicitly settled independent facility-owned accounts after the earlier connector-only proposal.
 
-**How to apply:** Preserve per-location channel identity in CRM design. Do not equate a location connector with a settled independent-account versus managed-subaccount model. Keep Gmail versus a dedicated email service explicitly open until approved.
+**How to apply:** Do not substitute centrally managed subaccounts, a shared sender or fallback credentials. Buying numbers, live connections, real family outreach and autonomous voice require separate approval. Keep email outside the approved inquiry slice.

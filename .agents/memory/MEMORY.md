@@ -19,9 +19,10 @@
 - [Stripe test-clock list endpoint lag](stripe-test-clock-list-endpoint-lag.md) — GET /v1/subscriptions?status=active can miss test-clock subscriptions that are genuinely active; cross-check with /search before assuming a code bug.
 - [Subscription.create off_session bug pattern](stripe-subscription-create-confirm.md) — passing off_session to Subscription.create doesn't confirm the invoice PaymentIntent; must explicitly confirm when status=requires_confirmation or new subs never activate.
 - [invoice.lines period vs invoice.period_end](stripe-invoice-period-fields.md) — on renewal invoices invoice.period_end is the just-elapsed period, not the new one; use invoice.lines.data[0].period.end for next_billing_at.
-- [CRM channel direction](crm-channel-direction.md) — Twilio proposed with a connector per location; Gmail suggested for email, with account ownership and final email choice still open.
-- [CRM design-first scope](crm-design-first.md) — finalize design before implementation; shared messaging, pipelines, configurable workflows and manual/workflow tagging are requested.
+- [CRM channel direction](crm-channel-direction.md) — each facility owns its Twilio account; live outreach remains gated and email is outside the approved inquiry slice.
+- [CRM design-first scope](crm-design-first.md) — four-view synthetic inquiry journey is approved for implementation; broader campaigns, graph execution and staff privileges are not.
 - [Sandbox test port isolation](sandbox-test-ports.md) — middleware-mode Vite tests can register unwanted preview ports unless their WebSocket listener is disabled too.
+- [Isolated PostgreSQL lifecycle](isolated-postgres-lifecycle.md) — persistent rehearsals need a managed workflow; detached shell readiness may not survive the next tool call.
 - [Enrollment recovery](enrollment-recovery.md) — reserve identity before Auth creation; card setup is not first-invoice payment, and recovery must reuse the original subscription.
 - [Mobile enrollment scope](mobile-enrollment-parity.md) — keep location on screen 2; fix functional compatibility without relocating fields to match the web layout.
 - [Training replacement scope](training-replacement-scope.md) — web Operations module requested; plan first, preserve existing Trainual content and videos before transition.

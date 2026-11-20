@@ -132,6 +132,10 @@ args = "staff-enrollment"
 task = "workflow.run"
 args = "portal-types"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "CRM isolated rehearsal"
+
 [[workflows.workflow]]
 name = "Expo dev (proxy)"
 author = "agent"
@@ -188,3 +192,14 @@ args = "npm --prefix portal run typecheck"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "CRM isolated rehearsal"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python scripts/crm-preview.py && python scripts/crm-worker.py"
+
+[workflows.workflow.metadata]
+outputType = "console"

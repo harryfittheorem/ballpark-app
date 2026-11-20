@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test:crm": "cd .. && node --test portal/tests/crm.test.cjs",
     "test:navigation": "node --test tests/navigation.test.cjs",
     "test:retention": "node --test tests/retention.test.cjs tests/retention-sql.test.cjs"
   },

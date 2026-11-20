@@ -284,3 +284,31 @@ mtime_ms = 1794511281343
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/b93f9368-d166-4e77-983a-2c88d0c79b24/b36d3a5d-e955-4e2e-9eb3-b9e1aa4521b1"
 storage_version_token = "1794511346125925"
 content_type = "text/html"
+
+[[outputs]]
+id = "_xjIdKW__TL-I63Z9Kyo7"
+uri = "file://generated-artifacts/crm-evidence/casey-07-desktop-context-after-reload.png"
+type = "image"
+title = "Desktop staff CRM evidence"
+description = "Persisted inquiry, simulated completed staff call and evaluation-booked thread after reload."
+logical_id = "b4f3c781-7433-4073-aa3b-4fca8399e9e5"
+content_hash = "sha256:2bb2c9325978f68170efaf1d3b82131c4aacdbdd49403f7a680028728235a3f9"
+size = 288094
+mtime_ms = 1795204212117
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/b4f3c781-7433-4073-aa3b-4fca8399e9e5/523ed2f5-a4b7-4575-90d3-ae97d0855284"
+storage_version_token = "1795204365530646"
+content_type = "image/png"
+
+[[outputs]]
+id = "SUZ0CDUvEsdDAKCMJuYbu"
+uri = "file://generated-artifacts/crm-evidence/casey-08-phone-initial.png"
+type = "image"
+title = "Phone staff CRM evidence"
+description = "Responsive 390px overview showing two persisted evaluations; conversation and Context navigation were also verified."
+logical_id = "1851a758-af90-4d3c-abdd-e5adf942f0b5"
+content_hash = "sha256:e91aa2f94bd74cce84a7721ab2f8afcabe05c047bcd2fc206f9931e88d12d2d9"
+size = 98515
+mtime_ms = 1795204010394
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/1851a758-af90-4d3c-abdd-e5adf942f0b5/6713f283-cde7-4ca4-86e6-b021ac5bcdbf"
+storage_version_token = "1795204366365103"
+content_type = "image/png"
