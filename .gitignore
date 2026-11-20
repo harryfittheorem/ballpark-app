@@ -35,6 +35,8 @@ supabase/.env
 # Testing
 coverage/
 *.lcov
+/generated-artifacts/
+/.pythonlibs/
 
 # Logs
 *.log
