@@ -2414,6 +2414,508 @@ export type Database = {
         }
         Relationships: []
       }
+      training_assets: {
+        Row: {
+          checksum: string | null
+          created_at: string
+          filename: string
+          id: string
+          mime: string
+          path: string
+          size: number
+          status: string
+          tenant_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          checksum?: string | null
+          created_at?: string
+          filename: string
+          id?: string
+          mime: string
+          path: string
+          size: number
+          status?: string
+          tenant_id: string
+          uploaded_by: string
+        }
+        Update: {
+          checksum?: string | null
+          created_at?: string
+          filename?: string
+          id?: string
+          mime?: string
+          path?: string
+          size?: number
+          status?: string
+          tenant_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_assets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_assignments: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_name: string | null
+          assigned_by: string
+          completed_at: string | null
+          course_id: string
+          created_at: string
+          cycle: number
+          due_at: string | null
+          id: string
+          path_id: string | null
+          prerequisite_ids: string[]
+          source: string
+          tenant_id: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_name?: string | null
+          assigned_by: string
+          completed_at?: string | null
+          course_id: string
+          created_at?: string
+          cycle?: number
+          due_at?: string | null
+          id?: string
+          path_id?: string | null
+          prerequisite_ids?: string[]
+          source?: string
+          tenant_id: string
+          user_id: string
+          version: number
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_name?: string | null
+          assigned_by?: string
+          completed_at?: string | null
+          course_id?: string
+          created_at?: string
+          cycle?: number
+          due_at?: string | null
+          id?: string
+          path_id?: string | null
+          prerequisite_ids?: string[]
+          source?: string
+          tenant_id?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_assignments_course_id_version_fkey"
+            columns: ["course_id", "version"]
+            isOneToOne: false
+            referencedRelation: "training_revisions"
+            referencedColumns: ["course_id", "version"]
+          },
+          {
+            foreignKeyName: "training_assignments_path_id_fkey"
+            columns: ["path_id"]
+            isOneToOne: false
+            referencedRelation: "training_paths"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_assignments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_attempts: {
+        Row: {
+          answers: Json
+          assignment_id: string
+          created_at: string
+          id: string
+          passed: boolean
+          score: number
+        }
+        Insert: {
+          answers: Json
+          assignment_id: string
+          created_at?: string
+          id?: string
+          passed: boolean
+          score: number
+        }
+        Update: {
+          answers?: Json
+          assignment_id?: string
+          created_at?: string
+          id?: string
+          passed?: boolean
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_attempts_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "training_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_audit: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string
+          detail: Json
+          entity_id: string | null
+          id: string
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string
+          detail?: Json
+          entity_id?: string | null
+          id?: string
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          created_at?: string
+          detail?: Json
+          entity_id?: string | null
+          id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_audit_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_courses: {
+        Row: {
+          archived: boolean
+          created_at: string
+          created_by: string
+          draft: Json
+          editors: string[]
+          id: string
+          import_batch_id: string | null
+          published_version: number | null
+          source_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          archived?: boolean
+          created_at?: string
+          created_by: string
+          draft: Json
+          editors?: string[]
+          id?: string
+          import_batch_id?: string | null
+          published_version?: number | null
+          source_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string
+          draft?: Json
+          editors?: string[]
+          id?: string
+          import_batch_id?: string | null
+          published_version?: number | null
+          source_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_courses_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "training_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_courses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_history: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          record: Json
+          source_id: string
+          tenant_id: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          record: Json
+          source_id: string
+          tenant_id: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          record?: Json
+          source_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_history_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "training_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_import_batches: {
+        Row: {
+          checksum: string
+          created_at: string
+          created_by: string
+          id: string
+          imported_at: string | null
+          manifest: Json
+          rolled_back_at: string | null
+          source: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          checksum: string
+          created_at?: string
+          created_by: string
+          id?: string
+          imported_at?: string | null
+          manifest: Json
+          rolled_back_at?: string | null
+          source: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          checksum?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          imported_at?: string | null
+          manifest?: Json
+          rolled_back_at?: string | null
+          source?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_import_batches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_paths: {
+        Row: {
+          course_ids: string[]
+          created_at: string
+          description: string
+          id: string
+          tenant_id: string
+          title: string
+        }
+        Insert: {
+          course_ids: string[]
+          created_at?: string
+          description?: string
+          id?: string
+          tenant_id: string
+          title: string
+        }
+        Update: {
+          course_ids?: string[]
+          created_at?: string
+          description?: string
+          id?: string
+          tenant_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_paths_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_progress: {
+        Row: {
+          assignment_id: string
+          completed_at: string
+          lesson_id: string
+          signed_off_by: string | null
+        }
+        Insert: {
+          assignment_id: string
+          completed_at?: string
+          lesson_id: string
+          signed_off_by?: string | null
+        }
+        Update: {
+          assignment_id?: string
+          completed_at?: string
+          lesson_id?: string
+          signed_off_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_progress_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "training_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_revisions: {
+        Row: {
+          content: Json
+          course_id: string
+          published_at: string
+          published_by: string
+          version: number
+        }
+        Insert: {
+          content: Json
+          course_id: string
+          published_at?: string
+          published_by: string
+          version: number
+        }
+        Update: {
+          content?: Json
+          course_id?: string
+          published_at?: string
+          published_by?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_revisions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "training_courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_rules: {
+        Row: {
+          audience: string
+          course_id: string | null
+          created_at: string
+          due_days: number
+          enabled: boolean
+          id: string
+          path_id: string | null
+          repeat_days: number | null
+          starts_at: string
+          tenant_id: string
+          title: string
+        }
+        Insert: {
+          audience: string
+          course_id?: string | null
+          created_at?: string
+          due_days?: number
+          enabled?: boolean
+          id?: string
+          path_id?: string | null
+          repeat_days?: number | null
+          starts_at?: string
+          tenant_id: string
+          title: string
+        }
+        Update: {
+          audience?: string
+          course_id?: string | null
+          created_at?: string
+          due_days?: number
+          enabled?: boolean
+          id?: string
+          path_id?: string | null
+          repeat_days?: number | null
+          starts_at?: string
+          tenant_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_rules_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "training_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_rules_path_id_fkey"
+            columns: ["path_id"]
+            isOneToOne: false
+            referencedRelation: "training_paths"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_video_views: {
         Row: {
           id: string
@@ -2963,6 +3465,20 @@ export type Database = {
         Returns: undefined
       }
       toggle_swing_favorite: { Args: { p_swing_id: string }; Returns: boolean }
+      training_apply_rules: {
+        Args: { p_tenant: string; p_user?: string }
+        Returns: number
+      }
+      training_mutate: {
+        Args: {
+          p_action: string
+          p_actor: string
+          p_data?: Json
+          p_id: string
+          p_tenant: string
+        }
+        Returns: Json
+      }
       undo_check_in: { Args: { p_booking_id: string }; Returns: Json }
       update_assignment_for_coach: {
         Args: {
@@ -3022,12 +3538,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3051,11 +3567,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3076,11 +3592,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3101,11 +3617,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3118,11 +3634,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
