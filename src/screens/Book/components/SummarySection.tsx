@@ -12,6 +12,7 @@ import type { Tables } from '@/types/database';
 
 import { useCoaches } from '../hooks/useCoaches';
 import { useCreateBooking, isNoSessionCreditsError, type CreateBookingResult } from '../hooks/useCreateBooking';
+import { uuidv4 } from '@/utils/uuid';
 import { useActiveLocation } from '../hooks/useActiveLocation';
 import { bookSessionWithFriend, type BookWithFriendResult } from '@/api/memberships';
 import type { SessionType } from '@/api/bookings';
@@ -241,6 +242,7 @@ export default function SummarySection({
   }, [slot, date, sessionType?.id, selectedCoachId]);
 
   const formattedWhenRef = useRef<string>('');
+  const friendRequest = useRef<{ payload: string; id: string } | null>(null);
 
   const handleConfirm = async () => {
     if (!ready || createBooking.isPending || bafPending || !activeKid || outOfCredits) return;
@@ -260,6 +262,8 @@ export default function SummarySection({
     if (bafOptedIn) {
       setBafPending(true);
       try {
+        const payload = JSON.stringify([activeKid.id, slot, bafName, bafPhone, bafEmail]);
+        if (friendRequest.current?.payload !== payload) friendRequest.current = { payload, id: uuidv4() };
         const result = await withTimeout(
           bookSessionWithFriend({
             tenant_id:        family!.tenant_id,
@@ -272,6 +276,7 @@ export default function SummarySection({
             guest_name:       bafName.trim(),
             guest_phone:      bafPhone.trim() || null,
             guest_email:      bafEmail.trim() || null,
+            request_id:       friendRequest.current.id,
           }),
           BAF_TIMEOUT_MS,
           'Unable to complete booking — please try again.',
@@ -515,6 +520,9 @@ export default function SummarySection({
                     <Text style={styles.bafToggleSub}>
                       Uses 2 credits total · You earn +100 pts
                     </Text>
+                    {sessionType?.type_category === 'cage' && <Text style={styles.bafToggleSub}>
+                      Requires two available rental cages.
+                    </Text>}
                   </View>
                 </Pressable>
 

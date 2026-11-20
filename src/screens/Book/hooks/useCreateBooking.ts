@@ -1,28 +1,20 @@
 /**
  * useCreateBooking — TanStack mutation that inserts a confirmed booking.
  *
- * Flow:
- *  1. Pre-check session credits via `checkSessionCredits`.
- *     If credits = 0 → throw NoSessionCreditsError immediately (no booking
- *     row is inserted).
- *  2. Insert the booking row.
- *  3. Call `deductSessionCredit` atomically (FOR UPDATE in the RPC protects
- *     against concurrent bookings racing on the last credit).
- *     If that fails (race condition edge case) → cancel the booking and
- *     re-throw NoSessionCreditsError.
+ * The server commits booking, capacity reservation, retry receipt and credit
+ * deduction in one transaction. A lost response can be retried with the same
+ * request ID without duplicating the booking or spending another credit.
  *
  * On success: invalidates day_bookings, upcoming-session, family_bookings,
  * and active_membership (so the Me tab updates the credit badge immediately).
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRef } from 'react';
 
-import { createBooking, cancelBooking, type Booking, type BookingInsert } from '@/api/bookings';
-import {
-  checkSessionCredits,
-  deductSessionCredit,
-} from '@/api/memberships';
+import { createBooking, type Booking, type BookingInsert } from '@/api/bookings';
 import { activeMembershipKey } from '@/hooks/useActiveMembership';
+import { uuidv4 } from '@/utils/uuid';
 
 export class NoSessionCreditsError extends Error {
   readonly code = 'NO_SESSION_CREDITS' as const;
@@ -44,39 +36,14 @@ export type CreateBookingResult = {
 
 export function useCreateBooking() {
   const qc = useQueryClient();
+  const request = useRef<{ payload: string; id: string } | null>(null);
 
   return useMutation<CreateBookingResult, Error, BookingInsert>({
     mutationFn: async (input) => {
-      // ── Step 1: Pre-flight credit check (fast UX fail-fast) ──────────────
-      // Treat any RPC error as unlimited (-1) so a cold-start / network
-      // hiccup on the first call doesn't block the booking. The real
-      // race-condition guard is deductSessionCredit (FOR UPDATE in DB).
-      let remaining = -1;
-      try {
-        remaining = await checkSessionCredits(input.kid_id, input.tenant_id);
-      } catch {
-        remaining = -1;
-      }
-      if (remaining === 0) {
-        throw new NoSessionCreditsError();
-      }
-
-      // ── Step 2: Insert the booking ────────────────────────────────────────
-      const booking = await createBooking(input);
-
-      // ── Step 3: Atomically deduct one credit (FOR UPDATE race guard) ──────
-      let sessionsRemaining = -1;
-      try {
-        sessionsRemaining = await deductSessionCredit(booking.id);
-      } catch {
-        // Race condition: another concurrent booking consumed the last credit
-        // between our pre-check and the deduction. Cancel this booking and
-        // surface the error to the caller.
-        await cancelBooking(booking.id, 'no_session_credits').catch(() => undefined);
-        throw new NoSessionCreditsError();
-      }
-
-      return { booking, sessionsRemaining };
+      const payload = JSON.stringify(input);
+      if (request.current?.payload !== payload) request.current = { payload, id: uuidv4() };
+      const booking = await createBooking(input, request.current.id);
+      return { booking, sessionsRemaining: booking.sessionsRemaining };
     },
     onSuccess: (_result, input) => {
       void qc.invalidateQueries({ queryKey: ['day_bookings'] });

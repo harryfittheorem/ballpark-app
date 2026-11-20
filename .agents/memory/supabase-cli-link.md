@@ -1,10 +1,24 @@
 ---
 name: Supabase CLI project link
-description: The CLI defaults to a local "workspace" project; must be explicitly linked to production before db push or db query.
+description: Confirm the Supabase target and explicitly link the CLI before remote database operations.
 ---
 
 ## Rule
-Before running `npx supabase db push` or `npx supabase db query`, always link to the real production project:
+The user confirmed on 2026-11-20 that `ballpark-app` is development-only and serves no live customers. Earlier notes calling it production were inaccurate. It is shared by this app and its task forks, not an isolated database for each fork.
+
+**CLI query rule:** `supabase db query` defaults to the local target. Use `--linked` explicitly and put SQL after `--`, especially when a migration starts with a SQL comment.
+
+**Why:** the CLI otherwise treats leading SQL comments as command flags, and a configured project link alone does not select remote query execution.
+
+**Integration rule:** minimal SQL fixtures prove focused logic, not compatibility with the shared app's real schema and triggers.
+
+**Why:** fixture-only scheduling checks missed real tenancy and gamification behavior. Confirm integration against the approved development target before declaring booking/attendance changes complete; never substitute customer data for a development test tenant.
+
+**Why:** The user explicitly clarified the environment before authorizing scheduling migrations and test bookings.
+
+**How to apply:** Verify the intended target before remote changes. Do not infer a live deployment or isolated testing environment from the project name.
+
+Before running `npx supabase db push` or remote `npx supabase db query`, explicitly link to the confirmed target:
 
 ```bash
 SUPABASE_ACCESS_TOKEN="$SUPABASE_ACCESS_TOKEN" npx supabase link \
@@ -12,7 +26,7 @@ SUPABASE_ACCESS_TOKEN="$SUPABASE_ACCESS_TOKEN" npx supabase link \
   --password "$SUPABASE_DB_PASSWORD"
 ```
 
-Without this, `db push` connects to a non-existent local container and reports "Remote database is up to date" even when production is out of sync.
+Without this, commands can target a stale local "workspace" link and misleadingly report that no migrations remain. Use `db query --linked` for a remote query; its default is local.
 
 ## Verifying schema via Management API (when psql/db-query fail)
 Direct postgres connections (ports 5432/6543) may be blocked in the Replit sandbox. Use the Management API instead:

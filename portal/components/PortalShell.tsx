@@ -52,6 +52,7 @@ const ADMIN_NAV: NavSection[] = [
   {
     items: [
       { label: 'Check-In', href: '/admin/check-in', icon: ClipboardCheck },
+      { label: 'Schedule', href: '/admin/schedule', icon: Calendar },
       { label: 'Redemptions', href: '/admin/redemptions', icon: Sparkles },
       { label: 'Training Videos', href: '/admin/training-videos', icon: Video },
       { label: 'Messages', href: '/admin/messages', icon: MessageSquare },

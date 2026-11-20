@@ -1340,6 +1340,10 @@ export async function getRetentionData(supabase: SupabaseClient, tenantId: strin
 // ─── Schedule ───────────────────────────────────────────────────────────────
 
 export type ScheduleBooking = {
+  locationId?: string;
+  seriesId?: string;
+  occurrenceNumber?: number;
+  isCampBooking?: boolean;
   id: string;
   kidName: string;
   coachName: string;
@@ -1444,7 +1448,7 @@ export type ScheduledChargeRow = {
 };
 
 export type BookingFormCoach = { id: string; name: string };
-export type BookingFormSessionType = { id: string; name: string; category: string };
+export type BookingFormSessionType = { id: string; name: string; category: string; durationMinutes?: number };
 export type BookingFormLocation = { id: string; name: string };
 
 export type BookingFormOptions = {
@@ -1466,7 +1470,7 @@ export async function getBookingFormOptions(
       .order('first_name'),
     supabase
       .from('session_types')
-      .select('id, name, type_category')
+      .select('id, name, type_category, duration_minutes')
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .order('name'),
@@ -1485,6 +1489,7 @@ export async function getBookingFormOptions(
     id: s.id as string,
     name: s.name as string,
     category: s.type_category as string,
+    durationMinutes: s.duration_minutes as number,
   }));
   const locations: BookingFormLocation[] = (locationsRes.data ?? []).map(l => ({
     id: l.id as string,

@@ -128,12 +128,15 @@ export function BookingClient({
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [sessionTypes, setSessionTypes] = useState<SessionTypeRow[]>([]);
+  const [loadingTypes, setLoadingTypes] = useState(true);
+  const [typesError, setTypesError] = useState<string | null>(null);
+  const [typesRevision, setTypesRevision] = useState(0);
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   // ── Browse — session type is REQUIRED before seeing slots ─────────────────
   const [selectedType, setSelectedType] = useState<SessionTypeRow | null>(null);
-  const [selectedCoach, setSelectedCoach] = useState("all");
+  const bookingRequest = useRef<{ payload: string; id: string } | null>(null);
 
   // ── Browse — date strip ───────────────────────────────────────────────────
   const today = useRef(new Date());
@@ -203,10 +206,19 @@ export function BookingClient({
 
   // ── Session types ─────────────────────────────────────────────────────────
   useEffect(() => {
-    supabase
-      .rpc("get_public_session_types", { p_tenant_slug: tenantSlug })
-      .then(({ data }) => setSessionTypes((data as SessionTypeRow[]) ?? []));
-  }, [supabase, tenantSlug]);
+    let active = true;
+    setLoadingTypes(true); setTypesError(null); setSelectedType(null);
+    void (async () => {
+      try {
+        const { data, error } = await supabase.rpc("get_public_session_types", { p_tenant_slug: tenantSlug });
+        if (error) throw error;
+        if (active) setSessionTypes(((data as SessionTypeRow[]) ?? []).filter(type => ['private', 'cage'].includes(type.type_category)));
+      } catch {
+        if (active) { setSessionTypes([]); setTypesError("Session types could not be loaded. Please try again."); }
+      } finally { if (active) setLoadingTypes(false); }
+    })();
+    return () => { active = false; };
+  }, [supabase, tenantSlug, typesRevision]);
 
   // ── Availability — only load once a session type is selected ──────────────
   const loadAvailability = useCallback(async () => {
@@ -249,22 +261,12 @@ export function BookingClient({
   }, [loadKids]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const uniqueCoaches = Array.from(
-    new Map(
-      availability.map((s) => [
-        s.coach_id,
-        `${s.coach_first_name} ${s.coach_last_name}`,
-      ])
-    ).entries()
-  );
-
   // Slots for the selected date, filtered by coach, with is_available = true
-  const filteredSlots = availability.filter(
+  const filteredSlots = Array.from(new Map(availability.filter(
     (s) =>
       s.is_available &&
-      s.slot_date === selectedDate &&
-      (selectedCoach === "all" || s.coach_id === selectedCoach)
-  );
+      s.slot_date === selectedDate
+  ).map(s => [`${s.location_id}:${s.slot_date}:${s.start_time}`, s])).values());
 
   const availableDates = new Set(
     availability.filter((s) => s.is_available).map((s) => s.slot_date)
@@ -275,7 +277,6 @@ export function BookingClient({
   function handleSelectType(st: SessionTypeRow) {
     setSelectedType(st);
     sessionStorage.setItem(SS_TYPE, JSON.stringify(st));
-    setSelectedCoach("all");
   }
 
   function handleSelectSlot(slot: AvailabilitySlot) {
@@ -372,6 +373,8 @@ export function BookingClient({
       `${pendingSlot.slot_date}T${pendingSlot.start_time}`
     ).toISOString();
 
+    const payload = JSON.stringify([kidId, pendingSlot.location_id, selectedType.id, scheduledStart]);
+    if (bookingRequest.current?.payload !== payload) bookingRequest.current = { payload, id: crypto.randomUUID() };
     const db = supabase as unknown as import("@supabase/supabase-js").SupabaseClient;
     const { data, error } = await db.rpc("create_public_booking", {
       p_tenant_slug:     tenantSlug,
@@ -380,6 +383,7 @@ export function BookingClient({
       p_session_type_id: selectedType.id,
       p_kid_id:          kidId,
       p_scheduled_start: scheduledStart,
+      p_request_id:      bookingRequest.current.id,
     });
 
     if (error) {
@@ -472,7 +476,7 @@ export function BookingClient({
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-gold-deep">
             1. Choose Session Type
           </p>
-          {sessionTypes.length === 0 ? (
+          {loadingTypes ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
                 <div
@@ -481,6 +485,13 @@ export function BookingClient({
                 />
               ))}
             </div>
+          ) : typesError ? (
+            <div role="alert">
+              <p>{typesError}</p>
+              <button type="button" className="mt-2 text-gold-deep underline" onClick={() => setTypesRevision(n => n + 1)}>Retry loading session types</button>
+            </div>
+          ) : sessionTypes.length === 0 ? (
+            <p role="status" className="text-sm text-text-light">No lessons or cage rentals are currently available online. Contact the location for help.</p>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
               {sessionTypes.map((st) => {
@@ -549,41 +560,7 @@ export function BookingClient({
           </div>
         ) : (
           <>
-            {/* Coach filter */}
-            {uniqueCoaches.length > 1 && (
-              <section className="mb-5">
-                <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-gold-deep">
-                  Coach
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: "all", name: "Any Coach" },
-                    ...uniqueCoaches.map(([id, name]) => ({ id, name })),
-                  ].map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => setSelectedCoach(c.id)}
-                      style={
-                        c.id === selectedCoach
-                          ? {
-                              borderColor: "var(--bp-primary)",
-                              backgroundColor: "color-mix(in srgb, var(--bp-primary) 15%, transparent)",
-                              color: "var(--bp-primary)",
-                            }
-                          : undefined
-                      }
-                      className={
-                        c.id === selectedCoach
-                          ? "rounded-full border px-3.5 py-1 text-sm font-medium"
-                          : PILL
-                      }
-                    >
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
+            <p className="mb-5 text-sm text-text-light">Book Infinite Hitting. Your actual instructor is recorded at check-in.</p>
 
             {/* Date strip */}
             <section className="mb-6">
@@ -703,7 +680,6 @@ export function BookingClient({
                           {fmt12(slot.start_time)} – {fmt12(slot.end_time)}
                         </p>
                         <p className="truncate text-xs text-text-light">
-                          {slot.coach_first_name} {slot.coach_last_name} ·{" "}
                           {slot.location_name}
                         </p>
                       </div>
@@ -765,8 +741,7 @@ export function BookingClient({
                     {fmt12(pendingSlot.end_time)}
                   </p>
                   <p className="mt-0.5 text-xs text-text-light">
-                    {pendingSlot.coach_first_name} {pendingSlot.coach_last_name}{" "}
-                    · {pendingSlot.location_name}
+                    {pendingSlot.location_name}
                   </p>
                 </div>
               )}
@@ -1001,8 +976,7 @@ export function BookingClient({
                         {formatLongDate(pendingSlot.slot_date)} at{" "}
                         {fmt12(pendingSlot.start_time)}
                         <br />
-                        with {pendingSlot.coach_first_name}{" "}
-                        {pendingSlot.coach_last_name}
+                        at Infinite Hitting
                       </p>
                     )}
                     {confirmedId && (

@@ -1,13 +1,19 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { checkInBookingAction, markNoShowAction, undoCheckInAction } from './actions';
+import { checkInBookingAction, markNoShowAction, undoCheckInAction, fetchCheckInRoster, fetchCheckInInstructors, correctInstructorAction, fetchCheckInWaitlistCounts } from './actions';
 import { CheckCircle, XCircle, RotateCcw, Clock, UserCircle, Users } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 
 export type CheckInBooking = {
   id: string;
+  location_id: string;
+  actual_coach_id: string | null;
+  actual_coach_first_name: string | null;
+  actual_coach_last_name: string | null;
+  type_category: string;
+  can_correct_instructor: boolean;
   scheduled_start: string;
   scheduled_end: string;
   cage_number: string | null;
@@ -68,8 +74,35 @@ type Props = { initialBookings: CheckInBooking[]; waitlistCounts: WaitlistCount[
 
 export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Props) {
   const [bookings, setBookings] = useState<BookingState[]>(initialBookings);
-  const waitlistByHour = new Map(waitlistCounts.map((w) => [w.hour_label, w.count]));
+  const [liveWaitlist, setLiveWaitlist] = useState(waitlistCounts);
+  const waitlistByHour = new Map(liveWaitlist.map((w) => [w.hour_label, w.count]));
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [instructors, setInstructors] = useState<Record<string, {id: string; first_name: string; last_name: string | null}[]>>({});
+  const [chosen, setChosen] = useState<Record<string, string>>({});
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const [correcting, setCorrecting] = useState<string | null>(null);
+  const rosterVersion = useRef(0);
+
+  useEffect(() => { setBookings(initialBookings); }, [initialBookings]);
+
+  const reload = useCallback(async () => {
+    const version = ++rosterVersion.current;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    try {
+      const [rows, counts] = await Promise.all([
+        fetchCheckInRoster(today.toISOString(), tomorrow.toISOString()),
+        fetchCheckInWaitlistCounts(today.toISOString(), tomorrow.toISOString()),
+      ]);
+      if (version !== rosterVersion.current) return;
+      setLiveWaitlist(counts);
+      setBookings(rows); setRosterError(null);
+      const locations = [...new Set(rows.map(row => row.location_id))];
+      const pairs = await Promise.all(locations.map(async id => [id, await fetchCheckInInstructors(id)] as const));
+      if (version !== rosterVersion.current) return;
+      setInstructors(Object.fromEntries(pairs));
+    } catch (error) { if (version === rosterVersion.current) setRosterError(error instanceof Error ? error.message : 'Roster unavailable.'); }
+  }, []);
 
   const showToast = useCallback((msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -84,10 +117,6 @@ export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Prop
   // Realtime subscription
   useEffect(() => {
     const supabase = createClient();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today.getTime() + 86_400_000);
-
     const channel = supabase
       .channel('checkin-bookings')
       .on(
@@ -98,37 +127,19 @@ export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Prop
           table: 'bookings',
           filter: `tenant_id=eq.${tenantId}`,
         },
-        (payload) => {
-          const row = payload.new as Record<string, unknown>;
-          if (!row || !row.id) return;
-          const start = new Date(row.scheduled_start as string);
-          if (start < today || start >= tomorrow) return;
-
-          if (payload.eventType === 'DELETE') {
-            setBookings((prev) => prev.filter((b) => b.id !== (payload.old as Record<string, unknown>).id));
-            return;
-          }
-
-          setBookings((prev) => {
-            const idx = prev.findIndex((b) => b.id === row.id);
-            if (idx === -1) return prev;
-            const updated: BookingState = {
-              ...prev[idx],
-              status: row.status as string,
-              attended_at: (row.attended_at as string | null) ?? null,
-              cage_number: (row.cage_number as string | null) ?? null,
-              pending: undefined,
-            };
-            const next = [...prev];
-            next[idx] = updated;
-            return next;
-          });
-        },
+        () => { void reload(); },
       )
-      .subscribe();
-
-    return () => { void supabase.removeChannel(channel); };
-  }, [tenantId]);
+      .subscribe(status => { if (status === 'SUBSCRIBED') void reload(); });
+    void reload();
+    const timer = setInterval(() => { void reload(); }, 30000);
+    const refresh = () => { void reload(); };
+    window.addEventListener('online', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      clearInterval(timer); window.removeEventListener('online', refresh); window.removeEventListener('focus', refresh);
+      void supabase.removeChannel(channel);
+    };
+  }, [tenantId, reload]);
 
   const callRpc = useCallback(
     async (
@@ -145,7 +156,10 @@ export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Prop
         mark_no_show: markNoShowAction,
         undo_check_in: undoCheckInAction,
       };
-      const result = await actionMap[rpc](bookingId);
+      const result = await (rpc === 'check_in_booking'
+        ? checkInBookingAction(bookingId, chosen[bookingId])
+        : actionMap[rpc](bookingId))
+        .catch(error => ({ ok: false as const, message: error instanceof Error ? error.message : 'Attendance was not saved. Retry safely.' }));
 
       if (!result.ok) {
         setBookings((prev) =>
@@ -156,6 +170,7 @@ export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Prop
       }
 
       const updated = result.data;
+      ++rosterVersion.current;
       setBookings((prev) =>
         prev.map((b) =>
           b.id === bookingId
@@ -170,8 +185,9 @@ export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Prop
         undo_check_in: 'Check-in undone.',
       };
       showToast(labels[rpc] ?? 'Done.');
+      void reload();
     },
-    [showToast],
+    [showToast, chosen, reload],
   );
 
   // Group by hour slot
@@ -192,6 +208,7 @@ export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Prop
 
   return (
     <div className="space-y-8">
+      {rosterError && <p role="alert" className="text-red-400">Roster refresh failed: {rosterError} <button onClick={() => void reload()}>Retry</button></p>}
       {/* Toast */}
       {toast && (
         <div
@@ -237,7 +254,7 @@ export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Prop
 
             <div className="space-y-2">
               {slots.map((b) => {
-                const isLoading = !!b.pending;
+                const isLoading = !!b.pending || correcting === b.id;
                 const canUndo = isWithinUndo(b);
 
                 return (
@@ -256,7 +273,8 @@ export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Prop
                         <p className="mt-0.5 text-xs text-text-light">
                           {b.session_type_name ?? 'Session'}
                           {b.cage_number ? ` · Cage ${b.cage_number}` : ''}
-                          {' · '}{coachName(b)}
+                           {' · Scheduled: '}{coachName(b)}
+                           {' · Actual: '}{[b.actual_coach_first_name,b.actual_coach_last_name].filter(Boolean).join(' ') || 'Not recorded'}
                         </p>
                       </div>
 
@@ -267,11 +285,31 @@ export function CheckInBoard({ initialBookings, waitlistCounts, tenantId }: Prop
 
                       {/* Actions */}
                       <div className="flex flex-shrink-0 items-center gap-2">
+                        {b.type_category !== 'cage' && (b.status === 'pending' || b.status === 'confirmed' || (b.status === 'completed' && b.can_correct_instructor)) && (
+                          <select aria-label={`Actual instructor for ${kidName(b)}`} className="rounded border p-2 bg-darkest text-cream-light"
+                            value={chosen[b.id] ?? ''} onChange={e => setChosen(prev => ({...prev, [b.id]: e.target.value}))}>
+                            <option value="">Choose actual instructor</option>
+                            {(instructors[b.location_id] ?? []).map(c => <option key={c.id} value={c.id}>{[c.first_name,c.last_name].filter(Boolean).join(' ')}</option>)}
+                          </select>
+                        )}
+                        {b.status === 'completed' && b.can_correct_instructor && b.type_category !== 'cage' && <button disabled={!chosen[b.id] || chosen[b.id] === b.actual_coach_id || isLoading}
+                          onClick={async () => {
+                            const reason = window.prompt('Reason for instructor correction');
+                            if (!reason?.trim()) return;
+                            setCorrecting(b.id);
+                            try {
+                              const result = await correctInstructorAction(b.id, chosen[b.id], reason);
+                              showToast(result.ok ? 'Instructor corrected.' : result.message, result.ok);
+                              if (result.ok) { ++rosterVersion.current; void reload(); }
+                            } catch (error) {
+                              showToast(error instanceof Error ? error.message : 'Instructor correction failed.', false);
+                            } finally { setCorrecting(null); }
+                          }}>Correct instructor</button>}
                         {(b.status === 'confirmed' || b.status === 'pending') && (
                           <>
                             <button
                               type="button"
-                              disabled={isLoading}
+                               disabled={isLoading || (b.type_category !== 'cage' && !chosen[b.id])}
                               onClick={() => callRpc('check_in_booking', b.id, 'checkin')}
                               className="flex items-center gap-1.5 rounded-lg border border-emerald-700 bg-emerald-900/30 px-3 py-1.5 text-xs font-semibold text-emerald-400 transition hover:bg-emerald-800/50 disabled:opacity-50"
                             >

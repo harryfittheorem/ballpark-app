@@ -25,6 +25,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { AppState } from 'react-native';
+import { useAuth } from '@/hooks/useAuth';
 
 import { supabase } from '@/lib/supabase';
 import {
@@ -43,8 +45,8 @@ export type StaffBookingWithPending = StaffBooking & {
 /** True when a coach has no coachId yet (coach row is still loading). */
 type CoachIdState = string | null | undefined;
 
-function staffSessionsKey(coachId: CoachIdState) {
-  return ['staff-sessions', coachId ?? 'all'] as const;
+function staffSessionsKey(coachId: CoachIdState, actorId?: string) {
+  return ['staff-sessions', actorId, coachId ?? 'all'] as const;
 }
 
 export function isWithinUndoWindow(b: StaffBooking): boolean {
@@ -61,19 +63,21 @@ export function isWithinUndoWindow(b: StaffBooking): boolean {
  */
 export function useStaffSessions(coachId: CoachIdState, isCoach = false) {
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   // Always-current key ref — closures in realtime and mutate read this, not
   // a captured snapshot from their creation time.
-  const keyRef = useRef(staffSessionsKey(coachId));
-  keyRef.current = staffSessionsKey(coachId);
+  const keyRef = useRef(staffSessionsKey(coachId, user?.id));
+  keyRef.current = staffSessionsKey(coachId, user?.id);
 
-  const queryEnabled = isCoach ? !!coachId : true;
+  const queryEnabled = !!user && (isCoach ? !!coachId : true);
 
   const { data: fetchedBookings, isPending, isError, error, refetch } = useQuery({
     queryKey: keyRef.current,
-    queryFn: () => getTodayStaffBookings(coachId),
+    queryFn: () => getTodayStaffBookings(),
     enabled: queryEnabled,
     staleTime: 30_000,
+    refetchInterval: 30_000,
   });
 
   // Local overlay to merge optimistic pending flags on top of server data.
@@ -90,59 +94,36 @@ export function useStaffSessions(coachId: CoachIdState, isCoach = false) {
   useEffect(() => {
     if (isCoach && !coachId) return; // wait until we know which coach to scope
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today.getTime() + 86_400_000);
-
     const channel = supabase
       .channel(`mobile-checkin-bookings-${coachId ?? 'all'}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bookings' },
-        (payload) => {
-          const row = payload.new as Record<string, unknown>;
-          if (!row?.id) return;
-          const start = new Date(row.scheduled_start as string);
-          if (start < today || start >= tomorrow) return;
-
-          // Patch the live key (captured via ref, never stale).
-          qc.setQueryData<StaffBooking[]>(keyRef.current, (prev) => {
-            if (!prev) return prev;
-            const idx = prev.findIndex((b) => b.id === row.id);
-            if (idx === -1) return prev;
-            const next = [...prev];
-            next[idx] = {
-              ...next[idx],
-              status: row.status as string,
-              attended_at: (row.attended_at as string | null) ?? null,
-              cage_number: (row.cage_number as string | null) ?? null,
-            };
-            return next;
-          });
-          // Clear any pending overlay for this row.
-          setPending((p) => {
-            if (!p[row.id as string]) return p;
-            const next = { ...p };
-            delete next[row.id as string];
-            return next;
-          });
+        () => {
+          // Inserts need joined names; deletes may only contain an old key.
+          // Refetch the authorized projection rather than patching known rows.
+          void qc.invalidateQueries({ queryKey: keyRef.current });
         },
       )
-      .subscribe();
+      .subscribe(status => { if (status === 'SUBSCRIBED') void qc.invalidateQueries({ queryKey: keyRef.current }); });
+    const listener = AppState.addEventListener('change', state => {
+      if (state === 'active') void qc.invalidateQueries({ queryKey: keyRef.current });
+    });
 
-    return () => { void supabase.removeChannel(channel); };
-  }, [coachId, isCoach, qc]);  // resubscribe when coachId resolves
+    return () => { listener.remove(); void supabase.removeChannel(channel); };
+  }, [coachId, isCoach, qc, user?.id]);
 
   const mutate = useCallback(
     async (
       action: 'checkin' | 'noshow' | 'undo',
       bookingId: string,
+      actualCoachId?: string,
     ): Promise<{ ok: true } | { ok: false; message: string }> => {
       setPending((p) => ({ ...p, [bookingId]: action }));
 
       try {
         let updated: StaffBooking;
-        if (action === 'checkin') updated = await checkInBookingRpc(bookingId);
+        if (action === 'checkin') updated = await checkInBookingRpc(bookingId, actualCoachId);
         else if (action === 'noshow') updated = await markNoShowRpc(bookingId);
         else updated = await undoCheckInRpc(bookingId);
 
@@ -152,7 +133,7 @@ export function useStaffSessions(coachId: CoachIdState, isCoach = false) {
           if (!prev) return prev;
           return prev.map((b) =>
             b.id === bookingId
-              ? { ...b, status: updated.status, attended_at: updated.attended_at }
+              ? { ...b, status: updated.status, attended_at: updated.attended_at, actual_coach_id: updated.actual_coach_id }
               : b,
           );
         });

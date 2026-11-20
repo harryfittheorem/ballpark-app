@@ -11,6 +11,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { MemberDetail, BookingFormOptions } from '@/lib/supabase/ownerQueries';
 import type { DemoMemberDetail } from './demoMemberDetails';
+import { NewBookingForm } from '../../schedule/NewBookingForm';
 
 type Props = {
   member: MemberDetail | DemoMemberDetail;
@@ -260,70 +261,20 @@ function EditMemberModal({ member, onClose, onSaved }: {
   );
 }
 
-const HOURS = ['9 AM','10 AM','11 AM','12 PM','1 PM','2 PM','3 PM','4 PM','5 PM','6 PM','7 PM','8 PM','9 PM','10 PM'];
-
-function BookSessionModal({ member, bookingOptions, onClose }: {
+function BookSessionModal({ member, onClose }: {
   member: MemberDetail | DemoMemberDetail;
-  bookingOptions: BookingFormOptions;
   onClose: () => void;
 }) {
-  const { coaches, sessionTypes, locations } = bookingOptions;
-  const [coachId, setCoachId] = useState(coaches[0]?.id ?? '');
-  const [sessionTypeId, setSessionTypeId] = useState(sessionTypes[0]?.id ?? '');
-  const [locationId, setLocationId] = useState(locations[0]?.id ?? '');
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [startHour, setStartHour] = useState('9');
-  const [notes, setNotes] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-
+  const router = useRouter();
+  const [saved, setSaved] = useState<{ date: Date; count: number } | null>(null);
   const kidId = (member as MemberDetail).kidId;
-  const isDemoMember = isDemo(member);
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!kidId || !coachId || !sessionTypeId || !locationId) return;
-    const [y, mo, d] = date.split('-').map(Number);
-    const hourNum = parseInt(startHour, 10);
-    const start = new Date(y, mo - 1, d, hourNum, 0, 0, 0);
-    const end = new Date(start.getTime() + 60 * 60 * 1000);
-
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/owner/bookings/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          kid_id: kidId,
-          coach_id: coachId,
-          session_type_id: sessionTypeId,
-          location_id: locationId,
-          scheduled_start: start.toISOString(),
-          scheduled_end: end.toISOString(),
-          notes: notes.trim() || null,
-        }),
-      });
-      const data = await res.json() as { ok?: boolean; error?: string };
-      if (!res.ok || !data.ok) {
-        setError(data.error ?? `Error ${res.status}`);
-      } else {
-        setSaved(true);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (saved) {
     return (
       <ModalShell title="Session Booked" onClose={onClose}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: brand.success, fontWeight: 700, fontSize: 13 }}>
           <CheckCircle size={16} />
-          Booked for {member.name} on {date} at {HOURS[parseInt(startHour, 10) - 9] ?? `${startHour}:00`}
+          {saved.count} booking{saved.count === 1 ? '' : 's'} saved for {member.name}, starting {saved.date.toLocaleString()}.
         </div>
         <div style={{ marginTop: 16, textAlign: 'right' }}>
           <OButton variant="secondary" onClick={onClose}>Close</OButton>
@@ -334,7 +285,7 @@ function BookSessionModal({ member, bookingOptions, onClose }: {
 
   return (
     <ModalShell title={`Book Session for ${member.name}`} onClose={onClose}>
-      {isDemoMember ? (
+      {isDemo(member) || !kidId ? (
         <div style={{ fontSize: 13, color: brand.textMuted }}>
           This is a demo record and cannot have real bookings created for it.
           <div style={{ marginTop: 16, textAlign: 'right' }}>
@@ -342,58 +293,8 @@ function BookSessionModal({ member, bookingOptions, onClose }: {
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSave}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-            <div>
-              <label style={modalLabelStyle}>Session Type</label>
-              <select required style={{ ...modalInputStyle, appearance: 'auto' }} value={sessionTypeId} onChange={e => setSessionTypeId(e.target.value)}>
-                {sessionTypes.length === 0 && <option value="">No session types configured</option>}
-                {sessionTypes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={modalLabelStyle}>Coach</label>
-              <select required style={{ ...modalInputStyle, appearance: 'auto' }} value={coachId} onChange={e => setCoachId(e.target.value)}>
-                {coaches.length === 0 && <option value="">No coaches available</option>}
-                {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-            <div>
-              <label style={modalLabelStyle}>Date</label>
-              <input type="date" required style={modalInputStyle} value={date} onChange={e => setDate(e.target.value)} />
-            </div>
-            <div>
-              <label style={modalLabelStyle}>Start Time</label>
-              <select style={{ ...modalInputStyle, appearance: 'auto' }} value={startHour} onChange={e => setStartHour(e.target.value)}>
-                {HOURS.map((h, i) => <option key={h} value={String(9 + i)}>{h}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <label style={modalLabelStyle}>Location</label>
-            <select required style={{ ...modalInputStyle, appearance: 'auto' }} value={locationId} onChange={e => setLocationId(e.target.value)}>
-              {locations.length === 0 && <option value="">No locations configured</option>}
-              {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-          </div>
-          <div style={{ marginBottom: 24 }}>
-            <label style={modalLabelStyle}>Notes (optional)</label>
-            <textarea rows={3} style={{ ...modalInputStyle, resize: 'vertical', fontFamily: fonts.body }} value={notes} onChange={e => setNotes(e.target.value)} />
-          </div>
-          {error && (
-            <div style={{ padding: '8px 10px', background: brand.dangerBg, borderRadius: 6, fontSize: 12, color: brand.danger, marginBottom: 12 }}>
-              {error}
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <OButton type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</OButton>
-            <OButton type="submit" variant="gold" disabled={saving || coaches.length === 0 || sessionTypes.length === 0 || locations.length === 0}>
-              {saving ? 'Booking…' : 'Book Session'}
-            </OButton>
-          </div>
-        </form>
+        <NewBookingForm initialAthleteId={kidId} showNotes onClose={onClose}
+          onSaved={(date, count = 1) => { setSaved({ date, count }); router.refresh(); }} />
       )}
     </ModalShell>
   );
@@ -1431,7 +1332,7 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
   );
 }
 
-export function MemberDetailContent({ member: initialMember, bookingOptions, waiverStatus, waiverSignedAt }: Props) {
+export function MemberDetailContent({ member: initialMember, waiverStatus, waiverSignedAt }: Props) {
   const [m, setM] = useState(initialMember);
   const [activeModal, setActiveModal] = useState<'message' | 'edit' | 'book' | null>(null);
 
@@ -1485,7 +1386,7 @@ export function MemberDetailContent({ member: initialMember, bookingOptions, wai
         />
       )}
       {activeModal === 'book' && (
-        <BookSessionModal member={m} bookingOptions={bookingOptions} onClose={() => setActiveModal(null)} />
+        <BookSessionModal member={m} onClose={() => setActiveModal(null)} />
       )}
 
       <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>

@@ -3,7 +3,7 @@
 - [HitTrax v1.3 API flow](hittrax-v13-flow.md) — v1.3 is instant/synchronous; no email confirm; remove requires session token (AuthenticateCloudUserViaThirdParty first); all outbound are GET except CreateCloudUserAccount (POST).
 - [HitTrax poll debugging](hittrax-poll-debugging.md) — cron auth, --use-api deploy, FullPlays field names (TS/Elv/SnId/Res/PV), partial index ON CONFLICT bug, historic backfill SQL.
 - [Per-business branded sender email](per-business-sender-email.md) — shared buildEmailSender/sendResendEmail helper (duplicated portal+edge fns) replaces raw Resend fetch + flat RESEND_FROM_EMAIL everywhere.
-- [Supabase CLI project link](supabase-cli-link.md) — CLI is linked to local "workspace" not production; always re-link before db push; use management API for schema verification.
+- [Supabase target verification](supabase-cli-link.md) — ballpark-app is development-only but shared across forks; verify the linked target and real schema before migrations.
 - [JWT claims vs app_metadata](jwt-claims-app-metadata.md) — Custom Access Token Hook injects claims into JWT payload only, never into raw_app_meta_data; edge functions must decode the JWT to read tenant_id/app_role.
 - [Supabase auth callback locking](supabase-auth-callback-lock.md) — defer session-dependent work outside auth subscribers or permission refreshes can deadlock.
 - [Owner layout auth pattern](owner-layout-auth.md) — auth checks must use cookie-based createClient(), never createServiceClient() (no cookie adapter, always returns null user).
@@ -25,3 +25,4 @@
 - [Mobile enrollment scope](mobile-enrollment-parity.md) — keep location on screen 2; fix functional compatibility without relocating fields to match the web layout.
 - [Training replacement scope](training-replacement-scope.md) — web Operations module requested; plan first, preserve existing Trainual content and videos before transition.
 - [Portal route compatibility](portal-route-compatibility.md) — preserve historical Today links; never resolve player identity from a name or an arbitrary family child.
+- [Scheduling policies](scheduling-policy.md) — manual limits, normal-rule walk-ins, owner/admin corrections, all-or-nothing credits, required rental cages; camp sales disabled.

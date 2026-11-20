@@ -5,17 +5,15 @@ import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, OCard, BarChart, DonutChart } from '@/components/owner/ui';
 import { Calendar, Activity, TrendingUp, Clock, Filter, Plus, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { OwnerScheduleData, ScheduleBooking } from '@/lib/supabase/ownerQueries';
-import { fetchScheduleRange, assignCageAction } from './actions';
+import { fetchScheduleRange, assignCageAction, getSchedulingOptions } from './actions';
+import { NewBookingForm } from './NewBookingForm';
+import { CapacitySettings } from './CapacitySettings';
+import { CapacityOverrides } from './CapacityOverrides';
+import { ResourceSettings } from './ResourceSettings';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const HOURS = ['9 AM','10 AM','11 AM','12 PM','1 PM','2 PM','3 PM','4 PM','5 PM','6 PM','7 PM','8 PM','9 PM','10 PM'];
-const CAGES = ['Cage 1','Cage 2','Cage 3','Cage 4','Cage 5','Cage 6','Cage 7','Cage 8','Unassigned'];
-const CAGE_NUMBERS: Record<string, number | null> = {
-  'Cage 1': 1, 'Cage 2': 2, 'Cage 3': 3, 'Cage 4': 4,
-  'Cage 5': 5, 'Cage 6': 6, 'Cage 7': 7, 'Cage 8': 8,
-  'Unassigned': null,
-};
 const DAY_NAMES        = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 const MONTH_NAMES      = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 const MONTH_NAMES_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -87,12 +85,6 @@ function localHourLabel(iso: string): string {
   return `${hr12} ${ampm}`;
 }
 
-function todayAt(h24: number): string {
-  const d = new Date();
-  d.setHours(h24, 0, 0, 0);
-  return d.toISOString();
-}
-
 function cageLabel(cage: string | null): string { return cage ?? 'Unassigned'; }
 
 function slotsForDayHourCage(bookings: ScheduleBooking[], cage: string, hour: string): ScheduleBooking[] {
@@ -104,38 +96,13 @@ function slotsForDayHourCage(bookings: ScheduleBooking[], cage: string, hour: st
   });
 }
 
-// ── Demo data ─────────────────────────────────────────────────────────────────
-
-const DEMO_BOOKINGS: ScheduleBooking[] = [
-  { id: 'b01', kidName: 'Jake M.',   coachName: 'Mike Rodriguez', scheduledStart: todayAt(9),  scheduledEnd: todayAt(10), cage: 'Cage 1', sessionType: 'Private',     status: 'confirmed' },
-  { id: 'b02', kidName: 'Ryan C.',   coachName: 'Sarah Kim',      scheduledStart: todayAt(9),  scheduledEnd: todayAt(10), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed' },
-  { id: 'b03', kidName: 'Aiden T.',  coachName: 'Mike Rodriguez', scheduledStart: todayAt(9),  scheduledEnd: todayAt(10), cage: 'Cage 3', sessionType: 'Private',     status: 'confirmed' },
-  { id: 'b04', kidName: 'Caleb N.',  coachName: 'Dave Thompson',  scheduledStart: todayAt(10), scheduledEnd: todayAt(11), cage: 'Cage 1', sessionType: 'Group',       status: 'confirmed' },
-  { id: 'b05', kidName: 'Noah P.',   coachName: 'Sarah Kim',      scheduledStart: todayAt(10), scheduledEnd: todayAt(11), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed' },
-  { id: 'b06', kidName: 'Liam P.',   coachName: 'Dave Thompson',  scheduledStart: todayAt(11), scheduledEnd: todayAt(12), cage: 'Cage 1', sessionType: 'Cage Rental', status: 'confirmed' },
-  { id: 'b07', kidName: 'Logan S.',  coachName: 'Mike Rodriguez', scheduledStart: todayAt(11), scheduledEnd: todayAt(12), cage: 'Cage 3', sessionType: 'Private',     status: 'confirmed' },
-  { id: 'b08', kidName: 'Hunter D.', coachName: 'Sarah Kim',      scheduledStart: todayAt(12), scheduledEnd: todayAt(13), cage: 'Cage 2', sessionType: 'Cage Rental', status: 'confirmed' },
-  { id: 'b09', kidName: 'Jaxon R.',  coachName: 'Dave Thompson',  scheduledStart: todayAt(13), scheduledEnd: todayAt(14), cage: 'Cage 4', sessionType: 'Group',       status: 'confirmed' },
-  { id: 'b10', kidName: 'Zane H.',   coachName: 'Mike Rodriguez', scheduledStart: todayAt(14), scheduledEnd: todayAt(15), cage: 'Cage 1', sessionType: 'Private',     status: 'confirmed' },
-  { id: 'b11', kidName: 'Ethan B.',  coachName: 'Sarah Kim',      scheduledStart: todayAt(14), scheduledEnd: todayAt(15), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed' },
-  { id: 'b12', kidName: 'Carter S.', coachName: 'Dave Thompson',  scheduledStart: todayAt(14), scheduledEnd: todayAt(15), cage: 'Cage 3', sessionType: 'Cage Rental', status: 'confirmed' },
-  { id: 'b13', kidName: 'Marcus W.', coachName: 'Mike Rodriguez', scheduledStart: todayAt(15), scheduledEnd: todayAt(16), cage: 'Cage 1', sessionType: 'Private',     status: 'pending'   },
-  { id: 'b14', kidName: 'Owen M.',   coachName: 'Sarah Kim',      scheduledStart: todayAt(15), scheduledEnd: todayAt(16), cage: 'Cage 2', sessionType: 'Group',       status: 'confirmed' },
-  { id: 'b15', kidName: 'Tyler J.',  coachName: 'Dave Thompson',  scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 1', sessionType: 'Private',     status: 'confirmed' },
-  { id: 'b16', kidName: 'Jake M.',   coachName: 'Mike Rodriguez', scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 2', sessionType: 'Group',       status: 'confirmed' },
-  { id: 'b17', kidName: 'Aiden T.',  coachName: 'Sarah Kim',      scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 3', sessionType: 'Private',     status: 'confirmed' },
-  { id: 'b18', kidName: 'Ryan C.',   coachName: 'Dave Thompson',  scheduledStart: todayAt(16), scheduledEnd: todayAt(17), cage: 'Cage 4', sessionType: 'Cage Rental', status: 'confirmed' },
-  { id: 'b19', kidName: 'Caleb N.',  coachName: 'Mike Rodriguez', scheduledStart: todayAt(17), scheduledEnd: todayAt(18), cage: 'Cage 1', sessionType: 'Group',       status: 'confirmed' },
-  { id: 'b20', kidName: 'Noah P.',   coachName: 'Sarah Kim',      scheduledStart: todayAt(17), scheduledEnd: todayAt(18), cage: 'Cage 2', sessionType: 'Private',     status: 'confirmed' },
-];
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type ViewMode = 'day' | 'week' | 'month';
 
-type Popover = { bookingId: string; currentCage: string | null; top: number; left: number; isDemo?: boolean };
+type Popover = { bookingId: string; currentCage: string | null; top: number; left: number };
 
-type Props = { data: OwnerScheduleData; tenantId: string };
+type Props = { data: OwnerScheduleData; tenantId: string; basePath?: string };
 
 // ── Style constants ───────────────────────────────────────────────────────────
 
@@ -159,11 +126,10 @@ const labelStyle: React.CSSProperties = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function ScheduleContent({ data, tenantId }: Props) {
-  const hasLiveData = data.bookings.length > 0;
+export function ScheduleContent({ data, tenantId, basePath = '/owner/schedule' }: Props) {
   const todayDate   = useMemo(() => new Date(), []);
 
-  const [bookings,       setBookings]      = useState<ScheduleBooking[]>(hasLiveData ? data.bookings : DEMO_BOOKINGS);
+  const [bookings,       setBookings]      = useState<ScheduleBooking[]>(data.bookings);
   const [waitlistByHour, setWaitlistByHour] = useState<Map<string, number>>(new Map());
   const [loading,        setLoading]       = useState(false);
   const [popover,        setPopover]       = useState<Popover | null>(null);
@@ -176,41 +142,36 @@ export function ScheduleContent({ data, tenantId }: Props) {
   const [filterType,     setFilterType]    = useState<string>('all');
   const [filterCoach,    setFilterCoach]   = useState<string>('all');
   const [showNewBooking, setShowNewBooking] = useState(false);
+  const [showCapacity, setShowCapacity] = useState(false);
+  const [showCapacityOverrides, setShowCapacityOverrides] = useState(false);
+  const [showResources, setShowResources] = useState(false);
   const [toast,          setToast]         = useState<string | null>(null);
-  const [bookingForm,    setBookingForm]   = useState({
-    kidName: '', coachName: 'Mike Rodriguez', sessionType: 'Private',
-    date: toInputDate(new Date()), startHour: '9', cage: 'Cage 1',
-  });
+  const [revision, setRevision] = useState(0);
+  const [resources, setResources] = useState<{ location_id: string; cage_number: string; purpose: string }[]>([]);
+  const [canSchedule, setCanSchedule] = useState(false);
+  const [canSetCapacity, setCanSetCapacity] = useState(false);
+  const CAGES = useMemo(() => [...new Set([...resources.map(r => `Cage ${r.cage_number}`), ...bookings.map(b => b.cage).filter((c): c is string => !!c)])].sort().concat('Unassigned'), [resources, bookings]);
+
+  useEffect(() => {
+    let active = true;
+    getSchedulingOptions().then(result => {
+      if (active) { setResources(result.resources); setCanSchedule(result.canConfigureOverrides); setCanSetCapacity(result.canConfigureCapacity); }
+    }).catch(error => { if (active) setErrorMsg(error instanceof Error ? error.message : 'Resources unavailable.'); });
+    return () => { active = false; };
+  }, [revision, tenantId]);
 
   const popoverRef     = useRef<HTMLDivElement>(null);
   const dateInputRef   = useRef<HTMLInputElement>(null);
-  // skipOnce: true when SSR already gave us data for the initial view.
-  // The cleanup-reset pattern makes this work even under React Strict Mode,
-  // which fires effects twice on mount in development.
-  const skipOnce = useRef(hasLiveData);
 
   // ── Sync initial server data ─────────────────────────────────────────────
   useEffect(() => {
-    setBookings(prev => {
-      const local = prev.filter(b => b.id.startsWith('local-'));
-      return [...(hasLiveData ? data.bookings : DEMO_BOOKINGS), ...local];
-    });
+    setBookings(data.bookings);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.bookings]);
 
   // ── Live reload when date / view changes ─────────────────────────────────
   useEffect(() => {
     if (!tenantId) return;
-
-    // Skip the initial fetch when SSR already provided data.
-    // Return a cleanup that resets the flag so React Strict Mode's
-    // second mount also skips — without this reset, Strict Mode clears
-    // the ref on mount #1 and then fires the fetch on mount #2, wiping
-    // the SSR bookings with an empty result.
-    if (skipOnce.current) {
-      skipOnce.current = false;
-      return () => { skipOnce.current = true; };
-    }
 
     let cancelled = false;
 
@@ -234,20 +195,25 @@ export function ScheduleContent({ data, tenantId }: Props) {
           rangeEnd.toISOString(),
         );
         if (cancelled) return;
-        setBookings(prev => {
-          const local = prev.filter(bk => bk.id.startsWith('local-'));
-          return [...result.bookings, ...local];
-        });
+        setBookings(result.bookings);
         setWaitlistByHour(new Map(Object.entries(result.waitlistByHour)));
       } catch (err) {
-        if (!cancelled) console.error('[schedule] fetch error:', err);
+        if (!cancelled) setErrorMsg(err instanceof Error ? err.message : 'Schedule unavailable.');
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
 
     return () => { cancelled = true; };
-  }, [tenantId, currentDate, viewMode]);
+  }, [tenantId, currentDate, viewMode, revision]);
+
+  useEffect(() => {
+    const refresh = () => setRevision(n => n + 1);
+    const timer = setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener('online', refresh); };
+  }, []);
 
   // ── Toast auto-clear ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -265,22 +231,17 @@ export function ScheduleContent({ data, tenantId }: Props) {
     [bookings, currentDate, viewMode],
   );
 
-  const TOTAL_SLOTS  = 8 * 14;
-  const totalToday   = currentViewBookings.length > 0 ? currentViewBookings.length : (!hasLiveData ? DEMO_BOOKINGS.length : 0);
-  const occupancyPct = currentViewBookings.length > 0
-    ? Math.round((currentViewBookings.length / TOTAL_SLOTS) * 1000) / 10
-    : (!hasLiveData ? 78 : 0);
-  const openSlots    = TOTAL_SLOTS - (currentViewBookings.length > 0 ? currentViewBookings.length : (!hasLiveData ? DEMO_BOOKINGS.length : 0));
+  const totalToday   = currentViewBookings.length;
 
   const hourCounts: Record<string, number> = {};
-  const hourSource = currentViewBookings.length > 0 ? currentViewBookings : (!hasLiveData ? DEMO_BOOKINGS : []);
+  const hourSource = currentViewBookings;
   for (const b of hourSource) {
     const lbl = localHourLabel(b.scheduledStart);
     hourCounts[lbl] = (hourCounts[lbl] ?? 0) + 1;
   }
   const peakHour = Object.keys(hourCounts).length > 0
     ? Object.entries(hourCounts).sort(([, a], [, b]) => b - a)[0][0]
-    : (!hasLiveData ? '4 PM' : null);
+    : null;
 
   const hourBarData = HOURS.map(h => ({ label: h, value: hourCounts[h] ?? 0, highlight: h === peakHour }));
 
@@ -322,26 +283,26 @@ export function ScheduleContent({ data, tenantId }: Props) {
 
   const openPopover = useCallback((booking: ScheduleBooking, e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
+    if (booking.isCampBooking) {
+      setErrorMsg('Camp roster dates and resources use the camp workflow. Record daily attendance in Check-In; cancellation and refund policies remain gated.');
+      return;
+    }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setPopover({
       bookingId: booking.id,
       currentCage: booking.cage,
       top: rect.bottom + 4,
       left: rect.left,
-      isDemo: booking.id.startsWith('b') && !booking.id.startsWith('local-'),
     });
     setErrorMsg(null);
   }, []);
 
   const cancelBookingOverride = useCallback(async (bookingId: string) => {
-    if (!confirm('Cancel this booking immediately? This bypasses the cancellation policy.')) return;
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!confirm(booking?.seriesId
+      ? 'Cancel only this occurrence? Other bookings in the series will not change. This uses the existing staff cancellation override.'
+      : 'Cancel this booking immediately? This bypasses the cancellation policy.')) return;
     setPopover(null);
-    if (bookingId.startsWith('local-') || bookingId.match(/^b\d+$/)) {
-      // Demo booking — remove from local state only
-      setBookings(prev => prev.filter(b => b.id !== bookingId));
-      setToast('Demo booking cancelled (no DB write).');
-      return;
-    }
     setCancelling(bookingId);
     setErrorMsg(null);
     try {
@@ -362,22 +323,21 @@ export function ScheduleContent({ data, tenantId }: Props) {
     } finally {
       setCancelling(null);
     }
-  }, []);
+  }, [bookings]);
 
   const assignCage = useCallback(async (bookingId: string, cageName: string) => {
-    const cageNum = CAGE_NUMBERS[cageName];
+    const cageNum = cageName === 'Unassigned' ? null : cageName.replace(/^Cage /, '');
     const previous = bookings.find(b => b.id === bookingId);
     setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, cage: cageNum == null ? null : cageName } : b));
     setPopover(null);
-    if (bookingId.startsWith('local-') || !tenantId) return;
     setSaving(bookingId);
     setErrorMsg(null);
     try {
       const result = await assignCageAction(bookingId, cageNum ?? null);
       if (result.error) throw new Error(result.error);
-    } catch {
+    } catch (error) {
       if (previous) setBookings(prev => prev.map(b => b.id === bookingId ? previous : b));
-      setErrorMsg('Failed to save cage assignment. Please try again.');
+      setErrorMsg(error instanceof Error ? error.message : 'Failed to save cage assignment.');
     } finally {
       setSaving(null);
     }
@@ -401,36 +361,6 @@ export function ScheduleContent({ data, tenantId }: Props) {
     catch { input.focus(); }
   };
 
-  // ── Create booking (optimistic, no DB write) ─────────────────────────────
-  const handleNewBooking = (e: React.FormEvent) => {
-    e.preventDefault();
-    const { kidName, coachName, sessionType, date, startHour, cage } = bookingForm;
-    if (!date || !kidName.trim()) return;
-
-    const [y, mo, d] = date.split('-').map(Number);
-    const hourNum = parseInt(startHour, 10);
-    const start = new Date(y, mo - 1, d, hourNum, 0, 0, 0);
-    const end   = new Date(start.getTime() + 60 * 60 * 1000);
-
-    const newBooking: ScheduleBooking = {
-      id:             `local-${Date.now()}`,
-      kidName:        kidName.trim(),
-      coachName,
-      scheduledStart: start.toISOString(),
-      scheduledEnd:   end.toISOString(),
-      cage,
-      sessionType,
-      status: 'pending',
-    };
-
-    setBookings(prev => [...prev, newBooking]);
-    setCurrentDate(new Date(y, mo - 1, d));
-    setViewMode('day');
-    setShowNewBooking(false);
-    setBookingForm({ kidName: '', coachName: 'Mike Rodriguez', sessionType: 'Private', date: toInputDate(new Date()), startHour: '9', cage: 'Cage 1' });
-    setToast(`Booking added for ${kidName.trim()} — ${sessionType} with ${coachName}`);
-  };
-
   const viewBtn = (mode: ViewMode, label: string) => (
     <OButton variant={viewMode === mode ? 'gold' : 'ghost'} size="sm" onClick={() => setViewMode(mode)}>
       {label}
@@ -443,25 +373,31 @@ export function ScheduleContent({ data, tenantId }: Props) {
     <div onClick={() => setPopover(null)}>
       <PageHeader
         title="Schedule & Capacity"
-        subtitle={`${navLabel(currentDate, viewMode)} · 8 cages`}
+        subtitle={`${navLabel(currentDate, viewMode)} · configured resources only`}
         actions={
           <>
             <OButton variant="secondary" icon={Filter} onClick={() => setShowFilter(o => !o)}>
               Filter{(filterType !== 'all' || filterCoach !== 'all') ? ' ●' : ''}
             </OButton>
-            <OButton variant="gold" icon={Plus} onClick={() => setShowNewBooking(true)}>New Booking</OButton>
+            {canSetCapacity && <OButton variant="secondary" onClick={() => setShowCapacity(true)}>Location capacity</OButton>}
+            {canSchedule && <OButton variant="secondary" onClick={() => setShowCapacityOverrides(true)}>Dated capacity</OButton>}
+            {canSchedule && <OButton variant="gold" icon={Plus} onClick={() => setShowNewBooking(true)}>New Booking</OButton>}
           </>
         }
       />
 
       <div style={{ padding: 24 }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+          <OButton variant="secondary" onClick={() => setShowResources(true)}>Location cages</OButton>
+          <a href={`${basePath}/camps`} style={{ color: brand.goldDeep, alignSelf: 'center' }}>Camps & clinics</a>
+        </div>
 
         {/* ── KPI row ───────────────────────────────────────────────────── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           <KPICard label={isToday ? "Today's Sessions" : `${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getDate()} Sessions`} value={totalToday} deltaLabel="booked" icon={Calendar} color="gold" />
-          <KPICard label={isToday ? "Today's Occupancy" : "Day Occupancy"} value={`${occupancyPct}%`} icon={Activity} color="success" />
+          <KPICard label="Occupancy" value="—" deltaLabel="varies by location and time" icon={Activity} color="success" />
           <KPICard label="Peak Hour"  value={peakHour ?? '—'} deltaLabel="busiest slot" icon={TrendingUp} color="warning" />
-          <KPICard label="Open Slots" value={openSlots}       deltaLabel={isToday ? 'today' : 'this day'} icon={Clock} />
+          <KPICard label="Open Slots" value="—" deltaLabel="varies by location and time" icon={Clock} />
         </div>
 
         {/* ── Filter panel ─────────────────────────────────────────────── */}
@@ -543,7 +479,7 @@ export function ScheduleContent({ data, tenantId }: Props) {
             <div style={{ overflow: 'auto' }}>
               <div style={{ minWidth: 900, padding: 16 }}>
                 {/* Cage column headers */}
-                <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(8, 1fr) minmax(80px, 0.8fr)', gap: 4, marginBottom: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${CAGES.length}, minmax(80px, 1fr))`, gap: 4, marginBottom: 8 }}>
                   <div />
                   {CAGES.map(c => (
                     <div key={c} style={{ fontSize: 10, fontWeight: 700, color: c === 'Unassigned' ? brand.warning : brand.textMuted, textAlign: 'center', letterSpacing: 0.5, padding: '6px 0', background: brand.surfaceAlt, borderRadius: 4, fontStyle: c === 'Unassigned' ? 'italic' : 'normal' }}>
@@ -553,7 +489,7 @@ export function ScheduleContent({ data, tenantId }: Props) {
                 </div>
                 {/* Hour rows */}
                 {HOURS.map((hr, hi) => (
-                  <div key={hi} style={{ display: 'grid', gridTemplateColumns: '60px repeat(8, 1fr) minmax(80px, 0.8fr)', gap: 4, marginBottom: 4, minHeight: 48 }}>
+                  <div key={hi} style={{ display: 'grid', gridTemplateColumns: `60px repeat(${CAGES.length}, minmax(80px, 1fr))`, gap: 4, marginBottom: 4, minHeight: 48 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: brand.textMuted, padding: '14px 0', textAlign: 'right', paddingRight: 8 }}>
                       {hr}
                       {waitlistByHour.get(hr) ? (
@@ -571,7 +507,7 @@ export function ScheduleContent({ data, tenantId }: Props) {
                             <div
                               key={si}
                               onClick={e => openPopover(b, e)}
-                              title={`${b.kidName} · ${b.sessionType}${b.coachName ? ` · ${b.coachName}` : ''}\nClick to assign cage`}
+                              title={`${b.kidName} · ${b.sessionType}${b.coachName ? ` · ${b.coachName}` : ''}${b.occurrenceNumber ? ` · Recurring occurrence ${b.occurrenceNumber}` : ''}\nClick to assign cage to this booking only`}
                               style={{ fontSize: 9, fontWeight: 700, color: saving === b.id ? brand.textMuted : (STATUS_COLOR[b.status] ?? brand.info), lineHeight: 1.4, borderRadius: 3, padding: '1px 2px', cursor: 'pointer', userSelect: 'none' }}
                             >
                               {b.kidName}
@@ -732,7 +668,8 @@ export function ScheduleContent({ data, tenantId }: Props) {
           <div style={{ fontSize: 10, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, textTransform: 'uppercase', padding: '4px 8px 6px', borderBottom: `1px solid ${brand.border}`, marginBottom: 4 }}>
             Assign Cage
           </div>
-          {CAGES.map(cage => {
+          {!canSchedule && <p style={{ padding: 8, fontSize: 12 }}>Only owners and location admins can reassign cages.</p>}
+          {canSchedule && CAGES.map(cage => {
             const isCurrent = cageLabel(popover.currentCage) === cage;
             return (
               <button
@@ -768,6 +705,29 @@ export function ScheduleContent({ data, tenantId }: Props) {
       )}
 
       {/* ── New Booking modal ────────────────────────────────────────────── */}
+      {showResources && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div role="dialog" aria-modal="true" aria-label="Location cages" style={{ background: 'white', borderRadius: 12, width: 'min(640px,95vw)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <ResourceSettings onClose={() => setShowResources(false)} onChanged={() => setRevision(n => n + 1)} />
+          </div>
+        </div>
+      )}
+      {showCapacityOverrides && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div role="dialog" aria-modal="true" aria-label="Dated capacity override" style={{ background: 'white', borderRadius: 12, width: 'min(640px,95vw)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <CapacityOverrides onClose={() => setShowCapacityOverrides(false)} onChanged={() => setRevision(n => n + 1)} />
+          </div>
+        </div>
+      )}
+      {showCapacity && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div role="dialog" aria-modal="true" aria-label="Location capacity" style={{ background: 'white', borderRadius: 12, width: 'min(520px,95vw)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <CapacitySettings onClose={() => setShowCapacity(false)} onSaved={() => {
+              setShowCapacity(false); setRevision(n => n + 1); setToast('Location capacity saved.');
+            }} />
+          </div>
+        </div>
+      )}
       {showNewBooking && (
         <div onClick={() => setShowNewBooking(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: 480, background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
@@ -775,53 +735,10 @@ export function ScheduleContent({ data, tenantId }: Props) {
               <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>New Booking</div>
               <button type="button" onClick={() => setShowNewBooking(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}><X size={16} color={brand.textMuted} /></button>
             </div>
-            <form onSubmit={handleNewBooking} style={{ padding: 24 }}>
-              <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>Athlete Name</label>
-                <input required style={inputStyle} value={bookingForm.kidName} onChange={e => setBookingForm(f => ({ ...f, kidName: e.target.value }))} placeholder="Jake Martinez" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-                <div>
-                  <label style={labelStyle}>Session Type</label>
-                  <select style={{ ...inputStyle, appearance: 'auto' }} value={bookingForm.sessionType} onChange={e => setBookingForm(f => ({ ...f, sessionType: e.target.value }))}>
-                    <option>Private</option>
-                    <option>Group</option>
-                    <option>Cage Rental</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Coach</label>
-                  <select style={{ ...inputStyle, appearance: 'auto' }} value={bookingForm.coachName} onChange={e => setBookingForm(f => ({ ...f, coachName: e.target.value }))}>
-                    {coaches.length > 0
-                      ? coaches.map(c => <option key={c}>{c}</option>)
-                      : ['Mike Rodriguez', 'Sarah Kim', 'Dave Thompson', 'Jess Morales'].map(c => <option key={c}>{c}</option>)
-                    }
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
-                <div>
-                  <label style={labelStyle}>Date</label>
-                  <input type="date" required style={inputStyle} value={bookingForm.date} onChange={e => setBookingForm(f => ({ ...f, date: e.target.value }))} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Start Time</label>
-                  <select style={{ ...inputStyle, appearance: 'auto' }} value={bookingForm.startHour} onChange={e => setBookingForm(f => ({ ...f, startHour: e.target.value }))}>
-                    {HOURS.map((h, i) => <option key={h} value={String(9 + i)}>{h}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Cage</label>
-                  <select style={{ ...inputStyle, appearance: 'auto' }} value={bookingForm.cage} onChange={e => setBookingForm(f => ({ ...f, cage: e.target.value }))}>
-                    {CAGES.filter(c => c !== 'Unassigned').map(c => <option key={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <OButton type="button" variant="secondary" onClick={() => setShowNewBooking(false)}>Cancel</OButton>
-                <OButton type="submit" variant="gold" icon={Plus}>Create Booking</OButton>
-              </div>
-            </form>
+            <NewBookingForm onClose={() => setShowNewBooking(false)} onSaved={(date, count = 1) => {
+              setCurrentDate(date); setViewMode('day'); setRevision(n => n + 1);
+              setShowNewBooking(false); setToast(count > 1 ? `${count} recurring bookings saved.` : 'Booking saved.');
+            }} />
           </div>
         </div>
       )}

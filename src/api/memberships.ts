@@ -167,6 +167,7 @@ export async function bookSessionWithFriend(params: {
   guest_name: string;
   guest_phone?: string | null;
   guest_email?: string | null;
+  request_id?: string;
 }): Promise<BookWithFriendResult> {
   const { data, error } = await untypedClient.rpc('book_session_with_friend', {
     p_tenant_id:        params.tenant_id,
@@ -179,6 +180,7 @@ export async function bookSessionWithFriend(params: {
     p_guest_name:       params.guest_name,
     p_guest_phone:      params.guest_phone ?? null,
     p_guest_email:      params.guest_email ?? null,
+    p_request_id:       params.request_id ?? null,
   });
   if (error) throw error;
   const row = data as {

@@ -27,6 +27,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -34,6 +35,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCoach } from '@/hooks/useCoach';
 import { isWithinUndoWindow, useStaffSessions, type StaffBookingWithPending } from '@/hooks/useStaffSessions';
 import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
+import { getCheckInInstructors, correctBookingInstructor, type CheckInInstructor } from '@/api/bookings';
 
 // ─── Time formatting ──────────────────────────────────────────────────────────
 
@@ -120,12 +122,23 @@ const badgeStyles = StyleSheet.create({
 
 type RosterRowProps = {
   booking: StaffBookingWithPending;
-  onAction: (action: 'checkin' | 'noshow' | 'undo', id: string) => void;
+  onAction: (action: 'checkin' | 'noshow' | 'undo' | 'refresh', id: string, actualCoachId?: string) => void;
 };
 
 function RosterRow({ booking: b, onAction }: RosterRowProps) {
+  const [instructors, setInstructors] = useState<CheckInInstructor[]>([]);
+  const [actualCoachId, setActualCoachId] = useState('');
+  const [reason, setReason] = useState('');
+  const [instructorError, setInstructorError] = useState('');
+  const [correcting, setCorrecting] = useState(false);
+  useEffect(() => {
+    let active = true;
+    getCheckInInstructors(b.location_id).then(rows => { if (active) setInstructors(rows); })
+      .catch(error => { if (active) setInstructorError(error.message ?? 'Instructors unavailable.'); });
+    return () => { active = false; };
+  }, [b.location_id]);
   const canUndo = isWithinUndoWindow(b);
-  const isPending = !!b.pending;
+  const isPending = !!b.pending || correcting;
   const isActionable = b.status === 'confirmed' || b.status === 'pending';
   const kidName = [b.kid_first_name, b.kid_last_name].filter(Boolean).join(' ') || 'Unknown';
 
@@ -160,13 +173,43 @@ function RosterRow({ booking: b, onAction }: RosterRowProps) {
         )}
       </View>
 
+      <Text style={{ color: colors.textLight }}>
+        Actual instructor: {[b.actual_coach_first_name,b.actual_coach_last_name].filter(Boolean).join(' ') || 'Not recorded'}
+      </Text>
+      {b.type_category !== 'cage' && (isActionable || (b.status === 'completed' && b.can_correct_instructor)) && (
+        <View style={{ gap: 8 }}>
+          <Text style={{ color: colors.textLight }}>Choose actual instructor</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {instructors.map(c => <Pressable key={c.id} disabled={isPending}
+              accessibilityRole="radio" accessibilityState={{ checked: actualCoachId === c.id }}
+              onPress={() => setActualCoachId(c.id)}
+              style={{ padding: 10, borderWidth: 1, borderColor: actualCoachId === c.id ? colors.gold : colors.border, borderRadius: 6 }}>
+              <Text style={{ color: colors.cream }}>{[c.first_name,c.last_name].filter(Boolean).join(' ')}</Text>
+            </Pressable>)}
+          </View>
+          {instructors.length === 0 && <Text style={{ color: colors.textLight }}>No eligible instructors available.</Text>}
+          {b.status === 'completed' && b.can_correct_instructor && <>
+            <TextInput value={reason} onChangeText={setReason} placeholder="Reason for instructor correction" placeholderTextColor={colors.textLight}
+              accessibilityLabel="Reason for instructor correction" style={{ color: colors.cream, padding: 10, borderColor: colors.border, borderWidth: 1 }} />
+            <Pressable disabled={isPending || !actualCoachId || actualCoachId === b.actual_coach_id || !reason.trim()}
+              onPress={async () => {
+                setCorrecting(true); setInstructorError('');
+                try { await correctBookingInstructor(b.id, actualCoachId, reason); setReason(''); onAction('refresh', b.id); }
+                catch (error) { setInstructorError(error instanceof Error ? error.message : 'Correction failed.'); }
+                finally { setCorrecting(false); }
+              }}><Text style={{ color: colors.gold }}>{correcting ? 'Saving…' : 'Correct instructor'}</Text></Pressable>
+          </>}
+          {!!instructorError && <Text accessibilityRole="alert" style={{ color: '#F87171' }}>{instructorError}</Text>}
+        </View>
+      )}
+
       {/* Bottom: full-width action buttons */}
       {isActionable && (
         <View style={rosterStyles.actionRow}>
           <Pressable
             style={[rosterStyles.actionBtn, rosterStyles.btnGreen]}
-            disabled={isPending}
-            onPress={() => onAction('checkin', b.id)}
+            disabled={isPending || (b.type_category !== 'cage' && !actualCoachId)}
+            onPress={() => onAction('checkin', b.id, actualCoachId)}
             accessibilityLabel={`Check in ${kidName}`}
             accessibilityRole="button"
           >
@@ -290,7 +333,7 @@ const rosterStyles = StyleSheet.create({
 
 type SessionCardProps = {
   session: SessionGroup;
-  onAction: (action: 'checkin' | 'noshow' | 'undo', id: string) => void;
+  onAction: (action: 'checkin' | 'noshow' | 'undo' | 'refresh', id: string, actualCoachId?: string) => void;
 };
 
 function SessionCard({ session, onAction }: SessionCardProps) {
@@ -479,8 +522,9 @@ export default function SessionsBody() {
   }, []);
 
   const handleAction = useCallback(
-    async (action: 'checkin' | 'noshow' | 'undo', bookingId: string) => {
-      const result = await mutate(action, bookingId);
+    async (action: 'checkin' | 'noshow' | 'undo' | 'refresh', bookingId: string, actualCoachId?: string) => {
+      if (action === 'refresh') { await refetch(); return; }
+      const result = await mutate(action, bookingId, actualCoachId);
       if (!result.ok) {
         showToast(result.message, false);
       } else {
@@ -492,7 +536,7 @@ export default function SessionsBody() {
         showToast(labels[action] ?? 'Done.', true);
       }
     },
-    [mutate, showToast],
+    [mutate, showToast, refetch],
   );
 
   const onRefresh = useCallback(async () => {
