@@ -144,3 +144,17 @@ mtime_ms = 1795145769159
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/4a793923-3020-4cdb-8824-4a6ff2cb0af0/2008144e-0f4b-466d-821c-6514451ca63a"
 storage_version_token = "1795145799611173"
 content_type = "text/html"
+
+[[outputs]]
+id = "ADZ4JpiIs_qCo-vr25KhE"
+uri = "file://docs/crm-design/specification.html"
+type = "html"
+title = "Clubhouse CRM — Leadership design and plan"
+description = "Updated review copy with connected-screen design, tagging, workflow rules, location SMS/email boundaries, open approvals and the final verification record."
+logical_id = "b0412487-6fcc-4eec-a67a-413929183359"
+content_hash = "sha256:835f0126afe4a4f35a8f2630ac7c4eefc394f8f826f22d2d16f178ac1e379a2c"
+size = 104864
+mtime_ms = 1795149113743
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/b0412487-6fcc-4eec-a67a-413929183359/c7d5b550-0961-4811-8bd6-bd9bcc1c579f"
+storage_version_token = "1795149193894484"
+content_type = "text/html"

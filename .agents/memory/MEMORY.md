@@ -17,3 +17,5 @@
 - [Subscription.create off_session bug pattern](stripe-subscription-create-confirm.md) — passing off_session to Subscription.create doesn't confirm the invoice PaymentIntent; must explicitly confirm when status=requires_confirmation or new subs never activate.
 - [invoice.lines period vs invoice.period_end](stripe-invoice-period-fields.md) — on renewal invoices invoice.period_end is the just-elapsed period, not the new one; use invoice.lines.data[0].period.end for next_billing_at.
 - [CRM channel direction](crm-channel-direction.md) — Twilio proposed with a connector per location; Gmail suggested for email, with account ownership and final email choice still open.
+- [CRM design-first scope](crm-design-first.md) — finalize design before implementation; shared messaging, pipelines, configurable workflows and manual/workflow tagging are requested.
+- [Sandbox test port isolation](sandbox-test-ports.md) — middleware-mode Vite tests can register unwanted preview ports unless their WebSocket listener is disabled too.

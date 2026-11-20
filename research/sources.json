@@ -105,7 +105,7 @@
       "key": "journeys-01-customerio-triggers",
       "title": "Automation triggers, filters, and frequencies - Customer.io Documentation",
       "url": "https://docs.customer.io/journeys/campaign-triggers/",
-      "publicationDate": "- When relevant events were last sent",
+      "publicationDate": "Not reliably established from retrieved page; accessed 2026-11-20",
       "tier": 3,
       "evidencePath": "research/sources/journeys-01-customerio-triggers.md",
       "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"
@@ -195,7 +195,7 @@
       "key": "governance-01-twilio-messaging-policy",
       "title": "Twilio Messaging Policy | Twilio",
       "url": "https://www.twilio.com/en-us/legal/messaging-policy",
-      "publicationDate": "** April 13, 2026",
+      "publicationDate": "April 13, 2026",
       "tier": 3,
       "evidencePath": "research/sources/governance-01-twilio-messaging-policy.md",
       "scope": "Official documentation; supports described behavior, not independent superiority or availability guarantees"

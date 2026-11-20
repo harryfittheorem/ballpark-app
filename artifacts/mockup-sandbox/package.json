@@ -7,7 +7,8 @@
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
     "build": "vite build --config vite.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:crm": "node --test tests/crm-interactions.test.mjs"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -60,6 +61,7 @@
     "react": "19.1.0",
     "react-day-picker": "^9.11.1",
     "react-dom": "19.1.0",
+    "react-test-renderer": "19.1.0",
     "react-hook-form": "^7.66.0",
     "react-resizable-panels": "^2.1.9",
     "recharts": "^2.15.4",
