@@ -48,6 +48,7 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/coach") ||
     path.startsWith("/admin") ||
     path.startsWith("/hq") ||
+    path.startsWith("/training") ||
     path.startsWith("/owner");
 
   if (protectedPath && !user) {

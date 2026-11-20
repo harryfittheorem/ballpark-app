@@ -39,14 +39,16 @@ const COACH_STAFF_EXTRA: NavSection = {
     { label: 'Check-In',   href: '/coach/check-in',    icon: ClipboardCheck },
     { label: 'Families',   href: '/coach/families',    icon: Users },
     { label: 'Redemptions', href: '/coach/redemptions', icon: Sparkles },
+    { label: 'Training Playbook', href: '/training', icon: BookOpen },
   ],
 };
 
 function buildCoachNav(isStaff: boolean): NavSection[] {
-  return isStaff ? [COACH_BASE_NAV, COACH_STAFF_EXTRA] : [COACH_BASE_NAV];
+  return isStaff ? [COACH_BASE_NAV, COACH_STAFF_EXTRA] : [COACH_BASE_NAV, { label: 'Operations', items: [{ label: 'Training Playbook', href: '/training', icon: BookOpen }] }];
 }
 
 const ADMIN_NAV: NavSection[] = [
+  { label: 'Operations', items: [{ label: 'Training Playbook', href: '/training', icon: BookOpen }] },
   {
     items: [
       { label: 'Check-In', href: '/admin/check-in', icon: ClipboardCheck },
@@ -68,6 +70,7 @@ const OWNER_NAV: NavSection[] = [
       { label: 'Schedule',  href: '/owner/schedule',   icon: Calendar },
       { label: 'Check-In',  href: '/admin/check-in',   icon: ClipboardCheck },
       { label: 'Coaches',   href: '/owner/coaches',    icon: UserCog },
+      { label: 'Training Playbook',  href: '/training', icon: BookOpen },
     ],
   },
   {
