@@ -158,3 +158,17 @@ mtime_ms = 1795149113743
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/b0412487-6fcc-4eec-a67a-413929183359/c7d5b550-0961-4811-8bd6-bd9bcc1c579f"
 storage_version_token = "1795149193894484"
 content_type = "text/html"
+
+[[outputs]]
+id = "Sc_KPT7Bpp_2KfU0fi3HW"
+uri = "file://generated-artifacts/clubhouse/splash-size-proofs.png"
+type = "image"
+title = "Clubhouse splash sizing"
+description = "Layout proofs for a small phone, Android’s configured logo size, and a tablet. These are sizing proofs, not native-device screenshots."
+logical_id = "95c11c1a-6d7a-4f2d-ba94-05332f327515"
+content_hash = "sha256:67bf3800d29061f4d67550ed62497638295ea672d0b2d05cecc3bb18d48acb1d"
+size = 98134
+mtime_ms = 1795167887024
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/95c11c1a-6d7a-4f2d-ba94-05332f327515/96036c0c-a831-4bd2-a07d-bc4b0db79cf5"
+storage_version_token = "1795167996024697"
+content_type = "image/png"

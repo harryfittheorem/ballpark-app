@@ -113,7 +113,7 @@ export default function SignUpScreen({ navigation }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <Text style={styles.brand}>BALLPARK</Text>
+          <Text style={styles.brand}>CLUBHOUSE</Text>
           <Text style={styles.title}>Create your account</Text>
           <Text style={styles.subtitle}>Parents — add your kid in the next step.</Text>
 

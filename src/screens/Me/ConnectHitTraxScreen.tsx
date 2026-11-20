@@ -154,7 +154,7 @@ export default function ConnectHitTraxScreen() {
         <Text style={styles.title}>HitTrax</Text>
         <Text style={styles.subtitle}>
           Link your athlete&apos;s HitTrax account and every cage swing syncs into
-          Ballpark within ~5 minutes of a session ending.
+          Clubhouse within ~5 minutes of a session ending.
         </Text>
 
         {!kid ? (
@@ -288,7 +288,7 @@ export default function ConnectHitTraxScreen() {
                       </TouchableOpacity>
                     </View>
                     <Text style={styles.note}>
-                      Your password is used once to verify with HitTrax — it is never stored by Ballpark.
+                      Your password is used once to verify with HitTrax — it is never stored by Clubhouse.
                     </Text>
                     <Button
                       label="Connect HitTrax"

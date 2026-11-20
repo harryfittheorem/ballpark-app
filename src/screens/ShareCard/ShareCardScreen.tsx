@@ -296,7 +296,7 @@ export default function ShareCardScreen() {
                 lineHeight: 20,
               }}
             >
-              Sharing and saving are available in the{'\n'}Ballpark app on your phone.
+              Sharing and saving are available in the{'\n'}Clubhouse app on your phone.
             </Text>
           </View>
         ) : (

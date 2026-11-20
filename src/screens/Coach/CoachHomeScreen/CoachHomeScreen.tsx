@@ -64,7 +64,7 @@ export default function CoachHomeScreen() {
   }, [qc, user]);
 
   const handleSignOut = useCallback(() => {
-    Alert.alert('Sign out?', 'You will need to sign in again to use Ballpark.', [
+    Alert.alert('Sign out?', 'You will need to sign in again to use Clubhouse.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign out',

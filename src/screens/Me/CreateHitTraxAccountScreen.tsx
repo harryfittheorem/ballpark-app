@@ -245,7 +245,7 @@ export default function CreateHitTraxAccountScreen() {
             </Text>
           ) : (
             <Text style={styles.subtitle}>
-              Set up a HitTrax account to auto-import cage swings into Ballpark.
+              Set up a HitTrax account to auto-import cage swings into Clubhouse.
             </Text>
           )}
 

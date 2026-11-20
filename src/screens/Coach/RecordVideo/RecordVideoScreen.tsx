@@ -153,8 +153,8 @@ export default function RecordVideoScreen() {
         Alert.alert(
           source === 'camera' ? 'Camera access needed' : 'Photo library access needed',
           source === 'camera'
-            ? 'Ballpark needs camera access to record a video. You can enable it in Settings.'
-            : 'Ballpark needs photo library access to pick a video. You can enable it in Settings.',
+            ? 'Clubhouse needs camera access to record a video. You can enable it in Settings.'
+            : 'Clubhouse needs photo library access to pick a video. You can enable it in Settings.',
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open Settings', onPress: () => void Linking.openSettings() },

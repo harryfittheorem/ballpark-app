@@ -97,7 +97,7 @@ function PaymentSheetPresenter({ setup, onSuccess, onCancel, onError }: Presente
           setupIntentClientSecret: setup.setupIntentClientSecret,
           customerId: setup.customerId,
           customerEphemeralKeySecret: setup.ephemeralKeySecret,
-          merchantDisplayName: 'Ballpark Sports',
+          merchantDisplayName: 'Clubhouse by Infinite Hitting',
           allowsDelayedPaymentMethods: false,
           style: 'alwaysDark',
         });

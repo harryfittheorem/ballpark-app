@@ -126,7 +126,7 @@ export default function ConnectHitTraxOnboardingScreen() {
           <View>
             <Text style={styles.title}>Connect HitTrax</Text>
             <Text style={styles.subtitle}>
-              Pull your athlete&apos;s cage swings into Ballpark automatically — exit
+              Pull your athlete&apos;s cage swings into Clubhouse automatically — exit
               velo, distance, and personal bests appear within ~5 minutes of
               every session. Requires a HitTrax account.
             </Text>
@@ -208,7 +208,7 @@ export default function ConnectHitTraxOnboardingScreen() {
                       </TouchableOpacity>
                     </View>
                     <Text style={styles.note}>
-                      Your password is used once to verify with HitTrax — it is never stored by Ballpark.
+                      Your password is used once to verify with HitTrax — it is never stored by Clubhouse.
                     </Text>
                   </View>
                 ) : (

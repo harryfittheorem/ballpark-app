@@ -116,7 +116,7 @@ export default function KioskScanScreen({ navigation, route }: Props) {
           <QrCode size={56} color={colors.gold} style={styles.permIcon} />
           <Text style={styles.permTitle}>Camera access needed</Text>
           <Text style={styles.permBody}>
-            Allow camera access so Ballpark can scan the kiosk QR code and sign
+            Allow camera access so Clubhouse can scan the kiosk QR code and sign
             your athlete in at the cage automatically.
           </Text>
           {permission.canAskAgain ? (

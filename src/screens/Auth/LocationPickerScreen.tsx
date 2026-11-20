@@ -173,7 +173,7 @@ export default function LocationPickerScreen({ route, navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.brand}>BALLPARK</Text>
+        <Text style={styles.brand}>CLUBHOUSE</Text>
         <Text style={styles.title}>Choose your location</Text>
         <Text style={styles.subtitle}>Select the facility where you train.</Text>
       </View>

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Ballpark",
+    "name": "Clubhouse",
     "slug": "ballpark-app",
     "scheme": "ballpark",
     "version": "1.0.0",
@@ -74,10 +74,10 @@
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Ballpark needs camera access so coaches can record video messages for their athletes.",
-        "NSMicrophoneUsageDescription": "Ballpark needs microphone access so the audio in coach video messages is recorded.",
-        "NSPhotoLibraryUsageDescription": "Ballpark needs photo library access to let you pick videos to send to your coach and to save Share Card images to your camera roll.",
-        "NSPhotoLibraryAddUsageDescription": "Ballpark needs permission to save Share Card images to your camera roll."
+        "NSCameraUsageDescription": "Clubhouse needs camera access so coaches can record video messages for their athletes.",
+        "NSMicrophoneUsageDescription": "Clubhouse needs microphone access so the audio in coach video messages is recorded.",
+        "NSPhotoLibraryUsageDescription": "Clubhouse needs photo library access to let you pick videos to send to your coach and to save Share Card images to your camera roll.",
+        "NSPhotoLibraryAddUsageDescription": "Clubhouse needs permission to save Share Card images to your camera roll."
       }
     },
     "android": {
@@ -121,9 +121,9 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Ballpark needs camera access so coaches can record video messages for their athletes.",
-          "microphonePermission": "Ballpark needs microphone access so the audio in coach video messages is recorded.",
-          "photosPermission": "Ballpark needs photo library access to let you pick videos to send to your coach and to save Share Card images to your camera roll."
+          "cameraPermission": "Clubhouse needs camera access so coaches can record video messages for their athletes.",
+          "microphonePermission": "Clubhouse needs microphone access so the audio in coach video messages is recorded.",
+          "photosPermission": "Clubhouse needs photo library access to let you pick videos to send to your coach and to save Share Card images to your camera roll."
         }
       ],
       [

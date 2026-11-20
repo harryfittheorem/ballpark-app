@@ -29,7 +29,7 @@ export default function EmptyHomeCard({ onAddKid }: Props) {
         <View style={styles.iconCircle}>
           <UserPlus size={28} color={colors.dark} />
         </View>
-        <Text style={styles.title}>WELCOME TO BALLPARK</Text>
+        <Text style={styles.title}>WELCOME TO CLUBHOUSE</Text>
         <Text style={styles.subtitle}>
           Add your kid to start booking sessions, earning points, and watching
           videos from their coach.

@@ -231,7 +231,7 @@ export default function ShareCardArtwork({
         })}
       </View>
 
-      {/* Footer: location (if set) + date + ballpark.app wordmark */}
+      {/* Footer: location (if set) + date + mobile product name (not a URL) */}
       <View
         style={{
           position: 'absolute',
@@ -276,7 +276,7 @@ export default function ShareCardArtwork({
             letterSpacing: 2,
           }}
         >
-          ballpark.app
+          Clubhouse by Infinite Hitting
         </Text>
       </View>
     </View>

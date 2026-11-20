@@ -153,7 +153,7 @@ export default function StoreCheckoutScreen({ route, navigation }: Props) {
       // 2. Initialise the Stripe payment sheet with customer context so saved
       //    payment methods are surfaced on subsequent purchases.
       const { error: initError } = await initPaymentSheet({
-        merchantDisplayName: 'Ballpark',
+        merchantDisplayName: 'Clubhouse by Infinite Hitting',
         paymentIntentClientSecret: result.clientSecret,
         customerId: result.customerId,
         customerEphemeralKeySecret: result.ephemeralKeySecret,
@@ -448,7 +448,7 @@ export default function StoreCheckoutScreen({ route, navigation }: Props) {
 
         <Text style={styles.disclaimer}>
           {hasCard
-            ? 'Card details are processed securely by Stripe and never stored on Ballpark servers.'
+            ? 'Card details are processed securely by Stripe and never stored on Clubhouse servers.'
             : 'Points redemptions are instant and cannot be reversed.'}
         </Text>
       </ScrollView>
