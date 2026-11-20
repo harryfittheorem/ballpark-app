@@ -7,6 +7,8 @@
  * required in most queries (though we add it for clarity & index usage).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getRetentionDataset } from '@/lib/retention/queries';
+import { buildRetentionReport, lastCompletedMonth } from '@/lib/retention/engine';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -174,7 +176,8 @@ export type OwnerKPIs = {
   collectedMtd: number;
   autoPayRate: number;
   pastDue: number;
-  retentionRate: number;
+  retentionRate: number | null;
+  retentionPeriod?: string;
   sessionsToday: number;
   utilizationPct: number;
   paidToday: number;
@@ -260,11 +263,13 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
   const activeMembers = new Set(active.map(m => m.kid_id)).size;
   const totalMembers = new Set(memberships.map(m => m.kid_id)).size;
 
-  // Retention rate: active memberships / all non-cancelled memberships
-  const nonCancelled = memberships.filter(m => m.status !== 'cancelled');
-  const retentionRate = nonCancelled.length > 0
-    ? Math.round((active.length / nonCancelled.length) * 1000) / 10
-    : 100;
+  const retentionData = await getRetentionDataset(supabase, { kind: 'owner', tenantId });
+  const retentionPeriod = retentionData.locations.length
+    ? retentionData.locations.map(l => lastCompletedMonth(now, l.timezone)).sort()[0]
+    : lastCompletedMonth(now);
+  const retentionRate = buildRetentionReport(retentionData, {
+    startMonth: retentionPeriod, endMonth: retentionPeriod,
+  }).retentionRate;
 
   const events = eventsRes.data ?? [];
   const collectedMtd = events
@@ -332,6 +337,7 @@ export async function getOwnerKPIs(supabase: SupabaseClient, tenantId: string): 
     autoPayRate,
     pastDue: failedMtd,
     retentionRate,
+    retentionPeriod,
     sessionsToday,
     utilizationPct,
     paidToday,
@@ -1184,158 +1190,8 @@ export async function getPointsRewardsData(supabase: SupabaseClient, tenantId: s
 
 // ─── Retention ───────────────────────────────────────────────────────────────
 
-export type ProgramRetention = {
-  name: string;
-  retentionRate: number;
-};
-
-export type RetentionData = {
-  hasMemberships: boolean;
-  retentionRate: number;
-  avgLifetimeMonths: number;
-  churnedMtd: number;
-  cohortRetention: Array<{ cohort: string; size: number; retention: (number | null)[] }>;
-  churnReasons: Array<{ reason: string; count: number; pct: number }>;
-  programBreakdown: ProgramRetention[];
-};
-
-export async function getRetentionData(supabase: SupabaseClient, tenantId: string): Promise<RetentionData> {
-  const { data: memberships } = await supabase
-    .from('memberships')
-    .select('started_at, cancelled_at, status, plan_type')
-    .eq('tenant_id', tenantId);
-
-  const rows = memberships ?? [];
-  const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  if (rows.length === 0) {
-    return {
-      hasMemberships: false,
-      retentionRate: 100,
-      avgLifetimeMonths: 0,
-      churnedMtd: 0,
-      cohortRetention: [],
-      churnReasons: [{ reason: 'Schedule conflict / too busy', count: 0, pct: 0 }],
-      programBreakdown: [],
-    };
-  }
-
-  // ── Build the 10-month cohort grid ──────────────────────────────────────
-  // Each cohort = one calendar month. For each cohort, compute what % of
-  // members who started in that month are still with us M+1, M+2 … M+9 months later.
-  // A member is "still with us at M+N" if they had NOT cancelled before
-  // the first day of the (cohort month + N) calendar month.
-
-  const cohortRetention: RetentionData['cohortRetention'] = [];
-
-  for (let i = 9; i >= 0; i--) {
-    const cohortStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const cohortEnd   = new Date(cohortStart.getFullYear(), cohortStart.getMonth() + 1, 1);
-
-    const cohortMembers = rows.filter(m => {
-      const s = new Date(m.started_at);
-      return s >= cohortStart && s < cohortEnd;
-    });
-
-    if (cohortMembers.length === 0) continue;
-
-    const size = cohortMembers.length;
-    const retention: (number | null)[] = [];
-
-    for (let n = 0; n <= 9; n++) {
-      // Reference date: first day of cohort month + n months
-      const refDate = new Date(cohortStart.getFullYear(), cohortStart.getMonth() + n, 1);
-
-      if (refDate > now) {
-        // Future month — we can't know yet
-        retention.push(null);
-        continue;
-      }
-
-      if (n === 0) {
-        retention.push(100);
-        continue;
-      }
-
-      // A member is "still with us at M+N" if they had not left before refDate.
-      // "Left" = cancelled_at < refDate, OR (status='cancelled' with no cancelled_at timestamp).
-      // Paused members are counted as retained (they are still paying / on hold).
-      const stillActive = cohortMembers.filter(m => {
-        if (m.cancelled_at) return new Date(m.cancelled_at) >= refDate;
-        return m.status !== 'cancelled';
-      }).length;
-
-      retention.push(Math.round((stillActive / size) * 1000) / 10);
-    }
-
-    cohortRetention.push({
-      cohort: `${MONTH_LABELS[cohortStart.getMonth()]} ${cohortStart.getFullYear()}`,
-      size,
-      retention,
-    });
-  }
-
-  // ── Summary stats ────────────────────────────────────────────────────────
-
-  // Average lifetime: from started_at to cancelled_at (or now for still-active)
-  const avgLifetimeMonths = Math.round(
-    rows.reduce((s, m) => {
-      const end = m.cancelled_at ? new Date(m.cancelled_at) : now;
-      return s + (end.getTime() - new Date(m.started_at).getTime()) / (30 * 86_400_000);
-    }, 0) / rows.length * 10
-  ) / 10;
-
-  // Overall retention rate: weighted M1 rate across all cohorts that have M1 data.
-  // Falls back to snapshot (active / total) if no cohort has reached M1 yet.
-  const cohortsWithM1 = cohortRetention.filter(c => c.retention[1] !== null);
-  let retentionRate: number;
-  if (cohortsWithM1.length > 0) {
-    const totalInCohorts  = cohortsWithM1.reduce((s, c) => s + c.size, 0);
-    const retainedAtM1    = cohortsWithM1.reduce(
-      (s, c) => s + Math.round(c.size * ((c.retention[1] as number) / 100)),
-      0
-    );
-    retentionRate = Math.round((retainedAtM1 / totalInCohorts) * 1000) / 10;
-  } else {
-    const active = rows.filter(m => m.status === 'active').length;
-    retentionRate = Math.round((active / rows.length) * 1000) / 10;
-  }
-
-  // Churned this calendar month
-  const churnedMtd = rows.filter(
-    m => m.cancelled_at && new Date(m.cancelled_at) >= monthStart
-  ).length;
-
-  // ── Program breakdown ────────────────────────────────────────────────────
-
-  const programBreakdown: ProgramRetention[] = [];
-
-  const addProgramSegment = (label: string, segment: typeof rows) => {
-    if (segment.length === 0) return;
-    const active = segment.filter(m => m.status === 'active').length;
-    programBreakdown.push({
-      name: label,
-      retentionRate: Math.round((active / segment.length) * 1000) / 10,
-    });
-  };
-
-  addProgramSegment('EFT Monthly',  rows.filter(m => m.plan_type === 'eft'));
-  addProgramSegment('OTC Packages', rows.filter(m => m.plan_type === 'otc'));
-  const unknownRows = rows.filter(m => !m.plan_type || !['eft', 'otc'].includes(m.plan_type));
-  addProgramSegment('Unknown',      unknownRows);
-
-  return {
-    hasMemberships: true,
-    retentionRate,
-    avgLifetimeMonths,
-    churnedMtd,
-    cohortRetention,
-    churnReasons: [{ reason: 'Schedule conflict / too busy', count: 0, pct: 0 }],
-    programBreakdown,
-  };
-}
+/** Compatibility export: all retention consumers use the same evidence contract. */
+export { getRetentionDataset } from '@/lib/retention/queries';
 
 // ─── Schedule ───────────────────────────────────────────────────────────────
 

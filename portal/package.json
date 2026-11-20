@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:navigation": "node --test tests/navigation.test.cjs"
+    "test:navigation": "node --test tests/navigation.test.cjs",
+    "test:retention": "node --test tests/retention.test.cjs tests/retention-sql.test.cjs"
   },
   "dependencies": {
     "@mux/mux-player-react": "^3.13.0",

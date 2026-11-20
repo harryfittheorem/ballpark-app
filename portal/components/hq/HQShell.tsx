@@ -18,6 +18,7 @@ const hqNav: NavItem[] = [
   { label: 'Locations', href: '/hq/locations', icon: MapPin },
   { label: 'Team', href: '/hq/team', icon: Users },
   { label: 'Revenue', href: '/hq/revenue', icon: DollarSign },
+  { label: 'Network Churn & LTV', href: '/hq/churn-analysis', icon: Globe2 },
 ];
 
 interface HQShellProps {

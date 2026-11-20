@@ -26,3 +26,4 @@
 - [Training replacement scope](training-replacement-scope.md) — web Operations module requested; plan first, preserve existing Trainual content and videos before transition.
 - [Portal route compatibility](portal-route-compatibility.md) — preserve historical Today links; never resolve player identity from a name or an arbitrary family child.
 - [Scheduling policies](scheduling-policy.md) — manual limits, normal-rule walk-ins, owner/admin corrections, all-or-nothing credits, required rental cages; camp sales disabled.
+- [Retention approval and evidence](retention-approval-evidence.md) — candidate policies are not approval; unknown prior segments stay unknown and late edits cannot rewrite closed periods.
