@@ -32,4 +32,4 @@
 - [Scheduling policies](scheduling-policy.md) — manual limits, normal-rule walk-ins, owner/admin corrections, all-or-nothing credits, required rental cages; camp sales disabled.
 - [Retention approval and evidence](retention-approval-evidence.md) — candidate policies are not approval; unknown prior segments stay unknown and late edits cannot rewrite closed periods.
 - [Coaching access policy](coaching-access-policy.md) — private lesson notes are author-only; no implicit GM or corporate readership.
-- [Supabase Node runtime](supabase-node-runtime.md) — standalone Node 20 clients need explicit `ws` transport even for Auth/REST-only checks.
+- [Supabase acceptance runtime](supabase-node-runtime.md) — Node clients need `ws`; browser QA needs correctly chunked cookies and in-process, test-session-only cleanup.

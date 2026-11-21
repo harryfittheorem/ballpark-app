@@ -3,9 +3,12 @@
 ## Approved boundary
 
 Approved location: **Frisco Academy**. The creator named an existing account as
-the pilot operator. A read-only check confirmed that account exists but found
-**no explicit Frisco grant**. No role or grant was created. No real sender, receiving staff number or separate
-callback handset was provided.
+the pilot operator, then explicitly approved adding that owner's Frisco access.
+The canonical token hook confirmed the existing owner role and tenant before
+the narrow development-data change. The resulting account has **one Frisco
+grant and zero other-location grants**. No role, password or account metadata
+was changed. No real sender, receiving staff number or separate callback
+handset was provided.
 
 **Real-provider verification remains pending.** No number purchase, live routing
 change, family outreach, email integration, payment processing or production
@@ -13,9 +16,10 @@ publication is authorized by this delivery.
 
 The implementation is based on main revision `08c13382`, including the merged
 native CRM foundation, actual-coach scheduling, staff enrollment and scheduler
-integrity/capacity work. The pending mobile coaching “staff phone” work is not a
-Twilio telephony implementation. No separate existing telephony adapter was
-found in current main.
+integrity/capacity work. The mobile coaching “staff phone” work subsequently
+merged at `0fd6f21f`; it is not a Twilio telephony implementation. It remains
+intact and is not replaced by this pilot. No separate existing telephony
+adapter was found in current main.
 
 ## Implemented
 
@@ -118,10 +122,11 @@ substituted for non-owner front-desk permission proof.
 
 **Not verified. No real SMS or call was attempted.**
 
-Still required:
+Provider readiness and remaining gates:
 
-1. Explicit existing operator role and Frisco location grant; if the desired
-   front-desk user is not already an authorized admin, a separate role decision.
+1. The approved owner's role and Frisco grant are now confirmed. A different
+   non-owner front-desk operator still requires its own explicit role/location
+   approval and permission verification; owner evidence does not prove that path.
 2. Frisco-owned Twilio account and approved server-only credential reference.
    No shared token or arbitrary existing workspace account may be substituted.
 3. Approved dedicated staging sender and allowlisted receiving staff number and
@@ -134,12 +139,16 @@ Still required:
 6. Actual inbound/reply/delivery-failure/voice-leg/booking/pause evidence from
    that approved staff-only run, with numbers and credentials redacted.
 
-The provider rehearsal also needs an explicitly confirmed **non-production
-backend target** with these migrations installed. This delivery applied them
-only to the representative private PostgreSQL rehearsal, not to shared
-Supabase or production. Preview is simulation-only even if its binding is
-mistakenly changed. Do not enable real transport by repurposing that preview,
-resetting shared development data or silently choosing another backend.
+The provider rehearsal also needs a confirmed **non-production backend
+configuration**. Initial schema checks used the representative private
+PostgreSQL rehearsal. A read-only follow-up after the coaching merge found
+the CRM and pilot tables already present in shared development Supabase, but
+**Frisco has no pilot configuration, no CRM connection binding and no active
+provider pilot**. This access-approval step did not run remote migrations.
+Table presence alone is not provider verification. Preview remains
+simulation-only even if its binding is mistakenly changed. Do not enable real
+transport by repurposing that preview, resetting shared development data or
+silently choosing another backend. Production remains outside this task.
 
 ## Reproduce safely
 
@@ -224,20 +233,66 @@ Evidence is stored under ignored
 sign-in screenshots and authorization-boundary JSON. The same test run then
 continued with the creator's approved account and location.
 
-Read-only development checks confirmed the account exists and its metadata
-identifies it as an owner, but `staff_locations` contains **zero grants for that
-account and zero grants for Frisco Academy**. No test session was issued, no
-role or grant was changed, and no authenticated walkthrough was claimed.
+Initial read-only development checks found no location grants for the approved
+account. The creator subsequently explicitly approved Frisco-only access.
+After rechecking the canonical token hook, tenant, location, confirmed identity
+and account status, one matching `staff_locations` row was inserted.
+Verification confirmed **one Frisco grant and zero other-location grants**.
+No role, password or metadata change was made. The previously blocked
+normal-auth owner walkthrough then continued against synthetic data only.
+Its result is recorded below, separately from this access change.
 A new grant is an access decision, not a test-fixture repair.
 
-Decision required: approve a Frisco grant for the named account through the
-normal access-management process, or select another operator and explicitly
-approve that operator's necessary access. A location grant is a real access
-change and may affect other location-scoped staff tools; it is not limited to
-the rehearsal screen.
+The Frisco-only location-access decision is now approved and applied. It is
+not limited to the rehearsal screen; other Frisco-scoped staff tools may also
+honor this real grant. No other location access or role elevation was added.
 
-The ignored Frisco/operator scope binding is recorded as a **restriction**:
-it does not create access, and the portal must still reject the missing grant.
-The named account cannot currently complete either the normal CRM path or the
-approved Frisco rehearsal path. Even after that access decision, an owner-only
-walkthrough would not prove non-owner front-desk access.
+The ignored Frisco/operator scope binding remains a **restriction**, not a
+permission source. Each request still requires the real cookie role and source
+location grant before accessing synthetic records. Revoking that source grant
+must block the rehearsal again. An owner-only walkthrough does not prove
+non-owner front-desk access.
+
+### Signed-in owner desktop and phone result
+
+**Passed: 21 checks**, at **1440×960 desktop** and **390×844 phone**.
+The real owner cookie identity and Frisco source grant were checked before
+mapping operations to the private synthetic rehearsal. This is owner-only
+evidence, not a non-owner front-desk permission claim.
+
+- Overview and rehearsal banner loaded at both sizes with no horizontal
+  overflow.
+- Inbox opened a synthetic conversation with staff queue and simulated
+  acceptance evidence.
+- Private notes saved at both sizes; no parent message was sent.
+- Availability lookup ran without creating a booking. Phone users could open
+  context and return to the conversation.
+- Owner configuration saved **paused**, assigned the approved operator and
+  used simulation-only approval text and fixture numbers.
+- Explicit `STAFF ONLY` confirmation started the simulated pilot; repeated
+  start/pause transitions worked. The final isolated state is **paused**.
+- Phone readiness and pause/refresh/disconnect/restore labels were visible.
+
+The final browser run reported no page errors. One resource returned **404**;
+the resource was not identified. It did not prevent the checked interactions,
+but is not claimed fixed.
+
+Earlier test-harness attempts failed before completion because of session
+handoff, cookie sizing and selector setup, not a confirmed CRM defect.
+The successful run kept session minting, chunked SSR cookies, browser contexts
+and cleanup in one process. Its session was revoked with local scope in
+`finally`; no global sign-out was used. Two earlier abandoned test sessions
+were removed individually; existing user sessions were not changed.
+
+Retained evidence under `generated-artifacts/crm-pilot-evidence/`:
+`owner-desktop-*.png`, `owner-phone-*.png` and
+`owner-walkthrough-results.json`. These contain synthetic CRM records only.
+Repeated walkthrough attempts left synthetic notes and control history in the
+private fixture; no fixture reset was performed afterward.
+
+The browser pass did **not** exercise SMS/call dispatch, callback resolution or
+real provider delivery. Those still have the separately labeled backend/
+transport-double evidence above, not browser or real-provider proof.
+Non-owner front-desk access and the approved staff-number provider rehearsal
+remain unverified. No shared CRM records, member bookings, roles or provider
+configuration were changed by the walkthrough.
