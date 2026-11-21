@@ -1,6 +1,7 @@
 - [Expo Go proxy domain](expo-proxy-domain.md) — use REPLIT_DEV_DOMAIN (not REPLIT_EXPO_DEV_DOMAIN) as EXPO_MANIFEST_PROXY_URL; the expo subdomain doesn't route to the portal.
 - [Leadership scope boundaries](leadership-scope-decisions.md) — native CRM, full Mindbody exit, manual performance baseline; payment approach and staff packaging still need approval.
 - [Portal port routing](portal-port-routing.md) — portal must run on port 5000 (webview); port 3000 breaks preview pane and Stripe Connect callbacks.
+- [Preview build isolation](preview-build-isolation.md) — post-merge setup runs before workflow restart; never delete or rebuild the active development output.
 - [HitTrax v1.3 API flow](hittrax-v13-flow.md) — v1.3 is instant/synchronous; no email confirm; remove requires session token (AuthenticateCloudUserViaThirdParty first); all outbound are GET except CreateCloudUserAccount (POST).
 - [HitTrax poll debugging](hittrax-poll-debugging.md) — cron auth, --use-api deploy, FullPlays field names (TS/Elv/SnId/Res/PV), partial index ON CONFLICT bug, historic backfill SQL.
 - [Per-business branded sender email](per-business-sender-email.md) — shared buildEmailSender/sendResendEmail helper (duplicated portal+edge fns) replaces raw Resend fetch + flat RESEND_FROM_EMAIL everywhere.

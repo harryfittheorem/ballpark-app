@@ -20,6 +20,9 @@ const allowedOrigins = [
 const isDev = process.env.NODE_ENV !== 'production';
 
 const nextConfig: NextConfig = {
+  // Post-merge builds must not replace files used by the running dev server.
+  // `next build` and `next start` both use the production directory.
+  distDir: isDev ? ".next" : ".next-build",
   outputFileTracingRoot: path.join(__dirname),
   experimental: {
     serverActions: {
