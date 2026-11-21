@@ -10,6 +10,11 @@ export type Lesson = {
   transcript?: string;
   checklist?: string[];
   managerSignoff?: boolean;
+  sourceUrl?: string;
+  sourceNumber?: number;
+  sectionId?: string;
+  references?: { url: string; kind: 'video' | 'resource'; label: string; status: 'linked' | 'unavailable' }[];
+  sourceWarnings?: string[];
 };
 export type Question = {
   id: string;
@@ -28,6 +33,7 @@ export type CourseContent = {
   acknowledgment: string;
   audience: (TrainingRole | 'staff')[];
   reviewDate: string | null;
+  sourceReview?: { updated: string; notes: string; warnings: string[]; tests: { title: string; body: string }[] };
 };
 export type Course = {
   id: string;
@@ -52,7 +58,7 @@ export type Attempt = { id: string; assignment_id: string; score: number; passed
 export type TrainingPerson = { id: string; email: string; name: string; role: TrainingRole; staff: boolean };
 export type LearningPath = { id: string; title: string; description: string; course_ids: string[]; created_at: string };
 export type MigrationItem = { sourceId: string; title: string; kind: string; status: 'ready' | 'blocked' | 'archived'; reason?: string; course?: CourseContent };
-export type MigrationManifest = { format: 'ballpark-training-v1'; source: string; items: MigrationItem[]; historicalRecords?: { sourceId: string; email: string; courseSourceId: string; completedAt: string; score?: number; evidence?: string }[] };
+export type MigrationManifest = { format: 'ballpark-training-v1'; source: string; items: MigrationItem[]; sourceArchives?: { filename: string; sha256: string; content: string }[]; historicalRecords?: { sourceId: string; email: string; courseSourceId: string; completedAt: string; score?: number; evidence?: string }[] };
 export type MigrationBatch = { id: string; source: string; checksum: string; status: string; manifest: MigrationManifest; created_at: string; imported_at: string | null; rolled_back_at: string | null };
 export type TrainingAsset = { id: string; filename: string; mime: string; size: number; checksum: string | null; status: string; created_at: string };
 export type TrainingOverview = {

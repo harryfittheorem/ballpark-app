@@ -40,12 +40,24 @@ export function validateCourse(value: unknown, publishing = false): CourseConten
     requireValue(checklist.length <= 100, 'Use at most 100 checklist items');
     const externalUrl = l.externalUrl ? safeExternalUrl(l.externalUrl) : '';
     const body = text(l.body, 100000);
+    requireValue(!l.references || Array.isArray(l.references) && l.references.length <= 100, 'Invalid lesson references');
+    const references = l.references?.map(r => {
+      requireValue(['video','resource'].includes(r.kind) && ['linked','unavailable'].includes(r.status), 'Invalid reference type or state');
+      text(r.url,2000,true);
+      return {url:safeExternalUrl(r.url),kind:r.kind,label:text(r.label,500,true),status:r.status};
+    });
+    requireValue(!l.sourceWarnings || Array.isArray(l.sourceWarnings) && l.sourceWarnings.length <= 100, 'Invalid source warnings');
     requireValue(!publishing || l.kind !== 'text' || body.length > 0, 'Text lessons need content');
     requireValue(!publishing || !['video','file'].includes(l.kind) || l.assetId || externalUrl, 'Media lessons need an uploaded file or external link');
     requireValue(!publishing || l.kind !== 'checklist' || checklist.length > 0, 'Checklist lessons need items');
     return {id,title:text(l.title,180,true),section:text(l.section ?? '',180),kind:l.kind,body,
       ...(l.assetId ? {assetId:uuid(l.assetId)} : {}),externalUrl,transcript:text(l.transcript ?? '',100000),
-      checklist,managerSignoff:l.managerSignoff === true};
+      checklist,managerSignoff:l.managerSignoff === true,
+      ...(references ? {references} : {}),
+      ...(l.sourceUrl ? {sourceUrl:safeExternalUrl(l.sourceUrl)} : {}),
+      ...(l.sectionId ? {sectionId:text(l.sectionId,100,true)} : {}),
+      ...(l.sourceNumber !== undefined ? {sourceNumber:l.sourceNumber} : {}),
+      ...(l.sourceWarnings ? {sourceWarnings:l.sourceWarnings.map(w=>text(w,3000))} : {})};
   });
   requireValue(Array.isArray(d.questions) && d.questions.length <= 100, 'Use at most 100 questions');
   ids.clear();
@@ -63,7 +75,15 @@ export function validateCourse(value: unknown, publishing = false): CourseConten
   requireValue(Number.isInteger(d.maxAttempts) && d.maxAttempts >= 1 && d.maxAttempts <= 100, 'Attempts must be 1–100');
   requireValue(Array.isArray(d.audience) && d.audience.length > 0 && d.audience.every(r => ['owner','admin','coach','staff'].includes(r)), 'Choose at least one valid audience role');
   requireValue(!d.reviewDate || /^\d{4}-\d{2}-\d{2}$/.test(d.reviewDate) && Number.isFinite(Date.parse(d.reviewDate)), 'Invalid review date');
+  let sourceReview: CourseContent['sourceReview'];
+  if(d.sourceReview) {
+    const r=d.sourceReview;
+    requireValue(Array.isArray(r.warnings) && r.warnings.length<=100 && Array.isArray(r.tests) && r.tests.length<=20,'Invalid source review');
+    sourceReview={updated:text(r.updated,200),notes:text(r.notes,50000),warnings:r.warnings.map(w=>text(w,3000)),
+      tests:r.tests.map(t=>({title:text(t.title,500,true),body:text(t.body,100000,true)}))};
+  }
   return {title,description,category,lessons,questions,passingScore:d.passingScore,maxAttempts:d.maxAttempts,
+    ...(sourceReview ? {sourceReview} : {}),
     audience:[...new Set(d.audience)],acknowledgment:text(d.acknowledgment,10000),reviewDate:d.reviewDate || null};
 }
 export function gradeQuiz(questions: Question[], input: unknown) {
@@ -87,6 +107,13 @@ export function validateManifest(value: unknown): MigrationManifest {
   text(m.source,100,true);
   requireValue(Array.isArray(m.items) && m.items.length > 0 && m.items.length <= 500, 'A batch must contain 1–500 inventory items');
   const ids = new Set<string>();
+  if(m.sourceArchives) {
+    requireValue(Array.isArray(m.sourceArchives) && m.sourceArchives.length<=10,'Invalid source archive');
+    for(const archive of m.sourceArchives) {
+      text(archive.filename,240,true);text(archive.content,2000000,true);
+      requireValue(typeof archive.sha256==='string' && /^[a-f0-9]{64}$/.test(archive.sha256),'Invalid archive checksum');
+    }
+  }
   for (const i of m.items) {
     text(i.sourceId,180,true); text(i.title,180,true); text(i.kind,100,true);
     requireValue(!ids.has(i.sourceId),'Duplicate source identifier'); ids.add(i.sourceId);

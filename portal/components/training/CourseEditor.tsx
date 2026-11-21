@@ -8,6 +8,7 @@ import { Feedback, move } from './ui';
 import styles from './training.module.css';
 import { TextEditor } from './TextEditor';
 import { trainingFileMime } from '@/lib/training/formats';
+import { LessonSource, SourceReview } from './SourceReview';
 
 const roles: (TrainingRole|'staff')[] = ['owner', 'admin', 'coach', 'staff'];
 export function CourseEditor({ course, overview, onSaved, onClose }: { course: Course; overview: TrainingOverview; onSaved: () => Promise<void>; onClose: () => void }) {
@@ -47,6 +48,7 @@ export function CourseEditor({ course, overview, onSaved, onClose }: { course: C
   return <section className={styles.stack}>
     <div className={styles.spread}><div><h2>Edit draft</h2><p className={styles.muted}>Formatted text, original files and practical lessons. Changes only reach learners after publishing.</p></div><Button variant="ghost" disabled={busy} onClick={() => { if (!dirty || window.confirm('Discard unsaved draft changes?')) onClose(); }}>Close editor</Button></div>
     <Feedback {...action}/>
+    <SourceReview content={draft}/>
     <form onSubmit={e => { e.preventDefault(); void save(); }}>
       <fieldset disabled={busy} className={styles.stack}>
         <div className={`${styles.panel} ${styles.stack}`}>
@@ -67,6 +69,19 @@ export function CourseEditor({ course, overview, onSaved, onClose }: { course: C
           <div className={styles.grid}><label>Lesson title<input required value={item.title} onChange={e => lesson(index, { title: e.target.value })}/></label><label>Section<input required value={item.section} onChange={e => lesson(index, { section: e.target.value })}/></label></div>
           <label>Lesson type<select value={item.kind} onChange={e => lesson(index, { kind: e.target.value as Lesson['kind'] })}><option value="text">Text</option><option value="video">Video</option><option value="file">File</option><option value="checklist">Checklist</option></select></label>
           <TextEditor value={item.body} onChange={value=>lesson(index,{body:value})}/>
+          <LessonSource lesson={item}/>
+          <div className={styles.stack}>
+            <div className={styles.spread}><h3>Video & resource references</h3><Button type="button" variant="secondary" size="sm" onClick={() => lesson(index, { references: [...(item.references || []), { url: '', label: '', kind: 'video', status: 'linked' }] })}>Add reference</Button></div>
+            <p className={styles.muted}>YouTube and Loom videos can play inline. Other providers open externally. Keep unavailable references to preserve source evidence.</p>
+            {(item.references || []).map((reference, ri) => {
+              const updateReference = (patch: Partial<NonNullable<Lesson['references']>[number]>) => lesson(index, { references: item.references!.map((r, i) => i === ri ? { ...r, ...patch } : r) });
+              return <div key={ri} className={`${styles.reference} ${styles.stack}`}>
+                <div className={styles.grid}><label>Reference {ri + 1} label<input value={reference.label} onChange={e => updateReference({ label: e.target.value })}/></label><label>URL<input type="url" pattern="https?://.*" placeholder="https://" value={reference.url} onChange={e => updateReference({ url: e.target.value })}/></label></div>
+                <div className={styles.grid}><label>Reference type<select value={reference.kind} onChange={e => updateReference({ kind: e.target.value as 'video' | 'resource' })}><option value="video">Video</option><option value="resource">Resource</option></select></label><label>Availability<select value={reference.status} onChange={e => updateReference({ status: e.target.value as 'linked' | 'unavailable' })}><option value="linked">Linked · verify access</option><option value="unavailable">Unavailable</option></select></label></div>
+                <Button type="button" size="sm" variant="danger" onClick={() => { if (window.confirm('Remove this source reference?')) lesson(index, { references: item.references!.filter((_, i) => i !== ri) }); }}>Remove reference</Button>
+              </div>;
+            })}
+          </div>
           {(item.kind === 'video' || item.kind === 'file') && <div className={styles.stack}>
             <label>Upload private {item.kind === 'video' ? 'video' : 'file'}<input type="file" accept={item.kind === 'video' ? 'video/*' : undefined} onChange={e => { const file = e.target.files?.[0]; if (file) void upload(file, index); e.target.value = ''; }}/></label>
             <label>Private asset<select value={item.assetId || ''} onChange={e => lesson(index, { assetId: e.target.value || undefined })}><option value="">No private file</option>{overview.assets.map(a => <option key={a.id} value={a.id}>{a.filename} · {a.status}</option>)}{item.assetId && !overview.assets.some(a => a.id === item.assetId) && <option value={item.assetId}>{item.assetId} (new upload)</option>}</select></label>

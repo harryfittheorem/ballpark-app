@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/Button';
 import { downloadJson, request, useAction } from './api';
 import { date, Empty, Feedback, Raw } from './ui';
 import { DriveSource, ManualUploads } from './ManualUploads';
+import { TrainualImport } from './TrainualImport';
 import styles from './training.module.css';
+import { ImportReconciliation } from './ImportReconciliation';
 
 const template: MigrationManifest = { format: 'ballpark-training-v1', source: 'Replace with your source system or export name', items: [{ sourceId: 'replace-with-stable-source-id', title: 'Replace with course title', kind: 'course', status: 'ready', course: { ...emptyCourse(), title: 'Replace with course title', description: 'Replace with reviewed source content', lessons: [{ id: 'replace-with-stable-lesson-id', title: 'Replace with lesson title', section: 'Getting started', kind: 'text', body: 'Replace with plain-text source content. Do not insert HTML.' }] } }], historicalRecords: [] };
 function parseManifest(text: string): MigrationManifest {
@@ -42,9 +44,10 @@ export function Migration({ overview, onSaved }: { overview: TrainingOverview; o
   const [reading, setReading] = useState(false);
   const action = useAction();
   return <div className={styles.stack}>
+    <TrainualImport onSaved={onSaved}/>
     <ManualUploads overview={overview} onSaved={onSaved}/>
     <DriveSource onSaved={onSaved}/>
-    <details className={styles.panel}><summary className="cursor-pointer text-sm text-gold">Advanced: normalized manifest migration & source batch history</summary><div className={`${styles.stack} mt-5`}>
+    <details className={styles.panel}><summary className="cursor-pointer text-sm text-gold">Source batch history & advanced normalized manifest migration</summary><div className={`${styles.stack} mt-5`}>
     <div><h2>Advanced manifest workspace</h2><p className={styles.muted}>For pre-normalized source content and historical evidence. Manual files and videos can be uploaded above without JSON.</p></div>
     <div className={styles.notice}><strong>This advanced importer accepts normalized JSON, not arbitrary Trainual PDFs.</strong><p>Use our <code>ballpark-training-v1</code> manifest format here. Upload PDFs and original media through the manual workflow above instead. Review source content, external links, quiz answers and historical evidence before importing. Registered Drive links remain blocked references; they are not copied media. This workspace does not establish transfer or cutover completion.</p></div>
     <Feedback {...action}/><Feedback error={parseError}/>
@@ -61,13 +64,14 @@ export function Migration({ overview, onSaved }: { overview: TrainingOverview; o
       <p className={styles.muted}>Checksum: <span className="break-all">{batch.checksum}</span>{batch.imported_at ? ` · Imported ${date(batch.imported_at)}` : ''}{batch.rolled_back_at ? ` · Rolled back ${date(batch.rolled_back_at)}` : ''}</p>
       <ul className="space-y-2 text-sm">{batch.manifest.items.map((item, i) => <li key={`${item.sourceId}-${i}`}><span className={styles.badge}>{item.status}</span> {item.title}{item.reason ? ` — ${item.reason}` : ''}{item.status === 'ready' && !item.course ? ' — Missing course content' : ''}</li>)}</ul>
       <div className={styles.row}>
-        <Button disabled={action.pending || !!batch.imported_at || !!batch.rolled_back_at || !batch.manifest.items.some(i => i.status === 'ready' && i.course)} onClick={() => { if (window.confirm('Import eligible source items as drafts only? Blocked items are not training content. Review the batch and source dependencies first.')) void action.run(async () => { const result = await request<{ count: number }>(`/api/training/migrations/${batch.id}`, 'POST', { action: 'import' }); await onSaved(); return result; }, 'Draft import processed. Review imported content before publishing.'); }}>Import drafts only</Button>
+        <Button disabled={action.pending || !!batch.imported_at || !!batch.rolled_back_at || !batch.manifest.items.some(i => i.status === 'ready' && i.course)} onClick={() => { if (window.confirm('Confirm you reviewed linked-only media, missing content and ungraded tests. External resources are NOT archived. Import eligible source items as drafts only, without publishing or enrolling staff?')) void action.run(async () => { const result = await request<{ count: number }>(`/api/training/migrations/${batch.id}`, 'POST', { action: 'import', reviewLinkedMedia:true }); await onSaved(); return result; }, 'Draft import processed. Review imported content before publishing.'); }}>Import drafts only</Button>
         <Button variant="secondary" disabled={action.pending} onClick={() => void action.run(async () => { const result = await request<MigrationManifest>(`/api/training/migrations/${batch.id}`, 'POST', { action: 'export' }); downloadJson(`source-manifest-${batch.id}.json`, result); return true; }, 'Source manifest exported.')}>Export source manifest</Button>
         <Button variant="danger" disabled={action.pending || !batch.imported_at || !!batch.rolled_back_at} onClick={() => { setRollbackId(batch.id); setConfirm(''); }}>Roll back batch</Button>
       </div>
       {rollbackId === batch.id && <form className={`${styles.notice} ${styles.stack}`} onSubmit={e => { e.preventDefault(); void action.run(async () => { const result = await request<{ count: number }>(`/api/training/migrations/${batch.id}`, 'POST', { action: 'rollback' }); setRollbackId(''); await onSaved(); return result; }, 'Rollback processed. Review the batch and audit evidence.'); }}>
         <strong className="text-danger">Warning: rollback removes imported batch material where permitted. It is not an undo for a completed system cutover.</strong><p>Existing use may block rollback. Read the server response and preserve your exported source manifest. Type the full batch ID to confirm.</p><fieldset disabled={action.pending} className={styles.stack}><label>Confirm batch ID<input value={confirm} onChange={e => setConfirm(e.target.value)} autoComplete="off"/></label><div className={styles.row}><Button variant="danger" disabled={confirm !== batch.id} type="submit">Confirm rollback</Button><Button type="button" variant="ghost" onClick={() => setRollbackId('')}>Cancel</Button></div></fieldset>
       </form>}
+      <ImportReconciliation manifest={batch.manifest}/>
       <Raw label="Staged manifest / raw historical evidence" value={batch.manifest}/>
     </article>)}
     </div></details>

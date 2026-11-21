@@ -26,6 +26,7 @@
 - [Enrollment recovery](enrollment-recovery.md) — reserve identity before Auth creation; card setup is not first-invoice payment, and recovery must reuse the original subscription.
 - [Mobile enrollment scope](mobile-enrollment-parity.md) — keep location on screen 2; fix functional compatibility without relocating fields to match the web layout.
 - [Training replacement scope](training-replacement-scope.md) — web Operations module requested; plan first, preserve existing Trainual content and videos before transition.
+- [Trainual export reconciliation](trainual-export-reconciliation.md) — JSON merges tests into lessons and substitutes survey URLs; reconcile companion Markdown without guessing grading keys.
 - [Portal route compatibility](portal-route-compatibility.md) — preserve historical Today links; never resolve player identity from a name or an arbitrary family child.
 - [Scheduling policies](scheduling-policy.md) — manual limits, normal-rule walk-ins, owner/admin corrections, all-or-nothing credits, required rental cages; camp sales disabled.
 - [Retention approval and evidence](retention-approval-evidence.md) — candidate policies are not approval; unknown prior segments stay unknown and late edits cannot rewrite closed periods.

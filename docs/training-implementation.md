@@ -38,6 +38,27 @@ node --test /tmp/ballpark-training-tests/validation.test.js
 The rollback-only SQL assertions are in scripts/test-training-database.sql. Run against the configured
 Supabase project with authorized management access; the script always rolls back its fixture changes.
 
+## Subject/topic/step Trainual exports
+
+The migration workspace now accepts the supplied JSON plus companion Markdown as a pair.
+Original UTF-8 contents, filenames and SHA-256 checksums are retained in tenant-private batch
+storage and downloadable by managers. Subjects become editable drafts; topics and lessons retain
+their source ordering. Imported references are explicitly linked-only, with manager acknowledgment
+required before import. Legacy file/video inventory still requires verified private assets.
+
+The companion Markdown separates tests merged into lesson bodies in the JSON. Original bodies
+are preserved and tests remain ungraded source content awaiting answer-key review. No answer keys,
+learner history, publication or enrollment are inferred. See `trainual-import-reconciliation.md`.
+
+Additional verification:
+```
+cd portal
+./node_modules/.bin/tsc --outDir /tmp/trainual-suite --module commonjs --target es2022 --esModuleInterop --skipLibCheck lib/training/trainual.test.ts lib/training/validation.test.ts
+node --test /tmp/trainual-suite/lib/training/{trainual,validation}.test.js
+```
+`scripts/test-trainual-import-database.sql` checks cross-tenant import rejection, repeat import,
+repeated references and edited/published rollback guards inside an always-rolled-back transaction.
+
 ## Security boundary
 Training tables have RLS enabled and direct anon/authenticated privileges revoked. Mutations use
 service-only RPCs after the portal verifies the signed-in identity and tenant claim. All request IDs
