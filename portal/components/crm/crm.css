@@ -1,3 +1,15 @@
+.clubhouse-crm .crm-pilot { margin: 14px 0; padding: 16px; }
+.clubhouse-crm .crm-pilot summary { cursor: pointer; min-height: 44px; font-weight: 650; }
+.clubhouse-crm .crm-pilot p { margin: 10px 0; }
+.clubhouse-crm .crm-pilot-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.clubhouse-crm .crm-pilot-form { display: grid; gap: 12px; max-width: 680px; margin: 16px 0; }
+.clubhouse-crm .crm-pilot-form label { display: grid; gap: 6px; font-size: 14px; }
+.clubhouse-crm .crm-pilot-form input, .clubhouse-crm .crm-pilot-form textarea {
+  box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px; border: 1px solid #464a50;
+  background: #181b20; color: #fff; border-radius: 7px; font: inherit;
+}
+.clubhouse-crm .crm-pilot-evidence { list-style: none; padding: 0; }
+.clubhouse-crm .crm-pilot-evidence li { display: grid; gap: 4px; padding: 10px 0; border-bottom: 1px solid #41454b; overflow-wrap: anywhere; }
 .clubhouse-crm {
   --crm-bg: #171716;
   --crm-panel: #22211f;

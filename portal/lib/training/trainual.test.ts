@@ -26,7 +26,7 @@ test('exact export hierarchy, source bodies, order and repeated videos survive v
   assert.equal(c.title,s.title);assert.equal(c.category,s.category);
   assert.equal(c.sourceReview?.notes,s.notes);assert.equal(c.sourceReview?.updated,s.updated);
   topics+=new Set(c.lessons.map(l=>l.sectionId)).size;
-  const raw=s.topics.flatMap((t:any)=>t.steps);
+  const raw=s.topics.flatMap((t:{steps:{title:string;body:string;url:string;video_urls:string[]}[]})=>t.steps);
   c.lessons.forEach((l,n)=>{
    assert.equal(l.title,raw[n].title);assert.equal(l.body,raw[n].body.trim());assert.equal(l.sourceUrl,raw[n].url);
    assert.deepEqual(l.references?.filter(r=>r.kind==='video').map(r=>r.url),raw[n].video_urls);

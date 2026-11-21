@@ -47,7 +47,16 @@ def start():
             sql((ROOT/'supabase/migrations'/name).read_text())
         sql((ROOT/'scripts/fixtures/crm.sql').read_text())
         (BASE/'ready').write_text('isolated-synthetic-only\n')
-    print('CRM rehearsal PostgreSQL ready; no live connections. Portal: /owner/crm?preview=1')
+    # Incremental local-only upgrade: do not reset an existing rehearsal just
+    # because a later staging migration was added. PostgreSQL commits atomically.
+    if sql("SELECT to_regprocedure('public.custom_access_token_hook(jsonb)') IS NOT NULL;").strip() == 'f':
+        sql((ROOT/'scripts/fixtures/crm-auth.sql').read_text())
+        sql((ROOT/'supabase/migrations/20260715000001_fix_hook_super_admin_branch.sql').read_text())
+    if sql("SELECT to_regprocedure('public.crm_pilot_status(uuid)') IS NOT NULL;").strip() == 'f':
+        sql((ROOT/'supabase/migrations/20261122000000_crm_staff_pilot.sql').read_text())
+    if sql("SELECT to_regprocedure('public.crm_pilot_inbound(text,jsonb)') IS NOT NULL;").strip() == 'f':
+        sql((ROOT/'supabase/migrations/20261122000001_crm_pilot_provider_evidence.sql').read_text())
+    print('CRM rehearsal PostgreSQL ready; no live connections. Portal: /admin/crm?preview=1')
 
 if __name__ == '__main__':
     try:

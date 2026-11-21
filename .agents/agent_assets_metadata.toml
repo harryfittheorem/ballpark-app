@@ -312,3 +312,17 @@ mtime_ms = 1795204010394
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/1851a758-af90-4d3c-abdd-e5adf942f0b5/6713f283-cde7-4ca4-86e6-b021ac5bcdbf"
 storage_version_token = "1795204366365103"
 content_type = "image/png"
+
+[[outputs]]
+id = "2_MGV9ECCLvgbKxo2VjZ2"
+uri = "file://generated-artifacts/crm-pilot-evidence/staff-pilot-handoff.html"
+type = "html"
+title = "Frisco CRM pilot — handoff and verification"
+description = "Implementation, changed files, passing checks, exact access/provider blockers, staging routes and reproduction steps. No real messages or calls were sent."
+logical_id = "7643e52c-d422-49b4-8d2f-9c016f1e0aad"
+content_hash = "sha256:c39d58bc44b422f47c1a114c26a7f145fd49caf2ebb4b3b95be4fc8852211996"
+size = 15305
+mtime_ms = 1795289129102
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:4799229d-16d5-4596-8bee-aa8967d74d38/7643e52c-d422-49b4-8d2f-9c016f1e0aad/b4751583-9efd-4e4a-88c6-b10f1e8c39b4"
+storage_version_token = "1795289130191343"
+content_type = "text/html"

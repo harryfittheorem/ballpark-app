@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertUUID, literal, localSQL, previewReady, root } from './local';
 
-type Binding = { account_sid: string; sender: string; credential_ref: string; connection: string; webhook_url: string | null };
+type Binding = { location_id: string; account_sid: string; sender: string; credential_ref: string; connection: string; webhook_url: string | null };
 export function twilioSignature(url: string, params: URLSearchParams, secret: string) {
   let input = url;
   for (const key of [...new Set(params.keys())].sort()) for (const value of [...new Set(params.getAll(key))].sort()) input += key + value;
@@ -13,7 +13,7 @@ export function signatureValid(url: string, params: URLSearchParams, signature: 
   const expected = Buffer.from(twilioSignature(url, params, secret)), actual = Buffer.from(signature);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
-async function localSigner() {
+export async function localSigner() {
   const filename = path.join(root, 'generated-artifacts/crm-preview/signing-key');
   try { return await readFile(filename, 'utf8'); } catch {
     const token = randomBytes(32).toString('hex');
@@ -28,7 +28,7 @@ async function bindingFor(account: string, preview: boolean): Promise<Binding | 
   }
   const { createServiceClient } = await import('../supabase/serviceClient');
   const { data, error } = await createServiceClient().from('crm_locations')
-    .select('account_sid,sender,credential_ref,connection,webhook_url').eq('account_sid', account).maybeSingle();
+    .select('location_id,account_sid,sender,credential_ref,connection,webhook_url').eq('account_sid', account).maybeSingle();
   if (error) throw new Error('Provider connection lookup unavailable');
   return data;
 }
@@ -38,16 +38,60 @@ export async function processProviderRequest(req: Request, preview = false) {
   const form = new URLSearchParams(raw);
   const account = form.get('AccountSid') || '';
   const binding = await bindingFor(account, preview);
-  if (!binding || binding.connection === 'missing') return Response.json({ error: 'Unknown location binding' }, { status: 403 });
-  const canonical = preview ? 'https://crm.synthetic.invalid/api/crm/provider?preview=1' : binding.webhook_url;
-  const secret = preview && binding.connection === 'simulated' ? await localSigner()
+  if (!binding) return Response.json({ error: 'Unknown location binding' }, { status: 403 });
+  const query = new URL(req.url).searchParams;
+  const attempt = query.get('dispatch_id'), leg = query.get('leg');
+  let canonical = preview ? 'https://crm.synthetic.invalid/api/crm/provider?preview=1' : binding.webhook_url;
+  if (attempt) {
+    try { assertUUID(attempt); } catch { return Response.json({ error: 'Invalid dispatch' }, { status: 403 }); }
+    if (!['sms','staff','recipient'].includes(leg || '') || !canonical ||
+      [...query.keys()].some(key => !['dispatch_id','leg',...(preview ? ['preview'] : [])].includes(key))) {
+      return Response.json({ error: 'Invalid callback scope' }, { status: 403 });
+    }
+    const signedURL = new URL(canonical);
+    signedURL.searchParams.set('dispatch_id', attempt);
+    signedURL.searchParams.set('leg', leg!);
+    canonical = signedURL.toString();
+  }
+  const secret = preview && binding.account_sid.startsWith('AC_SYNTH_') ? await localSigner()
     : /^CRM_TWILIO_[A-Z0-9_]+$/.test(binding.credential_ref) ? process.env[binding.credential_ref] : undefined;
   if (!canonical || !secret || !signatureValid(canonical, form, req.headers.get('x-twilio-signature') || '', secret)) return Response.json({ error: 'Invalid provider signature' }, { status: 403 });
-  const isInbound = form.has('Body') || form.get('Direction') === 'inbound';
+  const isInbound = !attempt && (form.has('Body') || form.get('Direction') === 'inbound');
   const facility = isInbound ? form.get('To') : form.get('From');
   if (facility !== binding.sender || form.get('AccountSid') !== binding.account_sid) return Response.json({ error: 'Provider location mismatch' }, { status: 403 });
   const event = Object.fromEntries(form);
   event.kind = isInbound ? (form.has('CallSid') ? 'inbound_call' : 'inbound') : (form.has('CallSid') ? 'call_status' : 'sms_status');
+  let pilotConfigured = false;
+  if (preview) {
+    pilotConfigured = await localSQL(`SELECT EXISTS(SELECT 1 FROM crm_pilot_config WHERE location_id='${assertUUID(binding.location_id)}');`);
+  } else {
+    const { createServiceClient } = await import('../supabase/serviceClient');
+    const { data, error } = await createServiceClient().from('crm_pilot_config')
+      .select('location_id').eq('location_id', binding.location_id).maybeSingle();
+    if (error) return Response.json({ error: 'Pilot binding unavailable' }, { status: 503 });
+    pilotConfigured = !!data;
+  }
+  if (pilotConfigured) {
+    if (!isInbound && !attempt) return Response.json({ error: 'Dispatch-bound receipt required' }, { status: 403 });
+    try {
+      let evidence;
+      if (preview) {
+        evidence = await localSQL(attempt
+          ? `SELECT crm_pilot_receipt('${assertUUID(attempt)}',${literal(leg)}#>>'{}',${literal(event)});`
+          : `SELECT crm_pilot_inbound(${literal(account)}#>>'{}',${literal(event)});`);
+      } else {
+        const { createServiceClient } = await import('../supabase/serviceClient');
+        const { data, error } = await createServiceClient().rpc(attempt ? 'crm_pilot_receipt' : 'crm_pilot_inbound',
+          attempt ? { p_attempt: attempt, p_leg: leg, p_event: event } : { p_account: account, p_event: event });
+        if (error) throw new Error('Provider evidence rejected');
+        evidence = data;
+      }
+      return isInbound && !preview
+        ? new Response('<Response/>', { headers: { 'Content-Type': 'text/xml' } })
+        : Response.json(evidence);
+    } catch { return Response.json({ error: 'Provider pilot evidence rejected' }, { status: 403 }); }
+  }
+  if (attempt || binding.connection === 'missing') return Response.json({ error: 'Pilot binding unavailable' }, { status: 403 });
   let result;
   if (preview) {
     result = await localSQL(`SELECT crm_provider_event(${literal(account)}#>>'{}',${literal(facility)}#>>'{}',${literal(event)});`);

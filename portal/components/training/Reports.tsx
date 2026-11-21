@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { request, useAction, useResource, type CourseDetail } from './api';
 import { date, Empty, Feedback, LoadError, Loading, Raw } from './ui';
@@ -14,7 +15,7 @@ export function Reports() {
   const [search, setSearch] = useState('');
   if (!report.data) return report.error ? <LoadError error={report.error} retry={() => void report.reload()}/> : <Loading/>;
   const rows = report.data.rows.filter(r => `${r.name} ${r.email} ${r.course} ${r.status}`.toLowerCase().includes(search.toLowerCase()));
-  return <div className={styles.stack}><div className={styles.spread}><div><h2>Training records</h2><p className={styles.muted}>Enrollment evidence, practical signoffs and historical source records.</p></div><a className="rounded-xl border border-border-gold-strong px-4 py-2 text-sm text-gold" href="/api/training/reports?format=csv">Download CSV</a></div><Feedback error={report.error}/>
+  return <div className={styles.stack}><div className={styles.spread}><div><h2>Training records</h2><p className={styles.muted}>Enrollment evidence, practical signoffs and historical source records.</p></div><Link prefetch={false} download className="rounded-xl border border-border-gold-strong px-4 py-2 text-sm text-gold" href="/api/training/reports?format=csv">Download CSV</Link></div><Feedback error={report.error}/>
     <label>Search records<input type="search" placeholder="Person, course or status" value={search} onChange={e => setSearch(e.target.value)}/></label>
     <div className={`${styles.panel} ${styles.tableWrap}`}><table className={styles.table}><thead><tr><th>Person / course</th><th>Progress</th><th>Due / status</th><th>Evidence</th><th>Practical</th></tr></thead><tbody>{rows.map(row => <tr key={row.assignmentId}><td><strong>{row.name || row.email}</strong><p className={styles.muted}>{row.email}</p><p className="mt-2">{row.course} · v{row.version}</p></td><td>{row.progress} / {row.total}<p className={styles.muted}>Score {row.score === null ? '—' : `${row.score}%`}</p></td><td>{date(row.dueAt)}<p className="mt-2"><span className={styles.badge}>{row.status}</span></p></td><td><p className={styles.muted}>Source: {row.source}</p>{row.completedAt && <p>Completed {date(row.completedAt)}</p>}{row.acknowledgedAt && <p className={styles.muted}>{row.acknowledgedName} · acknowledged {date(row.acknowledgedAt)}</p>}</td><td><Button variant="secondary" size="sm" onClick={() => setSelected(row)}>View lessons</Button></td></tr>)}</tbody></table>{!rows.length && <Empty title="No matching training records">Assigned training will appear here. Adjust your search or create an assignment.</Empty>}</div>
     {selected && <Signoff key={selected.assignmentId} row={selected} onClose={() => setSelected(null)} onSaved={report.reload}/>}

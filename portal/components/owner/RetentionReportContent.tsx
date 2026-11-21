@@ -153,7 +153,7 @@ export function RetentionReportContent({ data, mode = data.scope === 'network' ?
           : <DataTable caption="Lost player detail" headers={['Player', 'Month', 'Effective date', 'Recorded reason']} rows={report.lostPlayers.map(loss => {
             const href = playerHref({ kidId: loss.kidId });
             const timezone = data.locations.find(l => l.id === loss.locationId)?.timezone ?? 'UTC';
-            return [href ? <Link key={loss.key} href={href} style={{ color: brand.gold, textDecoration: 'underline', textUnderlineOffset: 3 }}>{loss.name || 'Open player record'}</Link> : loss.name || 'Name unavailable', fmtMonth(loss.month), <span title={`${loss.effectiveAt} · ${timezone}`}>{new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: timezone }).format(new Date(loss.effectiveAt))} ({timezone})</span>, loss.reason === 'cancellation' ? 'Cancellation' : 'Nonrenewal'];
+            return [href ? <Link key={loss.key} href={href} style={{ color: brand.gold, textDecoration: 'underline', textUnderlineOffset: 3 }}>{loss.name || 'Open player record'}</Link> : loss.name || 'Name unavailable', fmtMonth(loss.month), <span key={`${loss.key}:date`} title={`${loss.effectiveAt} · ${timezone}`}>{new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: timezone }).format(new Date(loss.effectiveAt))} ({timezone})</span>, loss.reason === 'cancellation' ? 'Cancellation' : 'Nonrenewal'];
           })} empty="No evidence-backed loss rows are available. This does not mean there were zero losses; review coverage and policy notices above."/>}
       </section>
 

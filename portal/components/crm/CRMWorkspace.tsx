@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Select, TextArea } from "@/components/ui/Input";
 import "./crm.css";
+import CRMPilotPanel from "./CRMPilotPanel";
 
 type LocationOption = { id: string; name: string };
 type CRMResponse = { state: CRMState; locations?: LocationOption[]; location_id?: string; error?: string };
@@ -202,6 +203,7 @@ export default function CRMWorkspace({ preview = false }: { preview?: boolean })
         </div>
       </header>
       {preview && <div className="crm-preview" role="status"><b>Isolated rehearsal</b><span>Practice only · no family contacted · no production records changed</span></div>}
+      {locationId && <CRMPilotPanel locationId={locationId} preview={preview} />}
       <nav className="crm-nav" aria-label="CRM sections">{VIEWS.map((item) => <button key={item.id} aria-current={view === item.id ? "page" : undefined} onClick={() => { setView(item.id); setMobileThread(false); }}>{item.label}</button>)}</nav>
       {loadError && <div className="crm-error" role="alert" style={{ marginBottom: 14 }}>Latest refresh failed: {loadError} <button className="crm-btn quiet" onClick={() => void reload()}>Retry</button></div>}
       {actionFeedback}
