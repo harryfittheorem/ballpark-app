@@ -600,12 +600,13 @@ export type Database = {
           cancelled_at: string | null
           coach_id: string | null
           created_at: string
+          crm_prospect_id: string | null
           guest_email: string | null
           guest_name: string | null
           guest_phone: string | null
           id: string
           is_guest: boolean
-          kid_id: string
+          kid_id: string | null
           location_id: string
           notes: string | null
           scheduled_end: string
@@ -624,12 +625,13 @@ export type Database = {
           cancelled_at?: string | null
           coach_id?: string | null
           created_at?: string
+          crm_prospect_id?: string | null
           guest_email?: string | null
           guest_name?: string | null
           guest_phone?: string | null
           id?: string
           is_guest?: boolean
-          kid_id: string
+          kid_id?: string | null
           location_id: string
           notes?: string | null
           scheduled_end: string
@@ -648,12 +650,13 @@ export type Database = {
           cancelled_at?: string | null
           coach_id?: string | null
           created_at?: string
+          crm_prospect_id?: string | null
           guest_email?: string | null
           guest_name?: string | null
           guest_phone?: string | null
           id?: string
           is_guest?: boolean
-          kid_id?: string
+          kid_id?: string | null
           location_id?: string
           notes?: string | null
           scheduled_end?: string
@@ -670,6 +673,13 @@ export type Database = {
             columns: ["coach_id"]
             isOneToOne: false
             referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_crm_prospect_id_fkey"
+            columns: ["crm_prospect_id"]
+            isOneToOne: false
+            referencedRelation: "crm_threads"
             referencedColumns: ["id"]
           },
           {
@@ -1471,6 +1481,592 @@ export type Database = {
           subject?: string
         }
         Relationships: []
+      }
+      crm_actions: {
+        Row: {
+          actor: string | null
+          created_at: string
+          key: string
+          location_id: string
+          payload: Json
+          result: Json | null
+          state: string
+          tenant_id: string
+          thread_id: string | null
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          key: string
+          location_id: string
+          payload: Json
+          result?: Json | null
+          state?: string
+          tenant_id: string
+          thread_id?: string | null
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          key?: string
+          location_id?: string
+          payload?: Json
+          result?: Json | null
+          state?: string
+          tenant_id?: string
+          thread_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_actions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "crm_locations"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "crm_actions_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "crm_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_activity: {
+        Row: {
+          actor: string | null
+          created_at: string
+          evidence: Json
+          id: string
+          kind: string
+          location_id: string
+          tenant_id: string
+          thread_id: string | null
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          evidence: Json
+          id?: string
+          kind: string
+          location_id: string
+          tenant_id: string
+          thread_id?: string | null
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          evidence?: Json
+          id?: string
+          kind?: string
+          location_id?: string
+          tenant_id?: string
+          thread_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_activity_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "crm_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_evaluation_openings: {
+        Row: {
+          cage_number: string
+          coach_id: string
+          ends_at: string
+          id: string
+          location_id: string
+          session_type_id: string
+          starts_at: string
+          tenant_id: string
+        }
+        Insert: {
+          cage_number: string
+          coach_id: string
+          ends_at: string
+          id?: string
+          location_id: string
+          session_type_id: string
+          starts_at: string
+          tenant_id: string
+        }
+        Update: {
+          cage_number?: string
+          coach_id?: string
+          ends_at?: string
+          id?: string
+          location_id?: string
+          session_type_id?: string
+          starts_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_evaluation_openings_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_evaluation_openings_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "crm_locations"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "crm_evaluation_openings_session_type_id_fkey"
+            columns: ["session_type_id"]
+            isOneToOne: false
+            referencedRelation: "session_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_evaluation_services: {
+        Row: {
+          location_id: string
+          session_type_id: string
+          tenant_id: string
+        }
+        Insert: {
+          location_id: string
+          session_type_id: string
+          tenant_id: string
+        }
+        Update: {
+          location_id?: string
+          session_type_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_evaluation_services_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "crm_locations"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "crm_evaluation_services_session_type_id_fkey"
+            columns: ["session_type_id"]
+            isOneToOne: false
+            referencedRelation: "session_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_internal_tasks: {
+        Row: {
+          completed_at: string | null
+          due_at: string
+          id: string
+          kid_id: string
+          kind: string
+          location_id: string
+          reason: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          due_at: string
+          id?: string
+          kid_id: string
+          kind?: string
+          location_id: string
+          reason: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          due_at?: string
+          id?: string
+          kid_id?: string
+          kind?: string
+          location_id?: string
+          reason?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_internal_tasks_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_locations: {
+        Row: {
+          account_sid: string | null
+          callback_owner: string | null
+          connection: string
+          credential_ref: string | null
+          dispatch_policy: Json | null
+          location_id: string
+          sender: string | null
+          tenant_id: string
+          timezone: string
+          webhook_url: string | null
+          workflow: Json
+        }
+        Insert: {
+          account_sid?: string | null
+          callback_owner?: string | null
+          connection?: string
+          credential_ref?: string | null
+          dispatch_policy?: Json | null
+          location_id: string
+          sender?: string | null
+          tenant_id: string
+          timezone: string
+          webhook_url?: string | null
+          workflow?: Json
+        }
+        Update: {
+          account_sid?: string | null
+          callback_owner?: string | null
+          connection?: string
+          credential_ref?: string | null
+          dispatch_policy?: Json | null
+          location_id?: string
+          sender?: string | null
+          tenant_id?: string
+          timezone?: string
+          webhook_url?: string | null
+          workflow?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_locations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_outbox: {
+        Row: {
+          attempted_at: string | null
+          author: string
+          body: string
+          created_at: string
+          id: string
+          location_id: string
+          logical_key: string
+          provider_sid: string | null
+          purpose: string
+          reason: string | null
+          revision: number
+          status: string
+          tenant_id: string
+          thread_id: string
+        }
+        Insert: {
+          attempted_at?: string | null
+          author: string
+          body: string
+          created_at?: string
+          id?: string
+          location_id: string
+          logical_key: string
+          provider_sid?: string | null
+          purpose?: string
+          reason?: string | null
+          revision: number
+          status?: string
+          tenant_id: string
+          thread_id: string
+        }
+        Update: {
+          attempted_at?: string | null
+          author?: string
+          body?: string
+          created_at?: string
+          id?: string
+          location_id?: string
+          logical_key?: string
+          provider_sid?: string | null
+          purpose?: string
+          reason?: string | null
+          revision?: number
+          status?: string
+          tenant_id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_outbox_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "crm_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_pilot_attempts: {
+        Row: {
+          finished_at: string | null
+          id: string
+          location_id: string
+          outbox_id: string
+          phase: string
+          policy_revision: number
+          request: Json
+          result: Json | null
+          started_at: string | null
+        }
+        Insert: {
+          finished_at?: string | null
+          id?: string
+          location_id: string
+          outbox_id: string
+          phase?: string
+          policy_revision: number
+          request: Json
+          result?: Json | null
+          started_at?: string | null
+        }
+        Update: {
+          finished_at?: string | null
+          id?: string
+          location_id?: string
+          outbox_id?: string
+          phase?: string
+          policy_revision?: number
+          request?: Json
+          result?: Json | null
+          started_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_pilot_attempts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "crm_locations"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "crm_pilot_attempts_outbox_id_fkey"
+            columns: ["outbox_id"]
+            isOneToOne: true
+            referencedRelation: "crm_outbox"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_pilot_config: {
+        Row: {
+          active: boolean
+          approval: string
+          approved_numbers: string[]
+          last_worker_at: string | null
+          location_id: string
+          operator_id: string
+          paused: boolean
+          revision: number
+          staff_handset: string | null
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          active?: boolean
+          approval?: string
+          approved_numbers?: string[]
+          last_worker_at?: string | null
+          location_id: string
+          operator_id: string
+          paused?: boolean
+          revision?: number
+          staff_handset?: string | null
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          active?: boolean
+          approval?: string
+          approved_numbers?: string[]
+          last_worker_at?: string | null
+          location_id?: string
+          operator_id?: string
+          paused?: boolean
+          revision?: number
+          staff_handset?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_pilot_config_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "crm_locations"
+            referencedColumns: ["location_id"]
+          },
+        ]
+      }
+      crm_provider_events: {
+        Row: {
+          event_key: string
+          evidence: Json
+          kind: string
+          location_id: string
+          provider_sid: string
+          received_at: string
+          status: string | null
+          tenant_id: string
+        }
+        Insert: {
+          event_key: string
+          evidence: Json
+          kind: string
+          location_id: string
+          provider_sid: string
+          received_at?: string
+          status?: string | null
+          tenant_id: string
+        }
+        Update: {
+          event_key?: string
+          evidence?: Json
+          kind?: string
+          location_id?: string
+          provider_sid?: string
+          received_at?: string
+          status?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_provider_events_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "crm_locations"
+            referencedColumns: ["location_id"]
+          },
+        ]
+      }
+      crm_reminder_intents: {
+        Row: {
+          booking_id: string
+          due_at: string
+          location_id: string
+          reason: string
+          revision: number
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          booking_id: string
+          due_at: string
+          location_id: string
+          reason?: string
+          revision?: number
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          booking_id?: string
+          due_at?: string
+          location_id?: string
+          reason?: string
+          revision?: number
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_reminder_intents_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "booking_instructor_attribution"
+            referencedColumns: ["booking_id"]
+          },
+          {
+            foreignKeyName: "crm_reminder_intents_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_threads: {
+        Row: {
+          data: Json
+          family_id: string | null
+          id: string
+          kid_id: string | null
+          location_id: string
+          phone: string
+          tenant_id: string
+        }
+        Insert: {
+          data: Json
+          family_id?: string | null
+          id?: string
+          kid_id?: string | null
+          location_id: string
+          phone: string
+          tenant_id: string
+        }
+        Update: {
+          data?: Json
+          family_id?: string | null
+          id?: string
+          kid_id?: string | null
+          location_id?: string
+          phone?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_threads_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_threads_kid_id_fkey"
+            columns: ["kid_id"]
+            isOneToOne: false
+            referencedRelation: "kids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_threads_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "crm_locations"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "crm_threads_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       device_tokens: {
         Row: {
@@ -2920,6 +3516,178 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "promo_codes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retention_coverage: {
+        Row: {
+          started_at: string
+          tenant_id: string
+        }
+        Insert: {
+          started_at?: string
+          tenant_id: string
+        }
+        Update: {
+          started_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retention_coverage_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retention_membership_history: {
+        Row: {
+          actor_id: string | null
+          effective_at: string
+          id: string
+          kid_id: string
+          membership_id: string
+          recorded_at: string
+          source: string
+          state: Json
+          tenant_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          effective_at?: string
+          id?: string
+          kid_id: string
+          membership_id: string
+          recorded_at?: string
+          source: string
+          state: Json
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          effective_at?: string
+          id?: string
+          kid_id?: string
+          membership_id?: string
+          recorded_at?: string
+          source?: string
+          state?: Json
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retention_membership_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retention_policies: {
+        Row: {
+          id: string
+          policy: Json
+          recorded_at: string
+          tenant_id: string
+        }
+        Insert: {
+          id?: string
+          policy: Json
+          recorded_at?: string
+          tenant_id: string
+        }
+        Update: {
+          id?: string
+          policy?: Json
+          recorded_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retention_policies_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retention_reporting_locations: {
+        Row: {
+          id: string
+          name: string
+          recorded_at: string
+          tenant_id: string
+          timezone: string
+        }
+        Insert: {
+          id: string
+          name: string
+          recorded_at?: string
+          tenant_id: string
+          timezone: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          recorded_at?: string
+          tenant_id?: string
+          timezone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retention_reporting_locations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retention_segment_history: {
+        Row: {
+          actor_id: string | null
+          effective_at: string
+          id: string
+          kid_id: string
+          location_id: string | null
+          recorded_at: string
+          source: string
+          state: Json
+          tenant_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          effective_at?: string
+          id?: string
+          kid_id: string
+          location_id?: string | null
+          recorded_at?: string
+          source: string
+          state: Json
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          effective_at?: string
+          id?: string
+          kid_id?: string
+          location_id?: string | null
+          recorded_at?: string
+          source?: string
+          state?: Json
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retention_segment_history_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -4821,6 +5589,72 @@ export type Database = {
         }
         Returns: Json
       }
+      crm_can_access: {
+        Args: { p_location: string; p_tenant: string }
+        Returns: boolean
+      }
+      crm_event: {
+        Args: {
+          p_author: string
+          p_body: string
+          p_kind: string
+          p_sim: boolean
+          p_status: string
+        }
+        Returns: Json
+      }
+      crm_execute: {
+        Args: { p_command: Json; p_location: string }
+        Returns: Json
+      }
+      crm_execute_core: {
+        Args: { p_command: Json; p_location: string }
+        Returns: Json
+      }
+      crm_pilot_begin: { Args: { p_attempt: string }; Returns: Json }
+      crm_pilot_finish: {
+        Args: { p_attempt: string; p_result: Json }
+        Returns: undefined
+      }
+      crm_pilot_inbound: {
+        Args: { p_account: string; p_event: Json }
+        Returns: Json
+      }
+      crm_pilot_manage: {
+        Args: { p_action: string; p_location: string; p_payload: Json }
+        Returns: Json
+      }
+      crm_pilot_operator_allowed: {
+        Args: { p_location: string; p_operator: string; p_tenant: string }
+        Returns: boolean
+      }
+      crm_pilot_prepare: {
+        Args: { p_location: string; p_thread?: string; p_worker?: boolean }
+        Returns: Json
+      }
+      crm_pilot_reason: {
+        Args: {
+          l: Database["public"]["Tables"]["crm_locations"]["Row"]
+          o: Database["public"]["Tables"]["crm_outbox"]["Row"]
+          p: Database["public"]["Tables"]["crm_pilot_config"]["Row"]
+          t: Database["public"]["Tables"]["crm_threads"]["Row"]
+        }
+        Returns: string
+      }
+      crm_pilot_receipt: {
+        Args: { p_attempt: string; p_event: Json; p_leg: string }
+        Returns: Json
+      }
+      crm_pilot_status: { Args: { p_location: string }; Returns: Json }
+      crm_provider_event: {
+        Args: { p_account: string; p_destination: string; p_event: Json }
+        Returns: Json
+      }
+      crm_reevaluate: {
+        Args: { p_complete?: string; p_location: string }
+        Returns: Json
+      }
+      crm_snapshot: { Args: { p_location: string }; Returns: Json }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       deduct_session_credit: { Args: { p_booking_id: string }; Returns: number }
       deduct_session_credits: {
@@ -5118,6 +5952,8 @@ export type Database = {
         Returns: number
       }
       resume_membership: { Args: { p_membership_id: string }; Returns: Json }
+      retention_membership_state: { Args: { j: Json }; Returns: Json }
+      retention_segment_state: { Args: { j: Json }; Returns: Json }
       review_assignment: {
         Args: { p_assignment_id: string; p_feedback: string; p_rating: number }
         Returns: {
