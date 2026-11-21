@@ -14,14 +14,12 @@ import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/th
 
 const METRIC_LABELS: Record<string, string> = {
   exit_velocity_mph: 'EXIT VELO',
-  launch_angle_deg: 'LAUNCH ANGLE',
   distance_ft: 'DISTANCE',
   pitch_speed_mph: 'PITCH SPEED',
 };
 
 const METRIC_UNITS: Record<string, string> = {
   exit_velocity_mph: 'MPH',
-  launch_angle_deg: '°',
   distance_ft: 'FT',
   pitch_speed_mph: 'MPH',
 };
@@ -32,7 +30,7 @@ type Props = {
 };
 
 function fmt(v: number, metric: string) {
-  if (metric === 'distance_ft' || metric === 'launch_angle_deg') return Math.round(v).toString();
+  if (metric === 'distance_ft') return Math.round(v).toString();
   return Number(v).toFixed(1);
 }
 
@@ -49,6 +47,7 @@ function timeAgo(iso: string): string {
 }
 
 export default function LatestPersonalBestCard({ pr, onPress }: Props) {
+  if (pr?.metric === 'launch_angle_deg') return null;
   if (!pr) {
     return (
       <View style={styles.card}>

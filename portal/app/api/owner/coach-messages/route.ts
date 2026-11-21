@@ -14,6 +14,7 @@
  *   messageText?   string  — optional text body (required when videoId is omitted)
  */
 import { NextResponse } from "next/server";
+import { instructorMessagingApproved, instructorMessagingGate } from "@/lib/coachingMessaging";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
 import { readAppRole, readTenantId } from "@/lib/auth";
@@ -29,6 +30,8 @@ function clientErr(status: number, code: string, message: string) {
 }
 
 export async function POST(req: Request) {
+  // No service-role bypass of the R07 communication policy.
+  if (!instructorMessagingApproved()) return clientErr(403, "policy_required", instructorMessagingGate);
   const supabase = await createClient();
   const {
     data: { session },

@@ -215,11 +215,26 @@ export default function RecordVideoScreen() {
     setState({ kind: 'idle' });
   }, []);
 
+  if (purpose !== 'drill_assignment') {
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <View style={styles.container}>
+          <View style={styles.errorBox}>
+            <Text style={styles.errorTitle}>Instructor messaging unavailable</Text>
+            <Text style={styles.errorMessage}>
+              Instructor-to-player messaging is unavailable. Adult messaging awaits approval. You can still record training videos for drill assignments.
+            </Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.container}>
         {state.kind === 'idle' ? (
-          <IdleView onPick={handlePick} />
+          <IdleView onPick={handlePick} isDrill />
         ) : state.kind === 'preview' ? (
           <VideoPreview
             asset={state.asset}
@@ -263,12 +278,13 @@ export default function RecordVideoScreen() {
   );
 }
 
-function IdleView({ onPick }: { onPick: (source: PickerSource) => void }) {
+function IdleView({ onPick, isDrill }: { onPick: (source: PickerSource) => void; isDrill: boolean }) {
   return (
     <View style={styles.idleBox}>
       <Text style={styles.subheading}>
-        Record a new clip or pick one from your library. Up next you&apos;ll
-        choose which family receives it.
+        {isDrill
+          ? 'Record a training clip or select one from your library for this drill assignment.'
+          : 'Instructor-to-player messaging is unavailable. Adult messaging awaits approval.'}
       </Text>
 
       <TouchableOpacity

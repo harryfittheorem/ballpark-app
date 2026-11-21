@@ -51,14 +51,12 @@ type Nav = WorkStackScreenProps<'SwingDetail'>['navigation'];
 
 const METRIC_LABELS: Record<string, string> = {
   exit_velocity_mph: 'Exit velo',
-  launch_angle_deg: 'Launch',
   distance_ft: 'Distance',
   pitch_speed_mph: 'Pitch mph',
 };
 
 const METRIC_UNITS: Record<string, string> = {
   exit_velocity_mph: 'MPH',
-  launch_angle_deg: '°',
   distance_ft: 'FT',
   pitch_speed_mph: 'MPH',
 };
@@ -104,7 +102,9 @@ export default function SwingDetailScreen() {
   }
 
   const favorited = favorites?.has(swing.id) ?? false;
-  const prMatches = (prs ?? []).filter((p) => p.swing_id === swing.id);
+  const prMatches = (prs ?? []).filter(
+    (p) => p.swing_id === swing.id && p.metric !== 'launch_angle_deg',
+  );
 
   const handleFavorite = () => {
     toggleFav.mutate(swing.id, {
@@ -204,7 +204,6 @@ function PlaceholderPlayer() {
 function MetricGrid({ swing, prs }: { swing: Swing; prs: string[] }) {
   const items: { key: keyof Swing & string; metric: string }[] = [
     { key: 'exit_velocity_mph', metric: 'exit_velocity_mph' },
-    { key: 'launch_angle_deg', metric: 'launch_angle_deg' },
     { key: 'distance_ft', metric: 'distance_ft' },
     { key: 'pitch_speed_mph', metric: 'pitch_speed_mph' },
   ];
@@ -222,7 +221,7 @@ function MetricGrid({ swing, prs }: { swing: Swing; prs: string[] }) {
               </View>
             ) : null}
             <Text style={[styles.metricValue, isPr && styles.metricValuePr]}>
-              {fmt(v, key === 'launch_angle_deg' || key === 'distance_ft' ? 0 : 1)}
+              {fmt(v, key === 'distance_ft' ? 0 : 1)}
             </Text>
             <Text style={styles.metricUnit}>{METRIC_UNITS[metric]}</Text>
             <Text style={styles.metricLabel}>{METRIC_LABELS[metric].toUpperCase()}</Text>

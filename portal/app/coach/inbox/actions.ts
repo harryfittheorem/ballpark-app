@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { instructorMessagingApproved, instructorMessagingGate } from "@/lib/coachingMessaging";
 
 export async function replyToThread(
   formData: FormData,
 ): Promise<{ error: string } | undefined> {
+  if (!instructorMessagingApproved()) return { error: instructorMessagingGate };
   const kidId = String(formData.get("kid_id") ?? "").trim();
   const messageText = String(formData.get("message_text") ?? "").trim();
 

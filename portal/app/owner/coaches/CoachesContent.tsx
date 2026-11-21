@@ -4,31 +4,12 @@ import { useState, useEffect, useTransition } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, SectionHeader, OCard, OTable, BarChart } from '@/components/owner/ui';
 import type { TableColumn } from '@/components/owner/ui';
-import { UserCog, Activity, TrendingUp, DollarSign, Download, Plus, Star, MessageCircle, X, Shield, GraduationCap } from 'lucide-react';
+import { UserCog, Activity, Download, Plus, Star, MessageCircle, X, Shield, GraduationCap } from 'lucide-react';
 import type { OwnerCoach } from '@/lib/supabase/ownerQueries';
-import { CoachMessagePanel } from './CoachMessagePanel';
 import { exportCsv } from '@/lib/exportCsv';
 import { updateCoachPreset } from './actions';
 
 type Props = { coaches: OwnerCoach[]; tenantId: string };
-
-const DEMO_COACHES: OwnerCoach[] = [
-  { id: 'c1', userId: null, name: 'Mike Rodriguez',  specialty: 'Hitting / Power',       students: 48, utilization: 92, retention: 94, avgRating: 4.9, revenue: 13440, weeklyHours: 38, joinedDate: 'Jan 2023', preset: 'staff' },
-  { id: 'c2', userId: null, name: 'Sarah Kim',       specialty: 'Pitching / Mechanics',  students: 41, utilization: 85, retention: 91, avgRating: 4.8, revenue: 11480, weeklyHours: 34, joinedDate: 'Mar 2023', preset: 'instructor' },
-  { id: 'c3', userId: null, name: 'Dave Thompson',   specialty: 'Fielding / Speed',      students: 36, utilization: 78, retention: 88, avgRating: 4.7, revenue: 10080, weeklyHours: 30, joinedDate: 'Aug 2023', preset: 'instructor' },
-  { id: 'c4', userId: null, name: 'Jess Morales',    specialty: 'Catching / Defence',    students: 22, utilization: 68, retention: 86, avgRating: null, revenue: 0,     weeklyHours: 22, joinedDate: 'Feb 2024', preset: 'instructor' },
-];
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '9px 12px', border: `1px solid ${brand.border}`,
-  borderRadius: 7, fontSize: 13, color: brand.text, background: brand.surface,
-  fontFamily: fonts.body, outline: 'none', boxSizing: 'border-box',
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5,
-  textTransform: 'uppercase', marginBottom: 5, display: 'block',
-};
 
 const PRESET_META = {
   instructor: {
@@ -87,9 +68,7 @@ function PresetDropdown({
     startTransition(() => { updateCoachPreset(fd).catch(console.error); });
   };
 
-  if (disabled) {
-    return <span style={{ fontSize: 11, color: brand.textMuted }}>Demo mode</span>;
-  }
+  if (disabled) return <span style={{ fontSize: 11, color: brand.textMuted }}>No coach account linked</span>;
 
   return (
     <select
@@ -109,18 +88,14 @@ function PresetDropdown({
   );
 }
 
-export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
-  const isDemo        = !rawCoaches.length;
-  const [coaches, setCoaches] = useState<OwnerCoach[]>(isDemo ? DEMO_COACHES : rawCoaches);
+export function CoachesContent({ coaches: rawCoaches }: Props) {
+  const [coaches, setCoaches] = useState<OwnerCoach[]>(rawCoaches);
 
   const totalStudents = coaches.reduce((s, c) => s + c.students, 0);
   const avgUtil       = coaches.length > 0 ? Math.round(coaches.reduce((s, c) => s + c.utilization, 0) / coaches.length) : 0;
-  const avgRet        = coaches.length > 0 ? Math.round(coaches.reduce((s, c) => s + c.retention, 0) / coaches.length * 10) / 10 : 0;
 
-  const [activeCoach,  setActiveCoach]  = useState<OwnerCoach | null>(null);
   const [showHireModal, setShowHireModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [hireForm, setHireForm] = useState({ name: '', email: '', specialty: '', weeklyHours: '30' });
 
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }
@@ -135,21 +110,15 @@ export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
         { label: 'Preset',      key: 'preset' },
         { label: 'Students',    key: 'students' },
         { label: 'Utilization', key: 'utilization' },
-        { label: 'Retention',   key: 'retention' },
         { label: 'Rating',      key: 'avgRating' },
+        { label: 'Rated Lessons', key: 'ratedCount' },
+        { label: 'Eligible Lessons', key: 'eligibleCount' },
         { label: 'Revenue',     key: 'revenue' },
         { label: 'Hours/wk',    key: 'weeklyHours' },
         { label: 'Joined',      key: 'joinedDate' },
       ],
     );
     setToast(`Exported ${coaches.length} coaches as CSV`);
-  };
-
-  const handleHireSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setShowHireModal(false);
-    setHireForm({ name: '', email: '', specialty: '', weeklyHours: '30' });
-    setToast(`Invitation sent to ${hireForm.email} — ${hireForm.name} will appear once they complete onboarding`);
   };
 
   const handleOptimisticPreset = (id: string, next: 'instructor' | 'staff') => {
@@ -182,7 +151,7 @@ export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
             <PresetDropdown
               coachId={coach.id}
               current={coach.preset}
-              disabled={isDemo || !coach.userId}
+              disabled={!coach.userId}
               onOptimistic={handleOptimisticPreset}
             />
           </div>
@@ -208,18 +177,16 @@ export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
       },
     },
     {
-      label: 'Retention', key: 'retention', align: 'right',
-      render: (r) => <span style={{ color: (r.retention as number) >= 90 ? brand.success : brand.warning, fontWeight: 700 }}>{r.retention as number}%</span>,
-    },
-    {
       label: 'Rating', key: 'avgRating', align: 'right',
       render: (r) => {
         const rating = r.avgRating as number | null;
-        if (rating === null) return <span style={{ color: brand.textMuted, fontFamily: fonts.mono }}>–</span>;
+        const coach = r as unknown as OwnerCoach & { ratedCount?: number; eligibleCount?: number };
+        if (rating === null) return <span style={{ color: brand.textMuted, fontFamily: fonts.mono }}>Not rated · {coach.ratedCount ?? 0}/{coach.eligibleCount ?? 0} rated</span>;
         return (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }} title={`${coach.ratedCount ?? 0} of ${coach.eligibleCount ?? 0} eligible lessons rated`}>
             <Star size={12} color={brand.goldDeep} fill={brand.goldDeep} />
             <span style={{ fontWeight: 700, fontFamily: fonts.display }}>{rating.toFixed(1)}</span>
+            <span style={{ color: brand.textMuted, fontSize: 10 }}>{coach.ratedCount ?? 0}/{coach.eligibleCount ?? 0}</span>
           </div>
         );
       },
@@ -245,28 +212,26 @@ export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
     },
     {
       label: '', key: 'actions',
-      render: (r) => {
-        const coach = r as unknown as OwnerCoach;
-        const disabled = isDemo || !coach.userId;
+      render: () => {
         return (
           <button
-            onClick={() => { if (!disabled) setActiveCoach(coach); }}
-            disabled={disabled}
-            title={isDemo ? 'Demo mode — connect real data to send messages' : !coach.userId ? 'Coach has no login account' : `Send message as ${coach.name}`}
+            disabled
+            title="Instructor-to-player messaging is unavailable. Adult messaging awaits approval."
+            aria-label="Messaging unavailable"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
               padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700,
               fontFamily: fonts.display, letterSpacing: 0.5, textTransform: 'uppercase',
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              background: disabled ? brand.surfaceAlt : brand.dark,
-              color: disabled ? brand.textLight : brand.gold,
-              border: `1px solid ${disabled ? brand.border : brand.dark}`,
-              opacity: disabled ? 0.6 : 1,
+              cursor: 'not-allowed',
+              background: brand.surfaceAlt,
+              color: brand.textLight,
+              border: `1px solid ${brand.border}`,
+              opacity: 0.6,
               transition: 'opacity 0.15s',
             }}
           >
             <MessageCircle size={12} />
-            Message
+            Unavailable
           </button>
         );
       },
@@ -281,17 +246,16 @@ export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
         actions={
           <>
             <OButton variant="secondary" icon={Download} onClick={handleExport}>Export</OButton>
-            <OButton variant="gold" icon={Plus} onClick={() => setShowHireModal(true)}>Hire Coach</OButton>
+            <OButton variant="gold" icon={Plus} onClick={() => setShowHireModal(true)}>Add Coach</OButton>
           </>
         }
       />
 
       <div style={{ padding: 24 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
           <KPICard label="Staff Size"      value={coaches.length}    icon={UserCog} />
-          <KPICard label="Avg Utilization" value={`${avgUtil}%`}     icon={Activity}   color="success" />
-          <KPICard label="Avg Retention"   value={`${avgRet}%`}      icon={TrendingUp}  color="success" />
-          <KPICard label="Total Students"  value={totalStudents}     icon={DollarSign}  color="gold" />
+          <KPICard label="Avg Utilization" value={coaches.length ? `${avgUtil}%` : '—'} icon={Activity} color="success" />
+          <KPICard label="Total Students"  value={totalStudents}     icon={UserCog}  color="gold" />
         </div>
 
         <div style={{ marginBottom: 8, padding: '10px 14px', background: brand.surfaceAlt, borderRadius: 8, border: `1px solid ${brand.border}`, fontSize: 12, color: brand.textMuted, lineHeight: 1.5 }}>
@@ -301,13 +265,16 @@ export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
         </div>
 
         <SectionHeader title="Coach Roster — Performance" />
-        <OTable
+        {coaches.length ? <OTable
           columns={columns as TableColumn<Record<string, unknown>>[]}
           rows={coaches as unknown as Record<string, unknown>[]}
-        />
+        /> : <OCard><div style={{ textAlign: 'center', padding: '34px 16px' }}><div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>No coaches recorded</div><div style={{ fontSize: 12, color: brand.textMuted }}>This roster shows real coach data only. Add-coach invitations are not connected in this portal.</div></div></OCard>}
+        <div style={{ marginTop: 16, padding: '12px 14px', background: brand.surfaceAlt, borderRadius: 8, border: `1px solid ${brand.border}`, fontSize: 12, color: brand.textMuted }}>
+          Retention reporting: <strong style={{ color: brand.text }}>Pending model approval</strong>
+        </div>
 
         {coaches.length > 1 && (
-          <div style={{ marginTop: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div style={{ marginTop: 24 }}>
             <OCard>
               <SectionHeader title="Utilization Distribution" />
               <BarChart
@@ -320,78 +287,22 @@ export function CoachesContent({ coaches: rawCoaches, tenantId }: Props) {
               />
             </OCard>
 
-            <OCard>
-              <SectionHeader title="Retention by Coach" subtitle="Student retention per coach" />
-              {[...coaches].sort((a, b) => b.retention - a.retention).map((c, i, arr) => (
-                <div key={c.id} style={{ padding: '10px 0', borderBottom: i < arr.length - 1 ? `1px solid ${brand.border}` : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{c.name}</div>
-                  <div style={{ flex: 1, height: 8, background: brand.border, borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ width: `${c.retention}%`, height: '100%', background: c.retention >= 90 ? brand.success : brand.warning }} />
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, fontFamily: fonts.display, color: c.retention >= 90 ? brand.success : brand.warning, width: 50, textAlign: 'right' }}>{c.retention}%</div>
-                </div>
-              ))}
-            </OCard>
           </div>
         )}
       </div>
 
-      {activeCoach && (
-        <CoachMessagePanel
-          coach={activeCoach}
-          tenantId={tenantId}
-          onClose={() => setActiveCoach(null)}
-        />
-      )}
-
       {showHireModal && (
-        <div
-          onClick={() => setShowHireModal(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{ width: 460, background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)', overflow: 'hidden' }}
-          >
+        <div role="dialog" aria-modal="true" aria-labelledby="add-coach-title" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ width: 'min(460px, 100%)', background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, boxShadow: '0 16px 48px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: `1px solid ${brand.border}` }}>
-              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>Hire New Coach</div>
-              <div onClick={() => setShowHireModal(false)} style={{ cursor: 'pointer', padding: 4 }}><X size={16} color={brand.textMuted} /></div>
+              <div id="add-coach-title" style={{ fontSize: 16, fontWeight: 700, fontFamily: fonts.display }}>Add Coach</div>
+              <button aria-label="Close" onClick={() => setShowHireModal(false)} style={{ cursor: 'pointer', padding: 6, border: 0, background: 'transparent' }}><X size={16} color={brand.textMuted} /></button>
             </div>
-            <form onSubmit={handleHireSubmit} style={{ padding: 24 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-                <div>
-                  <label style={labelStyle}>Full Name</label>
-                  <input required style={inputStyle} value={hireForm.name} onChange={e => setHireForm(f => ({ ...f, name: e.target.value }))} placeholder="Alex Johnson" />
-                </div>
-                <div>
-                  <label style={labelStyle}>Email</label>
-                  <input required type="email" style={inputStyle} value={hireForm.email} onChange={e => setHireForm(f => ({ ...f, email: e.target.value }))} placeholder="alex@infinitehitting.com" />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-                <div>
-                  <label style={labelStyle}>Specialty</label>
-                  <select style={{ ...inputStyle, appearance: 'auto' }} value={hireForm.specialty} onChange={e => setHireForm(f => ({ ...f, specialty: e.target.value }))}>
-                    <option>Hitting / Power</option>
-                    <option>Pitching / Mechanics</option>
-                    <option>Fielding / Speed</option>
-                    <option>Catching / Defence</option>
-                    <option>General / Multi-skill</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Weekly Hours</label>
-                  <input type="number" min="1" max="60" style={inputStyle} value={hireForm.weeklyHours} onChange={e => setHireForm(f => ({ ...f, weeklyHours: e.target.value }))} />
-                </div>
-              </div>
-              <div style={{ padding: '12px 14px', background: brand.surfaceAlt, borderRadius: 8, marginBottom: 20, fontSize: 12, color: brand.textMuted, lineHeight: 1.5 }}>
-                An invitation email will be sent to the coach. They&apos;ll set their password and appear in the roster once they complete onboarding.
-              </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <OButton variant="secondary" onClick={() => setShowHireModal(false)}>Cancel</OButton>
-                <OButton variant="gold" icon={Plus}>Send Invitation</OButton>
-              </div>
-            </form>
+            <div style={{ padding: 24 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Coach creation is unavailable here</div>
+              <div style={{ fontSize: 12, color: brand.textMuted, lineHeight: 1.6 }}>No connected staff-creation flow is available in this portal, so no invitation has been sent. The default specialty for a new coach is <strong style={{ color: brand.text }}>Hitting Instructor</strong>.</div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}><OButton variant="secondary" onClick={() => setShowHireModal(false)}>Close</OButton></div>
+            </div>
           </div>
         </div>
       )}

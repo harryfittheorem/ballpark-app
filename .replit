@@ -102,7 +102,7 @@ NEXT_PUBLIC_PORTAL_URL = "https://ballpark-app.replit.app"
 EXPO_PUBLIC_PORTAL_URL = "https://ih.fittcoaching.ai"
 
 [userenv.development]
-EXPO_PUBLIC_PORTAL_URL = "https://4799229d-16d5-4596-8bee-aa8967d74d38-00-jk387h4icuwo-4mjbmbfq.riker.replit.dev"
+EXPO_PUBLIC_PORTAL_URL = "https://4799229d-16d5-4596-8bee-aa8967d74d38-00-jk387h4icuwo-ej9sks4f.riker.replit.dev"
 
 [postMerge]
 path = "scripts/post-merge.sh"
@@ -149,7 +149,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "EXPO_PACKAGER_PROXY_URL=\"https://$REPLIT_DEV_DOMAIN\" EXPO_MANIFEST_PROXY_URL=\"https://$REPLIT_DEV_DOMAIN\" npx expo start --port 8080 < /dev/null"
+args = "EXPO_PUBLIC_PORTAL_URL=\"https://$REPLIT_DEV_DOMAIN\" EXPO_PACKAGER_PROXY_URL=\"https://$REPLIT_DEV_DOMAIN\" EXPO_MANIFEST_PROXY_URL=\"https://$REPLIT_DEV_DOMAIN\" npx expo start --port 8080 < /dev/null"
 
 [[workflows.workflow]]
 name = "Portal dev"

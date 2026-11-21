@@ -1394,7 +1394,13 @@ export function MemberDetailContent({ member: initialMember, waiverStatus, waive
         <div>
           {/* KPI row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20 }}>
-            <KPIBlock label="Sessions Done" value={m.bookingCount} sub="completed" />
+            <a
+              href="#lesson-history"
+              aria-label={`View session history: ${m.bookingCount} completed sessions`}
+              style={{ color: 'inherit', textDecoration: 'none', borderRadius: 10 }}
+            >
+              <KPIBlock label="Sessions Done" value={m.bookingCount} sub="completed · view history" />
+            </a>
             <KPIBlock label="Member For" value={mo} sub="months" />
             <KPIBlock label="Engagement" value={m.engagementScore} sub="out of 100" highlight={m.engagementScore >= 70} />
             <KPIBlock label="Best Velo" value={demo ? `${demo.bestVeloMph} mph` : '—'} sub="exit velocity" highlight />
@@ -1422,13 +1428,6 @@ export function MemberDetailContent({ member: initialMember, waiverStatus, waive
                     <div style={{ fontSize: 28, fontWeight: 800, fontFamily: fonts.display, color: brand.success, marginTop: 2 }}>
                       {demo.hittraxBestVelo} <span style={{ fontSize: 13, color: brand.textMuted }}>mph</span>
                     </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Launch Angle</div>
-                    <div style={{ fontSize: 28, fontWeight: 800, fontFamily: fonts.display, color: brand.text, marginTop: 2 }}>
-                      {demo.hittraxLaunchAngle}<span style={{ fontSize: 13, color: brand.textMuted }}>°</span>
-                    </div>
-                    <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 2 }}>Optimal range</div>
                   </div>
                 </div>
                 <Sparkline points={demo.sparklinePoints} />

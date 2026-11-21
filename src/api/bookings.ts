@@ -347,10 +347,12 @@ export type StaffBooking = {
  *
  * Cancelled rows are excluded. Sorted by `scheduled_start` ascending.
  */
-export async function getTodayStaffBookings(): Promise<StaffBooking[]> {
+export async function getTodayStaffBookings(day?: string): Promise<StaffBooking[]> {
   // Server contract applies tenant, location and instructor scope. Do not
   // filter unassigned facility lessons out on the client.
-  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const start = day ? new Date(`${day}T00:00:00`) : new Date();
+  if (Number.isNaN(start.getTime())) throw new Error('Choose a valid roster date.');
+  start.setHours(0, 0, 0, 0);
   const end = new Date(start); end.setDate(end.getDate() + 1);
   const { data, error } = await (supabase as unknown as import('@supabase/supabase-js').SupabaseClient)
     .rpc('get_staff_checkin_roster', { p_start: start.toISOString(), p_end: end.toISOString() });

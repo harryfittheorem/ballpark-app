@@ -36,6 +36,8 @@ import { useCoach } from '@/hooks/useCoach';
 import { isWithinUndoWindow, useStaffSessions, type StaffBookingWithPending } from '@/hooks/useStaffSessions';
 import { colors, fontFamilies, fontSizes, radius, spacing } from '@/theme';
 import { getCheckInInstructors, correctBookingInstructor, type CheckInInstructor } from '@/api/bookings';
+import { useNavigation } from '@react-navigation/native';
+import type { CoachInboxStackScreenProps } from '@/navigation/types';
 
 // ─── Time formatting ──────────────────────────────────────────────────────────
 
@@ -48,6 +50,15 @@ function formatTime(iso: string): string {
   return min === 0
     ? `${h12}:00 ${ampm}`
     : `${h12}:${String(min).padStart(2, '0')} ${ampm}`;
+}
+
+function localDateValue(date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function rosterDateLabel(day: string): string {
+  const date = new Date(`${day}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? day : date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 // ─── Session grouping ─────────────────────────────────────────────────────────
@@ -126,6 +137,7 @@ type RosterRowProps = {
 };
 
 function RosterRow({ booking: b, onAction }: RosterRowProps) {
+  const navigation = useNavigation<CoachInboxStackScreenProps<'InboxHome'>['navigation']>();
   const [instructors, setInstructors] = useState<CheckInInstructor[]>([]);
   const [actualCoachId, setActualCoachId] = useState('');
   const [reason, setReason] = useState('');
@@ -176,6 +188,22 @@ function RosterRow({ booking: b, onAction }: RosterRowProps) {
       <Text style={{ color: colors.textLight }}>
         Actual instructor: {[b.actual_coach_first_name,b.actual_coach_last_name].filter(Boolean).join(' ') || 'Not recorded'}
       </Text>
+      {b.kid_id ? (
+        <Pressable
+          style={rosterStyles.recordButton}
+          onPress={() => navigation.navigate('StaffCoachingRecord', {
+            bookingId: b.id,
+            kidId: b.kid_id!,
+            kidName,
+            locationId: b.location_id,
+            bookingStart: b.scheduled_start,
+          })}
+          accessibilityRole="button"
+          accessibilityLabel={`Record training measurement or private lesson note for ${kidName}`}
+        >
+          <Text style={rosterStyles.recordButtonText}>Training record · EV / private note</Text>
+        </Pressable>
+      ) : null}
       {b.type_category !== 'cage' && (isActionable || (b.status === 'completed' && b.can_correct_instructor)) && (
         <View style={{ gap: 8 }}>
           <Text style={{ color: colors.textLight }}>Choose actual instructor</Text>
@@ -326,6 +354,20 @@ const rosterStyles = StyleSheet.create({
     fontSize: fontSizes.xs,
     fontStyle: 'italic',
     flexShrink: 0,
+  },
+  recordButton: {
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: radius.md,
+    paddingVertical: 11,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    backgroundColor: colors.darkest,
+  },
+  recordButtonText: {
+    color: colors.gold,
+    fontFamily: fontFamilies.interBold,
+    fontSize: fontSizes.sm,
   },
 });
 
@@ -510,8 +552,11 @@ export default function SessionsBody() {
 
   const isCoach = appRole === 'coach';
   const coachId = isCoach ? (coach?.id ?? undefined) : undefined;
+  const [day, setDay] = useState(localDateValue);
+  const [dateDraft, setDateDraft] = useState(localDateValue);
+  const [dateError, setDateError] = useState('');
 
-  const { bookings, isPending, isError, error, refetch, mutate } = useStaffSessions(coachId, isCoach);
+  const { bookings, isPending, isError, error, refetch, mutate } = useStaffSessions(coachId, isCoach, day);
 
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
@@ -544,25 +589,73 @@ export default function SessionsBody() {
     try { await refetch(); } finally { setRefreshing(false); }
   }, [refetch]);
 
+  const applyRosterDate = useCallback(() => {
+    const candidate = dateDraft.trim();
+    const date = new Date(`${candidate}T12:00:00`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(candidate) || Number.isNaN(date.getTime()) || localDateValue(date) !== candidate) {
+      setDateError('Enter a valid date in YYYY-MM-DD format.');
+      return;
+    }
+    if (candidate > localDateValue()) {
+      setDateError('Future rosters are not available. Choose today or an earlier date.');
+      return;
+    }
+    setDateError('');
+    setDay(candidate);
+  }, [dateDraft]);
+
   const sessions = groupIntoSessions(bookings);
+  const dateToolbar = (
+    <View style={bodyStyles.datePanel}>
+      <Text style={bodyStyles.dateLabel}>ROSTER DATE</Text>
+      <View style={bodyStyles.dateRow}>
+        <TextInput
+          value={dateDraft}
+          onChangeText={value => { setDateDraft(value); setDateError(''); }}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={colors.textMuted}
+          style={bodyStyles.dateInput}
+          accessibilityLabel="Roster date, YYYY-MM-DD"
+          maxLength={10}
+          returnKeyType="done"
+          onSubmitEditing={applyRosterDate}
+        />
+        <Pressable onPress={applyRosterDate} style={bodyStyles.dateButton} accessibilityRole="button">
+          <Text style={bodyStyles.dateButtonText}>View</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => { const today = localDateValue(); setDateDraft(today); setDay(today); setDateError(''); }}
+          style={bodyStyles.todayButton}
+          accessibilityRole="button"
+          accessibilityLabel="Show today's roster"
+        >
+          <Text style={bodyStyles.todayButtonText}>Today</Text>
+        </Pressable>
+      </View>
+      {!!dateError && <Text accessibilityRole="alert" style={bodyStyles.dateError}>{dateError}</Text>}
+      <Text style={bodyStyles.selectedDate}>Showing {rosterDateLabel(day)}</Text>
+    </View>
+  );
 
   if (isPending) {
     return (
-      <View style={bodyStyles.center}>
-        <ActivityIndicator color={colors.gold} size="large" />
+      <View style={bodyStyles.stateRoot}>
+        {dateToolbar}
+        <View style={bodyStyles.center}><ActivityIndicator color={colors.gold} size="large" /></View>
       </View>
     );
   }
 
   if (isError) {
     return (
-      <View style={bodyStyles.center}>
-        <Text style={bodyStyles.errorText}>
+      <View style={bodyStyles.stateRoot}>
+        {dateToolbar}
+        <View style={bodyStyles.center}><Text style={bodyStyles.errorText}>
           {error instanceof Error ? error.message : 'Failed to load sessions.'}
         </Text>
         <Pressable style={bodyStyles.retryBtn} onPress={() => void refetch()}>
           <Text style={bodyStyles.retryText}>Retry</Text>
-        </Pressable>
+        </Pressable></View>
       </View>
     );
   }
@@ -576,7 +669,8 @@ export default function SessionsBody() {
             tintColor={colors.gold} colors={[colors.gold]} />
         }
       >
-        <Text style={bodyStyles.emptyText}>No sessions scheduled for today.</Text>
+        {dateToolbar}
+        <Text style={bodyStyles.emptyText}>No sessions scheduled for {rosterDateLabel(day)}.</Text>
       </ScrollView>
     );
   }
@@ -586,6 +680,7 @@ export default function SessionsBody() {
       <FlatList
         data={sessions}
         keyExtractor={(item) => item.key}
+        ListHeaderComponent={dateToolbar}
         contentContainerStyle={bodyStyles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh}
@@ -602,6 +697,7 @@ export default function SessionsBody() {
 
 const bodyStyles = StyleSheet.create({
   root: { flex: 1 },
+  stateRoot: { flex: 1, paddingHorizontal: spacing['3xl'], paddingTop: spacing['2xl'] },
   list: {
     paddingHorizontal: spacing['3xl'],
     paddingTop: spacing['2xl'],
@@ -634,15 +730,36 @@ const bodyStyles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   emptyContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing['5xl'],
+    flexGrow: 1,
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
+    paddingHorizontal: spacing['3xl'],
+    paddingTop: spacing['2xl'],
+    paddingBottom: spacing['5xl'],
   },
   emptyText: {
     color: colors.textLight,
     fontFamily: fontFamilies.interRegular,
     fontSize: fontSizes.md,
     textAlign: 'center',
+    marginTop: spacing['5xl'],
   },
+  datePanel: {
+    backgroundColor: colors.darker,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing['2xl'],
+    gap: spacing.sm,
+  },
+  dateLabel: { color: colors.gold, fontFamily: fontFamilies.oswaldBold, fontSize: fontSizes.xs, letterSpacing: 1 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  dateInput: { flex: 1, minWidth: 0, color: colors.cream, backgroundColor: colors.darkest, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, fontFamily: fontFamilies.interMedium, fontSize: fontSizes.md },
+  dateButton: { minHeight: 44, minWidth: 54, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.gold, borderRadius: radius.md, paddingHorizontal: spacing.md },
+  dateButtonText: { color: colors.dark, fontFamily: fontFamilies.interBold, fontSize: fontSizes.sm },
+  todayButton: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: colors.gold, borderRadius: radius.md, paddingHorizontal: spacing.md },
+  todayButtonText: { color: colors.gold, fontFamily: fontFamilies.interBold, fontSize: fontSizes.sm },
+  selectedDate: { color: colors.textLight, fontFamily: fontFamilies.interRegular, fontSize: fontSizes.xs },
+  dateError: { color: '#F87171', fontFamily: fontFamilies.interRegular, fontSize: fontSizes.xs },
 });

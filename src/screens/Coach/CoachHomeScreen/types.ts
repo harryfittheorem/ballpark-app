@@ -6,6 +6,7 @@ export type CoachActionCardProps = {
   subtitle: string;
   icon: ComponentType<LucideProps>;
   onPress: () => void;
+  disabled?: boolean;
 };
 
 export type CoachGreetingHeaderProps = {

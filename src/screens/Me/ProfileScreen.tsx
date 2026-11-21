@@ -14,7 +14,6 @@ import {
   Sparkles,
   Star,
   Target,
-  TrendingUp,
   Trophy,
   Crown,
   Flame,
@@ -35,11 +34,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { deleteAccount } from '@/api/account';
 import { signOut } from '@/api/auth';
+import { getFamilyCoachingRecords } from '@/api/coaching';
 import { useActiveMembership } from '@/hooks/useActiveMembership';
 import { useAuth } from '@/hooks/useAuth';
 import { useDeleteKid } from '@/hooks/useFamily';
@@ -77,7 +78,6 @@ const ICONS: Record<string, LucideIcon> = {
 
 type PbMetric =
   | 'exit_velocity_mph'
-  | 'launch_angle_deg'
   | 'distance_ft'
   | 'contact_rate';
 
@@ -89,7 +89,6 @@ const PB_TILES: Array<{
   digits: number;
 }> = [
   { metric: 'exit_velocity_mph', label: 'EXIT VELO',    unit: 'MPH', icon: Gauge,      digits: 1 },
-  { metric: 'launch_angle_deg',  label: 'LAUNCH ANGLE', unit: '°',   icon: TrendingUp, digits: 0 },
   { metric: 'distance_ft',       label: 'DISTANCE',     unit: 'FT',  icon: Ruler,      digits: 0 },
   { metric: 'contact_rate',      label: 'CONTACT RATE', unit: '%',   icon: Target,     digits: 0 },
 ];
@@ -102,6 +101,12 @@ function fmtPb(v: number, digits: number): string {
 export default function ProfileScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { family, kid, kids, setSelectedKid } = useSelectedKid();
+  const { data: coachingRecords } = useQuery({
+    queryKey: ['family-coaching-records', user?.id, kid?.id],
+    queryFn: () => getFamilyCoachingRecords(kid!.id),
+    enabled: !!user?.id && !!kid?.id,
+  });
+  const pendingLessonRatings = coachingRecords?.lessons.filter(lesson => !lesson.rating).length ?? 0;
   const deleteKid = useDeleteKid();
 
   const { data: primaryLocation } = usePrimaryLocation();
@@ -353,6 +358,15 @@ export default function ProfileScreen({ navigation }: Props) {
           icon={BookOpen}
           label="Bookings"
           onPress={() => navigation.navigate('BookingsList')}
+        />
+        <Row
+          icon={Star}
+          label="Game stats & lesson ratings"
+          subtitle={pendingLessonRatings > 0
+            ? `${pendingLessonRatings} completed lesson${pendingLessonRatings !== 1 ? 's' : ''} to rate`
+            : 'Add game stats and review lessons'}
+          subtitleTone="gold"
+          onPress={() => navigation.navigate('FamilyCoaching')}
         />
         <Row
           icon={Gift}

@@ -45,8 +45,8 @@ export type StaffBookingWithPending = StaffBooking & {
 /** True when a coach has no coachId yet (coach row is still loading). */
 type CoachIdState = string | null | undefined;
 
-function staffSessionsKey(coachId: CoachIdState, actorId?: string) {
-  return ['staff-sessions', actorId, coachId ?? 'all'] as const;
+function staffSessionsKey(coachId: CoachIdState, actorId?: string, day?: string) {
+  return ['staff-sessions', actorId, coachId ?? 'all', day ?? 'today'] as const;
 }
 
 export function isWithinUndoWindow(b: StaffBooking): boolean {
@@ -61,20 +61,20 @@ export function isWithinUndoWindow(b: StaffBooking): boolean {
  *   coachId is still undefined (coach row loading), the query is disabled so
  *   we don't accidentally fetch unfiltered bookings on a coach's behalf.
  */
-export function useStaffSessions(coachId: CoachIdState, isCoach = false) {
+export function useStaffSessions(coachId: CoachIdState, isCoach = false, day?: string) {
   const qc = useQueryClient();
   const { user } = useAuth();
 
   // Always-current key ref — closures in realtime and mutate read this, not
   // a captured snapshot from their creation time.
-  const keyRef = useRef(staffSessionsKey(coachId, user?.id));
-  keyRef.current = staffSessionsKey(coachId, user?.id);
+  const keyRef = useRef(staffSessionsKey(coachId, user?.id, day));
+  keyRef.current = staffSessionsKey(coachId, user?.id, day);
 
   const queryEnabled = !!user && (isCoach ? !!coachId : true);
 
   const { data: fetchedBookings, isPending, isError, error, refetch } = useQuery({
     queryKey: keyRef.current,
-    queryFn: () => getTodayStaffBookings(),
+    queryFn: () => getTodayStaffBookings(day),
     enabled: queryEnabled,
     staleTime: 30_000,
     refetchInterval: 30_000,

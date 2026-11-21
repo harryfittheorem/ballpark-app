@@ -11,6 +11,7 @@ import MembershipDetailsScreen from '@/screens/Me/MembershipDetailsScreen';
 import OrdersListScreen from '@/screens/Me/OrdersListScreen';
 import PaymentMethodScreen from '@/screens/Me/PaymentMethodScreen';
 import ProfileScreen from '@/screens/Me/ProfileScreen';
+import FamilyCoachingScreen from '@/screens/Me/FamilyCoachingScreen';
 import UpgradeMembershipScreen from '@/screens/Me/UpgradeMembershipScreen';
 import WaitlistClaimScreen from '@/screens/Me/WaitlistClaimScreen';
 import { colors, fontFamilies, fontSizes } from '@/theme';
@@ -33,6 +34,7 @@ export default function MeStackNavigator() {
       }}
     >
       <Stack.Screen name="MeHome" component={ProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="FamilyCoaching" component={FamilyCoachingScreen} options={{ title: 'Progress & lessons' }} />
       <Stack.Screen
         name="BookingsList"
         component={BookingsListScreen}

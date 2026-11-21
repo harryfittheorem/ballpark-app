@@ -5,13 +5,15 @@ import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/th
 
 import type { CoachActionCardProps } from '../types';
 
-export default function CoachActionCard({ title, subtitle, icon: Icon, onPress }: CoachActionCardProps) {
+export default function CoachActionCard({ title, subtitle, icon: Icon, onPress, disabled = false }: CoachActionCardProps) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
       accessibilityLabel={title}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, disabled && styles.disabled, pressed && !disabled && styles.pressed]}
     >
       <View style={styles.iconWrap}>
         <Icon size={28} color={colors.gold} />
@@ -41,6 +43,7 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.85,
   },
+  disabled: { opacity: 0.72 },
   iconWrap: {
     width: 56,
     height: 56,

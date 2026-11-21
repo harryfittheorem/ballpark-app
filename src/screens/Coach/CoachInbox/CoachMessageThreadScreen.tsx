@@ -14,26 +14,21 @@
  */
 
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, PlayCircle, Send } from 'lucide-react-native';
-import { useMemo, useRef, useState } from 'react';
+import { ArrowLeft, PlayCircle } from 'lucide-react-native';
+import { useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { CoachThreadMessage } from '@/api/coachInbox';
-import { sendCoachTextReply } from '@/api/coachMessages';
-import { coachInboxKeys, useCoachMessageThread } from '@/hooks/useCoachInbox';
+import { useCoachMessageThread } from '@/hooks/useCoachInbox';
 import type { CoachInboxStackScreenProps } from '@/navigation/types';
 import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 import { errorMessage } from '@/utils/error';
@@ -62,9 +57,8 @@ function formatSentRelative(date: Date): string {
 export default function CoachMessageThreadScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { kidId, coachUserId, familyId, familyDisplayName } = route.params;
+  const { kidId, coachUserId, familyDisplayName } = route.params;
 
-  const queryClient = useQueryClient();
   const { data: messages, isPending, isError, error, refetch } = useCoachMessageThread(
     kidId,
     coachUserId,
@@ -73,45 +67,9 @@ export default function CoachMessageThreadScreen() {
   const data = useMemo(() => messages ?? [], [messages]);
   const flatListRef = useRef<FlatList>(null);
 
-  const [replyText, setReplyText] = useState('');
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
-
-  async function handleSend() {
-    const text = replyText.trim();
-    if (!text || sending) return;
-
-    setSending(true);
-    setSendError(null);
-    try {
-      await sendCoachTextReply({
-        recipientFamilyId: familyId,
-        recipientKidId: kidId,
-        messageText: text,
-      });
-      setReplyText('');
-      await queryClient.invalidateQueries({
-        queryKey: coachInboxKeys.thread(kidId, coachUserId),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: coachInboxKeys.inbox(coachUserId),
-      });
-      // Scroll to bottom after data refreshes
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 300);
-    } catch (e) {
-      setSendError(errorMessage(e));
-    } finally {
-      setSending(false);
-    }
-  }
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-      >
+      <View style={styles.flex}>
         {/* Header */}
         <View style={styles.headerBar}>
           <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
@@ -165,40 +123,10 @@ export default function CoachMessageThreadScreen() {
           />
         )}
 
-        {/* Compose bar */}
-        <View style={styles.composeArea}>
-          {sendError ? (
-            <Text style={styles.sendErrorText}>{sendError}</Text>
-          ) : null}
-          <View style={styles.composeRow}>
-            <TextInput
-              style={styles.input}
-              placeholder="Type a reply…"
-              placeholderTextColor={colors.textMuted}
-              value={replyText}
-              onChangeText={setReplyText}
-              multiline
-              maxLength={2000}
-              returnKeyType="default"
-            />
-            <Pressable
-              onPress={handleSend}
-              disabled={sending || !replyText.trim()}
-              style={({ pressed }) => [
-                styles.sendBtn,
-                (!replyText.trim() || sending) && styles.sendBtnDisabled,
-                pressed && styles.sendBtnPressed,
-              ]}
-            >
-              {sending ? (
-                <ActivityIndicator size="small" color={colors.dark} />
-              ) : (
-                <Send size={18} color={replyText.trim() ? colors.dark : colors.textMuted} />
-              )}
-            </Pressable>
-          </View>
+        <View style={styles.policyBanner}>
+          <Text style={styles.policyText}>Instructor-to-player messaging is unavailable. Adult messaging awaits approval. Historical messages remain available to read.</Text>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -321,6 +249,8 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     textAlign: 'center',
   },
+  policyBanner: { margin: spacing['2xl'], padding: spacing.lg, borderWidth: 1, borderColor: colors.borderGold, borderRadius: radius.md, backgroundColor: colors.darker },
+  policyText: { color: colors.textLight, fontFamily: fontFamilies.interRegular, fontSize: fontSizes.sm, lineHeight: 19 },
   list: {
     padding: spacing['3xl'],
     gap: spacing['2xl'],

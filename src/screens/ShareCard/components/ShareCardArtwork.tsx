@@ -15,13 +15,11 @@ import { colors, fontFamilies } from '@/theme';
 
 const METRIC_LABEL: Record<string, string> = {
   exit_velocity_mph: 'EXIT VELO',
-  launch_angle_deg: 'LAUNCH',
   distance_ft: 'DISTANCE',
   pitch_speed_mph: 'PITCH',
 };
 const METRIC_UNIT: Record<string, string> = {
   exit_velocity_mph: 'MPH',
-  launch_angle_deg: '°',
   distance_ft: 'FT',
   pitch_speed_mph: 'MPH',
 };
@@ -50,11 +48,11 @@ export default function ShareCardArtwork({
 }) {
   const metrics: { key: keyof Swing & string }[] = [
     { key: 'exit_velocity_mph' },
-    { key: 'launch_angle_deg' },
     { key: 'distance_ft' },
     { key: 'pitch_speed_mph' },
   ];
-  const isPr = prMetrics.length > 0;
+  const visiblePrMetrics = prMetrics.filter(metric => metric !== 'launch_angle_deg');
+  const isPr = visiblePrMetrics.length > 0;
 
   return (
     <View
@@ -175,8 +173,8 @@ export default function ShareCardArtwork({
       >
         {metrics.map(({ key }) => {
           const v = swing[key] as number | null;
-          const isPrMetric = prMetrics.includes(key);
-          const digits = key === 'launch_angle_deg' || key === 'distance_ft' ? 0 : 1;
+          const isPrMetric = visiblePrMetrics.includes(key);
+          const digits = key === 'distance_ft' ? 0 : 1;
           return (
             <View
               key={key}

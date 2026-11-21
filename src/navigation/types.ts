@@ -93,6 +93,14 @@ export type EarnStackScreenProps<T extends keyof EarnStackParamList> = Composite
 
 export type CoachInboxStackParamList = {
   CoachInboxHome: undefined;
+  StaffCoachingRecord: {
+    bookingId: string;
+    kidId: string;
+    kidName: string;
+    locationId: string;
+    bookingStart: string;
+  };
+  PhoneChecklists: undefined;
   StaffEnrollment: undefined;
   CoachMessageThread: { kidId: string; coachUserId: string; familyId: string; familyDisplayName?: string };
   InboxHome: undefined;
@@ -129,6 +137,7 @@ export type CoachTabScreenProps<T extends keyof CoachTabParamList> = BottomTabSc
  */
 export type MeStackParamList = {
   MeHome: undefined;
+  FamilyCoaching: undefined;
   BookingsList: undefined;
   BookingDetail: { bookingId: string };
   WaitlistClaim: { waitlistId: string };

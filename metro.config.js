@@ -53,6 +53,21 @@ config.resolver.unstable_enableSymlinks = true;
 // through directories that Watchman hasn't indexed.
 config.resolver.nodeModulesPaths = [path.join(projectRoot, 'node_modules')];
 
+// Stripe's native SDK imports React Native internals that cannot be bundled
+// for web. This explicit unavailable implementation never simulates payment.
+const previousResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (platform === 'web' && moduleName === '@stripe/stripe-react-native') {
+    return {
+      type: 'sourceFile',
+      filePath: path.join(projectRoot, 'src/lib/stripeWebUnavailable.tsx'),
+    };
+  }
+  return previousResolveRequest
+    ? previousResolveRequest(context, moduleName, platform)
+    : context.resolveRequest(context, moduleName, platform);
+};
+
 config.watcher = config.watcher || {};
 config.watcher.healthCheck = {
   ...(config.watcher.healthCheck || {}),

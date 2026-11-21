@@ -31,7 +31,6 @@ function fmt0(v: number | null | undefined): string {
   if (v == null) return '—';
   return String(Math.round(Number(v)));
 }
-
 export default function SwingThumbnail({ swing, favorited, onPress }: Props) {
   const isPr = !!swing.is_personal_best;
   return (
@@ -74,7 +73,6 @@ export default function SwingThumbnail({ swing, favorited, onPress }: Props) {
       ) : null}
       <View style={styles.metricStrip}>
         <Metric label="EV" value={fmt1(swing.exit_velocity_mph)} pr={isPr} />
-        <Metric label="LA" value={fmt0(swing.launch_angle_deg)} pr={isPr} />
         <Metric label="DIST" value={fmt0(swing.distance_ft)} pr={isPr} />
       </View>
     </Pressable>

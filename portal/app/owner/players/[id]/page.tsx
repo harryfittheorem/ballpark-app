@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireOwnerContext } from '@/lib/ownerAccess';
 import { getScopedPlayer } from '@/lib/supabase/playerProfile';
-import { getMemberDetail, getBookingFormOptions } from '@/lib/supabase/ownerQueries';
+import { getMemberDetail, getBookingFormOptions, getPlayerCoachingHistory, type CoachLessonDetail } from '@/lib/supabase/ownerQueries';
 import { MemberDetailContent } from '../../members/[id]/MemberDetailContent';
 import { playerHref } from '@/lib/playerLinks';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
@@ -11,7 +11,7 @@ export const metadata = { title: 'Player profile — Clubhouse by Infinite Hitti
 
 export default async function PlayerPage({ params, searchParams }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ membership?: string; paymentsPage?: string }>;
+  searchParams: Promise<{ membership?: string; paymentsPage?: string; lessonsPage?: string }>;
 }) {
   const [{ id }, query, { client, tenantId }] = await Promise.all([params, searchParams, requireOwnerContext()]);
   const player = await getScopedPlayer(client, tenantId, id);
@@ -27,11 +27,14 @@ export default async function PlayerPage({ params, searchParams }: {
   const historyClient = createServiceClient();
   const requestedPage = Number(query.paymentsPage ?? 1);
   const paymentsPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const requestedLessonsPage = Number(query.lessonsPage ?? 1);
+  const lessonsPage = Number.isSafeInteger(requestedLessonsPage) && requestedLessonsPage > 0 ? requestedLessonsPage : 1;
   const pageSize = 50;
 
-  const [detail, bookingOptions, payments] = await Promise.all([
+  const [detail, bookingOptions, lessonHistory, payments] = await Promise.all([
     selected ? getMemberDetail(historyClient, tenantId, selected.id) : Promise.resolve(null),
     getBookingFormOptions(historyClient, tenantId),
+    getPlayerCoachingHistory(client, id, lessonsPage),
     player.memberships.length ? historyClient.from('payment_events')
       .select('id, membership_id, created_at, amount_cents, payment_method, status', { count: 'exact' })
       .eq('tenant_id', tenantId).in('membership_id', player.memberships.map(m => m.id))
@@ -41,7 +44,9 @@ export default async function PlayerPage({ params, searchParams }: {
   if (payments.error) throw new Error('Unable to load payment history. Please retry.');
   if (selected && !detail) throw new Error('Unable to load membership details. Please retry.');
   const paymentPageHref = (page: number) =>
-    `/owner/players/${id}?${new URLSearchParams({ ...(selected ? { membership: selected.id } : {}), paymentsPage: String(page) })}#payment-history`;
+    `/owner/players/${id}?${new URLSearchParams({ ...(selected ? { membership: selected.id } : {}), paymentsPage: String(page), lessonsPage: String(lessonsPage) })}#payment-history`;
+  const lessonPageHref = (page: number) =>
+    `/owner/players/${id}?${new URLSearchParams({ ...(selected ? { membership: selected.id } : {}), paymentsPage: String(paymentsPage), lessonsPage: String(page) })}#lesson-history`;
 
   let waiverStatus: 'signed' | 'unsigned' | 'outdated' | null = null;
   let waiverSignedAt: string | null = null;
@@ -64,6 +69,7 @@ export default async function PlayerPage({ params, searchParams }: {
         <strong style={{ alignSelf: 'center' }}>{[player.kid.first_name, player.kid.last_name].filter(Boolean).join(' ')}</strong>
         <Link href="/owner/members">All members</Link>
         <a href="#player-details">Profile</a>
+        <a href="#lesson-history">Lesson history</a>
         <a href="#payment-history">Payment history</a>
         <a href="#package-history">Package history</a>
       </nav>
@@ -71,6 +77,29 @@ export default async function PlayerPage({ params, searchParams }: {
         {detail ? <MemberDetailContent key={detail.id} member={detail} bookingOptions={bookingOptions}
           waiverStatus={waiverStatus} waiverSignedAt={waiverSignedAt} /> :
           <h1>{[player.kid.first_name, player.kid.last_name].filter(Boolean).join(' ')} — no linked memberships</h1>}
+      </section>
+      <section id="lesson-history" className="owner-history-section">
+        <h2>Session history</h2>
+        <p>Completed, no-show, and cancelled training sessions recorded for this player. Instructor names reflect the actual recorded instructor.</p>
+        {!lessonHistory.rows.length ? <p>{lessonsPage > 1 ? 'No sessions on this page.' : 'No session history recorded for this player.'}</p> :
+          <div role="region" aria-label="Player session history" tabIndex={0} style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', textAlign: 'left' }}>
+              <thead><tr><th>Player</th><th>Date &amp; time</th><th>Actual instructor</th><th>Session type</th><th>Status</th><th>Rating</th></tr></thead>
+              <tbody>{lessonHistory.rows.map((lesson: CoachLessonDetail) => <tr key={lesson.id}>
+                <td>{lesson.kid_name || 'Not recorded'}</td>
+                <td>{formatLessonDateTime(lesson.scheduled_start, lesson.scheduled_end)}</td>
+                <td>{lesson.actual_coach_name || 'Not recorded'}</td>
+                <td>{lesson.type_name || 'Not recorded'}</td>
+                <td>{lessonStatusLabel(lesson.status)}</td>
+                <td>{lesson.rating == null ? 'Not rated' : `${lesson.rating}/5`}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>}
+        <nav aria-label="Lesson history pages" className="owner-payment-tools">
+          {lessonsPage > 1 && <Link href={lessonPageHref(lessonsPage - 1)}>Previous sessions</Link>}
+          <span style={{ alignSelf: 'center' }}>Page {lessonsPage} · {lessonHistory.total} sessions</span>
+          {lessonHistory.total > lessonsPage * pageSize && <Link href={lessonPageHref(lessonsPage + 1)}>Next sessions</Link>}
+        </nav>
       </section>
       <section id="package-history" className="owner-history-section">
         <h2>Package history</h2>
@@ -107,4 +136,22 @@ export default async function PlayerPage({ params, searchParams }: {
       </section>
     </>
   );
+}
+
+function formatLessonDateTime(start: string, end: string): string {
+  const startsAt = new Date(start);
+  if (Number.isNaN(startsAt.getTime())) return 'Date and time unavailable';
+  const startText = startsAt.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const endsAt = new Date(end);
+  const endText = Number.isNaN(endsAt.getTime())
+    ? ''
+    : endsAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return endText ? `${startText} – ${endText}` : startText;
+}
+
+function lessonStatusLabel(status: string): string {
+  if (status === 'completed') return 'Completed';
+  if (status === 'no_show') return 'No-show';
+  if (status === 'cancelled') return 'Cancelled';
+  return status || 'Not recorded';
 }

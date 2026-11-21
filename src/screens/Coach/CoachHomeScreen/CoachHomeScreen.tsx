@@ -177,10 +177,11 @@ export default function CoachHomeScreen() {
           )}
           <View style={[styles.section, styles.cards]}>
             <CoachActionCard
-              title="New Video"
-              subtitle="Record a quick message and send it to a family."
+              title="Video messaging unavailable"
+              subtitle="Instructor-to-player messaging is unavailable. Adult messaging awaits approval."
               icon={Video}
               onPress={() => navigation.navigate('RecordVideo')}
+              disabled
             />
             <CoachActionCard
               title="My Videos"
@@ -209,6 +210,12 @@ export default function CoachHomeScreen() {
                   subtitle="Rate and respond to submitted drills."
                   icon={ClipboardCheck}
                   onPress={() => navigation.navigate('ReviewQueue')}
+                />
+                <CoachActionCard
+                  title="Training Checklists"
+                  subtitle="Open assigned published lesson checklists on your phone."
+                  icon={ClipboardCheck}
+                  onPress={() => navigation.navigate('PhoneChecklists')}
                 />
               </>
             )}

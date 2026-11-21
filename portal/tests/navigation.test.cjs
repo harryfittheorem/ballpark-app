@@ -311,6 +311,12 @@ test('authorized profile renders all linked packages and scoped payment history'
     }) },
     '@/lib/supabase/ownerQueries': {
       getMemberDetail: async () => ({ id: membershipId }), getBookingFormOptions: async () => ({}),
+      getPlayerCoachingHistory: async (authenticatedClient, athlete, page) => {
+        assert.equal(authenticatedClient, client); assert.equal(athlete, kidId); assert.equal(page, 1);
+        return { total: 1, rows: [{ id: 'lesson', kid_name: 'Same Name', scheduled_start: '2026-01-01T12:00:00Z',
+          scheduled_end: '2026-01-01T13:00:00Z', actual_coach_name: null, type_name: 'Hitting Lesson',
+          status: 'completed', rating: 4 }] };
+      },
     },
     '../../members/[id]/MemberDetailContent': { MemberDetailContent: () => React.createElement('div', null, 'Profile detail') },
   });
@@ -318,6 +324,9 @@ test('authorized profile renders all linked packages and scoped payment history'
   const html = renderToStaticMarkup(element);
   assert.match(html, /id="payment-history"/);
   assert.match(html, /id="package-history"/);
+  assert.match(html, /id="lesson-history"/);
+  assert.match(html, /Not recorded/);
+  assert.match(html, /Hitting Lesson/);
   assert.match(html, /Old Pack/);
   assert.match(html, /Current Pack/);
   assert.match(html, /25\.00/);
@@ -424,6 +433,7 @@ test('client-side package navigation resets balances and sends overrides only to
       '@/lib/supabase/ownerQueries': {
         getMemberDetail: async (_client, _tenant, id) => members.get(id),
         getBookingFormOptions: async () => ({ coaches: [], sessionTypes: [], locations: [] }),
+        getPlayerCoachingHistory: async () => ({ rows: [], total: 0 }),
       },
       '../../members/[id]/MemberDetailContent': detailModule,
     }).default;

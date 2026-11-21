@@ -103,8 +103,7 @@ export default function SentVideosScreen() {
               </View>
               <Text style={styles.emptyTitle}>No videos yet</Text>
               <Text style={styles.emptyBody}>
-                You haven&apos;t sent any videos yet — tap New Video to send
-                your first.
+                No previously sent videos to show yet.
               </Text>
             </View>
           }

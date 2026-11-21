@@ -33,6 +33,7 @@
 // =============================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { INSTRUCTOR_ADULT_MESSAGING_APPROVED } from '../_shared/coachingPolicy.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { buildEmailSender, sendResendEmail as sendBrandedEmail } from '../_shared/email.ts';
 
@@ -95,6 +96,9 @@ serve(async (req) => {
   const token = authHeader.slice(7).trim();
   if (token !== SUPABASE_SERVICE_ROLE_KEY) {
     return jsonError(401, "unauthorized", "Service role required");
+  }
+  if (!INSTRUCTOR_ADULT_MESSAGING_APPROVED) {
+    return jsonOk({ ok: true, skipped: "adult_messaging_policy_required" });
   }
 
   // ---- 2. Parse body ------------------------------------------------------

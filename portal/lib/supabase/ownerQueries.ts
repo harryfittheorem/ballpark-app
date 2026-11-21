@@ -126,6 +126,8 @@ export type OwnerCoach = {
   utilization: number;
   retention: number;
   avgRating: number | null;
+  ratedCount?: number;
+  eligibleCount?: number;
   revenue: number;
   weeklyHours: number;
   joinedDate: string;
@@ -508,31 +510,21 @@ export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string
   if (error || !coaches) return [];
 
   const coachIds = coaches.map(c => c.id);
-  const coachUserIds = coaches
-    .map(c => (c as unknown as { user_id: string | null }).user_id)
-    .filter((id): id is string => !!id);
   const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
 
-  const [bookingsRes, assignmentsRes] = await Promise.all([
+  const [bookingsRes, lessonReport] = await Promise.all([
     supabase
       .from('bookings')
-      .select('coach_id, kid_id, status, scheduled_start, session_types(base_price_cents)')
+      .select('actual_coach_id, kid_id, status, scheduled_start, session_types(base_price_cents)')
       .eq('tenant_id', tenantId)
-      .in('coach_id', coachIds)
+      .in('actual_coach_id', coachIds)
       .gte('scheduled_start', ninetyDaysAgo),
-    coachUserIds.length > 0
-      ? supabase
-          .from('assignments')
-          .select('coach_user_id, rating')
-          .eq('tenant_id', tenantId)
-          .in('coach_user_id', coachUserIds)
-          .eq('status', 'reviewed')
-          .not('rating', 'is', null)
-      : Promise.resolve({ data: [] as { coach_user_id: string; rating: number }[], error: null }),
+    getCoachHours(supabase, tenantId, ninetyDaysAgo.slice(0,10), new Date().toISOString().slice(0,10)),
   ]);
+  if (bookingsRes.error || lessonReport === null) throw new Error('Coach lesson performance is unavailable. Please retry.');
 
   type BookingRow = {
-    coach_id: string;
+    actual_coach_id: string;
     kid_id: string;
     status: string;
     scheduled_start: string;
@@ -543,19 +535,13 @@ export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string
   const studentsByCoach: Record<string, Set<string>> = {};
   const revenueByCoach: Record<string, number> = {};
   for (const b of (bookingsRes.data ?? []) as unknown as BookingRow[]) {
-    if (!sessionsByCoach[b.coach_id]) sessionsByCoach[b.coach_id] = new Set();
-    sessionsByCoach[b.coach_id].add(b.scheduled_start);
-    if (!studentsByCoach[b.coach_id]) studentsByCoach[b.coach_id] = new Set();
-    studentsByCoach[b.coach_id].add(b.kid_id);
+    if (!sessionsByCoach[b.actual_coach_id]) sessionsByCoach[b.actual_coach_id] = new Set();
+    sessionsByCoach[b.actual_coach_id].add(b.scheduled_start);
+    if (!studentsByCoach[b.actual_coach_id]) studentsByCoach[b.actual_coach_id] = new Set();
+    studentsByCoach[b.actual_coach_id].add(b.kid_id);
     if (b.status === 'completed' && b.session_types) {
-      revenueByCoach[b.coach_id] = (revenueByCoach[b.coach_id] ?? 0) + b.session_types.base_price_cents;
+      revenueByCoach[b.actual_coach_id] = (revenueByCoach[b.actual_coach_id] ?? 0) + b.session_types.base_price_cents;
     }
-  }
-
-  const ratingsByCoachUser: Record<string, number[]> = {};
-  for (const a of (assignmentsRes.data ?? []) as { coach_user_id: string; rating: number }[]) {
-    if (!ratingsByCoachUser[a.coach_user_id]) ratingsByCoachUser[a.coach_user_id] = [];
-    ratingsByCoachUser[a.coach_user_id].push(a.rating);
   }
 
   return coaches.map(c => {
@@ -565,10 +551,8 @@ export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string
     const weeklyHours = Math.round((sessions / 13) * 1.5);
     const utilization = Math.min(100, Math.round((sessions / Math.max(sessions + 5, 40)) * 100));
 
-    const ratings = raw.user_id ? (ratingsByCoachUser[raw.user_id] ?? []) : [];
-    const avgRating = ratings.length > 0
-      ? Math.round(ratings.reduce((s, r) => s + r, 0) / ratings.length * 10) / 10
-      : null;
+    const performance = lessonReport.find(row => row.coach_id === c.id);
+    const avgRating = performance?.avg_rating ?? null;
 
     const revenue = Math.round((revenueByCoach[c.id] ?? 0) / 100);
     const specialty = raw.specialty?.trim() || 'Coach';
@@ -581,8 +565,10 @@ export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string
       specialty,
       students,
       utilization,
-      retention: 90,
+      retention: 0, // Not published: attribution model remains unapproved.
       avgRating,
+      ratedCount: performance?.rated_count ?? 0,
+      eligibleCount: performance?.eligible_count ?? 0,
       revenue,
       weeklyHours,
       joinedDate: formatJoinDate(c.created_at ?? new Date().toISOString()),
@@ -1675,13 +1661,28 @@ export async function getMemberDetail(
 export type CoachHoursRow = {
   coach_id: string;
   coach_name: string;
-  confirmed_count: number;
   completed_count: number;
   no_show_count: number;
   cancelled_count: number;
   total_hours: number;
+  avg_rating: number | null;
+  rated_count: number;
+  eligible_count: number;
+  original_hire_date: string | null;
+  first_anniversary: string | null;
+  lessons: CoachLessonDetail[];
 };
 
+export type CoachLessonDetail = {
+  id: string; kid_name: string; scheduled_start: string; scheduled_end: string;
+  actual_coach_name: string | null; type_name: string; status: string; rating: number | null;
+};
+
+export async function getPlayerCoachingHistory(supabase: SupabaseClient, kidId: string, page: number) {
+  const { data, error } = await supabase.rpc('get_player_coaching_history', { p_kid: kidId, p_page: page });
+  if (error || !data) throw new Error('Unable to load lesson history. Please retry.');
+  return data as { rows: CoachLessonDetail[]; total: number };
+}
 export async function getCoachHours(
   supabase: SupabaseClient,
   tenantId: string,
@@ -1689,10 +1690,9 @@ export async function getCoachHours(
   endDate: string,
 ): Promise<CoachHoursRow[] | null> {
   const { data, error } = await supabase
-    .rpc('get_coach_hours', {
-      p_tenant_id:  tenantId,
-      p_start_date: startDate,
-      p_end_date:   endDate,
+    .rpc('get_coaching_report', {
+      p_start: startDate,
+      p_end: endDate,
     });
 
   if (error) {
@@ -1703,11 +1703,16 @@ export async function getCoachHours(
   return (data ?? []).map((r: Record<string, unknown>) => ({
     coach_id:        r.coach_id as string,
     coach_name:      r.coach_name as string,
-    confirmed_count: Number(r.confirmed_count ?? 0),
     completed_count: Number(r.completed_count ?? 0),
     no_show_count:   Number(r.no_show_count ?? 0),
     cancelled_count: Number(r.cancelled_count ?? 0),
     total_hours:     Number(r.total_hours ?? 0),
+    avg_rating: r.avg_rating == null ? null : Number(r.avg_rating),
+    rated_count: Number(r.rated_count ?? 0),
+    eligible_count: Number(r.eligible_count ?? 0),
+    original_hire_date: r.original_hire_date as string | null,
+    first_anniversary: r.first_anniversary as string | null,
+    lessons: (r.lessons ?? []) as CoachLessonDetail[],
   }));
 }
 

@@ -492,6 +492,7 @@ export async function sendCoachTextReply(input: {
   recipientKidId: string;
   messageText: string;
 }): Promise<SentCoachMessage> {
+  requireInstructorMessagingApproval();
   const {
     data: { user },
     error: userErr,
@@ -526,6 +527,7 @@ export async function sendCoachTextReply(input: {
 export async function sendCoachMessage(
   input: SendCoachMessageInput,
 ): Promise<SentCoachMessage> {
+  requireInstructorMessagingApproval();
   const {
     data: { user },
     error: userErr,
@@ -568,4 +570,8 @@ export async function sendCoachMessage(
     .single();
   if (error) throw error;
   return data;
+}
+
+function requireInstructorMessagingApproval(): void {
+  throw new Error('Instructor-to-player messaging is unavailable. Adult messaging awaits policy approval; existing history is still available.');
 }

@@ -63,6 +63,7 @@
 // =============================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { INSTRUCTOR_ADULT_MESSAGING_APPROVED } from '../_shared/coachingPolicy.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -78,6 +79,7 @@ const MUX_WEBHOOK_SECRET = Deno.env.get("MUX_WEBHOOK_SECRET")!;
 // (`send-coach-video-notification`) are independent: one failing does not
 // block the other.
 async function fanOutCoachVideoNotifications(videoId: string): Promise<void> {
+  if (!INSTRUCTOR_ADULT_MESSAGING_APPROVED) return;
   const { data: video, error: vErr } = await adminClient
     .from("videos")
     .select("id, purpose")
