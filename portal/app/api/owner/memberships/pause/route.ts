@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       expected_resume_date: expectedResumeDate ?? null,
       reason: reason ?? null,
       created_by: userId,
-    }).catch(() => {});
+    }).then(null, () => {});
 
     return NextResponse.json({ ok: true });
   } catch (err) {
