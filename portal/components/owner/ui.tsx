@@ -36,10 +36,10 @@ const kpiColors: Record<KPIColor, { bg: string; border: string; iconBg: string; 
 const metricDescriptions: Record<string, string> = {
   'MRR': 'Monthly recurring revenue. Reporting period: current calendar month as of today. When Stripe is connected, this comes live from active Stripe subscriptions (EFT members only). When not connected, it is calculated from the most recent billing events in the database. Not a bank payout, cash balance, or guarantee of future collections.',
   'Collected (MTD)': 'Recorded collections since the start of the current month. Open transaction history to inspect individual payments.',
-  ‘Auto-Pay Rate’: ‘Percentage of scheduled EFT (auto-pay) charges that collected successfully this month. Calculated as: successful charges ÷ total attempted charges × 100. A failed charge that is retried counts each attempt separately. Does not include one-time card charges or pack purchases.’,
+  'Auto-Pay Rate': 'Percentage of scheduled EFT (auto-pay) charges that collected successfully this month. Calculated as: successful charges ÷ total attempted charges × 100. A failed charge that is retried counts each attempt separately. Does not include one-time card charges or pack purchases.',
   'Past Due': 'Outstanding failed payments in the existing billing report. Open Failed Payments to review available recovery actions.',
   'Revenue Today': 'Scheduled base value of confirmed and completed sessions today, not cash collected today.',
-  "Today's Sessions": 'Bookings scheduled for today, including cancelled sessions and no-shows. Open the schedule for each booking’s status.',
+  "Today's Sessions": "Bookings scheduled for today, including cancelled sessions and no-shows. Open the schedule for each booking's status.",
   'Active Members': 'Current active membership summary for this view; Today counts distinct families with active memberships.',
   'Total Cancelled': 'Recorded cancelled memberships within the selected cancellation-date period.',
   'Lost MRR (EFT)': 'Recurring monthly plan value of the cancelled EFT memberships in the selected period, not a refund total.',
