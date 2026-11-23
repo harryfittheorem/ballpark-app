@@ -7,7 +7,6 @@ export type DemoMemberDetail = Omit<MemberDetail,
   'sessionsRemaining' | 'sessionsTotal' |
   'weeklySessionsUsed' | 'weeklyTotal' | 'weeklyPeriodStart' |
   'familyId' | 'parentFirstName' | 'parentLastName' |
-  'cancelAt' | 'billingAnchorDay' | 'scheduledCharges' |
   'reviewAsked' | 'reviewLeft' | 'referralAsked' | 'referralGiven' |
   'adminEvents' | 'exitInterviewRequested' | 'waiverAuthorized' |
   'birthday' | 'sportType' | 'measurements' | 'measurementCount' | 'daysSinceLastMeasurement'
