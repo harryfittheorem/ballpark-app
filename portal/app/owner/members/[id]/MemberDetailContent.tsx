@@ -1623,7 +1623,7 @@ function ReEvalSection({ member }: { member: MemberDetail }) {
           title="Re-Evaluations"
           subtitle={measurementCount > 0 ? `${measurementCount} session${measurementCount !== 1 ? 's' : ''}` : undefined}
         />
-        <OButton variant="secondary" size="sm" disabled title="Use the booking form to record a session">
+        <OButton variant="secondary" size="sm" disabled>
           Log Re-Eval
         </OButton>
       </div>
