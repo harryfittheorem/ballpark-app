@@ -4,7 +4,8 @@ import { requireOwnerContext } from '@/lib/ownerAccess';
 
 export async function POST(req: NextRequest) {
   try {
-    const { email: staffEmail } = await requireOwnerContext();
+    const { user } = await requireOwnerContext();
+    const staffEmail = user.email;
     const { membershipId, field, value } = await req.json() as { membershipId: string; field: 'exit_interview_requested' | 'waiver_authorized'; value: boolean };
 
     if (!membershipId) return NextResponse.json({ error: 'Missing membershipId' }, { status: 400 });
