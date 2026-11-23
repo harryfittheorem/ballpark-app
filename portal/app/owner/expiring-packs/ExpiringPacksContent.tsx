@@ -194,7 +194,7 @@ export function ExpiringPacksContent({ packs: raw }: Props) {
         {/* Definition banner */}
         <div style={{ background: `${brand.info}12`, border: `1px solid ${brand.info}33`, borderRadius: 10, padding: '10px 16px', marginBottom: 20, fontSize: 12, color: brand.textMuted, lineHeight: 1.6 }}>
           <strong style={{ color: brand.text }}>Expiring Packs</strong> — OTC (upfront cash) session packs with an expiry date approaching or passed.
-          Trigger is the pack's calendar expiry date, regardless of sessions remaining.
+          Trigger is the pack&apos;s calendar expiry date, regardless of sessions remaining.
           {' '}<em>Compare with <strong style={{ color: brand.text }}>Low Balance Packs</strong>, which are filtered by sessions remaining (≤ 2 sessions left), not by expiry date.</em>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
