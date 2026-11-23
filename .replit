@@ -6,9 +6,8 @@ hidden = [".config", "package-lock.json", "node_modules"]
 channel = "stable-24_05"
 
 [deployment]
-run = ["npm", "--prefix", "portal", "run", "start"]
+run = ["sh", "-c", "npm --prefix portal run build && npm --prefix portal run start"]
 deploymentTarget = "autoscale"
-build = ["npm", "--prefix", "portal", "run", "build"]
 
 [env]
 PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin"
