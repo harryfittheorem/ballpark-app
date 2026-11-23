@@ -34,9 +34,9 @@ const kpiColors: Record<KPIColor, { bg: string; border: string; iconBg: string; 
 };
 
 const metricDescriptions: Record<string, string> = {
-  'MRR': 'Monthly recurring revenue from the existing billing report. This is not a bank payout or cash balance.',
+  'MRR': 'Monthly recurring revenue. Reporting period: current calendar month as of today. When Stripe is connected, this comes live from active Stripe subscriptions (EFT members only). When not connected, it is calculated from the most recent billing events in the database. Not a bank payout, cash balance, or guarantee of future collections.',
   'Collected (MTD)': 'Recorded collections since the start of the current month. Open transaction history to inspect individual payments.',
-  'Auto-Pay Rate': 'The existing billing report’s automatic-payment metric. This is not a guarantee that future charges will succeed.',
+  ‘Auto-Pay Rate’: ‘Percentage of scheduled EFT (auto-pay) charges that collected successfully this month. Calculated as: successful charges ÷ total attempted charges × 100. A failed charge that is retried counts each attempt separately. Does not include one-time card charges or pack purchases.’,
   'Past Due': 'Outstanding failed payments in the existing billing report. Open Failed Payments to review available recovery actions.',
   'Revenue Today': 'Scheduled base value of confirmed and completed sessions today, not cash collected today.',
   "Today's Sessions": 'Bookings scheduled for today, including cancelled sessions and no-shows. Open the schedule for each booking’s status.',
@@ -46,6 +46,13 @@ const metricDescriptions: Record<string, string> = {
   'Unused Sessions': 'Remaining pack sessions recorded on cancelled packages. Missing balances are not estimated.',
   'Revenue at Risk': 'Recorded failed payment amounts awaiting review. This is not a prediction of future collections.',
   'Accounts Affected': 'Failed payment records shown in this view. A family may have more than one failed payment.',
+  'LTV': 'Lifetime value is based on actual billed and collected payments recorded in the system — not the face value of purchased packs. A pack sold at a discount shows the discounted amount, not list price.',
+  'Lifetime': 'Total collected payments recorded for this member since their join date. Based on actual billed amounts, not the face value of packs purchased.',
+  'Engagement': 'Engagement score (0–100) measures how recently a member attended. Decreases by 4 points per day since their last session, flooring at 0. Score of 100 = attended today; below 50 = declining engagement. Does not factor in app logins or non-session activity.',
+  'At Risk': 'Members flagged based on attendance and account health. High risk: no session in 14+ days, account paused, or no re-evaluation in 30+ days. Medium risk: 7–13 days since last session. Click "View All" to see individual risk reasons.',
+  'Sessions Done': 'Total completed (attended) sessions since the member joined. Click to scroll to the full session history below.',
+  'Failed Payments': 'Count of payment events with a failed status recorded this month. Each retry attempt counts separately.',
+  'Churn Rate': 'Percentage of members who cancelled or did not renew in the selected period. Losses ÷ opening count. See Retention page for full methodology.',
 };
 
 export function KPICard({ label, value, unit, delta, deltaLabel, deltaInvert = false, icon: Icon, color = 'default' }: KPICardProps) {

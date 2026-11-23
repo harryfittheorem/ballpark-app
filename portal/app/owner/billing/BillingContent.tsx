@@ -70,6 +70,10 @@ export function BillingContent({ data }: Props) {
 
   const packages = data.packages;
   const recentTransactions = data.recentTransactions;
+  const [txPageSize, setTxPageSize] = useState<10 | 20 | 50>(10);
+  const [txPage, setTxPage] = useState(0);
+  const txPageCount = Math.ceil(recentTransactions.length / txPageSize);
+  const pagedTransactions = recentTransactions.slice(txPage * txPageSize, (txPage + 1) * txPageSize);
   const paidCount = data.paidCount;
   const failedCount = data.failedCount;
   const kpis = data.kpis;
@@ -229,11 +233,34 @@ export function BillingContent({ data }: Props) {
           subtitle={data.fetchedAt ? `Refreshed ${formatFetchedAt(data.fetchedAt)}` : undefined}
           action={<OButton variant="ghost" size="sm" onClick={() => router.push('/owner/revenue-reports')}>All transactions →</OButton>}
         />
+        {/* Rows-per-page selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 11, color: brand.textMuted, fontWeight: 600 }}>Rows per page:</span>
+          {([10, 20, 50] as const).map(n => (
+            <button key={n} type="button" onClick={() => { setTxPageSize(n); setTxPage(0); }} style={{
+              padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              background: txPageSize === n ? brand.goldDeep : brand.surface,
+              color: txPageSize === n ? brand.white : brand.text,
+              border: `1px solid ${txPageSize === n ? brand.goldDeep : brand.border}`,
+            }}>{n}</button>
+          ))}
+          <span style={{ fontSize: 11, color: brand.textMuted, marginLeft: 'auto' }}>
+            {recentTransactions.length} total
+          </span>
+        </div>
         <OTable
           columns={txColumns as TableColumn<Record<string, unknown>>[]}
-          rows={recentTransactions as unknown as Record<string, unknown>[]}
+          rows={pagedTransactions as unknown as Record<string, unknown>[]}
         />
         {recentTransactions.length === 0 && <p role="status">No recorded transactions. Live payments will appear here when available.</p>}
+        {/* Pagination controls */}
+        {txPageCount > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12 }}>
+            <button type="button" disabled={txPage === 0} onClick={() => setTxPage(p => p - 1)} style={{ padding: '4px 12px', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: txPage === 0 ? 'not-allowed' : 'pointer', border: `1px solid ${brand.border}`, background: brand.surface, color: txPage === 0 ? brand.textMuted : brand.text, opacity: txPage === 0 ? 0.5 : 1 }}>← Prev</button>
+            <span style={{ fontSize: 11, color: brand.textMuted, fontWeight: 600 }}>Page {txPage + 1} of {txPageCount}</span>
+            <button type="button" disabled={txPage >= txPageCount - 1} onClick={() => setTxPage(p => p + 1)} style={{ padding: '4px 12px', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: txPage >= txPageCount - 1 ? 'not-allowed' : 'pointer', border: `1px solid ${brand.border}`, background: brand.surface, color: txPage >= txPageCount - 1 ? brand.textMuted : brand.text, opacity: txPage >= txPageCount - 1 ? 0.5 : 1 }}>Next →</button>
+          </div>
+        )}
         </section>
       </div>
 

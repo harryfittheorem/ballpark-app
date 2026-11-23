@@ -402,7 +402,7 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: brand.surfaceAlt, borderBottom: `1px solid ${brand.border}` }}>
-                {['Package', 'Price', 'Active', 'MRR', '% of Revenue', 'LTV'].map((h, i) => (
+                {['Package', 'Plan Price (list)', 'Active', 'MRR', '% of Revenue', 'LTV'].map((h, i) => (
                   <th key={i} style={{
                     padding: '12px 16px',
                     textAlign: i === 0 ? 'left' : 'right',
@@ -430,6 +430,11 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
             </tbody>
           </table>
         </div>
+        <p style={{ fontSize: 11, color: brand.textMuted, marginTop: -16, marginBottom: 24, paddingLeft: 4 }}>
+          * <strong>Plan Price (list)</strong> is the configured monthly rate for each membership plan.
+          Actual amounts collected per member may differ due to promos, discounts, or pro-rations —
+          see the transaction list below for exact collected amounts.
+        </p>
           </>
         )}
 

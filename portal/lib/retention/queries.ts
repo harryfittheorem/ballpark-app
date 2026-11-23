@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { RetentionDataset, RetentionPolicy } from './types';
+import type { PauseAnalytics, RetentionDataset, RetentionPolicy } from './types';
 
 /** Always use explicit scope, including when the caller supplies a service client. */
 export async function getRetentionDataset(
@@ -12,6 +12,7 @@ export async function getRetentionDataset(
     names: {}, issues: [], asOf,
     finance: { available: false, reason: 'LTV unavailable — the approved R02 finance contract is not available. No independent estimate is calculated.' },
     instructors: { available: false, reason: 'Instructor dimension unavailable — the R06 actual-instructor retention evidence contract is not available. No instructor impact is inferred.' },
+    pauseAnalytics: null,
   };
   if (scope.kind === 'owner' && !scope.tenantId) {
     result.issues.push('Authorized tenant scope unavailable.');
@@ -62,6 +63,40 @@ export async function getRetentionDataset(
           result.names[`${scope.tenantId}:${kid.id}`] = [kid.first_name, kid.last_name].filter(Boolean).join(' ');
         }
         if ((names.data ?? []).length < 1000) break;
+      }
+
+      // Pause analytics — computed directly from memberships for owner scope.
+      try {
+        const { data: mem } = await client
+          .from('memberships')
+          .select('id, status, started_at, pause_start')
+          .eq('tenant_id', scope.tenantId)
+          .not('pause_start', 'is', null);
+
+        type PausedRow = { id: string; status: string; started_at: string | null; pause_start: string | null };
+        const rows = (mem ?? []) as PausedRow[];
+        const totalEverPaused = rows.length;
+        const currentlyPaused = rows.filter(r => r.status === 'paused').length;
+        const cancelled = rows.filter(r => r.status === 'cancelled').length;
+        const reactivated = rows.filter(r => r.status === 'active').length;
+        const pauseToCancelRate = totalEverPaused > 0 ? Math.round((cancelled / totalEverPaused) * 100) : null;
+        const reactivationRate = totalEverPaused > 0 ? Math.round((reactivated / totalEverPaused) * 100) : null;
+
+        const tenureDays = rows
+          .map(r => {
+            if (!r.started_at || !r.pause_start) return null;
+            const ms = new Date(r.pause_start).getTime() - new Date(r.started_at).getTime();
+            return ms > 0 ? Math.round(ms / 86_400_000) : null;
+          })
+          .filter((d): d is number => d !== null);
+        const avgTenureBeforePauseDays = tenureDays.length > 0
+          ? Math.round(tenureDays.reduce((a, b) => a + b, 0) / tenureDays.length)
+          : null;
+
+        const pa: PauseAnalytics = { totalEverPaused, currentlyPaused, avgTenureBeforePauseDays, pauseToCancelRate, reactivationRate };
+        result.pauseAnalytics = pa;
+      } catch {
+        // Non-fatal — pause analytics is supplementary.
       }
     }
   } catch {

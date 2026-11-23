@@ -50,6 +50,14 @@ export type SegmentEvidence = {
   };
 };
 export type RetentionLocation = { id: string; tenant_id: string; name: string; timezone: string };
+export type PauseAnalytics = {
+  totalEverPaused: number;
+  avgTenureBeforePauseDays: number | null;
+  pauseToCancelRate: number | null;
+  reactivationRate: number | null;
+  currentlyPaused: number;
+};
+
 export type RetentionDataset = {
   scope: 'owner' | 'network';
   locations: RetentionLocation[];
@@ -63,6 +71,7 @@ export type RetentionDataset = {
   finance: { available: false; reason: string };
   instructors: { available: false; reason: string };
   asOf: string;
+  pauseAnalytics: PauseAnalytics | null;
 };
 export type RetentionFilters = {
   startMonth: string;

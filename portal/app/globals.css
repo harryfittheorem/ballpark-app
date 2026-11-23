@@ -186,6 +186,14 @@ main[id="portal-main"] { scroll-padding-top: calc(var(--portal-page-header-heigh
 .portal-sticky-tabs { overflow-x: auto; }
 .portal-sticky-tabs > * { flex-shrink: 0; }
 .portal-sticky-controls { top: 0; }
+.portal-sticky-tab-row {
+  top: var(--portal-page-header-height, 0px);
+  z-index: 19;
+  padding: 10px 24px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
 @media (max-width: 767px) {
   :root { --portal-header-height: 3.5rem; --portal-scroll-offset: 4.25rem; }

@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, SectionHeader, OCard, OTable, BarChart } from '@/components/owner/ui';
 import type { TableColumn } from '@/components/owner/ui';
-import { UserCog, Activity, Download, Plus, Star, MessageCircle, X, Shield, GraduationCap } from 'lucide-react';
+import { UserCog, Activity, Download, Plus, Star, X, Shield, GraduationCap, TrendingUp } from 'lucide-react';
 import type { OwnerCoach } from '@/lib/supabase/ownerQueries';
 import { exportCsv } from '@/lib/exportCsv';
 import { updateCoachPreset } from './actions';
@@ -88,11 +88,38 @@ function PresetDropdown({
   );
 }
 
+type RetentionAgeRow = { ageGroup: string; retained: number; total: number; pct: number };
+
+function retentionColor(pct: number): string {
+  if (pct >= 80) return brand.success ?? '#4ade80';
+  if (pct >= 60) return brand.warning;
+  return brand.danger;
+}
+
 export function CoachesContent({ coaches: rawCoaches }: Props) {
   const [coaches, setCoaches] = useState<OwnerCoach[]>(rawCoaches);
 
   const totalStudents = coaches.reduce((s, c) => s + c.students, 0);
   const avgUtil       = coaches.length > 0 ? Math.round(coaches.reduce((s, c) => s + c.utilization, 0) / coaches.length) : 0;
+
+  // Aggregate retention by age across all coaches (merge each coach's retentionByAge).
+  const ageMap: Record<string, { retained: number; total: number }> = {};
+  for (const c of coaches) {
+    for (const row of (c.retentionByAge ?? [])) {
+      if (!ageMap[row.ageGroup]) ageMap[row.ageGroup] = { retained: 0, total: 0 };
+      ageMap[row.ageGroup].retained += row.retained;
+      ageMap[row.ageGroup].total    += row.total;
+    }
+  }
+  const AGE_ORDER = ['8U', '10U', '12U', '14U', 'HS', 'College'];
+  const retentionByAge: RetentionAgeRow[] = AGE_ORDER
+    .filter(ag => ageMap[ag]?.total > 0)
+    .map(ag => ({
+      ageGroup: ag,
+      retained: ageMap[ag].retained,
+      total:    ageMap[ag].total,
+      pct:      Math.round((ageMap[ag].retained / ageMap[ag].total) * 100),
+    }));
 
   const [showHireModal, setShowHireModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -177,16 +204,39 @@ export function CoachesContent({ coaches: rawCoaches }: Props) {
       },
     },
     {
-      label: 'Rating', key: 'avgRating', align: 'right',
+      label: 'Rating (1–5★)',
+      key: 'avgRating', align: 'right',
       render: (r) => {
         const rating = r.avgRating as number | null;
         const coach = r as unknown as OwnerCoach & { ratedCount?: number; eligibleCount?: number };
-        if (rating === null) return <span style={{ color: brand.textMuted, fontFamily: fonts.mono }}>Not rated · {coach.ratedCount ?? 0}/{coach.eligibleCount ?? 0} rated</span>;
+        const tooltip = `Average post-lesson rating (1–5 ★) submitted by parents after each completed session. ${coach.ratedCount ?? 0} of ${coach.eligibleCount ?? 0} eligible lessons rated.`;
+        if (rating === null) return (
+          <span style={{ color: brand.textMuted, fontFamily: fonts.mono }} title={tooltip}>
+            — · {coach.ratedCount ?? 0}/{coach.eligibleCount ?? 0}
+          </span>
+        );
         return (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }} title={`${coach.ratedCount ?? 0} of ${coach.eligibleCount ?? 0} eligible lessons rated`}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }} title={tooltip}>
             <Star size={12} color={brand.goldDeep} fill={brand.goldDeep} />
             <span style={{ fontWeight: 700, fontFamily: fonts.display }}>{rating.toFixed(1)}</span>
-            <span style={{ color: brand.textMuted, fontSize: 10 }}>{coach.ratedCount ?? 0}/{coach.eligibleCount ?? 0}</span>
+            <span style={{ color: brand.textMuted, fontSize: 10 }}>{coach.ratedCount ?? 0}/{coach.eligibleCount ?? 0} rated</span>
+          </div>
+        );
+      },
+    },
+    {
+      label: 'Retention (90d)', key: 'retention', align: 'right',
+      render: (r) => {
+        const pct = r.retention as number;
+        const students = r.students as number;
+        if (students === 0) return <span style={{ fontSize: 11, color: brand.textMuted }}>—</span>;
+        const color = retentionColor(pct);
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} title={`${pct}% of this coach's students from the past 90 days still have an active or paused membership.`}>
+            <div style={{ width: 60, height: 6, background: brand.border, borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ width: `${pct}%`, height: '100%', background: color }} />
+            </div>
+            <span style={{ fontFamily: fonts.mono, fontSize: 11, fontWeight: 700, color }}>{pct}%</span>
           </div>
         );
       },
@@ -210,32 +260,6 @@ export function CoachesContent({ coaches: rawCoaches }: Props) {
       label: 'Joined', key: 'joinedDate',
       render: (r) => <span style={{ fontSize: 11, color: brand.textMuted }}>{r.joinedDate as string}</span>,
     },
-    {
-      label: '', key: 'actions',
-      render: () => {
-        return (
-          <button
-            disabled
-            title="Instructor-to-player messaging is unavailable. Adult messaging awaits approval."
-            aria-label="Messaging unavailable"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-              fontFamily: fonts.display, letterSpacing: 0.5, textTransform: 'uppercase',
-              cursor: 'not-allowed',
-              background: brand.surfaceAlt,
-              color: brand.textLight,
-              border: `1px solid ${brand.border}`,
-              opacity: 0.6,
-              transition: 'opacity 0.15s',
-            }}
-          >
-            <MessageCircle size={12} />
-            Unavailable
-          </button>
-        );
-      },
-    },
   ];
 
   return (
@@ -256,6 +280,11 @@ export function CoachesContent({ coaches: rawCoaches }: Props) {
           <KPICard label="Staff Size"      value={coaches.length}    icon={UserCog} />
           <KPICard label="Avg Utilization" value={coaches.length ? `${avgUtil}%` : '—'} icon={Activity} color="success" />
           <KPICard label="Total Students"  value={totalStudents}     icon={UserCog}  color="gold" />
+          {coaches.length > 0 && (() => {
+            const withStudents = coaches.filter(c => c.students > 0);
+            const avgRet = withStudents.length > 0 ? Math.round(withStudents.reduce((s, c) => s + c.retention, 0) / withStudents.length) : 0;
+            return <KPICard label="Avg Retention (90d)" value={withStudents.length ? `${avgRet}%` : '—'} icon={TrendingUp} color={avgRet >= 80 ? 'success' : avgRet >= 60 ? 'warning' : 'danger'} />;
+          })()}
         </div>
 
         <div style={{ marginBottom: 8, padding: '10px 14px', background: brand.surfaceAlt, borderRadius: 8, border: `1px solid ${brand.border}`, fontSize: 12, color: brand.textMuted, lineHeight: 1.5 }}>
@@ -269,12 +298,12 @@ export function CoachesContent({ coaches: rawCoaches }: Props) {
           columns={columns as TableColumn<Record<string, unknown>>[]}
           rows={coaches as unknown as Record<string, unknown>[]}
         /> : <OCard><div style={{ textAlign: 'center', padding: '34px 16px' }}><div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>No coaches recorded</div><div style={{ fontSize: 12, color: brand.textMuted }}>This roster shows real coach data only. Add-coach invitations are not connected in this portal.</div></div></OCard>}
-        <div style={{ marginTop: 16, padding: '12px 14px', background: brand.surfaceAlt, borderRadius: 8, border: `1px solid ${brand.border}`, fontSize: 12, color: brand.textMuted }}>
-          Retention reporting: <strong style={{ color: brand.text }}>Pending model approval</strong>
+        <div style={{ marginTop: 16, padding: '10px 14px', background: brand.surfaceAlt, borderRadius: 8, border: `1px solid ${brand.border}`, fontSize: 11, color: brand.textMuted }}>
+          <strong style={{ color: brand.text }}>Retention (90d)</strong> — share of each coach&apos;s students from the past 90 days who still hold an active or paused membership today.
         </div>
 
         {coaches.length > 1 && (
-          <div style={{ marginTop: 24 }}>
+          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
             <OCard>
               <SectionHeader title="Utilization Distribution" />
               <BarChart
@@ -287,6 +316,26 @@ export function CoachesContent({ coaches: rawCoaches }: Props) {
               />
             </OCard>
 
+            {retentionByAge.length > 0 && (
+              <OCard>
+                <SectionHeader title="Retention by Age Group (90d)" subtitle="Share of students who trained in the last 90 days still holding an active/paused membership — across all coaches" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
+                  {retentionByAge.map(row => (
+                    <div key={row.ageGroup} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 48, fontSize: 11, fontWeight: 700, fontFamily: fonts.display, color: brand.text, textAlign: 'right', flexShrink: 0 }}>
+                        {row.ageGroup}
+                      </div>
+                      <div style={{ flex: 1, height: 10, background: brand.border, borderRadius: 5, overflow: 'hidden' }}>
+                        <div style={{ width: `${row.pct}%`, height: '100%', background: retentionColor(row.pct), borderRadius: 5, transition: 'width 0.4s ease' }} />
+                      </div>
+                      <div style={{ width: 80, fontSize: 11, fontFamily: fonts.mono, fontWeight: 700, color: retentionColor(row.pct), flexShrink: 0 }}>
+                        {row.pct}% <span style={{ color: brand.textMuted, fontWeight: 400 }}>({row.retained}/{row.total})</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </OCard>
+            )}
           </div>
         )}
       </div>
@@ -300,7 +349,7 @@ export function CoachesContent({ coaches: rawCoaches }: Props) {
             </div>
             <div style={{ padding: 24 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Coach creation is unavailable here</div>
-              <div style={{ fontSize: 12, color: brand.textMuted, lineHeight: 1.6 }}>No connected staff-creation flow is available in this portal, so no invitation has been sent. The default specialty for a new coach is <strong style={{ color: brand.text }}>Hitting Instructor</strong>.</div>
+              <div style={{ fontSize: 12, color: brand.textMuted, lineHeight: 1.6 }}>No connected staff-creation flow is available in this portal. When coaches are added through the admin panel, only <strong style={{ color: brand.text }}>Hitting Instructor</strong> is permitted as the coach type for new locations. Specialty Coach is not an allowed type.</div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}><OButton variant="secondary" onClick={() => setShowHireModal(false)}>Close</OButton></div>
             </div>
           </div>

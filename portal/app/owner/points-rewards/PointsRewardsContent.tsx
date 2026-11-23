@@ -6,6 +6,7 @@ import { OButton, PageHeader, SectionHeader, OCard, OTable, Chip } from '@/compo
 import type { TableColumn } from '@/components/owner/ui';
 import { Plus, Sparkles, Edit2, X } from 'lucide-react';
 import type { PointsRewardsData, PointsProduct } from '@/lib/supabase/ownerQueries';
+import { PlayerLink } from '@/components/owner/PlayerLink';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -24,22 +25,30 @@ type RewardForm = {
 // ── Initial rules ──────────────────────────────────────────────────────────
 
 const INITIAL_RULES: Rule[] = [
-  { id: 1, action: 'Complete a booked session',       points: 10, active: true },
-  { id: 2, action: 'Submit drill homework',            points: 25, active: true },
-  { id: 3, action: 'Coach reviews homework (bonus)',   points: 10, active: true },
-  { id: 4, action: 'Upload swing for coach feedback',  points: 15, active: true },
-  { id: 5, action: 'Login streak (daily)',             points: 5,  active: true },
-  { id: 6, action: 'Unlock an achievement',            points: 50, active: true },
+  { id: 1,  action: 'Complete a booked session',               points: 10,  active: true  },
+  { id: 2,  action: 'Upload swing for coach feedback',         points: 15,  active: true  },
+  { id: 3,  action: 'Post a Google review',                    points: 100, active: true  },
+  { id: 4,  action: 'Follow on Instagram',                     points: 25,  active: true  },
+  { id: 5,  action: 'Subscribe on YouTube',                    points: 25,  active: true  },
+  { id: 6,  action: 'Log game stats (self-reported)',          points: 20,  active: true  },
+  { id: 7,  action: 'Weekly attendance milestone (4 sessions)', points: 50,  active: true  },
+  { id: 8,  action: 'Monthly attendance streak (every session)', points: 75, active: true  },
+  { id: 9,  action: '1-year membership anniversary',          points: 200, active: true  },
+  { id: 10, action: 'HitTrax leaderboard Top 3 finish',       points: 150, active: true  },
+  { id: 11, action: 'Unlock an achievement',                  points: 50,  active: true  },
+  { id: 12, action: 'Refer a new family (member enrolls)',     points: 300, active: true  },
 ];
 
 // ── Demo rewards catalog ───────────────────────────────────────────────────
 
 const DEMO_PRODUCTS: PointsProduct[] = [
-  { id: 'p1', name: 'Free Cage Hour',              category: 'Sessions',  cost: 500,  inventory: null, fulfilled: 24, pending: 3, image_url: 'https://images.unsplash.com/photo-1508344928928-7165b67de128?w=400&q=80' },
-  { id: 'p2', name: 'Infinite Hitting Cap',         category: 'Apparel',   cost: 1200, inventory: 40,   fulfilled: 18, pending: 2, image_url: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400&q=80' },
-  { id: 'p3', name: 'Free Private Lesson (30min)', category: 'Sessions',  cost: 800,  inventory: null, fulfilled: 11, pending: 1, image_url: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400&q=80' },
-  { id: 'p4', name: 'Batting Gloves',              category: 'Equipment', cost: 1500, inventory: 20,   fulfilled: 7,  pending: 2, image_url: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=400&q=80' },
-  { id: 'p5', name: 'Water Bottle + Drawstring',   category: 'Apparel',   cost: 400,  inventory: 60,   fulfilled: 31, pending: 4, image_url: 'https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?w=400&q=80' },
+  { id: 'p1', name: 'Infinite Hitting T-Shirt',   category: 'Apparel',   cost: 500,   inventory: 80,   fulfilled: 34, pending: 5, image_url: null },
+  { id: 'p2', name: 'IH Water Bottle',             category: 'Apparel',   cost: 300,   inventory: 100,  fulfilled: 52, pending: 6, image_url: null },
+  { id: 'p3', name: 'Bat Sticker Pack',            category: 'Apparel',   cost: 150,   inventory: null, fulfilled: 88, pending: 9, image_url: null },
+  { id: 'p4', name: 'Free Private Lesson (30min)', category: 'Sessions',  cost: 800,   inventory: null, fulfilled: 11, pending: 1, image_url: null },
+  { id: 'p5', name: 'Baseball Bat (Youth)',         category: 'Equipment', cost: 3500,  inventory: 5,    fulfilled: 2,  pending: 1, image_url: null },
+  { id: 'p6', name: 'MLB Game Tickets (2)',         category: 'Experiences', cost: 5000, inventory: 10,  fulfilled: 3,  pending: 2, image_url: null },
+  { id: 'p7', name: 'PS5 Console',                 category: 'Electronics', cost: 15000, inventory: 2,  fulfilled: 0,  pending: 1, image_url: null },
 ];
 
 const DEMO_TOP_EARNERS = [
@@ -139,7 +148,7 @@ function productToForm(p: PointsProduct): RewardForm {
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function PointsRewardsContent({ data }: Props) {
-  const [tab,   setTab]   = useState<'rules' | 'rewards'>('rules');
+  const [tab,   setTab]   = useState<'rules' | 'rewards' | 'hittrax'>('rules');
   const [rules, setRules] = useState<Rule[]>(INITIAL_RULES);
 
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
@@ -275,10 +284,11 @@ export function PointsRewardsContent({ data }: Props) {
       />
 
       <div style={{ padding: 24 }}>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <div className="portal-sticky-tabs portal-sticky-tab-row" role="tablist" aria-label="Points and rewards sections" style={{ marginBottom: 20 }}>
           {[
             { id: 'rules'   as const, label: 'Earning Rules',   count: rules.length },
             { id: 'rewards' as const, label: 'Rewards Catalog', count: localProducts.length },
+            { id: 'hittrax' as const, label: 'HitTrax Leaderboard', count: data.hittraxLeaderboard.length },
           ].map(t => (
             <div
               key={t.id}
@@ -346,17 +356,19 @@ export function PointsRewardsContent({ data }: Props) {
 
               {topEarners.length > 0 && (
                 <div style={{ marginTop: 20 }}>
-                  <SectionHeader title="Top Earners" />
-                  <OCard>
-                    {topEarners.map((e, i) => (
-                      <div key={i} style={{ padding: '8px 0', borderBottom: i < topEarners.length - 1 ? `1px solid ${brand.border}` : 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 22, height: 22, borderRadius: 11, background: i === 0 ? brand.gold : brand.dark, color: i === 0 ? brand.dark : brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, fontFamily: fonts.display }}>
-                          {i + 1}
+                  <SectionHeader title={`All Earners (${topEarners.length})`} subtitle="All eligible players · highest points first" />
+                  <OCard style={{ padding: 0 }}>
+                    <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+                      {topEarners.map((e, i) => (
+                        <div key={i} style={{ padding: '8px 12px', borderBottom: i < topEarners.length - 1 ? `1px solid ${brand.border}` : 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 22, height: 22, borderRadius: 11, background: i === 0 ? brand.gold : i === 1 ? '#aaa' : i === 2 ? '#cd7f32' : brand.dark, color: i < 3 ? brand.dark : brand.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, fontFamily: fonts.display, flexShrink: 0 }}>
+                            {i + 1}
+                          </div>
+                          <div style={{ flex: 1, fontSize: 12, fontWeight: 600 }}><PlayerLink name={e.name} reference={{ kidId: e.kidId }} /></div>
+                          <div style={{ fontSize: 12, fontWeight: 700, fontFamily: fonts.mono }}>{e.points.toLocaleString()} pts</div>
                         </div>
-                        <div style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{e.name}</div>
-                        <div style={{ fontSize: 12, fontWeight: 700, fontFamily: fonts.mono }}>{e.points.toLocaleString()} pts</div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </OCard>
                 </div>
               )}
@@ -371,6 +383,71 @@ export function PointsRewardsContent({ data }: Props) {
             onRowClick={(row) => openEditReward(row as unknown as PointsProduct)}
           />
         )}
+
+        {tab === 'hittrax' && (() => {
+          const leaderboard = data.hittraxLeaderboard;
+          if (leaderboard.length === 0) {
+            return (
+              <OCard>
+                <div style={{ padding: '32px 16px', textAlign: 'center', color: brand.textMuted, fontSize: 13 }}>
+                  No HitTrax sessions recorded yet. Sessions with exit velocity data will appear here.
+                </div>
+              </OCard>
+            );
+          }
+
+          // Group by age group.
+          const AGE_ORDER = ['8U', '10U', '12U', '14U', 'HS', 'College'];
+          const byAge: Record<string, typeof leaderboard> = {};
+          for (const e of leaderboard) {
+            if (!byAge[e.ageGroup]) byAge[e.ageGroup] = [];
+            byAge[e.ageGroup].push(e);
+          }
+          const ageGroups = [...AGE_ORDER.filter(ag => byAge[ag]), ...Object.keys(byAge).filter(ag => !AGE_ORDER.includes(ag))];
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div style={{ padding: '10px 14px', background: brand.surfaceAlt, borderRadius: 8, border: `1px solid ${brand.border}`, fontSize: 12, color: brand.textMuted }}>
+                <strong style={{ color: brand.text }}>HitTrax Leaderboard</strong> — Best exit velocity (mph) and max distance (ft) per athlete, pulled from all recorded HitTrax sessions.
+                Grouped by age division. Click any athlete to open their profile.
+              </div>
+              {ageGroups.map(ag => {
+                const rows = (byAge[ag] ?? []).slice(0, 10);
+                return (
+                  <div key={ag}>
+                    <SectionHeader title={`${ag} Division`} subtitle={`Top ${rows.length} by exit velocity`} />
+                    <OCard padding={0}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 90px 90px', gap: 0 }}>
+                        <div style={{ padding: '7px 10px', fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: brand.textMuted, borderBottom: `1px solid ${brand.border}`, background: brand.surfaceAlt }}>#</div>
+                        <div style={{ padding: '7px 10px', fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: brand.textMuted, borderBottom: `1px solid ${brand.border}`, background: brand.surfaceAlt }}>Athlete</div>
+                        <div style={{ padding: '7px 10px', fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: brand.textMuted, borderBottom: `1px solid ${brand.border}`, background: brand.surfaceAlt, textAlign: 'right' }}>Best EV (mph)</div>
+                        <div style={{ padding: '7px 10px', fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: brand.textMuted, borderBottom: `1px solid ${brand.border}`, background: brand.surfaceAlt, textAlign: 'right' }}>Max Dist (ft)</div>
+                        {rows.map((e, i) => (
+                          <>
+                            <div key={`${e.kidId}-rank`} style={{ padding: '9px 10px', fontSize: 11, color: brand.textMuted, borderBottom: i < rows.length - 1 ? `1px solid ${brand.border}` : 'none', display: 'flex', alignItems: 'center' }}>
+                              <span style={{ width: 20, height: 20, borderRadius: 10, background: i === 0 ? brand.gold : i === 1 ? '#aaa' : i === 2 ? '#cd7f32' : brand.dark, color: i < 3 ? brand.dark : brand.gold, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, fontFamily: fonts.display }}>
+                                {i + 1}
+                              </span>
+                            </div>
+                            <div key={`${e.kidId}-name`} style={{ padding: '9px 10px', borderBottom: i < rows.length - 1 ? `1px solid ${brand.border}` : 'none', display: 'flex', alignItems: 'center' }}>
+                              <PlayerLink name={e.name} reference={{ kidId: e.kidId }} />
+                            </div>
+                            <div key={`${e.kidId}-ev`} style={{ padding: '9px 10px', fontFamily: fonts.mono, fontWeight: 700, fontSize: 13, color: brand.text, textAlign: 'right', borderBottom: i < rows.length - 1 ? `1px solid ${brand.border}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                              {e.bestEv != null ? e.bestEv.toFixed(1) : '—'}
+                            </div>
+                            <div key={`${e.kidId}-dist`} style={{ padding: '9px 10px', fontFamily: fonts.mono, fontWeight: 700, fontSize: 13, color: brand.textMuted, textAlign: 'right', borderBottom: i < rows.length - 1 ? `1px solid ${brand.border}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                              {e.maxDistance != null ? e.maxDistance : '—'}
+                            </div>
+                          </>
+                        ))}
+                      </div>
+                    </OCard>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── Edit Rule modal ─────────────────────────────────────────────── */}

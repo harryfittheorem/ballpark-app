@@ -9,6 +9,7 @@ import {
   UserCog, Sparkles, AlertCircle, Clock, AlertTriangle, BarChart3,
   MessageSquare, BookOpen, Video, Settings, ChevronLeft, ChevronRight,
   Menu, X, LogOut, ClipboardCheck, ClipboardList, Tag, XCircle, Battery,
+  Megaphone, Activity,
 } from 'lucide-react';
 import { signOut } from '@/app/login/actions';
 
@@ -43,8 +44,31 @@ const COACH_STAFF_EXTRA: NavSection = {
   ],
 };
 
-function buildCoachNav(isStaff: boolean): NavSection[] {
-  return isStaff ? [COACH_BASE_NAV, COACH_STAFF_EXTRA] : [COACH_BASE_NAV, { label: 'Operations', items: [{ label: 'Training Playbook', href: '/training', icon: BookOpen }] }];
+const SECTION_KEY_MAP: Record<string, string> = {
+  schedule: '/coach/schedule',
+  checkin: '/coach/check-in',
+  families: '/coach/families',
+  redemptions: '/coach/redemptions',
+  playbook: '/training',
+};
+
+function buildCoachNav(isStaff: boolean, accessConfig?: { instructor?: string[]; staff?: string[] } | null): NavSection[] {
+  const preset = isStaff ? 'staff' : 'instructor';
+  const allowedKeys = accessConfig?.[preset];
+
+  if (!allowedKeys) {
+    // No config: use defaults.
+    return isStaff ? [COACH_BASE_NAV, COACH_STAFF_EXTRA] : [COACH_BASE_NAV, { label: 'Operations', items: [{ label: 'Training Playbook', href: '/training', icon: BookOpen }] }];
+  }
+
+  const allowedHrefs = new Set(allowedKeys.map(k => SECTION_KEY_MAP[k]).filter(Boolean));
+
+  // Filter staff extra items to those in allowedHrefs.
+  const filteredExtra: NavItem[] = COACH_STAFF_EXTRA.items.filter(item => allowedHrefs.has(item.href));
+  if (filteredExtra.length === 0) {
+    return [COACH_BASE_NAV];
+  }
+  return [COACH_BASE_NAV, { label: 'Operations', items: filteredExtra }];
 }
 
 const ADMIN_NAV: NavSection[] = [
@@ -99,6 +123,13 @@ const OWNER_NAV: NavSection[] = [
     ],
   },
   {
+    label: 'Growth',
+    items: [
+      { label: 'Marketing', href: '/owner/marketing', icon: Megaphone },
+      { label: 'Engagement', href: '/owner/engagement', icon: Activity },
+    ],
+  },
+  {
     label: 'Config',
     items: [
       { label: 'Points & Rewards', href: '/owner/points-rewards', icon: Sparkles },
@@ -139,6 +170,8 @@ interface PortalShellProps {
   locationName?: string;
   isStaff?: boolean;
   paymentPausedCount?: number;
+  /** Staff access config from tenant settings — applied when role === 'coach' */
+  staffAccessConfig?: { instructor?: string[]; staff?: string[] } | null;
 }
 
 export function PortalShell({
@@ -149,6 +182,7 @@ export function PortalShell({
   locationName,
   isStaff = false,
   paymentPausedCount = 0,
+  staffAccessConfig,
 }: PortalShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -216,7 +250,7 @@ export function PortalShell({
         ? FRANCHISOR_NAV
         : baseOwnerNav
       : role === 'coach'
-        ? buildCoachNav(isStaff)
+        ? buildCoachNav(isStaff, staffAccessConfig)
         : ADMIN_NAV;
 
   const homeHref =

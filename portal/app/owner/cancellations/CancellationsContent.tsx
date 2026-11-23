@@ -5,10 +5,74 @@ import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, OTable, Chip } from '@/components/owner/ui';
 import type { TableColumn } from '@/components/owner/ui';
-import { XCircle, DollarSign, Package, Download, Phone, Mail } from 'lucide-react';
-import type { CancelledMembership } from '@/lib/supabase/ownerQueries';
+import { XCircle, DollarSign, Package, Download, Phone, Mail, MessageSquare } from 'lucide-react';
+import type { CancelledMembership, CancellationReason } from '@/lib/supabase/ownerQueries';
+import { CANCELLATION_REASONS } from '@/lib/supabase/ownerQueries';
 import { exportCsv } from '@/lib/exportCsv';
 import Link from 'next/link';
+
+function ExitReasonCell({ membership }: { membership: CancelledMembership }) {
+  const [reason, setReason] = useState<CancellationReason | null>(membership.cancellationReason);
+  const [competitor, setCompetitor] = useState(membership.competitorName ?? '');
+  const [saving, setSaving] = useState(false);
+
+  async function save(newReason: CancellationReason | null, newCompetitor: string) {
+    setSaving(true);
+    await fetch('/api/owner/cancellation-reason', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ membershipId: membership.id, reason: newReason, competitorName: newCompetitor || null }),
+    });
+    setSaving(false);
+  }
+
+  async function handleReasonChange(value: string) {
+    const newReason = value ? (value as CancellationReason) : null;
+    setReason(newReason);
+    if (newReason !== 'Competitor') setCompetitor('');
+    await save(newReason, newReason === 'Competitor' ? competitor : '');
+  }
+
+  async function handleCompetitorBlur() {
+    if (reason === 'Competitor') await save(reason, competitor);
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <select
+        value={reason ?? ''}
+        onChange={e => void handleReasonChange(e.target.value)}
+        disabled={saving}
+        style={{
+          padding: '4px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600,
+          border: `1px solid ${brand.border}`, background: brand.surface,
+          color: reason ? brand.text : brand.textMuted, cursor: 'pointer',
+          opacity: saving ? 0.6 : 1,
+        }}
+      >
+        <option value="">— Set reason</option>
+        {CANCELLATION_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+      </select>
+      {reason === 'Competitor' && (
+        <input
+          type="text"
+          placeholder="Competitor name…"
+          value={competitor}
+          maxLength={120}
+          onChange={e => setCompetitor(e.target.value)}
+          onBlur={() => void handleCompetitorBlur()}
+          disabled={saving}
+          style={{
+            padding: '4px 8px', borderRadius: 5, fontSize: 11,
+            border: `1px solid ${brand.border}`, background: brand.surface,
+            color: brand.text, outline: 'none',
+            opacity: saving ? 0.6 : 1,
+          }}
+        />
+      )}
+    </div>
+  );
+}
 
 type Props = {
   memberships: CancelledMembership[];
@@ -67,15 +131,32 @@ const columns: TableColumn<CancelledMembership & Record<string, unknown>>[] = [
     },
   },
   {
+    label: 'Exit Reason', key: 'cancellationReason',
+    render: (r) => <ExitReasonCell membership={r as unknown as CancelledMembership} />,
+  },
+  {
     label: 'Contact', key: 'id',
-    render: (r) => (
-      <div style={{ display: 'flex', gap: 4 }}>
-        {(r.parentPhone as string | null) && (
-          <OButton variant="gold" size="sm" icon={Phone}>Call</OButton>
-        )}
-        <OButton variant="secondary" size="sm" icon={Mail}>Email</OButton>
-      </div>
-    ),
+    render: (r) => {
+      const phone = r.parentPhone as string | null;
+      const email = r.parentEmail as string;
+      return (
+        <div style={{ display: 'flex', gap: 4 }}>
+          {phone && (
+            <a href={`tel:${phone}`} style={{ textDecoration: 'none' }}>
+              <OButton variant="gold" size="sm" icon={Phone}>Call</OButton>
+            </a>
+          )}
+          {phone && (
+            <a href={`sms:${phone}`} style={{ textDecoration: 'none' }}>
+              <OButton variant="secondary" size="sm" icon={MessageSquare}>Text</OButton>
+            </a>
+          )}
+          <a href={`mailto:${email}`} style={{ textDecoration: 'none' }}>
+            <OButton variant="secondary" size="sm" icon={Mail}>Email</OButton>
+          </a>
+        </div>
+      );
+    },
   },
 ];
 

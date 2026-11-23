@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/serviceClient';
-import { getTodayAtAGlanceData, getTenantName } from '@/lib/supabase/ownerQueries';
+import { getTodayAtAGlanceData, getTenantName, getOwnerNotifications } from '@/lib/supabase/ownerQueries';
 import { TodayDashboardContent } from './TodayDashboardContent';
 import { requireOwnerContext } from '@/lib/ownerAccess';
 
@@ -11,10 +11,11 @@ export default async function TodayDashboardPage() {
   const { tenantId } = await requireOwnerContext();
   const supabase = createServiceClient();
 
-  const [data, tenantName] = await Promise.all([
+  const [data, tenantName, notifications] = await Promise.all([
     getTodayAtAGlanceData(supabase, tenantId),
     getTenantName(supabase, tenantId),
+    getOwnerNotifications(supabase, tenantId),
   ]);
 
-  return <TodayDashboardContent data={data} tenantName={tenantName} />;
+  return <TodayDashboardContent data={data} tenantName={tenantName} notifications={notifications} />;
 }

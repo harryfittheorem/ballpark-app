@@ -243,6 +243,13 @@ export default function CancelMembershipScreen() {
               </Text>
             </View>
 
+            <View style={styles.infoBox}>
+              <Text style={styles.infoBoxText}>
+                <Text style={{ fontWeight: '700' }}>Exit interview option:</Text>
+                {' '}If you&apos;d like to speak with a staff member before your cancellation is processed, ask at the front desk. After an in-person exit interview, staff may authorize a fee waiver at their discretion.
+              </Text>
+            </View>
+
             {submitError ? (
               <Text style={styles.inlineError}>{submitError}</Text>
             ) : null}

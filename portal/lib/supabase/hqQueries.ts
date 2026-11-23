@@ -562,3 +562,148 @@ export async function getHQPendingInvites(
     createdAt: r.created_at,
   }));
 }
+
+// ─── Franchisor Performance ───────────────────────────────────────────────────
+
+export type FranchisorLocationRow = {
+  locationId: string;
+  locationName: string;
+  tenantId: string;
+  tenantName: string;
+  mrr: number;
+  memberCount: number;
+  newMembersMtd: number;
+  collectedMtd: number;
+  royaltyRate: number;
+  royaltyMtd: number;
+  leadsMtd: number;
+  evalsBookedMtd: number;
+  evalsDoneMtd: number;
+  closingRate: number | null;
+};
+
+export type FranchisorNetworkSummary = {
+  locations: FranchisorLocationRow[];
+  totalMrr: number;
+  totalMembers: number;
+  totalNewMtd: number;
+  totalCollectedMtd: number;
+  totalLeadsMtd: number;
+};
+
+export async function getFranchisorPerformance(supabase: SupabaseClient): Promise<FranchisorNetworkSummary> {
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  const monthStartIso = monthStart.toISOString();
+
+  const [locationsRes, tenantsRes, membershipsRes, newMembersRes, paymentsRes, familiesRes, crmThreadsRes, crmEvalsRes] = await Promise.all([
+    supabase.from('locations').select('id, tenant_id, name'),
+    supabase.from('tenants').select('id, name, royalty_config'),
+    supabase.from('memberships').select('family_id, tenant_id, amount_cents').eq('status', 'active'),
+    supabase.from('memberships').select('family_id, tenant_id').gte('started_at', monthStartIso),
+    supabase.from('payment_events').select('family_id, tenant_id, amount_cents').eq('status', 'paid').gte('created_at', monthStartIso),
+    supabase.from('families').select('id, tenant_id, primary_location_id'),
+    supabase.from('crm_threads').select('tenant_id').gte('created_at', monthStartIso).catch(() => ({ data: [] })),
+    supabase.from('crm_evaluation_openings').select('tenant_id, location_id').gte('starts_at', monthStartIso).catch(() => ({ data: [] })),
+  ]);
+
+  const tenantMap = new Map<string, { name: string; royaltyRate: number }>();
+  for (const t of (tenantsRes.data ?? [])) {
+    const rc = t.royalty_config as { rate?: number } | null;
+    tenantMap.set(t.id, { name: t.name, royaltyRate: rc?.rate ?? 0.025 });
+  }
+
+  const familyLocationMap = new Map<string, string | null>();
+  const familyTenantMap = new Map<string, string>();
+  for (const f of (familiesRes.data ?? [])) {
+    familyLocationMap.set(f.id, f.primary_location_id ?? null);
+    familyTenantMap.set(f.id, f.tenant_id);
+  }
+
+  const locations = locationsRes.data ?? [];
+  const locationsByTenant = new Map<string, string[]>();
+  for (const l of locations) {
+    const existing = locationsByTenant.get(l.tenant_id) ?? [];
+    existing.push(l.id);
+    locationsByTenant.set(l.tenant_id, existing);
+  }
+
+  function attributeToLocation(familyId: string, tenantId: string): string | null {
+    const loc = familyLocationMap.get(familyId);
+    if (loc) return loc;
+    const locs = locationsByTenant.get(tenantId) ?? [];
+    return locs.length === 1 ? locs[0] : null;
+  }
+
+  const mrrByLoc: Record<string, number> = {};
+  for (const m of (membershipsRes.data ?? [])) {
+    const loc = attributeToLocation(m.family_id, m.tenant_id);
+    if (loc) mrrByLoc[loc] = (mrrByLoc[loc] ?? 0) + (m.amount_cents ?? 0);
+  }
+
+  const membersCountByLoc: Record<string, number> = {};
+  for (const m of (membershipsRes.data ?? [])) {
+    const loc = attributeToLocation(m.family_id, m.tenant_id);
+    if (loc) membersCountByLoc[loc] = (membersCountByLoc[loc] ?? 0) + 1;
+  }
+
+  const newMtdByLoc: Record<string, number> = {};
+  for (const m of (newMembersRes.data ?? [])) {
+    const loc = attributeToLocation(m.family_id, m.tenant_id);
+    if (loc) newMtdByLoc[loc] = (newMtdByLoc[loc] ?? 0) + 1;
+  }
+
+  const collectedByLoc: Record<string, number> = {};
+  for (const p of (paymentsRes.data ?? [])) {
+    const loc = attributeToLocation(p.family_id, p.tenant_id);
+    if (loc) collectedByLoc[loc] = (collectedByLoc[loc] ?? 0) + (p.amount_cents ?? 0);
+  }
+
+  // CRM leads by tenant (threads don't have location_id)
+  const leadsByTenant: Record<string, number> = {};
+  for (const t of ((crmThreadsRes as { data: Array<{ tenant_id: string }> }).data ?? [])) {
+    leadsByTenant[t.tenant_id] = (leadsByTenant[t.tenant_id] ?? 0) + 1;
+  }
+
+  // Evals by location
+  const evalsByLoc: Record<string, number> = {};
+  for (const e of ((crmEvalsRes as { data: Array<{ tenant_id: string; location_id: string | null }> }).data ?? [])) {
+    if (e.location_id) evalsByLoc[e.location_id] = (evalsByLoc[e.location_id] ?? 0) + 1;
+  }
+
+  const rows: FranchisorLocationRow[] = locations.map(l => {
+    const tenant = tenantMap.get(l.tenant_id);
+    const mrr = (mrrByLoc[l.id] ?? 0) / 100;
+    const collected = (collectedByLoc[l.id] ?? 0) / 100;
+    const royaltyRate = tenant?.royaltyRate ?? 0.025;
+    const leads = leadsByTenant[l.tenant_id] ?? 0;
+    const evalsBooked = evalsByLoc[l.id] ?? 0;
+    const newMembers = newMtdByLoc[l.id] ?? 0;
+    return {
+      locationId: l.id,
+      locationName: l.name,
+      tenantId: l.tenant_id,
+      tenantName: tenant?.name ?? '—',
+      mrr,
+      memberCount: membersCountByLoc[l.id] ?? 0,
+      newMembersMtd: newMembers,
+      collectedMtd: collected,
+      royaltyRate,
+      royaltyMtd: Math.round(collected * royaltyRate * 100) / 100,
+      leadsMtd: leads,
+      evalsBookedMtd: evalsBooked,
+      evalsDoneMtd: 0,
+      closingRate: leads > 0 ? Math.round((newMembers / leads) * 100) : null,
+    };
+  }).sort((a, b) => b.mrr - a.mrr);
+
+  return {
+    locations: rows,
+    totalMrr: rows.reduce((s, r) => s + r.mrr, 0),
+    totalMembers: rows.reduce((s, r) => s + r.memberCount, 0),
+    totalNewMtd: rows.reduce((s, r) => s + r.newMembersMtd, 0),
+    totalCollectedMtd: rows.reduce((s, r) => s + r.collectedMtd, 0),
+    totalLeadsMtd: rows.reduce((s, r) => s + r.leadsMtd, 0),
+  };
+}

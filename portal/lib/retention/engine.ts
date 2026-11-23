@@ -3,7 +3,7 @@ import type {
   RetentionRow, MembershipEvidence, SegmentEvidence,
 } from './types';
 
-export const DIVISIONS = ['8U', '10U', '12U', '14U', 'High School', 'College'];
+export const DIVISIONS = ['8U', '10U', '12U', '14U', 'HS', 'College'];
 export const TENURE_BANDS = ['0–30 days', '31–90 days', '91–180 days', '181–270 days', '271–360 days', 'After 360 days — policy pending', 'Unknown prior history'];
 export function tenureBand(days: number | null): string {
   if (days === null || days < 0) return TENURE_BANDS[6];

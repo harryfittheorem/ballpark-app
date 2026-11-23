@@ -56,8 +56,8 @@ function formatDeclineCode(code: string | null | undefined): string | null {
 }
 
 function churnRisk(daysSinceLastSession: number): 'low' | 'medium' | 'high' {
-  if (daysSinceLastSession > 21) return 'high';
-  if (daysSinceLastSession > 14) return 'medium';
+  if (daysSinceLastSession > 14) return 'high';
+  if (daysSinceLastSession > 7) return 'medium';
   return 'low';
 }
 
@@ -115,6 +115,7 @@ export type OwnerMember = {
   pauseEnd?: string | null;
   cancelRequestedAt?: string | null;
   cancelEffectiveAt?: string | null;
+  competitionLevel?: 'Rec' | 'Travel' | 'Both' | null;
 };
 
 export type OwnerCoach = {
@@ -125,6 +126,7 @@ export type OwnerCoach = {
   students: number;
   utilization: number;
   retention: number;
+  retentionByAge: Array<{ ageGroup: string; retained: number; total: number; pct: number }>;
   avgRating: number | null;
   ratedCount?: number;
   eligibleCount?: number;
@@ -373,7 +375,7 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       pause_end,
       cancel_requested_at,
       cancel_effective_at,
-      kids!inner(first_name, last_name, age_group),
+      kids!inner(first_name, last_name, age_group, competition_level),
       families!inner(parent_first_name, parent_last_name, parent_email, parent_phone, card_last4, card_brand, card_exp_month, card_exp_year)
     `)
     .eq('tenant_id', tenantId)
@@ -387,7 +389,7 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
   const kidIds = [...new Set(rows.map(r => r.kid_id))];
   const membershipIds = rows.map(r => r.id);
 
-  const [{ data: bookings }, { data: payments }, { data: recentFailed }] = await Promise.all([
+  const [{ data: bookings }, { data: payments }, { data: recentFailed }, { data: recentMeasurements }] = await Promise.all([
     supabase
       .from('bookings')
       .select('kid_id, scheduled_start')
@@ -408,6 +410,12 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       .in('membership_id', membershipIds)
       .gte('created_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
       .order('created_at', { ascending: false }),
+    supabase
+      .from('coaching_measurements')
+      .select('kid_id, recorded_on')
+      .eq('tenant_id', tenantId)
+      .in('kid_id', kidIds)
+      .order('recorded_on', { ascending: false }),
   ]);
 
   const lastBookingByKid: Record<string, string> = {};
@@ -429,8 +437,13 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
   }
   const failedMembershipSet = new Set(failedByMembership.keys());
 
+  const lastReevalByKid: Record<string, string> = {};
+  for (const m of (recentMeasurements ?? []) as { kid_id: string; recorded_on: string }[]) {
+    if (!lastReevalByKid[m.kid_id]) lastReevalByKid[m.kid_id] = m.recorded_on;
+  }
+
   return rows.map(r => {
-    const kid = r.kids as unknown as { first_name: string; last_name: string | null; age_group: string | null };
+    const kid = r.kids as unknown as { first_name: string; last_name: string | null; age_group: string | null; competition_level: string | null };
     const fam = r.families as unknown as {
       parent_first_name: string;
       parent_last_name: string | null;
@@ -444,9 +457,18 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
     const lastTs = lastBookingByKid[r.kid_id] ?? null;
     const days = daysSince(lastTs);
     const hasFailedPayment = failedMembershipSet.has(r.id);
-    // Compute risk from session gap; also flag as high if payment failed regardless of session gap
+    const isPaused = r.status === 'paused';
+    const lastReevalDate = lastReevalByKid[r.kid_id] ?? null;
+    const daysSinceReeval = daysSince(lastReevalDate);
+    const noReeval = daysSinceReeval > 30;
+
     const sessionRisk = churnRisk(days);
-    const risk: 'low' | 'medium' | 'high' = hasFailedPayment && sessionRisk !== 'high' ? 'high' : sessionRisk;
+    // Escalate to high if: payment failed, account is paused, or no re-eval in 30+ days
+    const risk: 'low' | 'medium' | 'high' =
+      (hasFailedPayment || isPaused) && sessionRisk !== 'high' ? 'high'
+      : (noReeval && sessionRisk === 'low') ? 'medium'
+      : sessionRisk;
+
     const planType = r.plan_type as 'eft' | 'otc';
     const memberStatus = r.status === 'active' && risk === 'high' ? 'at-risk'
       : (r.status as 'active' | 'paused' | 'cancelled');
@@ -459,6 +481,8 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
         const declineLabel = formatDeclineCode(failedByMembership.get(r.id));
         parts.push(declineLabel ? `Last payment failed — ${declineLabel}` : 'Last payment failed');
       }
+      if (isPaused) parts.push('Account is paused');
+      if (noReeval) parts.push(`No re-evaluation in ${daysSinceReeval} days`);
       if (parts.length > 0) {
         riskReason = parts.join(' · ') + (risk === 'high' ? '. Call within 48 hours.' : '. Send an engagement message.');
       }
@@ -492,6 +516,7 @@ export async function getOwnerMembers(supabase: SupabaseClient, tenantId: string
       sessionsTotal: (r as unknown as { sessions_total?: number | null }).sessions_total ?? null,
       pauseStart: (r as unknown as { pause_start?: string | null }).pause_start ?? null,
       pauseEnd: (r as unknown as { pause_end?: string | null }).pause_end ?? null,
+      competitionLevel: (kid.competition_level as 'Rec' | 'Travel' | 'Both' | null) ?? null,
       cancelRequestedAt: (r as unknown as { cancel_requested_at?: string | null }).cancel_requested_at ?? null,
       cancelEffectiveAt: (r as unknown as { cancel_effective_at?: string | null }).cancel_effective_at ?? null,
     };
@@ -544,6 +569,40 @@ export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string
     }
   }
 
+  // Collect all kid_ids that trained with any coach in the last 90 days.
+  const allKidIds = Array.from(new Set((bookingsRes.data ?? []).map((b: unknown) => (b as BookingRow).kid_id)));
+
+  // Look up current membership status + age group for retention calculation.
+  const [membershipStatusRes, kidsRes] = allKidIds.length > 0 ? await Promise.all([
+    supabase
+      .from('memberships')
+      .select('kid_id, status')
+      .eq('tenant_id', tenantId)
+      .in('kid_id', allKidIds)
+      .order('started_at', { ascending: false }),
+    supabase
+      .from('kids')
+      .select('id, age_group')
+      .eq('tenant_id', tenantId)
+      .in('id', allKidIds),
+  ]) : [{ data: [], error: null }, { data: [], error: null }];
+
+  // Keep the most recent membership status per kid.
+  const statusByKid: Record<string, string> = {};
+  for (const m of (membershipStatusRes.data ?? []) as Array<{ kid_id: string; status: string }>) {
+    if (!statusByKid[m.kid_id]) statusByKid[m.kid_id] = m.status;
+  }
+
+  const ageGroupByKid: Record<string, string> = {};
+  for (const k of (kidsRes.data ?? []) as Array<{ id: string; age_group: string | null }>) {
+    ageGroupByKid[k.id] = k.age_group ?? 'Unknown';
+  }
+
+  // Active = membership status 'active' or 'paused' (still enrolled).
+  const isRetained = (kidId: string) => ['active', 'paused'].includes(statusByKid[kidId] ?? '');
+
+  const ageGroupsOrder = ['8U', '10U', '12U', '14U', 'HS', 'College'];
+
   return coaches.map(c => {
     const raw = c as unknown as { user_id: string | null; specialty?: string | null; capabilities?: { preset?: string } };
     const sessions = sessionsByCoach[c.id]?.size ?? 0;
@@ -555,8 +614,30 @@ export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string
     const avgRating = performance?.avg_rating ?? null;
 
     const revenue = Math.round((revenueByCoach[c.id] ?? 0) / 100);
-    const specialty = raw.specialty?.trim() || 'Coach';
+    const specialty = raw.specialty?.trim() || 'Hitting Instructor';
     const preset = raw.capabilities?.preset === 'staff' ? 'staff' : 'instructor';
+
+    // Compute per-coach retention: how many of this coach's 90d students are still active.
+    const myKids = Array.from(studentsByCoach[c.id] ?? []);
+    const retainedCount = myKids.filter(isRetained).length;
+    const retention = myKids.length > 0 ? Math.round((retainedCount / myKids.length) * 100) : 0;
+
+    // Per-coach retention by age group.
+    const coachAgeMap: Record<string, { retained: number; total: number }> = {};
+    for (const kidId of myKids) {
+      const ag = ageGroupByKid[kidId] ?? 'Unknown';
+      if (!coachAgeMap[ag]) coachAgeMap[ag] = { retained: 0, total: 0 };
+      coachAgeMap[ag].total += 1;
+      if (isRetained(kidId)) coachAgeMap[ag].retained += 1;
+    }
+    const retentionByAge = ageGroupsOrder
+      .filter(ag => coachAgeMap[ag]?.total > 0)
+      .map(ag => ({
+        ageGroup: ag,
+        retained: coachAgeMap[ag].retained,
+        total: coachAgeMap[ag].total,
+        pct: Math.round((coachAgeMap[ag].retained / coachAgeMap[ag].total) * 100),
+      }));
 
     return {
       id: c.id,
@@ -565,7 +646,8 @@ export async function getOwnerCoaches(supabase: SupabaseClient, tenantId: string
       specialty,
       students,
       utilization,
-      retention: 0, // Not published: attribution model remains unapproved.
+      retention,
+      retentionByAge,
       avgRating,
       ratedCount: performance?.rated_count ?? 0,
       eligibleCount: performance?.eligible_count ?? 0,
@@ -1108,10 +1190,19 @@ export async function getRevenueReportsData(supabase: SupabaseClient, tenantId: 
 
 // ─── Points & Rewards ───────────────────────────────────────────────────────
 
+export type HittraxLeaderboardEntry = {
+  kidId: string;
+  name: string;
+  ageGroup: string;
+  bestEv: number | null;
+  maxDistance: number | null;
+};
+
 export type PointsRewardsData = {
   products: PointsProduct[];
   totalPointsIssued: number;
-  topEarners: Array<{ name: string; points: number }>;
+  topEarners: Array<{ name: string; kidId: string | null; points: number }>;
+  hittraxLeaderboard: HittraxLeaderboardEntry[];
 };
 
 export async function getPointsRewardsData(supabase: SupabaseClient, tenantId: string): Promise<PointsRewardsData> {
@@ -1141,22 +1232,56 @@ export async function getPointsRewardsData(supabase: SupabaseClient, tenantId: s
 
   const { data: ledger } = await supabase
     .from('points_ledger')
-    .select('delta, kid_id, kids(first_name)')
+    .select('delta, kid_id, kids(first_name, last_name)')
     .eq('tenant_id', tenantId)
     .gt('delta', 0);
 
   const totalPointsIssued = (ledger ?? []).reduce((s, l) => s + (l.delta ?? 0), 0);
 
-  const earnerMap: Record<string, number> = {};
+  const earnerMap: Record<string, { name: string; points: number }> = {};
   for (const l of (ledger ?? [])) {
-    const k = l.kids as unknown as { first_name: string } | null;
-    const name = k?.first_name ?? 'Unknown';
-    earnerMap[name] = (earnerMap[name] ?? 0) + (l.delta ?? 0);
+    const k = l.kids as unknown as { first_name: string; last_name: string | null } | null;
+    const name = k ? [k.first_name, k.last_name].filter(Boolean).join(' ') : 'Unknown';
+    const kidId = l.kid_id as string | null;
+    const key = kidId ?? name;
+    if (!earnerMap[key]) earnerMap[key] = { name, points: 0 };
+    earnerMap[key].points += (l.delta ?? 0);
   }
   const topEarners = Object.entries(earnerMap)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 4)
-    .map(([name, points]) => ({ name, points }));
+    .sort(([, a], [, b]) => b.points - a.points)
+    .map(([key, { name, points }]) => ({ name, kidId: key.length === 36 ? key : null, points }));
+
+  // HitTrax leaderboard: best ev + max distance per kid, ordered by ev.
+  const { data: hittraxSessions } = await supabase
+    .from('sessions')
+    .select('kid_id, best_exit_velocity_mph, max_distance_ft, kids(first_name, last_name, age_group)')
+    .eq('tenant_id', tenantId)
+    .not('best_exit_velocity_mph', 'is', null)
+    .order('best_exit_velocity_mph', { ascending: false });
+
+  type HittraxRow = { kid_id: string; best_exit_velocity_mph: number | null; max_distance_ft: number | null; kids: { first_name: string; last_name: string | null; age_group: string | null } | null };
+  const evByKid: Record<string, { bestEv: number; maxDist: number; name: string; ageGroup: string }> = {};
+  for (const row of (hittraxSessions ?? []) as HittraxRow[]) {
+    if (!row.kid_id || row.best_exit_velocity_mph == null) continue;
+    const existing = evByKid[row.kid_id];
+    const ev = row.best_exit_velocity_mph;
+    const dist = row.max_distance_ft ?? 0;
+    const kid = row.kids;
+    const name = kid ? [kid.first_name, kid.last_name].filter(Boolean).join(' ') : 'Unknown';
+    const ageGroup = kid?.age_group ?? 'Unknown';
+    if (!existing || ev > existing.bestEv) {
+      evByKid[row.kid_id] = { bestEv: ev, maxDist: Math.max(existing?.maxDist ?? 0, dist), name, ageGroup };
+    } else if (dist > existing.maxDist) {
+      evByKid[row.kid_id].maxDist = dist;
+    }
+  }
+  const hittraxLeaderboard: HittraxLeaderboardEntry[] = Object.entries(evByKid)
+    .sort(([, a], [, b]) => b.bestEv - a.bestEv)
+    .map(([kidId, { bestEv, maxDist, name, ageGroup }]) => ({
+      kidId, name, ageGroup,
+      bestEv,
+      maxDistance: maxDist || null,
+    }));
 
   return {
     products: (products ?? []).map(p => ({
@@ -1171,6 +1296,7 @@ export async function getPointsRewardsData(supabase: SupabaseClient, tenantId: s
     })),
     totalPointsIssued,
     topEarners,
+    hittraxLeaderboard,
   };
 }
 
@@ -1379,6 +1505,25 @@ export type MemberDetail = OwnerMember & {
   billingAnchorDay: number | null;
   /** Scheduled balance payments for split OTC enrollments. Empty array if none. */
   scheduledCharges: ScheduledChargeRow[];
+  reviewAsked: boolean;
+  reviewLeft: boolean;
+  referralAsked: boolean;
+  referralGiven: boolean;
+  adminEvents: Array<{ id: string; eventType: string; note: string | null; createdBy: string; createdAt: string }>;
+  exitInterviewRequested: boolean;
+  waiverAuthorized: boolean;
+  birthday: string | null;
+  sportType: string | null;
+  measurements: Array<{
+    id: string;
+    recordedOn: string;
+    averageEv: number | null;
+    peakEv: number | null;
+    unit: string;
+    source: string;
+  }>;
+  measurementCount: number;
+  daysSinceLastMeasurement: number | null;
 };
 
 export async function getMemberDetail(
@@ -1412,7 +1557,9 @@ export async function getMemberDetail(
       sessions_per_week,
       weekly_sessions_used,
       weekly_period_start,
-      kids!inner(id, first_name, last_name, age_group, points_balance),
+      exit_interview_requested,
+      waiver_authorized,
+      kids!inner(id, first_name, last_name, age_group, points_balance, birthday, sport_type),
       families!inner(parent_first_name, parent_last_name, parent_email, parent_phone, card_last4, card_brand, card_exp_month, card_exp_year)
     `)
     .eq('tenant_id', tenantId)
@@ -1428,6 +1575,8 @@ export async function getMemberDetail(
     last_name: string | null;
     age_group: string | null;
     points_balance: number;
+    birthday: string | null;
+    sport_type: string | null;
   };
   const fam = mem.families as unknown as {
     parent_first_name: string;
@@ -1447,7 +1596,7 @@ export async function getMemberDetail(
     return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
   };
 
-  const [bookingCountRes, sessionsRes, recentBookingsRes, paymentsRes, lastBookingRes] = await Promise.all([
+  const [bookingCountRes, sessionsRes, recentBookingsRes, paymentsRes, lastBookingRes, reviewRes, referralRes, adminEventsRes, measurementsRes] = await Promise.all([
     // Exact completed-booking count — no row limit so all completed bookings are counted
     supabase
       .from('bookings')
@@ -1486,16 +1635,68 @@ export async function getMemberDetail(
       .eq('status', 'completed')
       .order('scheduled_start', { ascending: false })
       .limit(1),
+    supabase
+      .from('kid_review_tracking')
+      .select('review_asked, review_left')
+      .eq('tenant_id', tenantId)
+      .eq('kid_id', kid.id)
+      .maybeSingle(),
+    supabase
+      .from('kid_referral_tracking')
+      .select('referral_asked, referral_given')
+      .eq('tenant_id', tenantId)
+      .eq('kid_id', kid.id)
+      .maybeSingle(),
+    supabase
+      .from('membership_admin_events')
+      .select('id, event_type, note, created_by, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('membership_id', membershipId)
+      .order('created_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('coaching_measurements')
+      .select('id, recorded_on, average_ev, peak_ev, unit, source')
+      .eq('kid_id', kid.id)
+      .is('replaces_id', null)
+      .order('recorded_on', { ascending: false })
+      .limit(20),
   ]);
 
   const bookingCount = bookingCountRes.count ?? 0;
   const hittraxSessionCount = sessionsRes.count ?? 0;
+  const reviewRow = reviewRes.data as { review_asked: boolean; review_left: boolean } | null;
+  const referralRow = referralRes.data as { referral_asked: boolean; referral_given: boolean } | null;
+  type AdminEventRow = { id: string; event_type: string; note: string | null; created_by: string; created_at: string };
+  const adminEvents = ((adminEventsRes.data ?? []) as AdminEventRow[]).map(e => ({
+    id: e.id,
+    eventType: e.event_type,
+    note: e.note,
+    createdBy: e.created_by,
+    createdAt: e.created_at,
+  }));
+
+  type MeasurementRow = { id: string; recorded_on: string; average_ev: number | null; peak_ev: number | null; unit: string; source: string };
+  const measurements = ((measurementsRes.data ?? []) as MeasurementRow[]).map(m => ({
+    id: m.id,
+    recordedOn: m.recorded_on,
+    averageEv: m.average_ev ?? null,
+    peakEv: m.peak_ev ?? null,
+    unit: m.unit ?? 'mph',
+    source: m.source ?? 'manual',
+  }));
+  const measurementCount = measurements.length;
+  const lastMeasurementOn = measurements[0]?.recordedOn ?? null;
+  const daysSinceLastMeasurement = lastMeasurementOn
+    ? Math.floor((Date.now() - new Date(lastMeasurementOn).getTime()) / 86_400_000)
+    : null;
 
   if (bookingCountRes.error) console.error('[getMemberDetail] bookingCount:', bookingCountRes.error.message);
   if (sessionsRes.error) console.error('[getMemberDetail] sessions:', sessionsRes.error.message);
   if (recentBookingsRes.error) console.error('[getMemberDetail] recentBookings:', recentBookingsRes.error.message);
   if (paymentsRes.error) console.error('[getMemberDetail] payments:', paymentsRes.error.message);
   if (lastBookingRes.error) console.error('[getMemberDetail] lastBooking:', lastBookingRes.error.message);
+  if (measurementsRes.error) console.error('[getMemberDetail] measurements:', measurementsRes.error.message);
   if ([bookingCountRes, sessionsRes, recentBookingsRes, paymentsRes, lastBookingRes].some(r => r.error)) {
     throw new Error('Unable to load complete player history. Please retry.');
   }
@@ -1553,9 +1754,11 @@ export async function getMemberDetail(
 
   const lastBookingTs = lastBookingRes.data?.[0]?.scheduled_start ?? null;
   const days = daysSince(lastBookingTs);
-  const risk = churnRisk(days);
   const planType = mem.plan_type as 'eft' | 'otc';
   const rawStatus = mem.status as string;
+  const isDetailPaused = rawStatus === 'paused';
+  const sessionRiskDetail = churnRisk(days);
+  const risk: 'low' | 'medium' | 'high' = isDetailPaused && sessionRiskDetail !== 'high' ? 'high' : sessionRiskDetail;
   const memberStatus = rawStatus === 'active' && risk === 'high' ? 'at-risk'
     : (rawStatus as 'active' | 'paused' | 'cancelled' | 'payment_overdue');
 
@@ -1619,11 +1822,13 @@ export async function getMemberDetail(
     mrr: mem.amount_cents / 100,
     lifetime,
     joinedDate: formatJoinDate(mem.started_at),
-    riskReason: risk === 'high'
-      ? `No session in ${days} days. Outreach recommended within 48 hours.`
-      : risk === 'medium'
-      ? `No session in ${days} days. Send an engagement message.`
-      : undefined,
+    riskReason: (() => {
+      if (risk === 'low') return undefined;
+      const parts: string[] = [];
+      if (days < 9999) parts.push(`No session in ${days} day${days !== 1 ? 's' : ''}`);
+      if (isDetailPaused) parts.push('Account is paused');
+      return parts.join(' · ') + (risk === 'high' ? '. Call within 48 hours.' : '. Send an engagement message.');
+    })(),
     bookingCount,
     hittraxSessionCount,
     pointsBalance: kid.points_balance,
@@ -1653,7 +1858,110 @@ export async function getMemberDetail(
       : null,
     billingAnchorDay:    (mem.billing_anchor_day as number | null) ?? null,
     scheduledCharges,
+    reviewAsked:    reviewRow?.review_asked ?? false,
+    reviewLeft:     reviewRow?.review_left ?? false,
+    referralAsked:  referralRow?.referral_asked ?? false,
+    referralGiven:  referralRow?.referral_given ?? false,
+    adminEvents,
+    exitInterviewRequested: (mem.exit_interview_requested as boolean | null) ?? false,
+    waiverAuthorized: (mem.waiver_authorized as boolean | null) ?? false,
+    birthday: kid.birthday ?? null,
+    sportType: kid.sport_type ?? null,
+    measurements,
+    measurementCount,
+    daysSinceLastMeasurement,
   };
+}
+
+// ─── Owner Notifications (A5) ─────────────────────────────────────────────────
+
+export type OwnerNotification = {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  ctaLabel: string | null;
+  ctaHref: string | null;
+  severity: 'info' | 'warning' | 'critical';
+  createdAt: string;
+};
+
+export async function getOwnerNotifications(supabase: SupabaseClient, tenantId: string): Promise<OwnerNotification[]> {
+  try {
+    const { data, error } = await supabase
+      .from('owner_notifications')
+      .select('id, kind, title, body, cta_label, cta_href, severity, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('dismissed', false)
+      .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(10);
+    if (error) return [];
+    return (data ?? []).map(n => ({
+      id: n.id as string,
+      kind: n.kind as string,
+      title: n.title as string,
+      body: n.body as string,
+      ctaLabel: (n.cta_label as string | null) ?? null,
+      ctaHref: (n.cta_href as string | null) ?? null,
+      severity: (n.severity as 'info' | 'warning' | 'critical') ?? 'info',
+      createdAt: n.created_at as string,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── LTV ─────────────────────────────────────────────────────────────────────
+
+export type LTVData = {
+  activeMemberCount: number;
+  avgMrrCents: number;
+  avgTenureMonths: number | null;
+  ltv: number | null;
+  cancelledMemberCount: number;
+};
+
+export async function getLTVData(supabase: SupabaseClient, tenantId: string): Promise<LTVData> {
+  const [activeRes, cancelledRes] = await Promise.all([
+    supabase
+      .from('memberships')
+      .select('amount_cents')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active'),
+    supabase
+      .from('memberships')
+      .select('started_at, cancel_effective_at')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'cancelled')
+      .not('cancel_effective_at', 'is', null)
+      .not('started_at', 'is', null),
+  ]);
+
+  const activeRows = (activeRes.data ?? []) as Array<{ amount_cents: number }>;
+  const cancelledRows = (cancelledRes.data ?? []) as Array<{ started_at: string; cancel_effective_at: string }>;
+
+  const activeMemberCount = activeRows.length;
+  const avgMrrCents = activeMemberCount > 0
+    ? Math.round(activeRows.reduce((s, r) => s + (r.amount_cents ?? 0), 0) / activeMemberCount)
+    : 0;
+
+  const tenures = cancelledRows
+    .map(r => {
+      const ms = new Date(r.cancel_effective_at).getTime() - new Date(r.started_at).getTime();
+      return ms > 0 ? ms / (30.44 * 86_400_000) : null;
+    })
+    .filter((v): v is number => v !== null);
+
+  const avgTenureMonths = tenures.length > 0
+    ? Math.round((tenures.reduce((a, b) => a + b, 0) / tenures.length) * 10) / 10
+    : null;
+
+  const ltv = avgTenureMonths != null && avgMrrCents > 0
+    ? Math.round((avgTenureMonths * avgMrrCents) / 100)
+    : null;
+
+  return { activeMemberCount, avgMrrCents, avgTenureMonths, ltv, cancelledMemberCount: cancelledRows.length };
 }
 
 // ─── Coach Hours ─────────────────────────────────────────────────────────────
@@ -1888,6 +2196,8 @@ export type TodayAtAGlanceData = {
   stats: TodayStats;
   todayBookings: TodayBooking[];
   upcomingBookings: UpcomingBooking[];
+  preChargeReevalCount: number;
+  anniversaryCount: number;
 };
 
 export async function getTodayAtAGlanceData(
@@ -1906,7 +2216,7 @@ export async function getTodayAtAGlanceData(
     coaches(first_name, last_name)
   `;
 
-  const [bookingsTodayRes, upcomingRes, membershipsRes] = await Promise.all([
+  const [bookingsTodayRes, upcomingRes, membershipsRes, activeMembershipsRes, recentMeasurementsRes] = await Promise.all([
     supabase
       .from('bookings')
       .select(BOOKING_SELECT)
@@ -1928,6 +2238,18 @@ export async function getTodayAtAGlanceData(
       .select('family_id')
       .eq('tenant_id', tenantId)
       .eq('status', 'active'),
+
+    supabase
+      .from('memberships')
+      .select('kid_id, billing_anchor_day, started_at, plan_type')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active'),
+
+    supabase
+      .from('coaching_measurements')
+      .select('kid_id, recorded_on')
+      .eq('tenant_id', tenantId)
+      .order('recorded_on', { ascending: false }),
   ]);
 
   if ([bookingsTodayRes, upcomingRes, membershipsRes].some(r => r.error)) {
@@ -1995,6 +2317,43 @@ export async function getTodayAtAGlanceData(
   // Count distinct coaches by ID (not name string) to avoid duplicate-name false negatives
   const coachesToday = new Set(todayBookings.map(b => b.coachId).filter(Boolean)).size;
 
+  // Pre-billing re-eval alert: active EFT members with billing anchor within 10 days who lack a recent re-eval
+  type ActiveMemberRow = { kid_id: string | null; billing_anchor_day: number | null; started_at: string; plan_type: string };
+  type MeasurementRow = { kid_id: string; recorded_on: string };
+  const lastReevalMap: Record<string, string> = {};
+  for (const m of ((recentMeasurementsRes.data ?? []) as MeasurementRow[])) {
+    if (!lastReevalMap[m.kid_id]) lastReevalMap[m.kid_id] = m.recorded_on;
+  }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tenDaysFromNow = new Date(today.getTime() + 10 * 86_400_000);
+  let preChargeReevalCount = 0;
+  for (const mem of ((activeMembershipsRes.data ?? []) as ActiveMemberRow[])) {
+    if (!mem.kid_id || mem.plan_type !== 'eft' || !mem.billing_anchor_day) continue;
+    // Compute next billing date
+    const anchorDay = mem.billing_anchor_day;
+    const nextBilling = new Date(today.getFullYear(), today.getMonth(), anchorDay);
+    if (nextBilling < today) nextBilling.setMonth(nextBilling.getMonth() + 1);
+    if (nextBilling > tenDaysFromNow) continue;
+    // Check if no re-eval in past 30 days
+    const lastReeval = lastReevalMap[mem.kid_id] ?? null;
+    const daysSinceReeval = lastReeval
+      ? Math.floor((today.getTime() - new Date(lastReeval).getTime()) / 86_400_000)
+      : 9999;
+    if (daysSinceReeval > 30) preChargeReevalCount++;
+  }
+
+  // Anniversary count: members with started_at anniversary within 7 days
+  let anniversaryCount = 0;
+  for (const mem of ((activeMembershipsRes.data ?? []) as ActiveMemberRow[])) {
+    if (!mem.started_at) continue;
+    const start = new Date(mem.started_at);
+    // Build this year's anniversary date
+    const anniversary = new Date(today.getFullYear(), start.getMonth(), start.getDate());
+    if (anniversary < today) anniversary.setFullYear(anniversary.getFullYear() + 1);
+    const daysUntil = Math.floor((anniversary.getTime() - today.getTime()) / 86_400_000);
+    if (daysUntil <= 7) anniversaryCount++;
+  }
+
   return {
     stats: {
       sessionsToday: todayBookings.length,
@@ -2004,10 +2363,15 @@ export async function getTodayAtAGlanceData(
     },
     todayBookings,
     upcomingBookings,
+    preChargeReevalCount,
+    anniversaryCount,
   };
 }
 
 // ─── Cancelled Memberships ───────────────────────────────────────────────────
+
+export const CANCELLATION_REASONS = ['Schedule', 'Price', 'Distance', 'Competitor', 'Quit Sport', 'Other'] as const;
+export type CancellationReason = typeof CANCELLATION_REASONS[number];
 
 export type CancelledMembership = {
   id: string;
@@ -2021,6 +2385,8 @@ export type CancelledMembership = {
   cancelledAtLabel: string;
   sessionsUnused: number | null;
   amountCents: number;
+  cancellationReason: CancellationReason | null;
+  competitorName: string | null;
 };
 
 export async function getCancelledMemberships(
@@ -2033,7 +2399,7 @@ export async function getCancelledMemberships(
   const { data, error } = await supabase
     .from('memberships')
     .select(`
-      id, plan_name, plan_type, amount_cents, cancelled_at, sessions_remaining,
+      id, plan_name, plan_type, amount_cents, cancelled_at, sessions_remaining, cancellation_reason, competitor_name,
       kids!inner(first_name, last_name, families!inner(tenant_id)),
       families!inner(parent_first_name, parent_last_name, parent_email, parent_phone)
     `)
@@ -2063,6 +2429,8 @@ export async function getCancelledMemberships(
       cancelledAtLabel: `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`,
       sessionsUnused: r.plan_type === 'otc' ? (r.sessions_remaining ?? null) : null,
       amountCents: r.amount_cents ?? 0,
+      cancellationReason: (r.cancellation_reason as CancellationReason | null) ?? null,
+      competitorName: (r as unknown as { competitor_name?: string | null }).competitor_name ?? null,
     };
   });
 }

@@ -11,7 +11,7 @@ import type { RetentionDataset, RetentionFilters, RetentionReport, RetentionRow 
 import { playerHref } from '@/lib/playerLinks';
 
 type Mode = 'retention' | 'churn' | 'network';
-type Props = { data: RetentionDataset; mode?: Mode };
+type Props = { data: RetentionDataset; mode?: Mode; showHeader?: boolean };
 type Period = 'month' | 'quarter' | 'year' | 'custom';
 const panel: CSSProperties = { background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, padding: 18 };
 const labelStyle: CSSProperties = { display: 'grid', gap: 6, color: brand.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', fontFamily: fonts.display };
@@ -50,7 +50,7 @@ function usableRows(report: RetentionReport) {
   return report.months.filter(row => row.opening !== null);
 }
 
-export function RetentionReportContent({ data, mode = data.scope === 'network' ? 'network' : 'retention' }: Props) {
+export function RetentionReportContent({ data, mode = data.scope === 'network' ? 'network' : 'retention', showHeader = true }: Props) {
   const now = useMemo(() => new Date(data.asOf), [data.asOf]);
   const completedMonth = useMemo(() => {
     const locations = data.locations;
@@ -92,7 +92,7 @@ export function RetentionReportContent({ data, mode = data.scope === 'network' ?
   const title = mode === 'churn' ? 'Churn analysis' : mode === 'network' ? 'Network churn analysis' : 'Member retention';
 
   return <div>
-    <PageHeader title={title} subtitle="Evidence-led lifecycle reporting · complete local calendar months only" />
+    {showHeader && <PageHeader title={title} subtitle="Evidence-led lifecycle reporting · complete local calendar months only" />}
     <main style={{ padding: '22px clamp(14px, 3vw, 30px) 42px', display: 'grid', gap: 18, maxWidth: 1500, margin: '0 auto' }}>
       <section aria-labelledby="report-controls" style={{ ...panel, padding: 16 }}>
         <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginBottom: 14, color: brand.gold, fontFamily: fonts.display, fontWeight: 700, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' }}><Filter size={15}/><h2 id="report-controls" style={{ margin: 0, font: 'inherit' }}>Report controls</h2></div>
@@ -107,6 +107,18 @@ export function RetentionReportContent({ data, mode = data.scope === 'network' ?
         </div>
         <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', color: brand.textMuted, fontSize: 11 }}><CalendarDays size={14}/><span>Showing {periodText}. Latest fully completed month across permitted location timezones: <strong style={{ color: brand.text }}>{fmtMonth(completedMonth)}</strong>.</span></div>
       </section>
+
+      <details style={{ ...panel, padding: 0, cursor: 'default' }}>
+        <summary style={{ padding: '11px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, color: brand.gold, fontFamily: fonts.display, letterSpacing: 0.5, listStyle: 'none', userSelect: 'none' }}>
+          <CircleHelp size={14} /> About this report — data source, definition &amp; calculation
+        </summary>
+        <div style={{ padding: '0 16px 14px', color: brand.textMuted, fontSize: 12, lineHeight: 1.65, display: 'grid', gap: 6 }}>
+          <p style={{ margin: 0 }}><strong style={{ color: brand.text }}>Data source:</strong> Membership coverage records stored in retention history snapshots. Each snapshot records whether a membership was in force (active EFT or pack with sessions remaining) at the close of a calendar month.</p>
+          <p style={{ margin: 0 }}><strong style={{ color: brand.text }}>Retention definition:</strong> A member is counted as <em>retained</em> in a month if they had active coverage at the start of that month AND still had active coverage at the month close. Members who cancelled, let packs expire without renewal, or whose memberships lapsed during the month are counted as <em>losses</em>.</p>
+          <p style={{ margin: 0 }}><strong style={{ color: brand.text }}>Calculation:</strong> Retention rate = (opening members − losses) ÷ opening members. Churn rate = losses ÷ opening members. Multi-month summaries use combined player-month totals across the period, not an average of monthly rates.</p>
+          <p style={{ margin: 0 }}><strong style={{ color: brand.text }}>Measurement period:</strong> Complete local calendar months only. Partial months (the current month and any month without a full close snapshot) are excluded entirely — partial data is withheld rather than treated as zero losses to prevent misleading rates.</p>
+        </div>
+      </details>
 
       {data.issues.length > 0 && <aside role="status" style={{ ...panel, borderColor: brand.warning, background: brand.warningBg, padding: 14 }}><strong style={{ color: brand.warning, fontSize: 12 }}>Source issues</strong><ul style={{ margin: '8px 0 0', paddingLeft: 20, color: brand.text, fontSize: 12 }}>{data.issues.map((issue, i) => <li key={`${issue}-${i}`}>{issue}</li>)}</ul></aside>}
       {data.policies.length === 0 && <aside style={{ ...panel, padding: 13, color: brand.textMuted, fontSize: 12 }}><CircleHelp size={14} style={{ verticalAlign: 'middle', marginRight: 7, color: brand.warning }}/>No approved reporting policy is supplied for this scope. Metrics remain unavailable until contract requirements are satisfied.</aside>}
@@ -156,6 +168,24 @@ export function RetentionReportContent({ data, mode = data.scope === 'network' ?
             return [href ? <Link key={loss.key} href={href} style={{ color: brand.gold, textDecoration: 'underline', textUnderlineOffset: 3 }}>{loss.name || 'Open player record'}</Link> : loss.name || 'Name unavailable', fmtMonth(loss.month), <span key={`${loss.key}:date`} title={`${loss.effectiveAt} · ${timezone}`}>{new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: timezone }).format(new Date(loss.effectiveAt))} ({timezone})</span>, loss.reason === 'cancellation' ? 'Cancellation' : 'Nonrenewal'];
           })} empty="No evidence-backed loss rows are available. This does not mean there were zero losses; review coverage and policy notices above."/>}
       </section>
+
+      {!isNetwork && data.pauseAnalytics && (() => {
+        const pa = data.pauseAnalytics;
+        const fmt = (v: number | null, suffix = '%') => v == null ? '—' : `${v}${suffix}`;
+        const fmtDays = (v: number | null) => v == null ? '—' : v >= 365 ? `${(v / 365).toFixed(1)} yr` : v >= 30 ? `${Math.round(v / 30)} mo` : `${v}d`;
+        return (
+          <section style={panel}>
+            <div style={{ marginBottom: 13 }}><h2 style={sectionTitle}>Pause analytics</h2><p style={sectionSub}>Members who have ever been paused — tenure before pausing, likelihood of cancellation vs reactivation.</p></div>
+            <div className="retention-metrics" style={{ marginBottom: 0 }}>
+              <Metric title="Ever paused" value={String(pa.totalEverPaused)} sub="Members who have been paused at least once" accent={brand.warning} />
+              <Metric title="Currently paused" value={String(pa.currentlyPaused)} sub="Memberships in paused status right now" accent={brand.warning} />
+              <Metric title="Avg tenure before pause" value={fmtDays(pa.avgTenureBeforePauseDays)} sub="Days from start to first pause event" accent={brand.goldDeep} />
+              <Metric title="Pause→cancel rate" value={fmt(pa.pauseToCancelRate)} sub="Of all paused, % who eventually cancelled" accent={brand.danger} />
+              <Metric title="Reactivation rate" value={fmt(pa.reactivationRate)} sub="Of all paused, % who returned to active" accent={brand.success ?? '#4ade80'} />
+            </div>
+          </section>
+        );
+      })()}
 
       {!isNetwork && <section className="retention-availability" aria-label="Unavailable dimensions">
         <div style={panel}><h2 style={sectionTitle}>Finance</h2><p style={sectionSub}>{data.finance.reason}</p><div style={eyebrow}>LTV and revenue impact unavailable</div></div>

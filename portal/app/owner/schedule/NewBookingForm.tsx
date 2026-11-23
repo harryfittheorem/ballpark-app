@@ -127,7 +127,11 @@ export function NewBookingForm({ onSaved, onClose, initialAthleteId, showNotes =
           onChange={e => { setSearch(e.target.value); setAthlete(null); }} placeholder="Search first or last name" /></label>}
         {searching && <p role="status">Searching athletes…</p>}
         {!athlete && !searching && !error && search.trim().length >= 2 && athletes.length === 0 && <p>No matching athletes at this location.</p>}
-        {!athlete && athletes.map(k => <button type="button" key={k.id} onClick={() => { setAthlete(k); setSearch(k.name); }} style={{ ...field, textAlign: 'left' }}>{k.name}</button>)}
+        {!athlete && athletes.length > 0 && (
+          <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid #ddd', borderRadius: 6 }}>
+            {athletes.map(k => <button type="button" key={k.id} onClick={() => { setAthlete(k); setSearch(k.name); }} style={{ ...field, textAlign: 'left', borderBottom: '1px solid #eee', borderRadius: 0 }}>{k.name}</button>)}
+          </div>
+        )}
         {athlete && <p role="status">Selected athlete: {athlete.name}</p>}
         {showNotes && <label>Notes (optional)<textarea style={field} maxLength={2000} rows={3} value={notes} onChange={e => setNotes(e.target.value)} /></label>}
         <label>Session type<select required style={field} value={type} onChange={e => { setType(e.target.value); setCage(''); }}>

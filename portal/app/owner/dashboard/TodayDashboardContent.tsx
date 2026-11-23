@@ -1,12 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { KPICard, OButton, PageHeader, SectionHeader, OCard, Chip } from '@/components/owner/ui';
-import { Calendar, DollarSign, Users, Clock, ChevronRight } from 'lucide-react';
+import { Calendar, DollarSign, Users, Clock, ChevronRight, CheckSquare, Square, ClipboardList, AlertTriangle, Info, XCircle } from 'lucide-react';
 import { PlayerLink } from '@/components/owner/PlayerLink';
-import type { TodayAtAGlanceData, TodayBooking, UpcomingBooking } from '@/lib/supabase/ownerQueries';
+import type { TodayAtAGlanceData, TodayBooking, UpcomingBooking, OwnerNotification } from '@/lib/supabase/ownerQueries';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -124,13 +124,180 @@ function UpcomingRow({ b }: { b: UpcomingBooking }) {
   );
 }
 
+// ── Notification Banners ──────────────────────────────────────────────────────
+
+function NotificationBanners({ notifications }: { notifications: OwnerNotification[] }) {
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  if (notifications.length === 0) return null;
+  const visible = notifications.filter(n => !dismissed.has(n.id));
+  if (visible.length === 0) return null;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+      {visible.map(n => {
+        const isWarning = n.severity === 'warning';
+        const isCritical = n.severity === 'critical';
+        const borderColor = isCritical ? brand.danger : isWarning ? brand.warning : brand.info;
+        const bg = isCritical ? `${brand.danger}11` : isWarning ? `${brand.warning}11` : `${brand.info}11`;
+        const Icon = isCritical || isWarning ? AlertTriangle : Info;
+        const iconColor = isCritical ? brand.danger : isWarning ? brand.warning : brand.info;
+
+        return (
+          <div key={n.id} style={{
+            display: 'flex', alignItems: 'flex-start', gap: 12,
+            padding: '12px 16px', borderRadius: 10,
+            border: `1px solid ${borderColor}44`,
+            borderLeft: `4px solid ${borderColor}`,
+            background: bg,
+          }}>
+            <Icon size={16} color={iconColor} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: brand.text, marginBottom: 2 }}>{n.title}</div>
+              <div style={{ fontSize: 12, color: brand.textMuted, lineHeight: 1.5 }}>{n.body}</div>
+              {n.ctaLabel && n.ctaHref && (
+                <a href={n.ctaHref} style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 700, color: iconColor, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                  {n.ctaLabel} →
+                </a>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setDismissed(prev => new Set([...prev, n.id]))}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, flexShrink: 0 }}
+              title="Dismiss"
+            >
+              <XCircle size={15} color={brand.textMuted} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── GM Daily Checklist ────────────────────────────────────────────────────────
+
+const BASE_CHECKLIST_ITEMS = [
+  { key: 'review_schedule',    label: 'Review today\'s full schedule',      note: 'Confirm all sessions are staffed and cages are assigned' },
+  { key: 'check_payments',     label: 'Check for failed payments',           note: 'Follow up with members on billing errors' },
+  { key: 'review_at_risk',     label: 'Review at-risk members',              note: 'Reach out to anyone 14+ days without a session' },
+  { key: 'send_reeval',        label: 'Send re-evaluation reminders',        note: '' },
+  { key: 'google_reviews',     label: 'Respond to / request Google reviews', note: 'Reply to new reviews; ask recent completions to leave one' },
+  { key: 'coach_checkin',      label: 'Coach check-in complete',             note: 'Confirm all coaches have reviewed their schedules' },
+  { key: 'bank_deposit',       label: 'Verify EFT / bank deposits settled',  note: 'Confirm payment batch settled overnight' },
+  { key: 'cancellation_queue', label: 'Review cancellation / pause queue',   note: 'Follow up on any pending cancellation requests' },
+  { key: 'anniversaries',      label: 'Member anniversaries today / this week', note: '' },
+] as const;
+
+type ChecklistKey = typeof BASE_CHECKLIST_ITEMS[number]['key'];
+
+function todayKey() {
+  const d = new Date();
+  return `gm_checklist_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function GMChecklist({ preChargeReevalCount, anniversaryCount }: { preChargeReevalCount: number; anniversaryCount: number }) {
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(todayKey());
+      if (stored) setChecked(JSON.parse(stored) as Record<string, boolean>);
+    } catch { /* ignore */ }
+  }, []);
+
+  function toggle(key: ChecklistKey) {
+    setChecked(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem(todayKey(), JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  const CHECKLIST_ITEMS = BASE_CHECKLIST_ITEMS.map(item => {
+    if (item.key === 'send_reeval') {
+      return { ...item, note: preChargeReevalCount > 0 ? `${preChargeReevalCount} member${preChargeReevalCount !== 1 ? 's' : ''} billing in ≤10 days with no recent re-eval` : 'No members due for re-eval before next billing' };
+    }
+    if (item.key === 'anniversaries') {
+      return { ...item, note: anniversaryCount > 0 ? `${anniversaryCount} member${anniversaryCount !== 1 ? 's have' : ' has'} an anniversary this week — send a congratulations!` : 'No anniversaries this week' };
+    }
+    return item;
+  });
+  const doneCount = CHECKLIST_ITEMS.filter(i => checked[i.key]).length;
+  const total = CHECKLIST_ITEMS.length;
+  const pct = Math.round((doneCount / total) * 100);
+
+  return (
+    <OCard style={{ padding: 0 }}>
+      {/* Header */}
+      <div style={{ padding: '14px 20px', borderBottom: `1px solid ${brand.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <ClipboardList size={15} color={brand.goldDeep} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: brand.text, fontFamily: fonts.display, letterSpacing: 0.3 }}>
+            GM Daily Checklist
+          </div>
+          <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 1 }}>{doneCount} of {total} complete</div>
+        </div>
+        {/* Progress pill */}
+        <div style={{
+          fontSize: 11, fontWeight: 800, fontFamily: fonts.display,
+          background: pct === 100 ? `${brand.success}22` : `${brand.gold}22`,
+          color: pct === 100 ? brand.success : brand.goldDeep,
+          border: `1px solid ${pct === 100 ? brand.success : brand.gold}44`,
+          borderRadius: 20, padding: '2px 10px',
+        }}>
+          {pct}%
+        </div>
+      </div>
+      {/* Progress bar */}
+      <div style={{ height: 3, background: brand.border }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? brand.success : brand.gold, borderRadius: 2, transition: 'width 0.3s ease' }} />
+      </div>
+      {/* Items */}
+      {CHECKLIST_ITEMS.map((item, i) => {
+        const done = !!checked[item.key];
+        return (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => toggle(item.key)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
+              padding: '11px 20px',
+              background: done ? `${brand.success}09` : 'transparent',
+              cursor: 'pointer',
+              textAlign: 'left',
+              border: 'none',
+              borderBottom: i < CHECKLIST_ITEMS.length - 1 ? `1px solid ${brand.border}` : 'none',
+            }}
+          >
+            {done
+              ? <CheckSquare size={16} color={brand.success} style={{ flexShrink: 0, marginTop: 1 }} />
+              : <Square size={16} color={brand.textMuted} style={{ flexShrink: 0, marginTop: 1 }} />
+            }
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: done ? brand.textMuted : brand.text, textDecoration: done ? 'line-through' : 'none' }}>
+                {item.label}
+              </div>
+              <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 1 }}>{item.note}</div>
+            </div>
+          </button>
+        );
+      })}
+    </OCard>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
-type Props = { data: TodayAtAGlanceData; tenantName: string };
+type Props = { data: TodayAtAGlanceData; tenantName: string; notifications?: OwnerNotification[] };
 
-export function TodayDashboardContent({ data, tenantName }: Props) {
+export function TodayDashboardContent({ data, tenantName, notifications = [] }: Props) {
   const router = useRouter();
-  const { stats, todayBookings, upcomingBookings } = data;
+  const { stats, todayBookings, upcomingBookings, preChargeReevalCount, anniversaryCount } = data;
 
   const now = new Date();
   const MONTHS  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -165,6 +332,9 @@ export function TodayDashboardContent({ data, tenantName }: Props) {
       />
 
       <div style={{ padding: 24 }}>
+
+        {/* ── Automated Notifications (A5) ──────────────────────────────── */}
+        <NotificationBanners notifications={notifications} />
 
         {/* ── Quick Stats bar ────────────────────────────────────────────── */}
         <div className="owner-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16, marginBottom: 28 }}>
@@ -247,8 +417,11 @@ export function TodayDashboardContent({ data, tenantName }: Props) {
             </OCard>
           </div>
 
-          {/* ── Right: Upcoming 48h ─────────────────────────────────────── */}
-          <div>
+          {/* ── Right: GM Checklist + Upcoming 48h ──────────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <SectionHeader title="Daily Checklist" subtitle="Resets each morning" />
+            <GMChecklist preChargeReevalCount={preChargeReevalCount} anniversaryCount={anniversaryCount} />
+
             <SectionHeader
               title="Next 48 Hours"
               subtitle={`${upcomingBookings.length} upcoming booking${upcomingBookings.length !== 1 ? 's' : ''}`}

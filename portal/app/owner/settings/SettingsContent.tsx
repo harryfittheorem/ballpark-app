@@ -2,8 +2,131 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
-import { OCard, PageHeader, OButton } from '@/components/owner/ui';
+import { OCard, PageHeader, OButton, SectionHeader } from '@/components/owner/ui';
 import { createClient } from '@/lib/supabase/client';
+
+// Nav sections that can be toggled per preset.
+const CONFIGURABLE_SECTIONS = [
+  { key: 'schedule',    label: 'Schedule',       defaultStaff: true,  defaultInstructor: false },
+  { key: 'checkin',     label: 'Check-In',       defaultStaff: true,  defaultInstructor: false },
+  { key: 'families',    label: 'Families',        defaultStaff: true,  defaultInstructor: false },
+  { key: 'redemptions', label: 'Redemptions',     defaultStaff: true,  defaultInstructor: false },
+  { key: 'playbook',    label: 'Training Playbook', defaultStaff: true, defaultInstructor: true },
+] as const;
+
+type SectionKey = typeof CONFIGURABLE_SECTIONS[number]['key'];
+type AccessConfig = { instructor: SectionKey[]; staff: SectionKey[] };
+
+function defaultConfig(): AccessConfig {
+  return {
+    instructor: CONFIGURABLE_SECTIONS.filter(s => s.defaultInstructor).map(s => s.key),
+    staff: CONFIGURABLE_SECTIONS.filter(s => s.defaultStaff).map(s => s.key),
+  };
+}
+
+function StaffAccessPanel() {
+  const [config, setConfig] = useState<AccessConfig>(defaultConfig());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    (async () => {
+      try {
+        const { data } = await (supabase as unknown as import('@supabase/supabase-js').SupabaseClient)
+          .from('tenants').select('staff_access_config').maybeSingle();
+        if (data?.staff_access_config && typeof data.staff_access_config === 'object') {
+          const raw = data.staff_access_config as Partial<AccessConfig>;
+          setConfig({
+            instructor: Array.isArray(raw.instructor) ? raw.instructor as SectionKey[] : defaultConfig().instructor,
+            staff: Array.isArray(raw.staff) ? raw.staff as SectionKey[] : defaultConfig().staff,
+          });
+        }
+      } catch { /* silent */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  const toggle = (preset: 'instructor' | 'staff', key: SectionKey) => {
+    setConfig(prev => {
+      const list = prev[preset];
+      return { ...prev, [preset]: list.includes(key) ? list.filter(k => k !== key) : [...list, key] };
+    });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/owner/settings/staff-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch { /* silent */ }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <OCard style={{ marginTop: 24 }}>
+      <div style={{ padding: '4px 4px 8px' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, fontFamily: fonts.display, color: brand.text, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 }}>
+          Staff Access Profiles
+        </div>
+        <div style={{ fontSize: 12, color: brand.textMuted, marginBottom: 20 }}>
+          Control which nav sections each staff preset can access. Changes take effect on the staff member&apos;s next login.
+          <br />
+          <strong style={{ color: brand.warning }}>Note:</strong> Billing, Revenue Reports, and owner-only analytics are always restricted to Owner accounts — these cannot be enabled for staff.
+        </div>
+
+        {loading ? (
+          <div style={{ fontSize: 12, color: brand.textMuted }}>Loading…</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${brand.border}` }}>
+                  <th style={{ textAlign: 'left', padding: '8px 12px', color: brand.textMuted, fontWeight: 700, letterSpacing: 0.6, fontSize: 10, textTransform: 'uppercase' }}>Section</th>
+                  <th style={{ textAlign: 'center', padding: '8px 12px', color: brand.goldDeep, fontWeight: 700, letterSpacing: 0.6, fontSize: 10, textTransform: 'uppercase' }}>Instructor</th>
+                  <th style={{ textAlign: 'center', padding: '8px 12px', color: brand.success ?? '#4ade80', fontWeight: 700, letterSpacing: 0.6, fontSize: 10, textTransform: 'uppercase' }}>Staff</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CONFIGURABLE_SECTIONS.map((section, i) => (
+                  <tr key={section.key} style={{ borderBottom: i < CONFIGURABLE_SECTIONS.length - 1 ? `1px solid ${brand.border}` : 'none' }}>
+                    <td style={{ padding: '10px 12px', color: brand.text, fontWeight: 600 }}>{section.label}</td>
+                    {(['instructor', 'staff'] as const).map(preset => (
+                      <td key={preset} style={{ textAlign: 'center', padding: '10px 12px' }}>
+                        <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <input
+                            type="checkbox"
+                            checked={config[preset].includes(section.key)}
+                            onChange={() => toggle(preset, section.key)}
+                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: brand.goldDeep }}
+                          />
+                        </label>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 16 }}>
+          {saved && <span style={{ fontSize: 12, color: brand.success }}>Saved!</span>}
+          <OButton variant="gold" onClick={() => void handleSave()} disabled={saving || loading}>
+            {saving ? 'Saving…' : 'Save Access Config'}
+          </OButton>
+        </div>
+      </div>
+    </OCard>
+  );
+}
 
 type CancellationPolicy = {
   booking_cancel_window_hours: number;
@@ -143,7 +266,7 @@ export function SettingsContent() {
     <div>
       <PageHeader
         title="Settings"
-        subtitle="Cancellation policies and location configuration."
+        subtitle="Cancellation policies, staff access profiles, and location configuration."
       />
 
       <div style={{ padding: '28px 32px' }}>
@@ -234,6 +357,8 @@ export function SettingsContent() {
             </div>
           </div>
         </OCard>
+
+        <StaffAccessPanel />
       </div>
 
       {/* Toast */}

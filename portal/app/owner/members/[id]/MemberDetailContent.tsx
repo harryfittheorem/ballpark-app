@@ -1,11 +1,12 @@
 'use client';
 
 import { brand, fonts } from '@/lib/ownerBrandTokens';
-import { OButton, PageHeader, SectionHeader, OCard, Chip } from '@/components/owner/ui';
+import { OButton, PageHeader, SectionHeader, OCard, Chip, MiniLineChart, OTable } from '@/components/owner/ui';
 import {
   Calendar, MessageCircle, Edit2, Activity, Clock,
   CheckCircle, XCircle, CreditCard, Star, Zap, TrendingUp,
   AlertCircle, PauseCircle, PlayCircle, Package, Phone, Mail, X,
+  CheckSquare, Square, MessageSquare,
 } from 'lucide-react';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -464,6 +465,14 @@ function PauseSection({ member }: { member: MemberDetail }) {
               {formatDateShort(pauseEnd)}
             </span>
           </div>
+          {member.sessionsRemaining != null && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: brand.textMuted }}>Session balance</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: brand.text }}>
+                {member.sessionsRemaining} session{member.sessionsRemaining !== 1 ? 's' : ''} remaining
+              </span>
+            </div>
+          )}
           <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 4, fontStyle: 'italic' }}>
             No billing charges until the resume date.
           </div>
@@ -1332,6 +1341,441 @@ function SubscriptionSection({ member }: { member: MemberDetail }) {
   );
 }
 
+function ReviewReferralSection({ member }: { member: MemberDetail }) {
+  const [reviewAsked, setReviewAsked]     = useState(member.reviewAsked);
+  const [reviewLeft, setReviewLeft]       = useState(member.reviewLeft);
+  const [referralAsked, setReferralAsked] = useState(member.referralAsked);
+  const [referralGiven, setReferralGiven] = useState(member.referralGiven);
+
+  async function toggle(type: 'review' | 'referral', field: 'asked' | 'left' | 'given', value: boolean) {
+    const setFn = type === 'review'
+      ? (field === 'asked' ? setReviewAsked : setReviewLeft)
+      : (field === 'asked' ? setReferralAsked : setReferralGiven);
+    setFn(value);
+    await fetch('/api/owner/engagement-tracking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kidId: member.kidId, type, field, value }),
+    });
+  }
+
+  const rows: Array<{ label: string; note: string; checked: boolean; type: 'review' | 'referral'; field: 'asked' | 'left' | 'given' }> = [
+    { label: 'Google review asked',   note: 'Requested a review after a session',         checked: reviewAsked,   type: 'review',   field: 'asked'  },
+    { label: 'Google review left',    note: 'Member left a Google review',                 checked: reviewLeft,    type: 'review',   field: 'left'   },
+    { label: 'Referral asked',        note: 'Asked member to refer friends/family',        checked: referralAsked, type: 'referral', field: 'asked'  },
+    { label: 'Referral given',        note: 'Member referred someone who signed up',       checked: referralGiven, type: 'referral', field: 'given'  },
+  ];
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <SectionHeader title="Reviews & Referrals" />
+      <OCard style={{ padding: 0 }}>
+        {rows.map((row, i) => (
+          <button
+            key={row.field + row.type}
+            type="button"
+            onClick={() => toggle(row.type, row.field, !row.checked)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '11px 16px', background: row.checked ? `${brand.success}09` : 'transparent',
+              cursor: 'pointer', textAlign: 'left', border: 'none',
+              borderBottom: i < rows.length - 1 ? `1px solid ${brand.border}` : 'none',
+            }}
+          >
+            {row.checked
+              ? <CheckSquare size={15} color={brand.success} style={{ flexShrink: 0, marginTop: 1 }} />
+              : <Square size={15} color={brand.textMuted} style={{ flexShrink: 0, marginTop: 1 }} />
+            }
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: row.checked ? brand.textMuted : brand.text, textDecoration: row.checked ? 'line-through' : 'none' }}>
+                {row.label}
+              </div>
+              <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 1 }}>{row.note}</div>
+            </div>
+          </button>
+        ))}
+      </OCard>
+    </div>
+  );
+}
+
+type GameRow = {
+  id: string;
+  game_date: string;
+  opponent: string | null;
+  result: string | null;
+  at_bats: number | null;
+  hits: number | null;
+  home_runs: number | null;
+  rbi: number | null;
+  avg_exit_velo: number | null;
+  peak_exit_velo: number | null;
+  notes: string | null;
+  source: string;
+};
+
+type GameForm = {
+  gameDate: string; opponent: string; result: string;
+  atBats: string; hits: string; homeRuns: string; rbi: string;
+  avgExitVelo: string; peakExitVelo: string; notes: string;
+};
+
+const GAME_RESULT_COLOR: Record<string, 'success' | 'danger' | 'default'> = {
+  win: 'success', loss: 'danger', tie: 'default', scrimmage: 'default',
+};
+
+function GameStatsSection({ kidId }: { kidId: string }) {
+  const [games, setGames] = useState<GameRow[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<GameForm>({
+    gameDate: new Date().toISOString().slice(0, 10), opponent: '', result: '',
+    atBats: '', hits: '', homeRuns: '', rbi: '', avgExitVelo: '', peakExitVelo: '', notes: '',
+  });
+
+  const loadGames = useCallback(() => {
+    if (!kidId) return;
+    fetch(`/api/owner/game-stats?kidId=${kidId}`)
+      .then(r => r.json())
+      .then(d => { if ((d as { games?: GameRow[] }).games) setGames((d as { games: GameRow[] }).games); })
+      .catch(() => {});
+  }, [kidId]);
+
+  useEffect(() => { loadGames(); }, [loadGames]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/owner/game-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kidId,
+          gameDate: form.gameDate,
+          opponent: form.opponent || undefined,
+          result: form.result || undefined,
+          atBats: form.atBats ? parseInt(form.atBats, 10) : undefined,
+          hits: form.hits ? parseInt(form.hits, 10) : undefined,
+          homeRuns: form.homeRuns ? parseInt(form.homeRuns, 10) : undefined,
+          rbi: form.rbi ? parseInt(form.rbi, 10) : undefined,
+          avgExitVelo: form.avgExitVelo ? parseFloat(form.avgExitVelo) : undefined,
+          peakExitVelo: form.peakExitVelo ? parseFloat(form.peakExitVelo) : undefined,
+          notes: form.notes || undefined,
+        }),
+      });
+      const data = await res.json() as { ok?: boolean };
+      if (data.ok) { setModalOpen(false); loadGames(); }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <SectionHeader title="Game Stats" subtitle={games.length > 0 ? `${games.length} logged` : undefined} />
+        <OButton variant="secondary" size="sm" onClick={() => setModalOpen(true)}>Log Game Stats</OButton>
+      </div>
+      {games.length === 0 ? (
+        <OCard style={{ padding: 24, textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: brand.textMuted }}>No game stats recorded yet.</div>
+        </OCard>
+      ) : (
+        <OTable
+          columns={[
+            { key: 'game_date', label: 'Date', render: (r: GameRow) => new Date(r.game_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) },
+            { key: 'result', label: 'Result', render: (r: GameRow) => r.result ? <Chip color={GAME_RESULT_COLOR[r.result] ?? 'default'} size="sm">{r.result.toUpperCase()}</Chip> : <span style={{ color: brand.textMuted }}>—</span> },
+            { key: 'at_bats', label: 'AB/H', render: (r: GameRow) => (r.at_bats != null || r.hits != null) ? `${r.at_bats ?? '—'}/${r.hits ?? '—'}` : '—' },
+            { key: 'avg_exit_velo', label: 'Avg EV', render: (r: GameRow) => r.avg_exit_velo != null ? `${r.avg_exit_velo} mph` : '—' },
+          ]}
+          rows={games.slice(0, 10)}
+        />
+      )}
+
+      {modalOpen && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onClick={e => { if (e.target === e.currentTarget) setModalOpen(false); }}
+        >
+          <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 14, padding: 24, width: '100%', maxWidth: 480 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, fontFamily: fonts.display, marginBottom: 16, color: brand.text }}>Log Game Stats</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>GAME DATE</label>
+                <input type="date" value={form.gameDate} onChange={e => setForm(p => ({ ...p, gameDate: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+              </div>
+              {(['atBats', 'hits', 'homeRuns', 'rbi'] as const).map(f => (
+                <div key={f}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>
+                    {f === 'atBats' ? 'AT BATS' : f === 'hits' ? 'HITS' : f === 'homeRuns' ? 'HR' : 'RBI'}
+                  </label>
+                  <input type="number" min="0" placeholder="0" value={form[f]} onChange={e => setForm(p => ({ ...p, [f]: e.target.value }))}
+                    style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+                </div>
+              ))}
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>AVG EV (mph)</label>
+                <input type="number" step="0.1" value={form.avgExitVelo} onChange={e => setForm(p => ({ ...p, avgExitVelo: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>PEAK EV (mph)</label>
+                <input type="number" step="0.1" value={form.peakExitVelo} onChange={e => setForm(p => ({ ...p, peakExitVelo: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <OButton variant="ghost" size="sm" onClick={() => setModalOpen(false)}>Cancel</OButton>
+              <OButton variant="gold" size="sm" disabled={saving || !form.gameDate} onClick={() => void save()}>
+                {saving ? 'Saving…' : 'Save'}
+              </OButton>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PauseMembershipButton({ membershipId, onPaused }: { membershipId: string; onPaused: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [resumeDate, setResumeDate] = useState('');
+  const [reason, setReason] = useState('');
+
+  async function submit() {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/owner/memberships/pause', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ membershipId, pauseStartDate: startDate, expectedResumeDate: resumeDate || undefined, reason: reason || undefined }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (data.ok) onPaused();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <OButton variant="secondary" size="sm" onClick={() => setOpen(true)}>Pause Membership</OButton>
+      {open && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}
+        >
+          <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 14, padding: 24, width: '100%', maxWidth: 400 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, fontFamily: fonts.display, marginBottom: 16, color: brand.text }}>Pause Membership</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>PAUSE START DATE</label>
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>EXPECTED RESUME DATE</label>
+                <input type="date" value={resumeDate} onChange={e => setResumeDate(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>REASON</label>
+                <select value={reason} onChange={e => setReason(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }}>
+                  <option value="">—</option>
+                  <option value="travel">Travel / Out of town</option>
+                  <option value="injury">Injury / Medical</option>
+                  <option value="school">School / Exams</option>
+                  <option value="financial">Financial hardship</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <OButton variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</OButton>
+              <OButton variant="secondary" size="sm" disabled={saving || !startDate} onClick={() => void submit()}>
+                {saving ? 'Saving…' : 'Pause Membership'}
+              </OButton>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ReEvalSection({ member }: { member: MemberDetail }) {
+  const { measurements, measurementCount, daysSinceLastMeasurement } = member;
+  const bestPeakEv = measurements.reduce<number | null>((best, m) => {
+    if (m.peakEv == null) return best;
+    return best == null || m.peakEv > best ? m.peakEv : best;
+  }, null);
+  // chronological for sparkline
+  const evTrend = [...measurements].reverse().map(m => m.averageEv ?? 0).filter(v => v > 0);
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <SectionHeader
+          title="Re-Evaluations"
+          subtitle={measurementCount > 0 ? `${measurementCount} session${measurementCount !== 1 ? 's' : ''}` : undefined}
+        />
+        <OButton variant="secondary" size="sm" disabled title="Use the booking form to record a session">
+          Log Re-Eval
+        </OButton>
+      </div>
+
+      {measurementCount === 0 ? (
+        <OCard style={{ textAlign: 'center', padding: 24 }}>
+          <div style={{ fontSize: 13, color: brand.textMuted }}>No re-evaluations recorded yet.</div>
+        </OCard>
+      ) : (
+        <>
+          {/* KPI strip */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
+            {[
+              { label: 'Total Sessions', value: String(measurementCount) },
+              { label: 'Days Since Last', value: daysSinceLastMeasurement != null ? String(daysSinceLastMeasurement) : '—' },
+              { label: 'Best Peak EV', value: bestPeakEv != null ? `${bestPeakEv} mph` : '—' },
+            ].map(({ label, value }) => (
+              <OCard key={label} style={{ padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: brand.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700, marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: fonts.display, color: brand.gold }}>{value}</div>
+              </OCard>
+            ))}
+          </div>
+
+          {/* Sparkline */}
+          {evTrend.length >= 2 && (
+            <OCard style={{ padding: '12px 16px', marginBottom: 14 }}>
+              <div style={{ fontSize: 10, color: brand.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700, marginBottom: 8 }}>Avg EV Trend (mph)</div>
+              <MiniLineChart data={evTrend} color={brand.goldDeep} height={52} />
+            </OCard>
+          )}
+
+          {/* History table */}
+          <OTable
+            columns={[
+              { key: 'date', label: 'Date' },
+              { key: 'avgEv', label: 'Avg EV' },
+              { key: 'peakEv', label: 'Peak EV' },
+              { key: 'source', label: 'Source' },
+            ]}
+            rows={measurements.map(m => ({
+              id: m.id,
+              date: new Date(m.recordedOn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              avgEv: m.averageEv != null ? `${m.averageEv} ${m.unit}` : '—',
+              peakEv: m.peakEv != null ? `${m.peakEv} ${m.unit}` : '—',
+              source: m.source === 'hittrax' ? 'HitTrax' : 'Manual',
+            }))}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+function ExitInterviewSection({ member }: { member: MemberDetail }) {
+  const [exitReq, setExitReq] = useState(member.exitInterviewRequested);
+  const [waiver, setWaiver] = useState(member.waiverAuthorized);
+  const [saving, setSaving] = useState(false);
+
+  async function toggle(field: 'exit_interview_requested' | 'waiver_authorized', value: boolean) {
+    setSaving(true);
+    if (field === 'exit_interview_requested') setExitReq(value);
+    else setWaiver(value);
+    await fetch('/api/owner/members/exit-interview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ membershipId: member.id, field, value }),
+    });
+    setSaving(false);
+  }
+
+  return (
+    <div>
+      <SectionHeader title="Exit Interview & Waiver" />
+      <OCard style={{ padding: 14 }}>
+        <div style={{ fontSize: 11, color: brand.textMuted, marginBottom: 12, lineHeight: 1.6 }}>
+          Per policy, members must give {30}-day notice. After an in-person exit interview, staff may authorize a fee waiver.
+        </div>
+        {[
+          { label: 'Exit interview requested', checked: exitReq, field: 'exit_interview_requested' as const },
+          { label: 'Waiver authorized by staff', checked: waiver, field: 'waiver_authorized' as const },
+        ].map(row => (
+          <div key={row.field} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 12, color: brand.text }}>{row.label}</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>
+              <input
+                type="checkbox"
+                checked={row.checked}
+                disabled={saving}
+                onChange={e => void toggle(row.field, e.target.checked)}
+                style={{ width: 15, height: 15, accentColor: brand.goldDeep, cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: 11, color: row.checked ? brand.success : brand.textMuted, fontWeight: 700 }}>
+                {row.checked ? 'Yes' : 'No'}
+              </span>
+            </label>
+          </div>
+        ))}
+      </OCard>
+    </div>
+  );
+}
+
+const COMPETITION_LEVELS = ['Rec', 'Travel', 'Both'] as const;
+type CompetitionLevel = typeof COMPETITION_LEVELS[number];
+
+function CompetitionLevelSection({ kidId, initial, ageGroup }: { kidId: string; initial: string | null; ageGroup: string }) {
+  const [level, setLevel] = useState<CompetitionLevel | null>(initial as CompetitionLevel | null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleChange(value: string) {
+    const next = value ? (value as CompetitionLevel) : null;
+    setLevel(next);
+    setSaving(true);
+    await fetch('/api/owner/members/competition-level', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kidId, level: next }),
+    });
+    setSaving(false);
+  }
+
+  return (
+    <div>
+      <SectionHeader title="Player Profile" />
+      <OCard style={{ padding: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 11, color: brand.textMuted }}>Age group</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: brand.text }}>{ageGroup}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: brand.textMuted }}>Rec / Travel</span>
+          <select
+            value={level ?? ''}
+            onChange={e => void handleChange(e.target.value)}
+            disabled={saving}
+            style={{
+              padding: '4px 8px', borderRadius: 5, fontSize: 11, fontWeight: 700,
+              border: `1px solid ${brand.border}`, background: brand.surface,
+              color: level ? brand.text : brand.textMuted, cursor: 'pointer',
+              opacity: saving ? 0.6 : 1,
+            }}
+          >
+            <option value="">— Not set</option>
+            {COMPETITION_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+        </div>
+      </OCard>
+    </div>
+  );
+}
+
 export function MemberDetailContent({ member: initialMember, waiverStatus, waiverSignedAt }: Props) {
   const [m, setM] = useState(initialMember);
   const [activeModal, setActiveModal] = useState<'message' | 'edit' | 'book' | null>(null);
@@ -1435,7 +1879,41 @@ export function MemberDetailContent({ member: initialMember, waiverStatus, waive
             </div>
           )}
 
+          {/* EV Performance — live profiles (W22) */}
+          {!demo && (m as MemberDetail).measurements && (m as MemberDetail).measurements.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <SectionHeader title="EV Performance" />
+              <OCard style={{ padding: 20 }}>
+                <div style={{ display: 'flex', gap: 20 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>AVG EXIT VELO</div>
+                    <div style={{ fontSize: 24, fontWeight: 800, fontFamily: fonts.display, color: brand.gold }}>
+                      {(m as MemberDetail).measurements[0].averageEv != null ? `${(m as MemberDetail).measurements[0].averageEv} mph` : '—'}
+                    </div>
+                    <div style={{ fontSize: 11, color: brand.textMuted }}>Most recent session</div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>BEST PEAK EV</div>
+                    <div style={{ fontSize: 24, fontWeight: 800, fontFamily: fonts.display, color: brand.goldDeep }}>
+                      {(() => {
+                        const best = (m as MemberDetail).measurements.reduce<number | null>((b, x) => x.peakEv != null && (b == null || x.peakEv > b) ? x.peakEv : b, null);
+                        return best != null ? `${best} mph` : '—';
+                      })()}
+                    </div>
+                    <div style={{ fontSize: 11, color: brand.textMuted }}>All-time best</div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>SESSIONS</div>
+                    <div style={{ fontSize: 24, fontWeight: 800, fontFamily: fonts.display, color: brand.text }}>{(m as MemberDetail).measurementCount}</div>
+                    <div style={{ fontSize: 11, color: brand.textMuted }}>Re-evals recorded</div>
+                  </div>
+                </div>
+              </OCard>
+            </div>
+          )}
+
           {/* Activity Timeline */}
+          <div id="lesson-history" />
           <SectionHeader title="Activity Timeline" />
           <OCard>
             {m.timeline.length === 0 ? (
@@ -1493,6 +1971,44 @@ export function MemberDetailContent({ member: initialMember, waiverStatus, waive
               </OCard>
             </div>
           )}
+
+          {/* Reviews & Referrals */}
+          {!demo && <ReviewReferralSection member={m as MemberDetail} />}
+
+          {/* Re-Evaluations */}
+          {!demo && <ReEvalSection member={m as MemberDetail} />}
+
+          {/* Game Stats (W21) */}
+          {!demo && (m as MemberDetail).kidId && (
+            <GameStatsSection kidId={(m as MemberDetail).kidId} />
+          )}
+
+          {/* Status History */}
+          {!demo && (m as MemberDetail).adminEvents.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <SectionHeader title="Status History" subtitle="Admin actions and status changes" />
+              <OCard style={{ padding: 0 }}>
+                {(m as MemberDetail).adminEvents.map((evt, i) => (
+                  <div key={evt.id} style={{
+                    padding: '11px 16px',
+                    borderBottom: i < (m as MemberDetail).adminEvents.length - 1 ? `1px solid ${brand.border}` : 'none',
+                    display: 'flex', alignItems: 'flex-start', gap: 10,
+                  }}>
+                    <div style={{ width: 7, height: 7, borderRadius: 4, background: brand.goldDeep, flexShrink: 0, marginTop: 5 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: brand.text }}>
+                        {evt.eventType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                      </div>
+                      {evt.note && <div style={{ fontSize: 11, color: brand.textMuted, marginTop: 2 }}>{evt.note}</div>}
+                      <div style={{ fontSize: 10, color: brand.textMuted, marginTop: 3 }}>
+                        {new Date(evt.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {evt.createdBy}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </OCard>
+            </div>
+          )}
         </div>
 
         {/* ── Right sidebar ── */}
@@ -1529,6 +2045,20 @@ export function MemberDetailContent({ member: initialMember, waiverStatus, waive
                     </a>
                   ) : (
                     <div style={{ fontSize: 13, color: brand.textMuted }}>—</div>
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>SMS</div>
+                  {m.parentPhone ? (
+                    <a
+                      href={`sms:${m.parentPhone}`}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, color: brand.gold, textDecoration: 'none', fontWeight: 500 }}
+                    >
+                      <MessageSquare size={12} />
+                      Text {m.parent.split(' ')[0]}
+                    </a>
+                  ) : (
+                    <div style={{ fontSize: 13, color: brand.textMuted }}>No phone on file</div>
                   )}
                 </div>
               </div>
@@ -1594,6 +2124,37 @@ export function MemberDetailContent({ member: initialMember, waiverStatus, waive
               </div>
             </OCard>
           </div>
+
+          {/* Player Profile — Rec/Travel tag */}
+          {!demo && (m as MemberDetail).kidId && (() => {
+            const detail = m as MemberDetail;
+            return (
+              <CompetitionLevelSection kidId={detail.kidId} initial={(detail as unknown as { competitionLevel?: string | null }).competitionLevel ?? null} ageGroup={detail.age} />
+            );
+          })()}
+
+          {/* Player Demographics — Birthday + Sport (W23) */}
+          {!demo && (
+            <div>
+              <SectionHeader title="Player Info" />
+              <OCard style={{ padding: 14 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <InfoRow
+                    label="Birthday"
+                    value={(m as MemberDetail).birthday
+                      ? new Date((m as MemberDetail).birthday!).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                      : '—'}
+                  />
+                  <InfoRow
+                    label="Sport"
+                    value={(m as MemberDetail).sportType
+                      ? ((m as MemberDetail).sportType!).charAt(0).toUpperCase() + ((m as MemberDetail).sportType!).slice(1)
+                      : '—'}
+                  />
+                </div>
+              </OCard>
+            </div>
+          )}
 
           {/* Billing */}
           <div>
@@ -1661,6 +2222,13 @@ export function MemberDetailContent({ member: initialMember, waiverStatus, waive
             <PauseSection member={m as MemberDetail} />
           )}
 
+          {/* Initiate pause — active members only (W28) */}
+          {!demo && m.status === 'active' && (m as MemberDetail).subscriptionStatus !== 'paused' && (
+            <div>
+              <PauseMembershipButton membershipId={(m as MemberDetail).id} onPaused={() => window.location.reload()} />
+            </div>
+          )}
+
           {/* Session Pack credits — OTC members only (Task #237) */}
           {!demo && (
             <SessionsOverrideSection member={m as MemberDetail} />
@@ -1686,6 +2254,11 @@ export function MemberDetailContent({ member: initialMember, waiverStatus, waive
           {/* Scheduled balance payments (split OTC) */}
           {!demo && (m as MemberDetail).scheduledCharges?.length > 0 && (
             <ScheduledChargesSection charges={(m as MemberDetail).scheduledCharges} />
+          )}
+
+          {/* Exit interview + waiver — show when member has requested cancellation or is cancelled */}
+          {!demo && ((m as MemberDetail).cancelRequestedAt || (m as MemberDetail).subscriptionStatus === 'cancelled') && (
+            <ExitInterviewSection member={m as MemberDetail} />
           )}
         </div>
       </div>

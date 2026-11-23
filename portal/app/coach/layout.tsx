@@ -28,8 +28,20 @@ export default async function CoachLayout({
   const caps = await getCoachCapabilities(supabase, user.id);
   const isStaff = isStaffPreset(caps);
 
+  // Load owner's staff access config to apply nav visibility overrides.
+  let staffAccessConfig: { instructor?: string[]; staff?: string[] } | null = null;
+  try {
+    const coachRow = await supabase.from('coaches').select('tenant_id').eq('user_id', user.id).maybeSingle();
+    if (coachRow.data?.tenant_id) {
+      const tenantRow = await supabase.from('tenants').select('staff_access_config').eq('id', coachRow.data.tenant_id).maybeSingle();
+      if (tenantRow.data?.staff_access_config) {
+        staffAccessConfig = tenantRow.data.staff_access_config as typeof staffAccessConfig;
+      }
+    }
+  } catch { /* non-fatal */ }
+
   return (
-    <PortalShell role="coach" email={user.email ?? null} isStaff={isStaff}>
+    <PortalShell role="coach" email={user.email ?? null} isStaff={isStaff} staffAccessConfig={staffAccessConfig}>
       <div className="mx-auto max-w-5xl px-6 py-8">{children}</div>
     </PortalShell>
   );

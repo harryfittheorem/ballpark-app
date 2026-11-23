@@ -5,21 +5,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { OButton, PageHeader, OCard, Chip } from '@/components/owner/ui';
-import { Send, Phone, Mail, Gift, Sparkles, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { Send, Phone, Mail, Gift, Sparkles, CheckCircle2, Loader2, AlertCircle, Smartphone, Trophy } from 'lucide-react';
 import type { OwnerMember } from '@/lib/supabase/ownerQueries';
 
 type Props = { members: OwnerMember[] };
-
-// ── Demo data ──────────────────────────────────────────────────────────────
-
-const DEMO_AT_RISK: OwnerMember[] = [
-  { id: 'd00', kidId: 'k00', name: 'Alex Owner Jr.',  age: '12U', parent: 'Owner Demo',      parentEmail: 'owner@example.com',    parentPhone: '555-100-0000', program: 'Unlimited Monthly',   planType: 'eft', status: 'active', engagementScore: 38, churnRisk: 'high',   lastSession: '31d ago', nextCharge: 'Overdue', mrr: 280, lifetime: 2240, joinedDate: 'May 2024', riskReason: 'No session in 31 days · Last payment failed — Insufficient funds. Call within 48 hours.',   cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
-  { id: 'd03', kidId: 'k03', name: 'Marcus Williams', age: '10U', parent: 'Darius Williams',  parentEmail: 'darius@example.com',   parentPhone: '555-100-0003', program: 'Unlimited Monthly',   planType: 'eft', status: 'active', engagementScore: 41, churnRisk: 'high',   lastSession: '28d ago', nextCharge: 'Overdue', mrr: 280, lifetime: 1680, joinedDate: 'Sep 2024', riskReason: 'No session in 28 days · Last payment failed — Card expired. Call within 48 hours.',            cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
-  { id: 'd02', kidId: 'k02', name: 'Tyler Johnson',   age: '14U', parent: 'Brad Johnson',      parentEmail: 'brad@example.com',     parentPhone: '555-100-0002', program: 'Team Training',        planType: 'eft', status: 'active', engagementScore: 60, churnRisk: 'high',   lastSession: '23d ago', nextCharge: 'Jun 5',   mrr: 450, lifetime: 5480, joinedDate: 'Mar 2024', riskReason: '23 days since last session. Members in Team Training who miss 3+ consecutive weeks churn 72% of the time.',             cardLast4: '5555', cardBrand: 'Mastercard', cardExpMonth: 6,    cardExpYear: 2028 },
-  { id: 'd11', kidId: 'k11', name: 'Owen Murphy',     age: '15U', parent: 'Patrick Murphy',    parentEmail: 'patrick@example.com',  parentPhone: '555-100-0011', program: 'Team Training',        planType: 'eft', status: 'paused', engagementScore: 30, churnRisk: 'high',   lastSession: '35d ago', nextCharge: '—',       mrr: 0,   lifetime: 2250, joinedDate: 'May 2024', riskReason: '35 days inactive — critical window. Contact required today.',                                                               cardLast4: null,   cardBrand: null,         cardExpMonth: null, cardExpYear: null },
-  { id: 'd05', kidId: 'k05', name: 'Ethan Brooks',    age: '13U', parent: 'Kevin Brooks',      parentEmail: 'kevin@example.com',    parentPhone: '555-100-0005', program: 'Cage Rental Monthly',  planType: 'eft', status: 'active', engagementScore: 63, churnRisk: 'medium', lastSession: '16d ago', nextCharge: 'Jun 3',   mrr: 120, lifetime: 960,  joinedDate: 'Jul 2024', riskReason: 'Attendance dropped significantly compared to prior months. Targeted messaging recommended.',                               cardLast4: '4444', cardBrand: 'Mastercard', cardExpMonth: 8,    cardExpYear: 2027 },
-  { id: 'd06', kidId: 'k06', name: 'Noah Patel',      age: '11U', parent: 'Raj Patel',         parentEmail: 'raj@example.com',      parentPhone: '555-100-0006', program: 'Unlimited Monthly',   planType: 'eft', status: 'active', engagementScore: 55, churnRisk: 'medium', lastSession: '15d ago', nextCharge: 'Jun 8',   mrr: 280, lifetime: 2240, joinedDate: 'Jun 2024', riskReason: 'Missed last 3 scheduled sessions without notice. Progress highlights may help re-engage.',                               cardLast4: '1234', cardBrand: 'Visa',       cardExpMonth: 11,   cardExpYear: 2026 },
-];
 
 
 type LoadingKey = `${string}-email` | `${string}-free_session`;
@@ -31,11 +20,28 @@ type CampaignState =
 
 // ── Component ──────────────────────────────────────────────────────────────
 
+type GameStatsForm = {
+  kidId: string;
+  kidName: string;
+  gameDate: string;
+  opponent: string;
+  result: '' | 'win' | 'loss' | 'tie' | 'scrimmage';
+  atBats: string;
+  hits: string;
+  homeRuns: string;
+  rbi: string;
+  avgExitVelo: string;
+  peakExitVelo: string;
+  notes: string;
+};
+
 export function AtRiskContent({ members: rawMembers }: Props) {
   const router = useRouter();
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState<Set<LoadingKey>>(new Set());
   const [campaign, setCampaign] = useState<CampaignState>({ status: 'idle' });
+  const [gameStatsModal, setGameStatsModal] = useState<null | GameStatsForm>(null);
+  const [gameStatsSaving, setGameStatsSaving] = useState(false);
 
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }
@@ -135,6 +141,51 @@ export function AtRiskContent({ members: rawMembers }: Props) {
     });
   }
 
+  function openGameStats(m: OwnerMember) {
+    setGameStatsModal({
+      kidId: m.kidId ?? m.id,
+      kidName: m.name,
+      gameDate: new Date().toISOString().slice(0, 10),
+      opponent: '', result: '', atBats: '', hits: '', homeRuns: '', rbi: '',
+      avgExitVelo: '', peakExitVelo: '', notes: '',
+    });
+  }
+
+  async function saveGameStats() {
+    if (!gameStatsModal) return;
+    setGameStatsSaving(true);
+    try {
+      const res = await fetch('/api/owner/game-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kidId: gameStatsModal.kidId,
+          gameDate: gameStatsModal.gameDate,
+          opponent: gameStatsModal.opponent || undefined,
+          result: gameStatsModal.result || undefined,
+          atBats: gameStatsModal.atBats ? parseInt(gameStatsModal.atBats, 10) : undefined,
+          hits: gameStatsModal.hits ? parseInt(gameStatsModal.hits, 10) : undefined,
+          homeRuns: gameStatsModal.homeRuns ? parseInt(gameStatsModal.homeRuns, 10) : undefined,
+          rbi: gameStatsModal.rbi ? parseInt(gameStatsModal.rbi, 10) : undefined,
+          avgExitVelo: gameStatsModal.avgExitVelo ? parseFloat(gameStatsModal.avgExitVelo) : undefined,
+          peakExitVelo: gameStatsModal.peakExitVelo ? parseFloat(gameStatsModal.peakExitVelo) : undefined,
+          notes: gameStatsModal.notes || undefined,
+        }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (data.ok) {
+        setToast(`Game stats logged for ${gameStatsModal.kidName}`);
+        setGameStatsModal(null);
+      } else {
+        setToast(`Error: ${data.error ?? 'Failed to save'}`);
+      }
+    } catch {
+      setToast('Network error — could not save game stats');
+    } finally {
+      setGameStatsSaving(false);
+    }
+  }
+
   const campaignIsSending = campaign.status === 'sending';
 
 
@@ -172,6 +223,31 @@ export function AtRiskContent({ members: rawMembers }: Props) {
         </div>
       )}
 
+      <div style={{ padding: '12px 24px 0' }}>
+        <details style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 10, marginBottom: 16 }}>
+          <summary style={{ padding: '10px 16px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: brand.gold, fontFamily: fonts.display, letterSpacing: 0.5, listStyle: 'none', userSelect: 'none' }}>
+            At-Risk criteria &amp; triggers
+          </summary>
+          <div style={{ padding: '0 16px 14px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, fontSize: 12 }}>
+            {[
+              { label: 'No session in 14+ days', risk: 'High', detail: 'Member has not attended a session for 14 or more calendar days. Contact required within 48 hours.' },
+              { label: 'Account paused', risk: 'High', detail: 'Membership is in a pause/hold state. Paused members cancel at a significantly higher rate than active members.' },
+              { label: 'No re-evaluation in 30+ days', risk: 'High', detail: 'No progress re-evaluation on record in the past 30 days. Re-evaluations are a key retention touchpoint.' },
+              { label: 'No Google review left', risk: 'Medium', detail: 'Member has never left a Google review. Flagged as a retention and referral opportunity.' },
+              { label: 'No session in 7–13 days', risk: 'Medium', detail: 'Attendance gap detected. Early outreach before the 14-day threshold can prevent escalation to High.' },
+            ].map(c => (
+              <div key={c.label} style={{ padding: 10, background: brand.surfaceAlt, borderRadius: 8, borderLeft: `3px solid ${c.risk === 'High' ? brand.danger : brand.warning}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: c.risk === 'High' ? brand.danger : brand.warning, letterSpacing: 0.5 }}>{c.risk.toUpperCase()}</span>
+                  <span style={{ fontWeight: 700, color: brand.text }}>{c.label}</span>
+                </div>
+                <p style={{ margin: 0, color: brand.textMuted, lineHeight: 1.5 }}>{c.detail}</p>
+              </div>
+            ))}
+          </div>
+        </details>
+      </div>
+
       <div style={{ padding: 24 }}>
         {atRisk.length === 0 ? (
           <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, padding: 40, textAlign: 'center' }}>
@@ -202,6 +278,21 @@ export function AtRiskContent({ members: rawMembers }: Props) {
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1 }}>LAST SESSION</div>
                           <div style={{ fontSize: 14, fontWeight: 700, color: brand.danger, marginTop: 2 }}>{m.lastSession}</div>
+                        </div>
+                      </div>
+
+                      {/* App Engagement Signal (W21) */}
+                      <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+                        <div style={{ flex: 1, padding: '8px 12px', background: brand.surfaceAlt, borderRadius: 8 }}>
+                          <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 1, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Smartphone size={10} /> APP ENGAGEMENT
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ flex: 1, height: 6, background: brand.border, borderRadius: 3, overflow: 'hidden' }}>
+                              <div style={{ width: `${m.engagementScore}%`, height: '100%', borderRadius: 3, background: m.engagementScore >= 70 ? brand.success : m.engagementScore >= 50 ? brand.warning : brand.danger }} />
+                            </div>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: m.engagementScore >= 70 ? brand.success : m.engagementScore >= 50 ? brand.warning : brand.danger, minWidth: 32 }}>{m.engagementScore}/100</span>
+                          </div>
                         </div>
                       </div>
 
@@ -241,6 +332,7 @@ export function AtRiskContent({ members: rawMembers }: Props) {
                         >
                           {freeLoading ? 'Sending…' : 'Offer Free Session'}
                         </OButton>
+                        <OButton variant="ghost" size="sm" icon={Trophy} onClick={() => openGameStats(m)}>Log Game Stats</OButton>
                         <OButton variant="ghost" size="sm" onClick={() => router.push(`/owner/members/${m.id}`)}>View Profile →</OButton>
                       </div>
                     </div>
@@ -251,6 +343,87 @@ export function AtRiskContent({ members: rawMembers }: Props) {
           </div>
         )}
       </div>
+
+      {/* Game Stats Modal (W21) */}
+      {gameStatsModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onClick={e => { if (e.target === e.currentTarget) setGameStatsModal(null); }}>
+          <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 14, padding: 24, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+            <div style={{ fontSize: 15, fontWeight: 800, fontFamily: fonts.display, color: brand.text, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Trophy size={16} color={brand.goldDeep} /> Log Game Stats
+            </div>
+            <div style={{ fontSize: 12, color: brand.textMuted, marginBottom: 20 }}>{gameStatsModal.kidName}</div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {/* Game Date */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>GAME DATE</label>
+                <input type="date" value={gameStatsModal.gameDate}
+                  onChange={e => setGameStatsModal(p => p ? { ...p, gameDate: e.target.value } : null)}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+              </div>
+              {/* Opponent */}
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>OPPONENT</label>
+                <input type="text" placeholder="Team name" value={gameStatsModal.opponent}
+                  onChange={e => setGameStatsModal(p => p ? { ...p, opponent: e.target.value } : null)}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+              </div>
+              {/* Result */}
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>RESULT</label>
+                <select value={gameStatsModal.result}
+                  onChange={e => setGameStatsModal(p => p ? { ...p, result: e.target.value as GameStatsForm['result'] } : null)}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }}>
+                  <option value="">—</option>
+                  <option value="win">Win</option>
+                  <option value="loss">Loss</option>
+                  <option value="tie">Tie</option>
+                  <option value="scrimmage">Scrimmage</option>
+                </select>
+              </div>
+              {/* At Bats / Hits */}
+              {(['atBats', 'hits', 'homeRuns', 'rbi'] as const).map(field => (
+                <div key={field}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>
+                    {field === 'atBats' ? 'AT BATS' : field === 'hits' ? 'HITS' : field === 'homeRuns' ? 'HOME RUNS' : 'RBI'}
+                  </label>
+                  <input type="number" min="0" placeholder="0" value={gameStatsModal[field]}
+                    onChange={e => setGameStatsModal(p => p ? { ...p, [field]: e.target.value } : null)}
+                    style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+                </div>
+              ))}
+              {/* Exit Velo */}
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>AVG EXIT VELO (mph)</label>
+                <input type="number" step="0.1" placeholder="e.g. 78.5" value={gameStatsModal.avgExitVelo}
+                  onChange={e => setGameStatsModal(p => p ? { ...p, avgExitVelo: e.target.value } : null)}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>PEAK EXIT VELO (mph)</label>
+                <input type="number" step="0.1" placeholder="e.g. 85.0" value={gameStatsModal.peakExitVelo}
+                  onChange={e => setGameStatsModal(p => p ? { ...p, peakExitVelo: e.target.value } : null)}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+              </div>
+              {/* Notes */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>NOTES</label>
+                <textarea rows={2} placeholder="Any observations…" value={gameStatsModal.notes}
+                  onChange={e => setGameStatsModal(p => p ? { ...p, notes: e.target.value } : null)}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13, resize: 'vertical' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+              <OButton variant="ghost" size="sm" onClick={() => setGameStatsModal(null)}>Cancel</OButton>
+              <OButton variant="gold" size="sm" icon={gameStatsSaving ? Loader2 : Trophy} disabled={gameStatsSaving || !gameStatsModal.gameDate} onClick={saveGameStats}>
+                {gameStatsSaving ? 'Saving…' : 'Save Game Stats'}
+              </OButton>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (

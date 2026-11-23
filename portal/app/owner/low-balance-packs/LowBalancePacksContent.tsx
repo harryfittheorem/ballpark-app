@@ -84,15 +84,38 @@ function makeColumns(onReminder: (pack: LowBalancePack) => void, loadingIds: Set
   ];
 }
 
+type DateFilter = 'all' | 'today' | '7' | '30' | '90' | 'custom';
+
 export function LowBalancePacksContent({ packs: raw }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
 
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 4000); return () => clearTimeout(t); }
   }, [toast]);
 
-  const totalSessionsLeft = raw.reduce((s, p) => s + p.sessionsRemaining, 0);
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const filteredPacks = raw.filter(p => {
+    if (dateFilter === 'all') return true;
+    if (!p.lastSessionDate) return false;
+    const d = new Date(p.lastSessionDate); d.setHours(0, 0, 0, 0);
+    const days = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
+    if (dateFilter === 'today') return days === 0;
+    if (dateFilter === '7') return days <= 7;
+    if (dateFilter === '30') return days <= 30;
+    if (dateFilter === '90') return days <= 90;
+    if (dateFilter === 'custom' && customFrom && customTo) {
+      const from = new Date(customFrom); from.setHours(0, 0, 0, 0);
+      const to = new Date(customTo); to.setHours(23, 59, 59, 999);
+      return d >= from && d <= to;
+    }
+    return true;
+  });
+
+  const totalSessionsLeft = filteredPacks.reduce((s, p) => s + p.sessionsRemaining, 0);
 
   async function sendReminder(pack: LowBalancePack) {
     setLoadingIds(prev => new Set(prev).add(pack.id));
@@ -151,12 +174,19 @@ export function LowBalancePacksContent({ packs: raw }: Props) {
       />
 
       <div style={{ padding: 24 }}>
+        {/* Definition banner */}
+        <div style={{ background: `${brand.warning}12`, border: `1px solid ${brand.warning}33`, borderRadius: 10, padding: '10px 16px', marginBottom: 20, fontSize: 12, color: brand.textMuted, lineHeight: 1.6 }}>
+          <strong style={{ color: brand.text }}>Low Balance Packs</strong> — OTC session packs with 2 or fewer sessions remaining, regardless of expiry date.
+          Use this list to proactively reach out before the member runs out.
+          {' '}<em>Compare with <strong style={{ color: brand.text }}>Expiring Packs</strong>, which are filtered by calendar expiry date, not session count.</em>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
           <KPICard
             label="Low Balance Packs"
-            value={raw.length}
+            value={filteredPacks.length}
+            deltaLabel={dateFilter !== 'all' ? `${raw.length} total` : undefined}
             icon={Battery}
-            color={raw.length > 0 ? 'warning' : 'default'}
+            color={filteredPacks.length > 0 ? 'warning' : 'default'}
           />
           <KPICard
             label="Sessions Remaining (total)"
@@ -166,14 +196,36 @@ export function LowBalancePacksContent({ packs: raw }: Props) {
           />
         </div>
 
-        {raw.length === 0 ? (
+        {/* Date filter tabs */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
+          {(['all', 'today', '7', '30', '90', 'custom'] as DateFilter[]).map(f => (
+            <button key={f} type="button" onClick={() => setDateFilter(f)} style={{
+              padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              background: dateFilter === f ? brand.goldDeep : brand.surface,
+              color: dateFilter === f ? brand.white : brand.text,
+              border: `1px solid ${dateFilter === f ? brand.goldDeep : brand.border}`,
+            }}>
+              {f === 'all' ? 'All time' : f === 'today' ? 'Active today' : f === 'custom' ? 'Custom' : `Last ${f}d`}
+            </button>
+          ))}
+          {dateFilter === 'custom' && (
+            <>
+              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={{ padding: '4px 8px', borderRadius: 5, fontSize: 11, border: `1px solid ${brand.border}`, background: brand.surface, color: brand.text }} />
+              <span style={{ fontSize: 11, color: brand.textMuted }}>to</span>
+              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} style={{ padding: '4px 8px', borderRadius: 5, fontSize: 11, border: `1px solid ${brand.border}`, background: brand.surface, color: brand.text }} />
+            </>
+          )}
+          <span style={{ fontSize: 11, color: brand.textMuted, marginLeft: 'auto' }}>{filteredPacks.length} of {raw.length}</span>
+        </div>
+
+        {filteredPacks.length === 0 ? (
           <div style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 12, padding: 48, textAlign: 'center', color: brand.textMuted }}>
-            No packs running low right now.
+            No packs match this filter.
           </div>
         ) : (
           <OTable
             columns={columns as TableColumn<Record<string, unknown>>[]}
-            rows={raw as unknown as Record<string, unknown>[]}
+            rows={filteredPacks as unknown as Record<string, unknown>[]}
           />
         )}
       </div>

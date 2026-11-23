@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
-import { PageHeader, SectionHeader, OCard, OButton, Chip } from '@/components/owner/ui';
+import { PageHeader, SectionHeader, OCard, OButton, Chip, KPICard } from '@/components/owner/ui';
 import {
   CreditCard, CheckCircle2, AlertCircle, Link2, Link2Off,
   ExternalLink, Info, Clock, RefreshCw,
@@ -185,6 +185,14 @@ export function PaymentsContent({ locations }: Props) {
     }
   }
 
+  const connectedCount = locations.filter(l => l.stripe_onboarding_status === 'connected').length;
+  const totalCount = locations.length;
+  const pendingCount = locations.filter(l => l.stripe_onboarding_status === 'not_connected' || l.stripe_onboarding_status === 'pending').length;
+  const connectedLocations = locations.filter(l => l.stripe_onboarding_status === 'connected' && l.stripe_payout_interval);
+  const payoutInterval = connectedLocations.length > 0
+    ? connectedLocations[0].stripe_payout_interval ?? '—'
+    : '—';
+
   return (
     <div>
       <PageHeader
@@ -192,18 +200,37 @@ export function PaymentsContent({ locations }: Props) {
         subtitle="Clubhouse by Infinite Hitting · Payment setup and existing billing tools"
       />
 
-      <div style={{ padding: 24, maxWidth: 820 }}>
-        <nav aria-label="Payment tools" className="owner-payment-tools">
-          <Link href="/owner/billing#transaction-history">Payment history</Link>
-          <Link href="/owner/failed-payments">Failed payments and existing recovery actions</Link>
-          <Link href="/owner/members">Player billing and package history</Link>
-          <Link href="/owner/revenue-reports">Transaction reports</Link>
-          <a href="#payment-connections">Connection settings</a>
-        </nav>
-        <p style={{ fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>
-          History uses the existing billing records. Open a linked player for their payment and package history.
-          Merchant identity is shown per location below; Clubhouse branding does not change the connected merchant.
-        </p>
+      <div style={{ padding: 24 }}>
+        {/* KPI row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+          <KPICard
+            label="Locations Connected"
+            value={`${connectedCount} / ${totalCount}`}
+            icon={CreditCard}
+            color={connectedCount === totalCount && totalCount > 0 ? 'success' : connectedCount > 0 ? 'warning' : 'danger'}
+          />
+          <KPICard
+            label="Pending Setup"
+            value={String(pendingCount)}
+            icon={AlertCircle}
+            color={pendingCount > 0 ? 'warning' : 'default'}
+          />
+          <KPICard
+            label="Payout Schedule"
+            value={payoutInterval}
+            icon={CheckCircle2}
+            color="default"
+          />
+        </div>
+
+        {/* Quick nav links */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+          <Link href="/owner/billing#transaction-history"><OButton variant="ghost" size="sm">Payment History</OButton></Link>
+          <Link href="/owner/failed-payments"><OButton variant="ghost" size="sm">Failed Payments</OButton></Link>
+          <Link href="/owner/members"><OButton variant="ghost" size="sm">Player Billing</OButton></Link>
+          <Link href="/owner/revenue-reports"><OButton variant="ghost" size="sm">Transaction Reports</OButton></Link>
+          <a href="#payment-connections"><OButton variant="ghost" size="sm">Connection Settings</OButton></a>
+        </div>
         {/* Flash message */}
         {flash && (
           <div role={flash.type === 'error' ? 'alert' : 'status'} style={{
@@ -263,7 +290,9 @@ export function PaymentsContent({ locations }: Props) {
         )}
 
         {/* Per-location cards */}
-        <h2 id="payment-connections" style={{ fontSize: 18, marginBottom: 16 }}>Payment connections</h2>
+        <div id="payment-connections">
+          <SectionHeader title="Payment Connections" />
+        </div>
         {locations.length === 0 && (
           <OCard>
             <div style={{ textAlign: 'center', padding: '24px 0', color: brand.textMuted, fontSize: 13 }}>
@@ -421,7 +450,7 @@ export function PaymentsContent({ locations }: Props) {
 
         {/* How it works */}
         <div style={{ marginTop: 32 }}>
-          <SectionHeader title="How it works" />
+          <SectionHeader title="How It Works" />
           <OCard>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {[

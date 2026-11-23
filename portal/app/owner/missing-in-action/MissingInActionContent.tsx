@@ -157,7 +157,7 @@ export function MissingInActionContent({ groups: rawGroups }: Props) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <div className="portal-sticky-tabs portal-sticky-tab-row" role="tablist" aria-label="Days missing filter" style={{ marginBottom: 20 }}>
           {tabDefs.map(t => (
             <div
               key={t.id}

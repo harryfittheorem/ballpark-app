@@ -147,9 +147,15 @@ const columns: TableColumn<OwnerMember & Record<string, unknown>>[] = [
       const m = r as unknown as OwnerMember;
       const resumeDate = rawStatus === 'paused' && m.pauseEnd ? m.pauseEnd.slice(0, 10) : null;
       const hasPendingCancel = !!(m.cancelRequestedAt) && rawStatus !== 'cancelled';
+      const sessionBalance = rawStatus === 'paused' && m.sessionsRemaining != null ? m.sessionsRemaining : null;
       return (
         <div>
           <Chip color={color}>{label}</Chip>
+          {sessionBalance != null && (
+            <div style={{ fontSize: 10, color: brand.textMuted, marginTop: 3 }}>
+              {sessionBalance} session{sessionBalance !== 1 ? 's' : ''} remaining
+            </div>
+          )}
           {resumeDate && (
             <div style={{ fontSize: 10, color: brand.textMuted, marginTop: 3 }}>
               Resumes {resumeDate}
@@ -217,7 +223,7 @@ const labelStyle: React.CSSProperties = {
 export function MembersContent({ members }: Props) {
   const router  = useRouter();
   const source = members;
-  const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'pending-cancel' | 'at-risk' | 'card-expiring'>('all');
+  const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'pending-cancel' | 'at-risk' | 'card-expiring' | 'rec' | 'travel'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [toast, setToast]   = useState<string | null>(null);
   const [form, setForm]     = useState({
@@ -234,6 +240,8 @@ export function MembersContent({ members }: Props) {
     if (filter === 'paused')         return m.status === 'paused';
     if (filter === 'pending-cancel') return !!(m as OwnerMember).cancelRequestedAt && m.status !== 'cancelled';
     if (filter === 'at-risk')        return m.churnRisk === 'high' || m.churnRisk === 'medium';
+    if (filter === 'rec')           return (m as OwnerMember).competitionLevel === 'Rec';
+    if (filter === 'travel')        return (m as OwnerMember).competitionLevel === 'Travel';
     if (filter === 'card-expiring') {
       return (
         isCardExpiringSoon(m.cardExpMonth, m.cardExpYear) ||
@@ -260,6 +268,8 @@ export function MembersContent({ members }: Props) {
     { id: 'pending-cancel',  label: 'Pending Cancel',     count: pendingCancelCount },
     { id: 'at-risk',         label: 'At Risk',            count: source.filter(m => m.churnRisk === 'high' || m.churnRisk === 'medium').length },
     { id: 'card-expiring',   label: 'Card Expiring Soon', count: cardExpiringSoonCount },
+    { id: 'rec',             label: 'Rec',                count: source.filter(m => (m as OwnerMember).competitionLevel === 'Rec').length },
+    { id: 'travel',          label: 'Travel',             count: source.filter(m => (m as OwnerMember).competitionLevel === 'Travel').length },
   ];
 
   const handleExport = () => {

@@ -101,7 +101,7 @@ export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMo
     <>
     <div>
       <PageHeader
-        title="Welcome back"
+        title="Dashboard"
         subtitle={`${tenantName} · ${kpis.activeMembers} active members`}
         actions={
           <>
@@ -165,7 +165,8 @@ export function DashboardContent({ kpis: rawKpis, members: rawMembers, revenueMo
 
       <div style={{ padding: 24 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
-          <KPICard label="MRR"             value={`$${totalMrr.toLocaleString()}`}       icon={DollarSign}    color="gold" />
+          <KPICard label="MRR"             value={`$${totalMrr.toLocaleString()}`}       icon={DollarSign}    color="gold"
+            deltaLabel={new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(new Date())} />
           <KPICard label="Active Members"  value={kpis.activeMembers}                     icon={Users} />
           <KPICard label={`Retention · ${kpis.retentionPeriod ?? 'last completed month'}`}
             value={kpis.retentionRate === null ? 'Unavailable' : `${kpis.retentionRate}%`}
