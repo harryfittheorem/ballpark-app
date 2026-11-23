@@ -19,7 +19,8 @@ type GameStatsBody = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { tenantId, userId } = await requireOwnerContext();
+    const { tenantId, user } = await requireOwnerContext();
+    const userId = user.id;
     const body = await req.json() as GameStatsBody;
     const { kidId, gameDate } = body;
 
