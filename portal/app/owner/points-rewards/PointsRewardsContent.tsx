@@ -52,10 +52,10 @@ const DEMO_PRODUCTS: PointsProduct[] = [
 ];
 
 const DEMO_TOP_EARNERS = [
-  { name: 'Caleb N.',  points: 2840 },
-  { name: 'Aiden T.',  points: 2210 },
-  { name: 'Jake M.',   points: 1980 },
-  { name: 'Logan S.',  points: 1640 },
+  { name: 'Caleb N.',  points: 2840, kidId: null },
+  { name: 'Aiden T.',  points: 2210, kidId: null },
+  { name: 'Jake M.',   points: 1980, kidId: null },
+  { name: 'Logan S.',  points: 1640, kidId: null },
 ];
 
 // ── Style helpers ──────────────────────────────────────────────────────────

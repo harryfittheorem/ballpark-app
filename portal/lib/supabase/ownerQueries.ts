@@ -1261,7 +1261,7 @@ export async function getPointsRewardsData(supabase: SupabaseClient, tenantId: s
 
   type HittraxRow = { kid_id: string; best_exit_velocity_mph: number | null; max_distance_ft: number | null; kids: { first_name: string; last_name: string | null; age_group: string | null } | null };
   const evByKid: Record<string, { bestEv: number; maxDist: number; name: string; ageGroup: string }> = {};
-  for (const row of (hittraxSessions ?? []) as HittraxRow[]) {
+  for (const row of (hittraxSessions ?? []) as unknown as HittraxRow[]) {
     if (!row.kid_id || row.best_exit_velocity_mph == null) continue;
     const existing = evByKid[row.kid_id];
     const ev = row.best_exit_velocity_mph;

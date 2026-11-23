@@ -6,7 +6,11 @@ export type DemoMemberDetail = Omit<MemberDetail,
   'cardLast4' | 'cardBrand' | 'cardExpMonth' | 'cardExpYear' |
   'sessionsRemaining' | 'sessionsTotal' |
   'weeklySessionsUsed' | 'weeklyTotal' | 'weeklyPeriodStart' |
-  'familyId' | 'parentFirstName' | 'parentLastName'
+  'familyId' | 'parentFirstName' | 'parentLastName' |
+  'cancelAt' | 'billingAnchorDay' | 'scheduledCharges' |
+  'reviewAsked' | 'reviewLeft' | 'referralAsked' | 'referralGiven' |
+  'adminEvents' | 'exitInterviewRequested' | 'waiverAuthorized' |
+  'birthday' | 'sportType' | 'measurements' | 'measurementCount' | 'daysSinceLastMeasurement'
 > & {
   familyId?: string;
   parentFirstName?: string;

@@ -604,8 +604,8 @@ export async function getFranchisorPerformance(supabase: SupabaseClient): Promis
     supabase.from('memberships').select('family_id, tenant_id').gte('started_at', monthStartIso),
     supabase.from('payment_events').select('family_id, tenant_id, amount_cents').eq('status', 'paid').gte('created_at', monthStartIso),
     supabase.from('families').select('id, tenant_id, primary_location_id'),
-    supabase.from('crm_threads').select('tenant_id').gte('created_at', monthStartIso).catch(() => ({ data: [] })),
-    supabase.from('crm_evaluation_openings').select('tenant_id, location_id').gte('starts_at', monthStartIso).catch(() => ({ data: [] })),
+    supabase.from('crm_threads').select('tenant_id').gte('created_at', monthStartIso).then(r => r, () => ({ data: [] })),
+    supabase.from('crm_evaluation_openings').select('tenant_id, location_id').gte('starts_at', monthStartIso).then(r => r, () => ({ data: [] })),
   ]);
 
   const tenantMap = new Map<string, { name: string; royaltyRate: number }>();
@@ -672,7 +672,7 @@ export async function getFranchisorPerformance(supabase: SupabaseClient): Promis
     if (e.location_id) evalsByLoc[e.location_id] = (evalsByLoc[e.location_id] ?? 0) + 1;
   }
 
-  const rows: FranchisorLocationRow[] = locations.map(l => {
+  const rows: FranchisorLocationRow[] = locations.map((l: { id: string; tenant_id: string; name: string }) => {
     const tenant = tenantMap.get(l.tenant_id);
     const mrr = (mrrByLoc[l.id] ?? 0) / 100;
     const collected = (collectedByLoc[l.id] ?? 0) / 100;
