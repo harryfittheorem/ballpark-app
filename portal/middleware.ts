@@ -8,6 +8,11 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
+  // Deployment healthcheck — must return 200 immediately with no auth/DB calls.
+  if (path === "/api/health") {
+    return NextResponse.next();
+  }
+
   // Public booking pages require no authentication.
   if (path.startsWith("/book")) {
     return NextResponse.next();
