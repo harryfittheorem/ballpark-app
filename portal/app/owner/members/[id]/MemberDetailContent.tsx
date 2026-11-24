@@ -415,7 +415,7 @@ function PauseSection({ member }: { member: MemberDetail }) {
       if (!res.ok || !data.ok) {
         setResumeErr(typeof data.error === 'string' ? data.error : `Error ${res.status}`);
       } else {
-        setResumeDone(true);
+        window.location.reload();
       }
     } catch (err) {
       setResumeErr(err instanceof Error ? err.message : 'Unknown error');
@@ -1579,7 +1579,7 @@ function PauseMembershipButton({ membershipId, onPaused }: { membershipId: strin
         body: JSON.stringify({ membershipId, pauseStartDate: startDate, expectedResumeDate: resumeDate || undefined, reason: reason || undefined }),
       });
       const data = await res.json() as { ok?: boolean; error?: string };
-      if (data.ok) onPaused();
+      if (data.ok) { setOpen(false); onPaused(); }
       else setSaveErr(data.error ?? 'Failed to pause membership');
     } finally {
       setSaving(false);
@@ -1624,7 +1624,7 @@ function PauseMembershipButton({ membershipId, onPaused }: { membershipId: strin
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <OButton variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</OButton>
               <OButton variant="secondary" size="sm" disabled={saving || !startDate} onClick={() => void submit()}>
-                {saving ? 'Saving…' : 'Pause Membership'}
+                {saving ? '⏳ Saving…' : 'Pause Membership'}
               </OButton>
             </div>
           </div>
