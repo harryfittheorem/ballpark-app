@@ -240,8 +240,8 @@ export function MembersContent({ members }: Props) {
     if (filter === 'paused')         return m.status === 'paused';
     if (filter === 'pending-cancel') return !!(m as OwnerMember).cancelRequestedAt && m.status !== 'cancelled';
     if (filter === 'at-risk')        return m.churnRisk === 'high' || m.churnRisk === 'medium';
-    if (filter === 'rec')           return (m as OwnerMember).competitionLevel === 'Rec';
-    if (filter === 'travel')        return (m as OwnerMember).competitionLevel === 'Travel';
+    if (filter === 'rec')           return (m as OwnerMember).competitionLevel === 'Rec' || (m as OwnerMember).competitionLevel === 'Both';
+    if (filter === 'travel')        return (m as OwnerMember).competitionLevel === 'Travel' || (m as OwnerMember).competitionLevel === 'Both';
     if (filter === 'card-expiring') {
       return (
         isCardExpiringSoon(m.cardExpMonth, m.cardExpYear) ||

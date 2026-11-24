@@ -1541,12 +1541,14 @@ function GameStatsSection({ kidId }: { kidId: string }) {
 function PauseMembershipButton({ membershipId, onPaused }: { membershipId: string; onPaused: () => void }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [resumeDate, setResumeDate] = useState('');
   const [reason, setReason] = useState('');
 
   async function submit() {
     setSaving(true);
+    setSaveErr(null);
     try {
       const res = await fetch('/api/owner/memberships/pause', {
         method: 'POST',
@@ -1555,6 +1557,7 @@ function PauseMembershipButton({ membershipId, onPaused }: { membershipId: strin
       });
       const data = await res.json() as { ok?: boolean; error?: string };
       if (data.ok) onPaused();
+      else setSaveErr(data.error ?? 'Failed to pause membership');
     } finally {
       setSaving(false);
     }
@@ -1594,6 +1597,7 @@ function PauseMembershipButton({ membershipId, onPaused }: { membershipId: strin
                 </select>
               </div>
             </div>
+            {saveErr && <div style={{ fontSize: 12, color: brand.danger, marginBottom: 8 }}>{saveErr}</div>}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <OButton variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</OButton>
               <OButton variant="secondary" size="sm" disabled={saving || !startDate} onClick={() => void submit()}>
