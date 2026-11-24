@@ -2222,8 +2222,8 @@ export function MemberDetailContent({ member: initialMember, waiverStatus, waive
             <PauseSection member={m as MemberDetail} />
           )}
 
-          {/* Initiate pause — active members only (W28) */}
-          {!demo && m.status === 'active' && (m as MemberDetail).subscriptionStatus !== 'paused' && (
+          {/* Initiate pause — active + at-risk members (W28) */}
+          {!demo && (m.status === 'active' || m.status === 'at-risk') && (m as MemberDetail).subscriptionStatus !== 'paused' && (
             <div>
               <PauseMembershipButton membershipId={(m as MemberDetail).id} onPaused={() => window.location.reload()} />
             </div>

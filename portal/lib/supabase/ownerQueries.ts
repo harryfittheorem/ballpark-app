@@ -1559,7 +1559,7 @@ export async function getMemberDetail(
       weekly_period_start,
       exit_interview_requested,
       waiver_authorized,
-      kids!inner(id, first_name, last_name, age_group, points_balance, birthday, sport_type),
+      kids!inner(id, first_name, last_name, age_group, points_balance, birthday, sport_type, competition_level),
       families!inner(parent_first_name, parent_last_name, parent_email, parent_phone, card_last4, card_brand, card_exp_month, card_exp_year)
     `)
     .eq('tenant_id', tenantId)
@@ -1577,6 +1577,7 @@ export async function getMemberDetail(
     points_balance: number;
     birthday: string | null;
     sport_type: string | null;
+    competition_level: string | null;
   };
   const fam = mem.families as unknown as {
     parent_first_name: string;
@@ -1867,6 +1868,7 @@ export async function getMemberDetail(
     waiverAuthorized: (mem.waiver_authorized as boolean | null) ?? false,
     birthday: kid.birthday ?? null,
     sportType: kid.sport_type ?? null,
+    competitionLevel: (kid.competition_level as 'Rec' | 'Travel' | 'Both' | null) ?? null,
     measurements,
     measurementCount,
     daysSinceLastMeasurement,
