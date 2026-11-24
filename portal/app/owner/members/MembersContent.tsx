@@ -268,8 +268,8 @@ export function MembersContent({ members }: Props) {
     { id: 'pending-cancel',  label: 'Pending Cancel',     count: pendingCancelCount },
     { id: 'at-risk',         label: 'At Risk',            count: source.filter(m => m.churnRisk === 'high' || m.churnRisk === 'medium').length },
     { id: 'card-expiring',   label: 'Card Expiring Soon', count: cardExpiringSoonCount },
-    { id: 'rec',             label: 'Rec',                count: source.filter(m => (m as OwnerMember).competitionLevel === 'Rec').length },
-    { id: 'travel',          label: 'Travel',             count: source.filter(m => (m as OwnerMember).competitionLevel === 'Travel').length },
+    { id: 'rec',             label: 'Rec',                count: source.filter(m => (m as OwnerMember).competitionLevel === 'Rec' || (m as OwnerMember).competitionLevel === 'Both').length },
+    { id: 'travel',          label: 'Travel',             count: source.filter(m => (m as OwnerMember).competitionLevel === 'Travel' || (m as OwnerMember).competitionLevel === 'Both').length },
   ];
 
   const handleExport = () => {

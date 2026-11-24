@@ -1484,8 +1484,10 @@ function GameStatsSection({ kidId }: { kidId: string }) {
         <OTable
           columns={[
             { key: 'game_date', label: 'Date', render: (r: GameRow) => new Date(r.game_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) },
+            { key: 'opponent', label: 'Opponent', render: (r: GameRow) => r.opponent ?? <span style={{ color: brand.textMuted }}>—</span> },
             { key: 'result', label: 'Result', render: (r: GameRow) => r.result ? <Chip color={GAME_RESULT_COLOR[r.result] ?? 'default'} size="sm">{r.result.toUpperCase()}</Chip> : <span style={{ color: brand.textMuted }}>—</span> },
             { key: 'at_bats', label: 'AB/H', render: (r: GameRow) => (r.at_bats != null || r.hits != null) ? `${r.at_bats ?? '—'}/${r.hits ?? '—'}` : '—' },
+            { key: 'home_runs', label: 'HR', render: (r: GameRow) => r.home_runs != null ? String(r.home_runs) : '—' },
             { key: 'avg_exit_velo', label: 'Avg EV', render: (r: GameRow) => r.avg_exit_velo != null ? `${r.avg_exit_velo} mph` : '—' },
           ]}
           rows={games.slice(0, 10)}
@@ -1505,10 +1507,26 @@ function GameStatsSection({ kidId }: { kidId: string }) {
                 <input type="date" value={form.gameDate} onChange={e => setForm(p => ({ ...p, gameDate: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
               </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>OPPONENT</label>
+                <input type="text" placeholder="Team name" value={form.opponent} onChange={e => setForm(p => ({ ...p, opponent: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>RESULT</label>
+                <select value={form.result} onChange={e => setForm(p => ({ ...p, result: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }}>
+                  <option value="">—</option>
+                  <option value="win">Win</option>
+                  <option value="loss">Loss</option>
+                  <option value="tie">Tie</option>
+                  <option value="scrimmage">Scrimmage</option>
+                </select>
+              </div>
               {(['atBats', 'hits', 'homeRuns', 'rbi'] as const).map(f => (
                 <div key={f}>
                   <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>
-                    {f === 'atBats' ? 'AT BATS' : f === 'hits' ? 'HITS' : f === 'homeRuns' ? 'HR' : 'RBI'}
+                    {f === 'atBats' ? 'AT BATS' : f === 'hits' ? 'HITS' : f === 'homeRuns' ? 'HOME RUNS' : 'RBI'}
                   </label>
                   <input type="number" min="0" placeholder="0" value={form[f]} onChange={e => setForm(p => ({ ...p, [f]: e.target.value }))}
                     style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
@@ -1516,13 +1534,18 @@ function GameStatsSection({ kidId }: { kidId: string }) {
               ))}
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>AVG EV (mph)</label>
-                <input type="number" step="0.1" value={form.avgExitVelo} onChange={e => setForm(p => ({ ...p, avgExitVelo: e.target.value }))}
+                <input type="number" step="0.1" placeholder="e.g. 78.5" value={form.avgExitVelo} onChange={e => setForm(p => ({ ...p, avgExitVelo: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>PEAK EV (mph)</label>
-                <input type="number" step="0.1" value={form.peakExitVelo} onChange={e => setForm(p => ({ ...p, peakExitVelo: e.target.value }))}
+                <input type="number" step="0.1" placeholder="e.g. 85.0" value={form.peakExitVelo} onChange={e => setForm(p => ({ ...p, peakExitVelo: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13 }} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, marginBottom: 4 }}>NOTES</label>
+                <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Any observations..."
+                  style={{ width: '100%', padding: '8px 10px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, color: brand.text, fontSize: 13, resize: 'vertical' }} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>

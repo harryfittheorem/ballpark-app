@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { requireOwnerContext } from '@/lib/ownerAccess';
 
 type PauseBody = {
@@ -21,12 +20,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'membershipId and pauseStartDate required' }, { status: 400 });
     }
 
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
-    );
+    const supabase = createServiceClient();
 
     const { data: mem, error: memErr } = await supabase
       .from('memberships')
