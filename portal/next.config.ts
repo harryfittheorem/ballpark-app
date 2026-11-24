@@ -25,6 +25,9 @@ const nextConfig: NextConfig = {
   // Post-merge builds must not replace files used by the running dev server.
   // `next build` and `next start` both use the production directory.
   distDir: isDev ? ".next" : ".next-build",
+  // Standalone output bundles everything needed into .next-build/standalone/server.js
+  // so the production container can start without a separate build step persisting.
+  output: isDev ? undefined : "standalone",
   outputFileTracingRoot: path.join(__dirname),
   experimental: {
     serverActions: {
