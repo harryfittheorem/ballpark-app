@@ -123,6 +123,20 @@ export function EngagementContent({ members }: { members: OwnerMember[] }) {
       <PageHeader title="App Activity & Engagement" subtitle="Member activity levels and inactivity alerts" />
 
       <div style={{ padding: '0 24px 24px' }}>
+        {/* Engagement score definition */}
+        <OCard style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(180,148,42,0.07)', borderLeft: `4px solid ${brand.gold}` }}>
+          <div style={{ fontSize: 12, color: brand.textMuted, lineHeight: 1.6 }}>
+            <strong style={{ color: brand.gold, fontSize: 13 }}>How engagement is measured</strong><br />
+            Each member receives a score (0–100) based on days since their last session:&nbsp;
+            <strong style={{ color: brand.success }}>Active</strong> (≤7 days) ·&nbsp;
+            <strong style={{ color: brand.textMuted }}>Warning</strong> (7–14 days) ·&nbsp;
+            <strong style={{ color: brand.warning }}>Alert</strong> (14–21 days) ·&nbsp;
+            <strong style={{ color: brand.danger }}>At Risk</strong> (21–25 days) ·&nbsp;
+            <strong style={{ color: brand.danger }}>Inactive</strong> (25+ days).
+            Members at Alert or At Risk are flagged for outreach.
+          </div>
+        </OCard>
+
         {/* KPI row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           <KPICard label="Avg Engagement" value={`${avgEngagement}/100`} icon={Activity} color={avgEngagement >= 70 ? 'success' : avgEngagement >= 50 ? 'warning' : 'danger'} />

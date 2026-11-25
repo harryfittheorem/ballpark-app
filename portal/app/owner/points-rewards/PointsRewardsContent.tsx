@@ -37,6 +37,12 @@ const INITIAL_RULES: Rule[] = [
   { id: 10, action: 'HitTrax leaderboard Top 3 finish',       points: 150, active: true  },
   { id: 11, action: 'Unlock an achievement',                  points: 50,  active: true  },
   { id: 12, action: 'Refer a new family (member enrolls)',     points: 300, active: true  },
+  { id: 13, action: 'Post a Facebook review',                  points: 75,  active: true  },
+  { id: 14, action: 'Post a Yelp review',                      points: 75,  active: true  },
+  { id: 15, action: 'Leave an in-app rating',                  points: 25,  active: true  },
+  { id: 16, action: 'Follow on Facebook',                      points: 25,  active: true  },
+  { id: 17, action: 'HitTrax leaderboard #1 finish',           points: 300, active: true  },
+  { id: 18, action: 'Upload game stats (box score)',           points: 20,  active: true  },
 ];
 
 // ── Demo rewards catalog ───────────────────────────────────────────────────

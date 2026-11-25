@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Infinite Hitting | App & Dashboard Requirements — Status</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, serif; background: #fff; color: #1a1a1a; font-size: 13px; line-height: 1.7; }
+  .page { max-width: 760px; margin: 0 auto; padding: 60px 60px; }
+  .doc-title { font-size: 26px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #B8942A; font-style: italic; margin-bottom: 6px; }
+  .intro { font-size: 13px; color: #444; margin-bottom: 32px; border-bottom: 1px solid #ddd; padding-bottom: 16px; }
+  h2 { font-size: 17px; font-weight: 700; color: #B8942A; margin: 32px 0 14px; }
+  .sub-item { margin-bottom: 14px; }
+  .sub-label { font-weight: 700; color: #1a1a1a; }
+  .status { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 12px; margin-left: 8px; vertical-align: middle; }
+  .done     { background: #dcfce7; color: #166534; }
+  .planned  { background: #f1f5f9; color: #475569; }
+  .external { background: #f5f3ff; color: #5b21b6; }
+  .clarify  { background: #eff6ff; color: #1e40af; }
+  .section-status { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 12px; margin-left: 10px; vertical-align: middle; }
+  hr { border: none; border-top: 1px solid #e0e0e0; margin: 28px 0; }
+  .footer { margin-top: 48px; font-size: 10px; color: #aaa; text-align: center; border-top: 1px solid #eee; padding-top: 12px; }
+  .note { background: #f5f3ff; border: 1px solid #c4b5fd; border-radius: 6px; padding: 10px 14px; font-size: 12px; color: #5b21b6; margin-top: 8px; }
+  @media print { body { font-size: 11px; } .page { padding: 32px 40px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="doc-title">Infinite Hitting | App &amp; Dashboard Requirements</div>
+<div class="subtitle">Consolidated product development notes • November 13, 2026 — with delivery status</div>
+<div class="intro">Objective: A unified platform for franchisor oversight, franchise owner performance, marketing, retention, training, accountability, and proactive support.</div>
+
+<!-- 1 -->
+<h2>1. Franchisor &amp; Owner Dashboards <span class="section-status done">✅ Complete</span></h2>
+
+<div class="sub-item">
+  <span class="sub-label">Location Performance Tracker <span class="status done">✅</span></span> — Location performance table on the HQ dashboard with Leads, Evaluations, Closing Rate, New Members, MRR, and Month-to-Date Sales per location.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Filtering and comparison <span class="status done">✅</span></span> — Sorting by any KPI, network totals, and location-to-location comparison via leaderboards and performance history.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Network MRR <span class="status done">✅</span></span> — Network MRR shown across all locations with network average and month-over-month change indicators.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Network churn <span class="status done">✅</span></span> — Network Churn & LTV section in HQ dashboard with location-level breakdown.
+</div>
+
+<hr>
+
+<!-- 2 -->
+<h2>2. Leaderboards &amp; Operational Rankings <span class="section-status done">✅ Complete</span></h2>
+
+<div class="sub-item">
+  <span class="sub-label">Clickable categories <span class="status done">✅</span></span> — HQ Leaderboards page with selectable metric tabs — click any category to rank all locations by that KPI with network benchmark comparison.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Commercial and retention metrics <span class="status done">✅</span></span> — MRR, Active Members, New Members MTD, Eval Closing Rate, Retention Rate — all rankable in the leaderboard.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Other rankings <span class="status done">✅</span></span> — Daily Checklist Completion and Avg Google Rating included as rankable metrics on the leaderboard.
+</div>
+
+<hr>
+
+<!-- 3 -->
+<h2>3. Franchise Owner Profiles &amp; Journey <span class="section-status done">✅ Complete</span></h2>
+
+<div class="sub-item">
+  <span class="sub-label">Owner record <span class="status done">✅</span></span> — HQ Owner Profiles page with one profile per owner showing location, contact info, franchise signing/opening dates, MRR, and member count.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Call notes <span class="status done">✅</span></span> — Chronological call notes from Marketing, Sales, and Leadership — filterable by department with add-note capability.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Action tracking <span class="status done">✅</span></span> — Assigned tasks with deadlines, responsible parties, and status (Open / Done / Overdue) — overdue items flagged with alerts.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Monthly performance history <span class="status done">✅</span></span> — 6-month MRR, New Members, Leads, Closing Rate, and Churn per owner compared against network averages with percentage delta.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Location-age benchmarking <span class="status done">✅</span></span> — Network average benchmark row shown alongside monthly performance history for direct comparison.
+</div>
+
+<hr>
+
+<!-- 4 -->
+<h2>4. Google Drive Document Integration <span class="section-status external">🔗 Pending Client Setup</span></h2>
+
+<div class="sub-item">
+  <span class="sub-label">Owner-specific library</span> — Attach, link or sync each owner's Drive folders/files: franchise agreements, onboarding, training, marketing, sales, operations, financials and meeting notes.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Document tools</span> — Search, categorization, version history, new-file syncing, owner/location associations and role-based permissions.
+</div>
+
+<div class="note">Awaiting Google Workspace OAuth credentials from client to proceed with integration.</div>
+
+<hr>
+
+<!-- 5 -->
+<h2>5. Automated Revenue Decline Intervention <span class="section-status done">✅ Complete</span></h2>
+
+<div class="sub-item">
+  <span class="sub-label">Trigger <span class="status done">✅</span></span> — After two consecutive completed months of month-over-month revenue decline, send an in-app notification to the affected franchise owner.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Call booking <span class="status done">✅</span></span> — Prompt a performance review and include a direct corporate booking link.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Corporate workflow <span class="status done">✅</span></span> — Notify leadership, log alert on owner journey, track booking/completion and remind if no appointment is made.
+</div>
+
+<hr>
+
+<!-- 6 -->
+<h2>6. Marketing Tab &amp; Events <span class="section-status done">✅ Complete</span></h2>
+
+<div class="sub-item">
+  <span class="sub-label">Navigation <span class="status done">✅</span></span> — Marketing added to the left sidebar of both Franchisor and Franchise Owner dashboards.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Calendar <span class="status done">✅</span></span> — Marketing calendar with corporate events, campaigns, meetings, deadlines, and color-coded event categories.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Ads Manager data <span class="status done">✅</span></span> — Ads Manager tab showing Ad Spend, Leads, Cost per Lead, Evals Booked, Cost per Eval, New Members, CAC, and ROAS.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Permissions <span class="status done">✅</span></span> — Franchise owner view scoped to their location's advertising data.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Resources <span class="status done">✅</span></span> — Resources tab in Marketing with marketing materials, campaign assets, and promotional content.
+</div>
+
+<hr>
+
+<!-- 7 -->
+<h2>7. Retention Tab <span class="section-status done">✅ Complete</span></h2>
+
+<div class="sub-item">
+  <span class="sub-label">Core metrics <span class="status done">✅</span></span> — Nationwide Churn Rate and Customer Lifetime Value (LTV); Average Retention removed.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Drill-down <span class="status done">✅</span></span> — Click metrics for detailed views; switch between nationwide and individual locations; compare with network benchmarks and chart historical trends.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Date controls <span class="status done">✅</span></span> — Month, quarter, year and custom date ranges.
+</div>
+
+<hr>
+
+<!-- 8 -->
+<h2>8. Trainual Training Integration <span class="section-status external">🔗 Pending Client Setup</span></h2>
+
+<div class="sub-item">
+  <span class="sub-label">Training navigation</span> — Training tab in both dashboards with Trainual access to onboarding, SOPs, courses and playbooks.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Monitoring</span> — Track training progress and completion for owners, GMs and instructors; corporate network oversight and role-based visibility.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Access</span> — Single sign-on or seamless direct launch where technically supported.
+</div>
+
+<div class="note">Awaiting Trainual account + API/SSO access from client to proceed with integration.</div>
+
+<hr>
+
+<!-- 9 -->
+<h2>9. App Activity &amp; Engagement <span class="section-status done">✅ Complete</span></h2>
+
+<div class="sub-item">
+  <span class="sub-label">Per-user analytics <span class="status done">✅</span></span> — HQ Engagement page shows last active, logins (30d), avg session, checklist completion %, and Trainual progress per user.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Franchisor oversight <span class="status done">✅</span></span> — Filterable by role (Owner / GM / Instructor) and status (Active / Warning / Inactive) across all locations.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Alerts <span class="status done">✅</span></span> — Alert banner for users inactive 14+ days; composite engagement score (0–100) based on logins, checklists, Trainual, and session time; status badges at 7d / 14d / 30d thresholds.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Governance <span class="status done">✅</span></span> — HQ-only access; engagement score methodology documented in-app for transparency.
+</div>
+
+<hr>
+
+<!-- 10 -->
+<h2>10. Player Profiles — Re-Evaluation Tracking <span class="section-status done">✅ Complete</span></h2>
+
+<div class="sub-item">
+  <span class="sub-label">Dedicated Re-Eval tab <span class="status done">✅</span></span> — Re-Evaluation tab added to each player profile.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Completed count <span class="status done">✅</span></span> — Total number of re-evaluations completed by the player is displayed.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Historical log <span class="status done">✅</span></span> — Each re-evaluation date, results, and coach notes are recorded.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Progress tracking <span class="status done">✅</span></span> — Outcomes compared between re-evaluations to visualize player improvement over time.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Upcoming re-evaluation <span class="status done">✅</span></span> — Next scheduled re-evaluation date shown when available.
+</div>
+
+<div class="sub-item">
+  <span class="sub-label">Role access <span class="status done">✅</span></span> — Authorized coaches, GMs, and corporate users can review re-evaluation history.
+</div>
+
+<div class="footer">INFINITE HITTING • APP & DASHBOARD REQUIREMENTS • Status as of November 25, 2026</div>
+</div>
+</body>
+</html>

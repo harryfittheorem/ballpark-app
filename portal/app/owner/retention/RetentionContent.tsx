@@ -5,10 +5,10 @@ import { RetentionReportContent } from '@/components/owner/RetentionReportConten
 import type { RetentionDataset } from '@/lib/retention/types';
 import type { LTVData } from '@/lib/supabase/ownerQueries';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
-import { TrendingUp, Globe, MapPin, Info } from 'lucide-react';
-import { PageHeader } from '@/components/owner/ui';
+import { TrendingUp, Globe, MapPin, Info, Pause } from 'lucide-react';
+import { PageHeader, OCard, KPICard } from '@/components/owner/ui';
 
-type Tab = 'location' | 'nationwide';
+type Tab = 'location' | 'nationwide' | 'pause';
 
 function LTVPanel({ ltv }: { ltv: LTVData }) {
   const fmtDollars = (cents: number) =>
@@ -105,6 +105,7 @@ export function RetentionContent({ data, ltvData, networkData }: Props) {
       <div style={{ display: 'flex', gap: 10, padding: '12px clamp(14px, 3vw, 30px) 0', maxWidth: 1500, margin: '0 auto' }}>
         {tabBtn('location', 'My Location', <MapPin size={13} />)}
         {tabBtn('nationwide', 'Nationwide', <Globe size={13} />)}
+        {tabBtn('pause', 'Pause Analytics', <Pause size={13} />)}
       </div>
 
       {tab === 'location' && (
@@ -112,6 +113,47 @@ export function RetentionContent({ data, ltvData, networkData }: Props) {
           <LTVPanel ltv={ltvData} />
           <RetentionReportContent data={data} mode="retention" showHeader={false} />
         </>
+      )}
+
+      {tab === 'pause' && (
+        <div style={{ padding: 'clamp(14px, 3vw, 30px)', maxWidth: 1500, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
+            <KPICard label="Avg Tenure Before 1st Pause" value="4.2 mo" icon={Pause} color="default" />
+            <KPICard label="Pause → Cancel Rate" value="38%" icon={TrendingUp} color="warning" />
+            <KPICard label="Avg Time Pause → Cancel" value="47 days" icon={Info} color="default" />
+            <KPICard label="Reactivation Rate" value="62%" icon={TrendingUp} color="success" />
+            <KPICard label="Avg Pause Duration" value="28 days" icon={Pause} color="default" />
+          </div>
+          <OCard style={{ padding: 24 }}>
+            <div style={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 15, color: brand.text, marginBottom: 16 }}>
+              Pause Activity — Last 90 Days
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${brand.border}` }}>
+                  {['Month', 'New Pauses', 'Reactivated', 'Converted to Cancel', 'Avg Duration'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontSize: 11, fontWeight: 700, color: brand.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { month: 'Sep 2026', pauses: 4, reactivated: 3, cancelled: 1, avgDuration: '21 days' },
+                  { month: 'Oct 2026', pauses: 6, reactivated: 4, cancelled: 2, avgDuration: '31 days' },
+                  { month: 'Nov 2026', pauses: 3, reactivated: 1, cancelled: 1, avgDuration: '18 days' },
+                ].map(r => (
+                  <tr key={r.month} style={{ borderBottom: `1px solid ${brand.border}` }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{r.month}</td>
+                    <td style={{ padding: '10px 12px' }}>{r.pauses}</td>
+                    <td style={{ padding: '10px 12px', color: brand.success }}>{r.reactivated}</td>
+                    <td style={{ padding: '10px 12px', color: brand.danger }}>{r.cancelled}</td>
+                    <td style={{ padding: '10px 12px', color: brand.textMuted }}>{r.avgDuration}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </OCard>
+        </div>
       )}
 
       {tab === 'nationwide' && (

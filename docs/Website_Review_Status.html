@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Infinite Hitting | Website Review Notes — Status</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, serif; background: #fff; color: #1a1a1a; font-size: 13px; line-height: 1.7; }
+  .page { max-width: 760px; margin: 0 auto; padding: 60px 60px; }
+  .doc-title { font-size: 26px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #B8942A; font-style: italic; margin-bottom: 6px; }
+  .intro { font-size: 13px; color: #444; margin-bottom: 32px; border-bottom: 1px solid #ddd; padding-bottom: 16px; }
+  .item { margin-bottom: 20px; }
+  .item-header { font-size: 14px; font-weight: 700; color: #B8942A; margin-bottom: 3px; }
+  .item-body { font-size: 13px; color: #333; }
+  .status { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 12px; margin-left: 8px; vertical-align: middle; }
+  .done    { background: #dcfce7; color: #166534; }
+  .clarify { background: #eff6ff; color: #1e40af; }
+  .planned { background: #f1f5f9; color: #475569; }
+  .external { background: #f5f3ff; color: #5b21b6; }
+  hr { border: none; border-top: 1px solid #e0e0e0; margin: 28px 0; }
+  .footer { margin-top: 48px; font-size: 10px; color: #aaa; text-align: center; border-top: 1px solid #eee; padding-top: 12px; }
+  @media print { body { font-size: 11px; } .page { padding: 32px 40px; } .item { margin-bottom: 14px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="doc-title">Infinite Hitting | Website Review Notes</div>
+<div class="subtitle">Consolidated feedback • November 13, 2026 • 57 review items — with delivery status</div>
+<div class="intro">Working review checklist covering dashboard, membership, scheduling, coaching, reporting, rewards, and cancellation flows.</div>
+
+<div class="item">
+  <div class="item-header">01 &nbsp;Dashboard <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Rename Owner to Dashboard.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">02 &nbsp;MRR <span class="status clarify">✅ Clarified</span></div>
+  <div class="item-body">Clarify the date/month represented by MRR and how its reporting period is calculated.<br><em style="color:#2563eb">Answer: Current active subscriptions × monthly price, calculated at page load.</em></div>
+</div>
+
+<div class="item">
+  <div class="item-header">03 &nbsp;Retention rate <span class="status clarify">✅ Clarified</span></div>
+  <div class="item-body">Identify the data source, retention definition, calculation, and measurement period.<br><em style="color:#2563eb">Answer: Active members at end of period ÷ active at start of period.</em></div>
+</div>
+
+<div class="item">
+  <div class="item-header">04 &nbsp;Retention detail <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Show the names of members who did not stay, including cancellation or nonrenewal dates.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">05 &nbsp;Lifetime value <span class="status clarify">✅ Clarified</span></div>
+  <div class="item-body">Clarify whether LTV is based on actual billed/collected payments or the face value of purchased packs.<br><em style="color:#2563eb">Answer: Based on actual billed/collected payments.</em></div>
+</div>
+
+<div class="item">
+  <div class="item-header">06 &nbsp;Billing profiles <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Make player names clickable from Billing to open their profiles and payment/package history.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">07 &nbsp;Today checklist <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Make Today an actionable GM daily checklist with completion checkboxes.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">08 &nbsp;Today layout <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Remove Coaches Today.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">09 &nbsp;Member engagement <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Define how engagement is measured and which activities count.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">10 &nbsp;Members navigation <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Keep the Members grid/menu sticky while scrolling.</div>
+</div>
+
+<hr>
+
+<div class="item">
+  <div class="item-header">11 &nbsp;At-risk definition <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Explain the criteria and triggers for the At Risk designation.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">12 &nbsp;Tooltips <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Add hover tooltips to buttons, metrics, and categories explaining definitions and calculations.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">13 &nbsp;At-risk rules <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Flag a member if they have not attended in 14 days, are paused, have not had a re-evaluation in 30 days, or have not left a Google review.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">14 &nbsp;Reviews tracking <span class="status done">✅ Complete</span></div>
+  <div class="item-body">On player profiles add Reviews: Asked / Left, with trackable checkboxes.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">15 &nbsp;Referral tracking <span class="status done">✅ Complete</span></div>
+  <div class="item-body">On player profiles add Referrals: Asked / Given, with trackable checkboxes.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">16 &nbsp;Profile messaging <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Clarify whether Messages only shows email; add an SMS tab for viewing and sending texts.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">17 &nbsp;Role permissions <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Create Owner, GM, and Instructor permissions, individual logins, configurable access, and corporate oversight. Instructors should not see sensitive billing.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">18 &nbsp;Pre-billing re-evaluation <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Ten days before a player's scheduled card charge, alert GM/instructor to complete a re-evaluation that day; add to Today and track completion.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">19 &nbsp;HitTrax launch angle <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Remove launch angle from HitTrax performance.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">20 &nbsp;Member anniversaries <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Track membership anniversaries from the original start date; notify the GM and track recognition.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">21 &nbsp;App engagement and game stats <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Include app inactivity in at-risk assessment. Let parents/players enter game dates, at-bats, hits, hit types, strikeouts, walks, RBIs, and notes; expose to instructors.</div>
+</div>
+
+<hr>
+
+<div class="item">
+  <div class="item-header">22 &nbsp;HitTrax metrics <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Track only exit velocity (mph) and hit distance (feet), with progress over time.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">23 &nbsp;Player demographics <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Collect player birthday (not parent birthday) and baseball/softball/both classification; support birthday reminders and filtering.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">24 &nbsp;Paused member balances <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Show remaining session count for paused members in Members and on profiles.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">25 &nbsp;Pause analytics <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Report average tenure before first pause, pause-to-cancel rate, time from pause to cancellation, reactivation rate, and average pause duration by location/date.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">26 &nbsp;Cancellation contact <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Add Text beside Call and Email in the cancellation Contact tab; save SMS history.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">27 &nbsp;Universal profile links <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Clicking a member anywhere—including Cancellations—should open their player profile.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">28 &nbsp;Cancel/pause actions <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Clarify where staff can cancel or hold a membership. Add profile actions for both with dates, reasons, status history, and permission checks.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">29 &nbsp;GHL CRM and calendar <span class="status external">🔗 Pending Client Setup</span></div>
+  <div class="item-body">Clarify GHL integration. Add Leads, pipeline, follow-ups, communication history, and Calendar for evaluations, appointments, and lessons.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">30 &nbsp;Session type <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Under Schedule, allow only Hitting Lesson or Cage Rental.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">31 &nbsp;Booking athlete selector <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Use a searchable autocomplete dropdown for Athlete Name in New Booking.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">32 &nbsp;Coach retention and age <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Track retention by instructor and player age. Customers book with Infinite Hitting; internally attribute each session to its coach, including multi-coach players.</div>
+</div>
+
+<hr>
+
+<div class="item">
+  <div class="item-header">33 &nbsp;Scheduling bug — high priority <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Bookings disappear after refresh and do not appear on Check-In. Fix saving, persistence, synchronization, and success confirmation.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">34 &nbsp;Coaches tab metrics <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Clarify whether retention is versus prior month and whether ratings come from app feedback. Remove coach-to-player messaging.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">35 &nbsp;New-location coach types <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Remove Specialty Coach for new locations; allow only Hitting Instructor.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">36 &nbsp;Coach button <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Rename Hire Coach to Add Coach.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">37 &nbsp;Multi-coach ratings <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Track the coach on every lesson. Prompt for a 1–5 star rating after every class, optional comments, and show ratings, rated-session share, and retention.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">38 &nbsp;Completed sessions <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Make Sessions Done clickable to show date, coach, session type, and rating for each completed lesson.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">39 &nbsp;Auto Pay Rate <span class="status clarify">✅ Clarified</span></div>
+  <div class="item-body">Clarify whether Auto Pay Rate measures enrollment in autopay or successful scheduled payment collection.<br><em style="color:#2563eb">Answer: % of active members enrolled in autopay EFT.</em></div>
+</div>
+
+<div class="item">
+  <div class="item-header">40 &nbsp;Revenue report price <span class="status clarify">✅ Clarified</span></div>
+  <div class="item-body">Clarify whether Price is actual sold price or list price.<br><em style="color:#2563eb">Answer: Actual sold price including discounts.</em></div>
+</div>
+
+<div class="item">
+  <div class="item-header">41 &nbsp;Transactions pagination <span class="status done">✅ Complete</span></div>
+  <div class="item-body">For Last 12 Months Transactions, add 10/20/50 rows-per-page selector and pagination.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">42 &nbsp;Coaches Hours summary <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Show each coach's average rating and first employment anniversary / original hire date.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">43 &nbsp;Coaches Hours drill-down <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Make No-Shows and Cancelled clickable to see players, dates, times, and coaches. Remove Confirmed.</div>
+</div>
+
+<hr>
+
+<div class="item">
+  <div class="item-header">44 &nbsp;Retention segmentation <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">On Retention tab, filter by player age group and baseball/softball, separately or together, with retention, tenure, cancellation rate, and date ranges.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">45 &nbsp;Rec vs travel <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Tag profiles Rec / Travel / Both and analyze retention, tenure, and cancellations by competition level, age, and sport.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">46 &nbsp;Sticky navigation sitewide <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Keep menus/tabs sticky on every page without obscuring content.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">47 &nbsp;Churn dashboard <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Consolidate churn into one page with selectable age, sport, gender, and Rec/Travel filters. Tenure: 0–30, 31–90, 91–180, 181–270, 271–360 days. Age divisions: 8U, 10U, 12U, 14U, High School, College.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">48 &nbsp;Exit reasons <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Use only Schedule, Price, Distance, Competitor, Quit Sport, Other; show optional details for Other and standardize reports.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">49 &nbsp;Competitor dropdown <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">If Competitor is selected, provide searchable competitor dropdown, option to add a new name, and reporting by competitor.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">50 &nbsp;Low-balance date range <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Add Today / 7 / 30 / 90 days and custom date range filters to Low Balance Packs; show player, balance, pack, and last session.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">51 &nbsp;Expiring vs low balance <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Clarify distinction between Expiring Packs and Low Balance Packs; remove redundancy or consolidate into Packs Needing Attention with filters.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">52 &nbsp;Leaderboards <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">In Points &amp; Rewards, show leaderboards for exit velocity and distance by baseball/softball and 8U, 10U, 12U, 14U, High School, College; update from HitTrax.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">53 &nbsp;Full leaderboard <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Do not cap rankings at top 10/20/50; let users scroll all eligible players.</div>
+</div>
+
+<hr>
+
+<div class="item">
+  <div class="item-header">54 &nbsp;Reward activities <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Remove Coach Reviews Homework and Drill Homework. Add Google, Facebook, in-app, and Yelp reviews; local/corporate Instagram follows, local/corporate Facebook follows, corporate YouTube subscription, and game-stat uploads. Add membership-tenure and top-10/top-3/#1 leaderboard achievements.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">55 &nbsp;Rewards catalog <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Keep only T-shirt, water bottle, bat sticker, PS5, local MLB tickets, and baseball bat.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">56 &nbsp;Payments design <span class="status planned">🔜 Planned</span></div>
+  <div class="item-body">Redesign Payments tab visually for cleaner organization, legibility, transaction history, and billing actions, consistent with Infinite Hitting branding.</div>
+</div>
+
+<div class="item">
+  <div class="item-header">57 &nbsp;Member cancellation experience <span class="status done">✅ Complete</span></div>
+  <div class="item-body">Customer cancellation flow should disclose 30-day notice and expected final payment with actual amount/date. Offer to waive notice/final payment after an in-person exit interview; let member request interview, notify GM, track completion, and authorize waiver.</div>
+</div>
+
+<div class="footer">INFINITE HITTING • WEBSITE REVIEW • Status as of November 25, 2026</div>
+</div>
+</body>
+</html>

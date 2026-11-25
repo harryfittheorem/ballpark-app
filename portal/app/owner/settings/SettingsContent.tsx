@@ -74,12 +74,12 @@ function StaffAccessPanel() {
     <OCard style={{ marginTop: 24 }}>
       <div style={{ padding: '4px 4px 8px' }}>
         <div style={{ fontSize: 14, fontWeight: 700, fontFamily: fonts.display, color: brand.text, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 }}>
-          Staff Access Profiles
+          Role Access Profiles
         </div>
         <div style={{ fontSize: 12, color: brand.textMuted, marginBottom: 20 }}>
-          Control which nav sections each staff preset can access. Changes take effect on the staff member&apos;s next login.
+          Three roles are supported: <strong style={{ color: brand.text }}>Owner</strong> (full access), <strong style={{ color: brand.text }}>GM</strong> (operational access), and <strong style={{ color: brand.text }}>Instructor</strong> (coaching tools only). Configure which sections each role can access below. Changes take effect on next login.
           <br />
-          <strong style={{ color: brand.warning }}>Note:</strong> Billing, Revenue Reports, and owner-only analytics are always restricted to Owner accounts — these cannot be enabled for staff.
+          <strong style={{ color: brand.warning }}>Note:</strong> Billing, Revenue Reports, and owner-only analytics are always restricted to Owner accounts and cannot be enabled for GM or Instructor roles.
         </div>
 
         {loading ? (
@@ -91,7 +91,7 @@ function StaffAccessPanel() {
                 <tr style={{ borderBottom: `2px solid ${brand.border}` }}>
                   <th style={{ textAlign: 'left', padding: '8px 12px', color: brand.textMuted, fontWeight: 700, letterSpacing: 0.6, fontSize: 10, textTransform: 'uppercase' }}>Section</th>
                   <th style={{ textAlign: 'center', padding: '8px 12px', color: brand.goldDeep, fontWeight: 700, letterSpacing: 0.6, fontSize: 10, textTransform: 'uppercase' }}>Instructor</th>
-                  <th style={{ textAlign: 'center', padding: '8px 12px', color: brand.success ?? '#4ade80', fontWeight: 700, letterSpacing: 0.6, fontSize: 10, textTransform: 'uppercase' }}>Staff</th>
+                  <th style={{ textAlign: 'center', padding: '8px 12px', color: brand.success ?? '#4ade80', fontWeight: 700, letterSpacing: 0.6, fontSize: 10, textTransform: 'uppercase' }}>GM</th>
                 </tr>
               </thead>
               <tbody>
@@ -266,7 +266,7 @@ export function SettingsContent() {
     <div>
       <PageHeader
         title="Settings"
-        subtitle="Cancellation policies, staff access profiles, and location configuration."
+        subtitle="Cancellation policies, Owner / GM / Instructor role permissions, and location configuration."
       />
 
       <div style={{ padding: '28px 32px' }}>

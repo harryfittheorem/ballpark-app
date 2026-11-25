@@ -6,6 +6,7 @@ import { brand, fonts } from '@/lib/ownerBrandTokens';
 import {
   MapPin, Users, DollarSign,
   Settings, ChevronLeft, ChevronRight, Globe2, LogOut,
+  Trophy, UserCircle, Activity,
 } from 'lucide-react';
 
 interface NavItem {
@@ -19,6 +20,9 @@ const hqNav: NavItem[] = [
   { label: 'Team', href: '/hq/team', icon: Users },
   { label: 'Revenue', href: '/hq/revenue', icon: DollarSign },
   { label: 'Network Churn & LTV', href: '/hq/churn-analysis', icon: Globe2 },
+  { label: 'Leaderboards', href: '/hq/leaderboards', icon: Trophy },
+  { label: 'Owner Profiles', href: '/hq/owners', icon: UserCircle },
+  { label: 'Engagement', href: '/hq/engagement', icon: Activity },
 ];
 
 interface HQShellProps {
