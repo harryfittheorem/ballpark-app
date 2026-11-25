@@ -407,8 +407,7 @@ export function ScheduleContent({ data, tenantId, basePath = '/owner/schedule' }
               <label style={labelStyle}>Session Type</label>
               <select style={{ ...inputStyle, appearance: 'auto' }} value={filterType} onChange={e => setFilterType(e.target.value)}>
                 <option value="all">All Types</option>
-                <option value="Private">Private</option>
-                <option value="Group">Group</option>
+                <option value="Hitting Lesson">Hitting Lesson</option>
                 <option value="Cage Rental">Cage Rental</option>
               </select>
             </div>

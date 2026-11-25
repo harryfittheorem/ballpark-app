@@ -111,6 +111,8 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
   const [isSending, setIsSending] = useState(false);
   const [start, setStart] = useState(startDate);
   const [end, setEnd]     = useState(endDate);
+  const [txPageSize, setTxPageSize] = useState<10 | 20 | 50>(10);
+  const [txPage, setTxPage] = useState(0);
 
   function applyFilter() {
     startTransition(() => {
@@ -456,6 +458,15 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
             <span style={{ fontSize: 11, color: brand.textMuted, marginLeft: 'auto' }}>
               {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
             </span>
+            <select
+              value={txPageSize}
+              onChange={e => { setTxPageSize(Number(e.target.value) as 10 | 20 | 50); setTxPage(0); }}
+              style={{ padding: '5px 8px', fontSize: 12, border: `1px solid ${brand.border}`, borderRadius: 6, background: brand.surface, color: brand.text, cursor: 'pointer' }}
+            >
+              <option value={10}>10 / page</option>
+              <option value={20}>20 / page</option>
+              <option value={50}>50 / page</option>
+            </select>
           </div>
         </OCard>
 
@@ -493,8 +504,8 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((t, i) => (
-                  <tr key={t.id} style={{ borderBottom: i < transactions.length - 1 ? `1px solid ${brand.border}` : 'none' }}>
+                {transactions.slice(txPage * txPageSize, (txPage + 1) * txPageSize).map((t, i) => (
+                  <tr key={t.id} style={{ borderBottom: i < Math.min(txPageSize, transactions.length - txPage * txPageSize) - 1 ? `1px solid ${brand.border}` : 'none' }}>
                     <td style={{ padding: '13px 16px', fontSize: 12, fontFamily: fonts.mono, color: brand.textMuted, whiteSpace: 'nowrap' }}>{t.date}</td>
                     <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 700, color: brand.text }}><PlayerLink name={t.memberName} reference={t} section="payment-history" /></td>
                     <td style={{ padding: '13px 16px', fontSize: 12, color: brand.text }}>{t.planName}</td>
@@ -520,6 +531,25 @@ export function RevenueReportsContent({ data, transactions, startDate, endDate, 
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* ── Transactions pagination ── */}
+        {transactions.length > txPageSize && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12 }}>
+            <button
+              onClick={() => setTxPage(p => Math.max(0, p - 1))}
+              disabled={txPage === 0}
+              style={{ padding: '5px 14px', fontSize: 12, border: `1px solid ${brand.border}`, borderRadius: 6, background: brand.surface, color: txPage === 0 ? brand.textMuted : brand.text, cursor: txPage === 0 ? 'not-allowed' : 'pointer' }}
+            >← Prev</button>
+            <span style={{ fontSize: 12, color: brand.textMuted }}>
+              Page {txPage + 1} of {Math.ceil(transactions.length / txPageSize)}
+            </span>
+            <button
+              onClick={() => setTxPage(p => Math.min(Math.ceil(transactions.length / txPageSize) - 1, p + 1))}
+              disabled={txPage >= Math.ceil(transactions.length / txPageSize) - 1}
+              style={{ padding: '5px 14px', fontSize: 12, border: `1px solid ${brand.border}`, borderRadius: 6, background: brand.surface, color: txPage >= Math.ceil(transactions.length / txPageSize) - 1 ? brand.textMuted : brand.text, cursor: txPage >= Math.ceil(transactions.length / txPageSize) - 1 ? 'not-allowed' : 'pointer' }}
+            >Next →</button>
           </div>
         )}
 

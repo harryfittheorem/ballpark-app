@@ -45,7 +45,6 @@ const DEMO_PRODUCTS: PointsProduct[] = [
   { id: 'p1', name: 'Infinite Hitting T-Shirt',   category: 'Apparel',   cost: 500,   inventory: 80,   fulfilled: 34, pending: 5, image_url: null },
   { id: 'p2', name: 'IH Water Bottle',             category: 'Apparel',   cost: 300,   inventory: 100,  fulfilled: 52, pending: 6, image_url: null },
   { id: 'p3', name: 'Bat Sticker Pack',            category: 'Apparel',   cost: 150,   inventory: null, fulfilled: 88, pending: 9, image_url: null },
-  { id: 'p4', name: 'Free Private Lesson (30min)', category: 'Sessions',  cost: 800,   inventory: null, fulfilled: 11, pending: 1, image_url: null },
   { id: 'p5', name: 'Baseball Bat (Youth)',         category: 'Equipment', cost: 3500,  inventory: 5,    fulfilled: 2,  pending: 1, image_url: null },
   { id: 'p6', name: 'MLB Game Tickets (2)',         category: 'Experiences', cost: 5000, inventory: 10,  fulfilled: 3,  pending: 2, image_url: null },
   { id: 'p7', name: 'PS5 Console',                 category: 'Electronics', cost: 15000, inventory: 2,  fulfilled: 0,  pending: 1, image_url: null },
@@ -414,10 +413,10 @@ export function PointsRewardsContent({ data }: Props) {
                 Grouped by age division. Click any athlete to open their profile.
               </div>
               {ageGroups.map(ag => {
-                const rows = (byAge[ag] ?? []).slice(0, 10);
+                const rows = byAge[ag] ?? [];
                 return (
                   <div key={ag}>
-                    <SectionHeader title={`${ag} Division`} subtitle={`Top ${rows.length} by exit velocity`} />
+                    <SectionHeader title={`${ag} Division`} subtitle={`${rows.length} athlete${rows.length !== 1 ? 's' : ''} by exit velocity`} />
                     <OCard padding={0}>
                       <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 90px 90px', gap: 0 }}>
                         <div style={{ padding: '7px 10px', fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: brand.textMuted, borderBottom: `1px solid ${brand.border}`, background: brand.surfaceAlt }}>#</div>
