@@ -760,8 +760,8 @@ export async function POST(req: NextRequest) {
     if (isMobileEnrollment(req) && resetRes.ok && resetBody.hashed_token) {
       // A direct portal form avoids Auth's redirect allow-list/site-URL traps,
       // and does not consume recovery proof until the parent submits a password.
-      // Use NEXT_PUBLIC_SITE_URL env var if set (avoids localhost in mobile-originated requests).
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '');
+      // Use NEXT_PUBLIC_PORTAL_URL env var if set (avoids localhost in mobile-originated requests).
+      const siteUrl = (process.env.NEXT_PUBLIC_PORTAL_URL ?? process.env.NEXT_PUBLIC_SITE_URL)?.replace(/\/$/, '');
       let baseUrl: string;
       if (siteUrl) {
         baseUrl = siteUrl;
