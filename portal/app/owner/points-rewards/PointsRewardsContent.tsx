@@ -195,7 +195,7 @@ export function PointsRewardsContent({ data }: Props) {
     const pts = parseInt(addForm.points, 10);
     if (!addForm.action.trim() || isNaN(pts) || pts < 1) return;
     const newId = Math.max(0, ...rules.map(r => r.id)) + 1;
-    setRules(prev => [...prev, { id: newId, action: addForm.action.trim(), points: pts, active: true }]);
+    setRules(prev => [{ id: newId, action: addForm.action.trim(), points: pts, active: true }, ...prev]);
     setShowAddRule(false);
   };
 
@@ -235,7 +235,7 @@ export function PointsRewardsContent({ data }: Props) {
         pending: 0,
         image_url: rewardForm.image_url.trim() || null,
       };
-      setLocalProducts(prev => [...prev, newProduct]);
+      setLocalProducts(prev => [newProduct, ...prev]);
     } else if (editingProduct !== null) {
       setLocalProducts(prev => prev.map(p =>
         p.id === editingProduct.id
@@ -273,13 +273,15 @@ export function PointsRewardsContent({ data }: Props) {
         title="Points & Rewards"
         subtitle="Configure the points system that drives athlete engagement"
         actions={
-          <OButton
-            variant="gold"
-            icon={Plus}
-            onClick={tab === 'rules' ? openAddRule : openAddReward}
-          >
-            {tab === 'rules' ? 'Add Rule' : 'Add Reward'}
-          </OButton>
+          tab !== 'hittrax' ? (
+            <OButton
+              variant="gold"
+              icon={Plus}
+              onClick={tab === 'rules' ? openAddRule : openAddReward}
+            >
+              {tab === 'rules' ? 'Add Rule' : 'Add Reward'}
+            </OButton>
+          ) : undefined
         }
       />
 
