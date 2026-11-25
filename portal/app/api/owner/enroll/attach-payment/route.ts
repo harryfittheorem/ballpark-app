@@ -760,9 +760,17 @@ export async function POST(req: NextRequest) {
     if (isMobileEnrollment(req) && resetRes.ok && resetBody.hashed_token) {
       // A direct portal form avoids Auth's redirect allow-list/site-URL traps,
       // and does not consume recovery proof until the parent submits a password.
-      const externalHost = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? req.nextUrl.host;
-      const externalProto = req.headers.get('x-forwarded-proto') ?? req.nextUrl.protocol.replace(':', '');
-      const link = new URL('/auth/enrollment-password', `${externalProto}://${externalHost}`);
+      // Use NEXT_PUBLIC_SITE_URL env var if set (avoids localhost in mobile-originated requests).
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '');
+      let baseUrl: string;
+      if (siteUrl) {
+        baseUrl = siteUrl;
+      } else {
+        const externalHost = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? req.nextUrl.host;
+        const externalProto = req.headers.get('x-forwarded-proto') ?? req.nextUrl.protocol.replace(':', '');
+        baseUrl = `${externalProto}://${externalHost}`;
+      }
+      const link = new URL('/auth/enrollment-password', baseUrl);
       link.searchParams.set('token_hash', resetBody.hashed_token);
       resetLink = link.toString();
     } else {
