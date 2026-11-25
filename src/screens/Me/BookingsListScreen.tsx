@@ -287,12 +287,12 @@ export default function BookingsListScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <SectionList
+      <SectionList<FamilyBooking | WaitlistEntryRich, Section>
         sections={sections}
         keyExtractor={(item) => (item as FamilyBooking | WaitlistEntryRich).id}
         renderItem={({ item, section }) => {
           if (section.kind === 'waitlist') {
-            const entry = item as WaitlistEntryRich;
+            const entry = item as unknown as WaitlistEntryRich;
             return (
               <WaitlistRow
                 entry={entry}

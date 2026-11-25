@@ -25,7 +25,7 @@ type Section = { title: string; data: AssignmentWithRefs[] };
 export default function AssignBody() {
   const navigation = useNavigation<Nav>();
   const { kid, loading: familyLoading } = useSelectedKid();
-  const { data, isPending, isError, error, refetch, isRefetching } = useAssignments(kid?.id);
+  const { data, isPending, isError, error, refetch } = useAssignments(kid?.id);
   const [manualRefreshing, setManualRefreshing] = useState(false);
 
   const sections = useMemo<Section[]>(() => {

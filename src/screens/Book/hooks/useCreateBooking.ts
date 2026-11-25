@@ -49,7 +49,7 @@ export function useCreateBooking() {
       void qc.invalidateQueries({ queryKey: ['day_bookings'] });
       void qc.invalidateQueries({ queryKey: ['upcoming-session'] });
       void qc.invalidateQueries({ queryKey: ['family_bookings'] });
-      void qc.invalidateQueries({ queryKey: activeMembershipKey(input.kid_id) });
+      void qc.invalidateQueries({ queryKey: activeMembershipKey(input.kid_id ?? '') });
     },
   });
 }

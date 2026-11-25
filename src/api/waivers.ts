@@ -49,7 +49,7 @@ export async function getFamilyWaiver(waiverId: string): Promise<FamilyWaiver | 
  */
 export async function signWaiver(waiverId: string): Promise<void> {
   const appVersion =
-    (Constants.expoConfig?.version ?? Constants.manifest?.version ?? null) as string | null;
+    (Constants.expoConfig?.version ?? Constants.manifest?.version ?? undefined) as string | undefined;
 
   const { error } = await supabase.rpc('sign_waiver', {
     p_waiver_id: waiverId,

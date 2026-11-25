@@ -29,7 +29,7 @@ import type { Tables } from '@/types/database';
 export type TenantKid = {
   kidId: string;
   firstName: string;
-  lastName: string;
+  lastName: string | null;
   ageGroup: string | null;
   avatarUrl: string | null;
   familyId: string;

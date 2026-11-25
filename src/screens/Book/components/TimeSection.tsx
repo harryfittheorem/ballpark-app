@@ -11,6 +11,7 @@ import {
   formatSlotTime,
   generateDaySlots,
   type Slot,
+  type SlotBookingInput,
 } from '../utils/slots';
 import SectionCard from './SectionCard';
 import type { SlotAvailability } from '@/api/waitlist';
@@ -63,7 +64,7 @@ export default function TimeSection({
       durationMinutes,
       timezone: tz,
       availability: availability.data,
-      bookings: bookings.data,
+      bookings: bookings.data as SlotBookingInput[],
     });
   }, [date, durationMinutes, availability.data, bookings.data, tz]);
 

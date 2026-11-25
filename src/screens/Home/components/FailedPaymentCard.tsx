@@ -1,6 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AlertTriangle, X } from 'lucide-react-native';
-import { colors, fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
+import { fontFamilies, fontSizes, radius, spacing, tracking } from '@/theme';
 
 type Props = {
   onPress: () => void;

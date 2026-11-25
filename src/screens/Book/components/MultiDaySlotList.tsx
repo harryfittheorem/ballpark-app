@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCoachAvailability } from '../hooks/useCoachAvailability';
 import { useDayBookings } from '../hooks/useDayBookings';
 import { useActiveLocation } from '../hooks/useActiveLocation';
-import { formatSlotTime, generateDaySlots, dayBoundsUtcISO, type Slot, type AvailabilityForSlots } from '../utils/slots';
+import { formatSlotTime, generateDaySlots, dayBoundsUtcISO, type Slot, type AvailabilityForSlots, type SlotBookingInput } from '../utils/slots';
 import type { SessionType } from '@/api/bookings';
 
 type Props = {
@@ -99,7 +99,7 @@ function DayColumn({
           durationMinutes: sessionType.duration_minutes,
           timezone,
           availability,
-          bookings: bookings.data,
+          bookings: bookings.data as SlotBookingInput[],
         })
       : [];
 

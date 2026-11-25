@@ -21,7 +21,7 @@ export type OrderWithProduct = Order & {
 export type LeaderboardEntry = {
   kidId: string;
   firstName: string;
-  lastName: string;
+  lastName: string | null;
   pointsBalance: number;
   rank: number;
 };

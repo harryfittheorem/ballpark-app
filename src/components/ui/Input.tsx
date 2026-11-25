@@ -17,6 +17,7 @@ export interface InputProps {
   placeholder?: string;
   secureTextEntry?: boolean;
   autoCapitalize?: TextInputProps['autoCapitalize'];
+  autoCorrect?: boolean;
   autoComplete?: TextInputProps['autoComplete'];
   keyboardType?: TextInputProps['keyboardType'];
   textContentType?: TextInputProps['textContentType'];
@@ -47,6 +48,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
     placeholder,
     secureTextEntry,
     autoCapitalize,
+    autoCorrect,
     autoComplete,
     keyboardType,
     textContentType,
@@ -101,6 +103,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
           placeholderTextColor={colors.textMuted}
           secureTextEntry={secureTextEntry}
           autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
           autoComplete={autoComplete}
           keyboardType={keyboardType}
           textContentType={textContentType}
