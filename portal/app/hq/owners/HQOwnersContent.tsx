@@ -118,7 +118,7 @@ const NETWORK_AVG: MonthPerf = { month: 'Nov 2026', mrr: 60800, newMembers: 7, l
 
 const deptColor = (dept: CallNote['dept']) => {
   if (dept === 'Leadership') return { bg: `${brand.gold}18`, color: brand.goldDeep };
-  if (dept === 'Marketing')  return { bg: `${brand.info ?? '#3b82f6'}18`, color: brand.info ?? '#3b82f6' };
+  if (dept === 'Marketing')  return { bg: `${brand.info}18`, color: brand.info };
   return { bg: `${brand.success}18`, color: brand.success };
 };
 

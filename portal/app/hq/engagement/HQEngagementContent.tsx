@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ElementType } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { Activity, AlertCircle, Users, TrendingUp, Clock } from 'lucide-react';
 
@@ -78,13 +78,13 @@ export function HQEngagementContent() {
 
       {/* KPI summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 28 }}>
-        {[
-          { label: 'Total Users', value: String(USERS.length), icon: Users, color: brand.text },
-          { label: 'Active (≤7d)', value: String(USERS.filter(u => u.daysInactive <= 7).length), icon: Activity, color: brand.success },
-          { label: 'Avg Eng. Score', value: `${avgScore}/100`, icon: TrendingUp, color: brand.gold },
-          { label: 'Inactive >14d', value: String(inactiveCount(14)), icon: AlertCircle, color: brand.warning },
-          { label: 'Inactive >30d', value: String(inactiveCount(30)), icon: Clock, color: brand.danger },
-        ].map(k => (
+        {([
+          { label: 'Total Users', value: String(USERS.length), icon: Users as ElementType, color: brand.text },
+          { label: 'Active (≤7d)', value: String(USERS.filter(u => u.daysInactive <= 7).length), icon: Activity as ElementType, color: brand.success },
+          { label: 'Avg Eng. Score', value: `${avgScore}/100`, icon: TrendingUp as ElementType, color: brand.gold },
+          { label: 'Inactive >14d', value: String(inactiveCount(14)), icon: AlertCircle as ElementType, color: brand.warning },
+          { label: 'Inactive >30d', value: String(inactiveCount(30)), icon: Clock as ElementType, color: brand.danger },
+        ] as { label: string; value: string; icon: ElementType; color: string }[]).map(k => (
           <div key={k.label} style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: 8, background: `${k.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <k.icon size={16} color={k.color} />

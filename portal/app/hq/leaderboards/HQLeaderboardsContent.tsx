@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ElementType } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
-import { TrendingUp, Users, DollarSign, Star, CheckSquare, MessageSquare, Award } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, Star, CheckSquare, MessageSquare } from 'lucide-react';
 
 type Metric = 'mrr' | 'members' | 'newMembers' | 'closingRate' | 'retention' | 'checklist' | 'reviews';
 
@@ -34,7 +34,7 @@ const LOCATIONS: Location[] = [
   { rank: 12, name: 'Indianapolis — Carmel',     region: 'Midwest',   mrr: 35100,  members: 66,  newMembers: 2,  closingRate: 41, retention: 74, checklist: 70, reviews: 4.0 },
 ];
 
-const METRICS: { key: Metric; label: string; icon: React.ElementType; fmt: (v: number) => string }[] = [
+const METRICS: { key: Metric; label: string; icon: ElementType; fmt: (v: number) => string }[] = [
   { key: 'mrr',         label: 'Monthly Revenue (MRR)',       icon: DollarSign,  fmt: v => `$${v.toLocaleString()}` },
   { key: 'members',     label: 'Active Members',              icon: Users,       fmt: v => String(v) },
   { key: 'newMembers',  label: 'New Members MTD',             icon: TrendingUp,  fmt: v => String(v) },
@@ -82,12 +82,12 @@ export function HQLeaderboardsContent() {
 
       {/* KPI summary row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
-        {[
-          { label: 'Network MRR', value: `$${LOCATIONS.reduce((s, l) => s + l.mrr, 0).toLocaleString()}`, icon: DollarSign },
-          { label: 'Total Members', value: String(LOCATIONS.reduce((s, l) => s + l.members, 0)), icon: Users },
-          { label: 'Avg Retention', value: `${networkAvg.retention}%`, icon: Star },
-          { label: 'Avg Closing Rate', value: `${networkAvg.closingRate}%`, icon: TrendingUp },
-        ].map(k => (
+        {([
+          { label: 'Network MRR', value: `$${LOCATIONS.reduce((s, l) => s + l.mrr, 0).toLocaleString()}`, icon: DollarSign as ElementType },
+          { label: 'Total Members', value: String(LOCATIONS.reduce((s, l) => s + l.members, 0)), icon: Users as ElementType },
+          { label: 'Avg Retention', value: `${networkAvg.retention}%`, icon: Star as ElementType },
+          { label: 'Avg Closing Rate', value: `${networkAvg.closingRate}%`, icon: TrendingUp as ElementType },
+        ] as { label: string; value: string; icon: ElementType }[]).map(k => (
           <div key={k.label} style={{ background: brand.surface, border: `1px solid ${brand.border}`, borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: 8, background: `${brand.gold}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <k.icon size={16} color={brand.goldDeep} />
@@ -123,7 +123,7 @@ export function HQLeaderboardsContent() {
       <div style={{ background: brand.surface, borderRadius: 12, border: `1px solid ${brand.border}`, overflow: 'hidden' }}>
         {/* Network avg banner */}
         <div style={{ padding: '10px 20px', background: `${brand.gold}10`, borderBottom: `1px solid ${brand.border}`, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: brand.textMuted }}>
-          <Award size={13} color={brand.goldDeep} />
+          <Star size={13} color={brand.goldDeep} />
           <span>Network average — <strong style={{ color: brand.gold }}>{metaObj.fmt(networkAvg[metric])}</strong></span>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
