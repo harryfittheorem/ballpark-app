@@ -344,9 +344,9 @@ export function AdsTab({ preview = false, initialReport = null }: {
           )}
 
           <OCard style={{ marginTop: 20 }}>
-            <SectionHeader title="Acquisition economics" subtitle="Available after CRM + payments connect (Phase B/C)" />
+            <SectionHeader title="Acquisition economics" subtitle="Performance tab" />
             <div style={{ fontSize: 13, color: brand.textMuted, lineHeight: 1.5 }}>
-              CAC, ROAS, and the lead-to-member funnel are available after CRM + payments connect (Phase B/C).
+              Cohort CAC, ROAS, and contribution are on the Performance tab. The July sample stays on ?preview=1. A live location shows unavailable until CRM origin and net receipts are populated.
             </div>
           </OCard>
         </>
