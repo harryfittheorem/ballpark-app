@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
-import { PageHeader, SectionHeader, OCard, KPICard, Chip } from '@/components/owner/ui';
-import { DollarSign, Users, TrendingUp, Megaphone, Calendar, ExternalLink, Info, BookOpen } from 'lucide-react';
+import { PageHeader, SectionHeader, OCard, Chip } from '@/components/owner/ui';
+import { Megaphone, Calendar, ExternalLink, BookOpen } from 'lucide-react';
+import { AdsTab } from './AdsTab';
 
 type Tab = 'calendar' | 'ads' | 'resources';
 
@@ -19,17 +20,6 @@ const CALENDAR_EVENTS = [
 ];
 
 const typeColor = (t: string) => t === 'campaign' ? 'gold' : t === 'deadline' ? 'danger' : 'info';
-
-// Mock Ads Manager data
-const ADS_DATA = {
-  spend: 4820,
-  leads: 143,
-  cpl: 33.7,
-  evals: 38,
-  newMembers: 11,
-  cac: 438.2,
-  roas: 3.4,
-};
 
 // Resources list
 const RESOURCES = [
@@ -72,45 +62,6 @@ function CalendarTab() {
   );
 }
 
-function AdsTab() {
-  const fmtMoney = (v: number) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '12px 16px', background: brand.surfaceAlt, border: `1px solid ${brand.border}`, borderRadius: 8, marginBottom: 20, fontSize: 12, color: brand.textMuted }}>
-        <Info size={14} color={brand.info} style={{ flexShrink: 0 }} />
-        <span>Ads Manager data shown is a placeholder. Connect your Google Ads or Meta Ads account in Settings to see live data.</span>
-      </div>
-
-      <SectionHeader title="Ads Performance (MTD)" subtitle="Aggregated across all active ad accounts" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        <KPICard label="Ad Spend" value={fmtMoney(ADS_DATA.spend)} icon={DollarSign} color="gold" />
-        <KPICard label="Leads" value={String(ADS_DATA.leads)} icon={Users} />
-        <KPICard label="Cost Per Lead" value={`$${ADS_DATA.cpl}`} icon={TrendingUp} />
-        <KPICard label="ROAS" value={`${ADS_DATA.roas}x`} icon={TrendingUp} color="success" />
-      </div>
-
-      <SectionHeader title="Conversion Funnel" />
-      <OCard>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
-          {[
-            { label: 'Leads', value: ADS_DATA.leads, sub: 'Total ad-generated contacts' },
-            { label: 'Evals Booked', value: ADS_DATA.evals, sub: `${Math.round(ADS_DATA.evals / ADS_DATA.leads * 100)}% of leads` },
-            { label: 'New Members', value: ADS_DATA.newMembers, sub: `${Math.round(ADS_DATA.newMembers / ADS_DATA.evals * 100)}% of evals` },
-            { label: 'CAC', value: `$${Math.round(ADS_DATA.cac)}`, sub: 'Cost to acquire member' },
-          ].map(({ label, value, sub }, i, arr) => (
-            <div key={label} style={{ padding: i > 0 ? '0 0 0 20px' : '0', borderLeft: i > 0 ? `1px solid ${brand.border}` : 'none' }}>
-              <div style={{ fontSize: 10, color: brand.textMuted, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
-              <div style={{ fontSize: 24, fontWeight: 700, fontFamily: fonts.display, color: brand.gold }}>{value}</div>
-              <div style={{ fontSize: 10, color: brand.textMuted, marginTop: 4 }}>{sub}</div>
-            </div>
-          ))}
-        </div>
-      </OCard>
-    </div>
-  );
-}
-
 function ResourcesTab() {
   return (
     <div>
@@ -139,7 +90,7 @@ function ResourcesTab() {
   );
 }
 
-export function MarketingContent() {
+export function MarketingContent({ preview = false }: { preview?: boolean }) {
   const [tab, setTab] = useState<Tab>('calendar');
 
   const tabs: Array<{ key: Tab; label: string; icon: React.ReactNode }> = [
@@ -175,7 +126,7 @@ export function MarketingContent() {
         </div>
 
         {tab === 'calendar' && <CalendarTab />}
-        {tab === 'ads' && <AdsTab />}
+        {tab === 'ads' && <AdsTab preview={preview} />}
         {tab === 'resources' && <ResourcesTab />}
       </div>
     </div>

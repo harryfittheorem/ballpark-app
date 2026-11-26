@@ -1,7 +1,8 @@
 import { requireOwnerContext } from '@/lib/ownerAccess';
 import { MarketingContent } from './MarketingContent';
 
-export default async function MarketingPage() {
+export default async function MarketingPage({ searchParams }: { searchParams: Promise<{ preview?: string }> }) {
   await requireOwnerContext();
-  return <MarketingContent />;
+  const params = await searchParams;
+  return <MarketingContent preview={params.preview === '1'} />;
 }

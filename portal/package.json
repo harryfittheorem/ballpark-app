@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test:crm": "cd .. && node --test portal/tests/crm.test.cjs && node --test portal/tests/crm-pilot.test.cjs portal/tests/crm-context.test.cjs",
     "test:navigation": "node --test tests/navigation.test.cjs",
-    "test:retention": "node --test tests/retention.test.cjs tests/retention-sql.test.cjs"
+    "test:retention": "node --test tests/retention.test.cjs tests/retention-sql.test.cjs",
+    "test:marketing": "node --test tests/marketing-meta.test.cjs"
   },
   "dependencies": {
     "@mux/mux-player-react": "^3.13.0",
