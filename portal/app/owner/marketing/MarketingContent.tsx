@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { brand, fonts } from '@/lib/ownerBrandTokens';
 import { PageHeader, SectionHeader, OCard, Chip } from '@/components/owner/ui';
-import { Megaphone, Calendar, ExternalLink, BookOpen } from 'lucide-react';
+import { Megaphone, Calendar, ExternalLink, BookOpen, LineChart } from 'lucide-react';
 import { AdsTab } from './AdsTab';
+import { PerformanceTab } from './PerformanceTab';
 
-type Tab = 'calendar' | 'ads' | 'resources';
+type Tab = 'calendar' | 'performance' | 'ads' | 'resources';
 
 // Corporate calendar events (static — synced by HQ)
 const CALENDAR_EVENTS = [
@@ -91,10 +92,11 @@ function ResourcesTab() {
 }
 
 export function MarketingContent({ preview = false }: { preview?: boolean }) {
-  const [tab, setTab] = useState<Tab>('calendar');
+  const [tab, setTab] = useState<Tab>(preview ? 'performance' : 'calendar');
 
   const tabs: Array<{ key: Tab; label: string; icon: React.ReactNode }> = [
     { key: 'calendar', label: 'Calendar', icon: <Calendar size={13} /> },
+    { key: 'performance', label: 'Performance', icon: <LineChart size={13} /> },
     { key: 'ads', label: 'Ads Manager', icon: <Megaphone size={13} /> },
     { key: 'resources', label: 'Resources', icon: <BookOpen size={13} /> },
   ];
@@ -105,7 +107,7 @@ export function MarketingContent({ preview = false }: { preview?: boolean }) {
 
       <div style={{ padding: '0 24px 24px' }}>
         {/* Tab strip */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
           {tabs.map(t => (
             <button
               key={t.key}
@@ -126,6 +128,7 @@ export function MarketingContent({ preview = false }: { preview?: boolean }) {
         </div>
 
         {tab === 'calendar' && <CalendarTab />}
+        {tab === 'performance' && <PerformanceTab preview={preview} />}
         {tab === 'ads' && <AdsTab preview={preview} />}
         {tab === 'resources' && <ResourcesTab />}
       </div>
