@@ -53,6 +53,14 @@ const metricDescriptions: Record<string, string> = {
   'Sessions Done': 'Total completed (attended) sessions since the member joined. Click to scroll to the full session history below.',
   'Failed Payments': 'Count of payment events with a failed status recorded this month. Each retry attempt counts separately.',
   'Churn Rate': 'Percentage of members who cancelled or did not renew in the selected period. Losses ÷ opening count. See Retention page for full methodology.',
+  'Ad spend': 'Media spend from Meta Insights for the selected account and dates, in the ad account currency. Missing spend is unavailable, not zero.',
+  'Meta leads': 'Lead actions of type lead or onsite_conversion.lead_grouped only. Other conversions are not counted. If Meta omits the action, the value is unavailable.',
+  'Meta CPL': 'Spend divided by Meta leads for the same window. Recomputed from those totals. Unavailable when leads are missing or zero.',
+  'Link CTR': 'Inline link clicks divided by impressions. Recomputed from those totals, not an average of daily rates.',
+  'CPC': 'Spend divided by inline link clicks. Recomputed from those totals.',
+  'Impressions': 'Impressions reported by Meta for this account and window.',
+  'Reach': 'Unique accounts reached for this exact window. Reach is never added across days, campaigns, or ads.',
+  'Frequency': 'Impressions divided by reach for this same window. Unavailable when reach is unavailable.',
 };
 
 export function KPICard({ label, value, unit, delta, deltaLabel, deltaInvert = false, icon: Icon, color = 'default' }: KPICardProps) {
